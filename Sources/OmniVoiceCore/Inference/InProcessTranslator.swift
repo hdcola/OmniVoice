@@ -109,7 +109,12 @@ struct TranslationTuning {
 /// point funnels through one serial `queue`; a llama.cpp context handle is
 /// no more safe to touch from two threads at once than an audiocpp session
 /// was.
-final class InProcessTranslator {
+/// `@unchecked Sendable`: honest given this class's own documented
+/// thread-safety contract above (every entry point funnels through the
+/// serial `queue`) — needed so `loadModel(modelPath:)`'s `queue.async`
+/// closure (a `@Sendable` closure, unlike the `queue.sync` ones elsewhere in
+/// this file) can capture `self` without a compiler warning.
+final class InProcessTranslator: @unchecked Sendable {
     /// Fires once per **committed** (TRANS) probe — append-only, like
     /// `InProcessTranscriber.onDelta`, not a tentative value that might later
     /// be revised. A WAIT probe fires nothing.
@@ -198,8 +203,23 @@ final class InProcessTranslator {
 
     /// Loads the model and creates a decode context. Call once before the
     /// first `feed(sourceDelta:)`; safe to call again after `unload()`.
-    func loadModel(modelPath: URL? = nil) throws {
-        try queue.sync { try loadModelLocked(modelPath: modelPath) }
+    ///
+    /// Dispatches onto `queue` **asynchronously** — see
+    /// `InProcessTranscriber.loadModel(modelPath:)`'s doc for why a
+    /// `queue.sync` here would instead freeze the whole (`@MainActor`-bound)
+    /// app UI for the whole load: the same reasoning applies verbatim to
+    /// T3PO's weights load + `llama_init_from_model`.
+    func loadModel(modelPath: URL? = nil) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                do {
+                    try self.loadModelLocked(modelPath: modelPath)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     private func loadModelLocked(modelPath: URL?) throws {

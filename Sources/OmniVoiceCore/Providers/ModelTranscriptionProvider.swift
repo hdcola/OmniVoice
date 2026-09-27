@@ -36,7 +36,7 @@ public final class ModelTranscriptionProvider: TranscriptionProvider {
     }
 
     public func loadModel() async throws {
-        try transcriber.loadModel(modelPath: modelPath)
+        try await transcriber.loadModel(modelPath: modelPath)
     }
 
     public func unload() {

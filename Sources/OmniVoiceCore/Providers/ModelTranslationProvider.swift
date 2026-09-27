@@ -29,7 +29,7 @@ public final class ModelTranslationProvider: TranslationProvider {
     }
 
     public func loadModel() async throws {
-        try translator.loadModel(modelPath: modelPath)
+        try await translator.loadModel(modelPath: modelPath)
     }
 
     public func unload() {

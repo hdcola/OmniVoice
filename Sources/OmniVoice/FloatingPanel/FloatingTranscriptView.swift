@@ -53,13 +53,31 @@ struct FloatingTranscriptView: View {
     /// don't offer different language options.)
     private var controlBar: some View {
         HStack(spacing: 10) {
-            Button(session.isRunning ? "停止" : (session.isStarting ? "启动中…" : "开始")) {
+            Button {
                 Task {
                     if session.isRunning {
                         await session.stop()
                     } else {
                         await session.start()
                     }
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    // Only while `isStarting` — a cold `start()` (no
+                    // preloaded model yet) does the exact same
+                    // possibly-multi-second `loadModel()` work
+                    // `preloadButton` guards, just without a warning first.
+                    // Without this spinner that stretch had zero visual
+                    // feedback beyond the static "启动中…" label — with the
+                    // main-actor-blocking bug fixed (see
+                    // `InProcessTranscriber.loadModel(modelPath:)`'s doc),
+                    // the window itself stays responsive through it, so this
+                    // is what actually shows something's happening.
+                    if session.isStarting {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text(session.isRunning ? "停止" : (session.isStarting ? "启动中…" : "开始"))
                 }
             }
             .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
@@ -118,8 +136,27 @@ struct FloatingTranscriptView: View {
                 .font(.caption)
                 .foregroundStyle(.green)
         } else {
-            Button(session.isPreloadingModel ? "加载中…" : "预加载模型") {
+            Button {
                 Task { await session.preloadModel() }
+            } label: {
+                HStack(spacing: 5) {
+                    // A visible spinner while `loadModel()` is in flight —
+                    // without this, the button just sat on a static "加载
+                    // 中…" label for however many seconds R2T2/T3PO's
+                    // weights took to read, which (before
+                    // `InProcessTranscriber`/`InProcessTranslator.loadModel(modelPath:)`
+                    // stopped blocking the main actor synchronously — see
+                    // their doc) used to coincide with the entire window
+                    // being genuinely frozen, not just looking idle. Now
+                    // that the load runs off the main actor, this spinner
+                    // animates the whole time, which is itself confirmation
+                    // the window hasn't hung.
+                    if session.isPreloadingModel {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text(session.isPreloadingModel ? "加载中…" : "预加载模型")
+                }
             }
             .disabled(session.isSessionActive || session.isPreloadingModel)
         }

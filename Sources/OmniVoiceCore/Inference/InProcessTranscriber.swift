@@ -102,7 +102,13 @@ struct StreamingTuning {
 /// funnels through one serial `queue`, and the `_locked` helpers assume
 /// they're already running on it (so `rotateStream` can call
 /// `_startStreamLocked` internally without a nested `queue.sync` deadlock).
-final class InProcessTranscriber {
+/// `@unchecked Sendable`: honest given this class's own documented
+/// thread-safety contract above (every mutable field is only ever touched
+/// from inside `queue`, synchronously or, since `loadModel(modelPath:)`,
+/// asynchronously) — needed so `loadModel(modelPath:)`'s `queue.async`
+/// closure (a `@Sendable` closure, unlike the `queue.sync` ones elsewhere in
+/// this file) can capture `self` without a compiler warning.
+final class InProcessTranscriber: @unchecked Sendable {
     var onDelta: ((String) -> Void)?
     var onFinalTail: ((String) -> Void)?
     /// Read by `startStream()` when it creates a session — i.e. changes only
@@ -149,8 +155,28 @@ final class InProcessTranscriber {
     /// Loads the registry and model. Call once before the first
     /// `startStream()`; safe to call again after `unload()`. Does not create
     /// a session — `startStream()` creates one on demand.
-    func loadModel(modelPath: URL? = nil) throws {
-        try queue.sync { try loadModelLocked(modelPath: modelPath) }
+    ///
+    /// Dispatches onto `queue` **asynchronously** (`queue.async`, not the
+    /// `queue.sync` every other entry point here uses) — reading a
+    /// multi-hundred-MB weights file plus backend init is the one operation
+    /// on this type that can take real seconds, and every caller of this is
+    /// `@MainActor`-isolated (`ModelTranscriptionProvider`). A `queue.sync`
+    /// call from the main actor blocks that actor's executor for the whole
+    /// load — the app's entire UI (including whatever "loading…" spinner is
+    /// meant to show progress) would freeze solid for that duration, not
+    /// just look busy. Suspending via a continuation instead lets the main
+    /// actor keep servicing SwiftUI/AppKit while this runs on `queue`.
+    func loadModel(modelPath: URL? = nil) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                do {
+                    try self.loadModelLocked(modelPath: modelPath)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     private func loadModelLocked(modelPath: URL?) throws {
