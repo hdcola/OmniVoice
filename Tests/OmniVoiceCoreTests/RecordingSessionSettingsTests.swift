@@ -29,6 +29,34 @@ struct RecordingSessionSettingsTests {
         body()
     }
 
+    /// A `ModelDownloadManager` whose cache directory already contains
+    /// `variant`'s weights (an empty stand-in file — nothing here ever reads
+    /// its contents) — for exercising "a `.model` engine that's actually
+    /// downloaded" without a real network transfer. Plain `RecordingSession()`
+    /// uses `.shared`, which reads the real Application Support directory —
+    /// empty in this test environment, so `fallBackToSystemEngineIfModelUnavailable()`
+    /// would otherwise always revert these tests' `.model` selections back to
+    /// `.system` before they get to assert anything about them.
+    private func makeDownloadManager(withDownloaded variant: ModelVariant) throws -> ModelDownloadManager {
+        let cacheDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RecordingSessionSettingsTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        let manager = ModelDownloadManager(cacheDirectory: cacheDirectory)
+        FileManager.default.createFile(atPath: manager.localURL(for: variant).path, contents: Data())
+        return manager
+    }
+
+    /// A fresh, empty cache directory — for exercising "nothing downloaded
+    /// yet" against an isolated `ModelDownloadManager` rather than `.shared`'s
+    /// real (also-empty-in-tests, but shared/mutable) Application Support
+    /// directory.
+    private func makeEmptyTempCacheDirectory() -> URL {
+        let cacheDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RecordingSessionSettingsTests-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        return cacheDirectory
+    }
+
     @Test func unrecognizedPersistedTranscriptionEngineIDFallsBackToDefault() {
         withPersisted([PersistedSettingsKey.transcriptionEngineID: "bogus.engine.id"]) {
             let session = RecordingSession()
@@ -43,10 +71,24 @@ struct RecordingSessionSettingsTests {
         }
     }
 
-    @Test func recognizedPersistedTranscriptionEngineIDIsRestored() {
+    @Test func recognizedPersistedTranscriptionEngineIDIsRestored() throws {
+        let variant = try #require(ProviderCatalog.modelVariants(forEngineID: "model.r2t2").first)
+        let manager = try makeDownloadManager(withDownloaded: variant)
         withPersisted([PersistedSettingsKey.transcriptionEngineID: "model.r2t2"]) {
-            let session = RecordingSession()
+            let session = RecordingSession(modelDownloadManager: manager)
             #expect(session.transcriptionEngineID == "model.r2t2")
+        }
+    }
+
+    /// Complements the above — restoring a persisted `.model` engine with
+    /// *nothing* downloaded for it (a fresh install, or a variant deleted via
+    /// "模型管理" since the last launch) must fall back to the `.system`
+    /// counterpart rather than leaving the selection pointing at a model
+    /// `start()`/`preloadModel()` can't use.
+    @Test func recognizedPersistedTranscriptionEngineIDWithNothingDownloadedFallsBackToSystem() {
+        withPersisted([PersistedSettingsKey.transcriptionEngineID: "model.r2t2"]) {
+            let session = RecordingSession(modelDownloadManager: ModelDownloadManager(cacheDirectory: makeEmptyTempCacheDirectory()))
+            #expect(session.transcriptionEngineID == "system.speech")
         }
     }
 
@@ -82,12 +124,14 @@ struct RecordingSessionSettingsTests {
         }
     }
 
-    @Test func modelEngineWithPersistedAutoSourceLanguageIsLeftAlone() {
+    @Test func modelEngineWithPersistedAutoSourceLanguageIsLeftAlone() throws {
+        let variant = try #require(ProviderCatalog.modelVariants(forEngineID: "model.r2t2").first)
+        let manager = try makeDownloadManager(withDownloaded: variant)
         withPersisted([
             PersistedSettingsKey.transcriptionEngineID: "model.r2t2",
             PersistedSettingsKey.sourceLanguageCode: "",
         ]) {
-            let session = RecordingSession()
+            let session = RecordingSession(modelDownloadManager: manager)
             #expect(session.transcriptionEngineKind == .model)
             #expect(session.sourceLanguageCode == nil)
         }
@@ -178,12 +222,14 @@ struct RecordingSessionSettingsTests {
         #expect(session.currentTranscriptionModelVariant?.id == ProviderCatalog.modelVariants(forEngineID: "model.r2t2").first?.id)
     }
 
-    @Test func recognizedPersistedModelVariantIDIsRestored() {
+    @Test func recognizedPersistedModelVariantIDIsRestored() throws {
+        let variant = try #require(ProviderCatalog.modelVariants(forEngineID: "model.r2t2").first { $0.id == "r2t2-q8_0" })
+        let manager = try makeDownloadManager(withDownloaded: variant)
         withPersisted([
             PersistedSettingsKey.transcriptionEngineID: "model.r2t2",
             PersistedSettingsKey.transcriptionModelVariantID: "r2t2-q8_0",
         ]) {
-            let session = RecordingSession()
+            let session = RecordingSession(modelDownloadManager: manager)
             #expect(session.transcriptionModelVariantID == "r2t2-q8_0")
             #expect(session.currentTranscriptionModelVariant?.id == "r2t2-q8_0")
         }
@@ -193,12 +239,14 @@ struct RecordingSessionSettingsTests {
     /// left over from a since-renamed/removed catalog entry (or a corrupted
     /// defaults domain) must fall back to the current engine's first variant
     /// rather than resolving to no variant at all.
-    @Test func unrecognizedPersistedModelVariantIDFallsBackToDefault() {
+    @Test func unrecognizedPersistedModelVariantIDFallsBackToDefault() throws {
+        let variant = try #require(ProviderCatalog.modelVariants(forEngineID: "model.r2t2").first)
+        let manager = try makeDownloadManager(withDownloaded: variant)
         withPersisted([
             PersistedSettingsKey.transcriptionEngineID: "model.r2t2",
             PersistedSettingsKey.transcriptionModelVariantID: "bogus.variant.id",
         ]) {
-            let session = RecordingSession()
+            let session = RecordingSession(modelDownloadManager: manager)
             #expect(session.transcriptionModelVariantID == nil)
             #expect(session.currentTranscriptionModelVariant?.id == ProviderCatalog.modelVariants(forEngineID: "model.r2t2").first?.id)
         }
@@ -440,14 +488,17 @@ struct RecordingSessionSettingsTests {
         session.finalizeActiveSessionBeforeQuit()
     }
 
-    /// `resolveModelPath` must fail fast with a friendly "尚未下载" status
-    /// message rather than attempt an implicit download — downloading is now
-    /// only ever triggered from `ModelManagementView`/`SettingsView`'s own
-    /// inline shortcut, never from `preloadModel()`/`start()`. A fresh
+    /// `preloadModel()` must never surface a "尚未下载" failure to the user —
+    /// `fallBackToSystemEngineIfModelUnavailable()` (called defensively at
+    /// its own top) catches an undownloaded `.model` selection first and
+    /// reverts it to the `.system` counterpart, so this call instead
+    /// (successfully, if uselessly) preloads the system engine. Downloading
+    /// is still never triggered implicitly here — only from
+    /// `ModelManagementView`/`SettingsView`'s own inline shortcut. A fresh
     /// temp-directory `ModelDownloadManager` guarantees `isDownloaded` reads
     /// `false` for any variant without touching the network, so this needs
     /// no stubbing.
-    @Test func preloadModelFailsFastWithAFriendlyMessageWhenTheSelectedVariantIsntDownloaded() async throws {
+    @Test func preloadModelFallsBackToSystemEngineWhenTheSelectedVariantIsntDownloaded() async throws {
         defer { defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID) }
         let tempCacheDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("ModelManagementTests-\(UUID().uuidString)", isDirectory: true)
@@ -459,9 +510,9 @@ struct RecordingSessionSettingsTests {
 
         await session.preloadModel()
 
-        #expect(!session.isModelLoaded)
-        #expect(session.statusMessage.contains("尚未下载"))
-        #expect(session.statusMessage.contains(ProviderCatalog.modelVariants(forEngineID: "model.r2t2").first?.displayName ?? ""))
+        #expect(session.isModelLoaded)
+        #expect(session.transcriptionEngineID == "system.speech")
+        #expect(!session.statusMessage.contains("尚未下载"))
     }
 
     @Test func isSessionActiveReflectsAnyLifecyclePhase() {

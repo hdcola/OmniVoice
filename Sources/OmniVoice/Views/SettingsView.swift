@@ -73,6 +73,7 @@ struct SettingsView: View {
                     )
                 )
                 .disabled(isBusy)
+                noLocalModelHint(for: ProviderCatalog.transcriptionEngines)
             }
 
             Section("翻译引擎") {
@@ -97,6 +98,7 @@ struct SettingsView: View {
                     )
                 )
                 .disabled(isBusy)
+                noLocalModelHint(for: ProviderCatalog.translationEngines)
             }
 
             Section("语言") {
@@ -186,6 +188,20 @@ struct SettingsView: View {
                     Text(variantLabel(for: variant)).tag(Optional(variant.id))
                 }
             }
+        }
+    }
+
+    /// Shown under a category's engine `Picker` whenever it's currently
+    /// showing only `.system` engines — without this, a `.model`-kind engine
+    /// simply not appearing in the list (see `isEngineAvailable(_:)`) reads
+    /// as a missing feature/bug rather than "go download one first", since
+    /// nothing else on this screen ever mentions "模型管理".
+    @ViewBuilder
+    private func noLocalModelHint(for engines: [EngineDescriptor]) -> some View {
+        if !engines.contains(where: { $0.kind == .model && hasDownloadedVariant($0) }) {
+            Text("还没有可用的本地模型，点击上方「模型管理…」下载后即可选用")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 

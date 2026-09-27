@@ -321,6 +321,34 @@ public final class RecordingSession: ObservableObject {
 
         validateAndNormalizeSourceLanguage()
         validateAndNormalizeModelVariantSelections()
+        fallBackToSystemEngineIfModelUnavailable()
+    }
+
+    /// Switches `transcriptionEngineID`/`translationEngineID` back to their
+    /// `.system` counterpart whenever the currently-selected `.model`-kind
+    /// engine has nothing downloaded for it — a fresh install (nothing ever
+    /// downloaded), or a variant deleted via "模型管理" out from under the
+    /// engine currently selected in Settings. Called at launch
+    /// (`restorePersistedSettings()`), from `ModelManagementView` right after
+    /// a delete, and defensively at the top of `preloadModel()`/`start()` —
+    /// the point is that neither of those should ever need to surface a
+    /// "尚未下载" `statusMessage` in the first place: the selection itself
+    /// should never be left pointing at an undownloaded model to begin with.
+    /// A no-op for a `.system`-kind selection (nothing to fall back from) or
+    /// a `.model`-kind selection that still has something downloaded.
+    public func fallBackToSystemEngineIfModelUnavailable() {
+        if transcriptionEngineKind == .model, !hasDownloadedModelVariant(engineID: transcriptionEngineID),
+            let systemEngine = ProviderCatalog.transcriptionEngines.first(where: { $0.kind == .system }) {
+            transcriptionEngineID = systemEngine.id
+        }
+        if translationEngineKind == .model, !hasDownloadedModelVariant(engineID: translationEngineID),
+            let systemEngine = ProviderCatalog.translationEngines.first(where: { $0.kind == .system }) {
+            translationEngineID = systemEngine.id
+        }
+    }
+
+    private func hasDownloadedModelVariant(engineID: String) -> Bool {
+        ProviderCatalog.modelVariants(forEngineID: engineID).contains { modelDownloadManager.isDownloaded($0) }
     }
 
     /// Drops a persisted variant selection that no longer names one of its
@@ -422,6 +450,13 @@ public final class RecordingSession: ObservableObject {
         guard !isSessionActive, !isPreloadingModel, !isModelLoaded else { return }
         isPreloadingModel = true
         defer { isPreloadingModel = false }
+
+        // Belt-and-suspenders — the selection should already never point at
+        // an undownloaded model by the time this runs (see this method's own
+        // doc), but re-checking here means a race (a deletion landing between
+        // this call being queued and actually running) still resolves to
+        // "use the system engine" instead of the "尚未下载" failure below.
+        fallBackToSystemEngineIfModelUnavailable()
 
         let transcriptionModelPath: URL?
         do {
@@ -598,6 +633,9 @@ public final class RecordingSession: ObservableObject {
         guard !isRunning, !isStopping, !isStarting, !isPreloadingModel else { return }
         isStarting = true
         defer { isStarting = false }
+
+        // Same defensive re-check `preloadModel()` does — see its doc.
+        fallBackToSystemEngineIfModelUnavailable()
         // `activeSessionRecord` is created below, before translation/
         // transcription/mic are actually up — any of those failing (several
         // `catch` blocks below `return` early) left that record as a

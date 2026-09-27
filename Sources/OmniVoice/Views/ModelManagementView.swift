@@ -171,6 +171,15 @@ struct ModelManagementView: View {
             {
                 session.unloadModels()
             }
+            // Without this, deleting the last downloaded variant for the
+            // currently-selected engine left Settings pointing at a
+            // `.model` engine with nothing behind it — the next "开始
+            //转录"/"预加载模型" would then fail with a "尚未下载" message
+            // the user has no reason to expect right after deleting
+            // something on purpose. Falls back to the corresponding
+            // `.system` engine instead, same as a fresh install where
+            // nothing was ever downloaded.
+            session.fallBackToSystemEngineIfModelUnavailable()
         } catch {
             errorTitle = "删除失败"
             errorMessage = error.localizedDescription
