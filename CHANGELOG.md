@@ -8,6 +8,7 @@ The format is based on Keep a Changelog.
 
 ### Added
 
+- feat(app): show live model-download progress outside the "模型管理" window — the menu bar's own icon swaps to a percentage readout (`MenuBarLabel`) while any model is downloading, and the menu's "模型管理…" row grows its own "（下载中 NN%）"/"（准备下载…）" suffix, so closing that window (or never opening it) no longer leaves a multi-GB download with no visible progress anywhere in the app (`ModelDownloadManager.hasActiveDownloads`)
 - feat(settings): add a hint under each engine picker ("还没有可用的本地模型，点击上方「模型管理…」下载后即可选用") when a category has no downloaded `.model`-kind engine to offer — previously a `.model` engine simply not appearing in the list (nothing downloaded for it yet) gave no indication of why or where to go fix that
 
 ### Changed

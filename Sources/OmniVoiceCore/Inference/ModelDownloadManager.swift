@@ -162,6 +162,15 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         jobs[variant.id] != nil
     }
 
+    /// Whether *any* variant currently has an `ensureDownloaded` job in
+    /// flight — for a global "downloading" indicator (menu bar icon/menu
+    /// item) that only needs to know "something is downloading", not which
+    /// variant. Not itself `@Published`, but `objectWillChange.send()` fires
+    /// at both job start (`ensureDownloaded`) and job end (the `defer` in its
+    /// `Task`), so an `@ObservedObject` view still redraws whenever this
+    /// changes.
+    public var hasActiveDownloads: Bool { !jobs.isEmpty }
+
     /// Cancels `variant`'s in-flight `ensureDownloaded` pipeline, whichever
     /// phase it's currently in (network transfer or SHA-256 verify/move) —
     /// every awaiter of that same job (see `ensureDownloaded`'s doc on

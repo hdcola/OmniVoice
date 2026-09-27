@@ -11,6 +11,17 @@ struct MenuBarContentView: View {
     @EnvironmentObject private var appDelegate: AppDelegate
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    /// Same instance `SettingsView`/`ModelManagementView` observe — see
+    /// `SettingsView`'s own `downloadManager` doc for why this is passed in
+    /// explicitly rather than defaulted to `.shared`. Only used here to show
+    /// download progress on the "模型管理…" row (see `modelManagementLabel`)
+    /// so a download started in that window stays visible after it's closed,
+    /// without needing that window open at all.
+    @ObservedObject private var downloadManager: ModelDownloadManager
+
+    init(modelDownloadManager: ModelDownloadManager) {
+        self.downloadManager = modelDownloadManager
+    }
 
     var body: some View {
         // Device list can change between menu opens (a USB mic plugged in,
@@ -97,7 +108,7 @@ struct MenuBarContentView: View {
             openWindow(id: "history")
         }
 
-        Button("模型管理…") {
+        Button(modelManagementLabel) {
             NSApp.activate(ignoringOtherApps: true)
             openWindow(id: "modelManagement")
         }
@@ -113,5 +124,42 @@ struct MenuBarContentView: View {
             NSApp.terminate(nil)
         }
         .keyboardShortcut("q")
+    }
+
+    /// "模型管理…", plus a live progress readout once a download is running
+    /// — without this, closing that window (or never having opened it) left
+    /// a multi-GB download with no visible progress anywhere in the app,
+    /// easy to mistake for "stuck" (see `MenuBarLabel` for the icon-level
+    /// equivalent when the menu itself isn't even open).
+    private var modelManagementLabel: String {
+        guard let fraction = downloadManager.downloadProgress.values.max() else {
+            return downloadManager.hasActiveDownloads ? "模型管理…（准备下载…）" : "模型管理…"
+        }
+        return "模型管理…（下载中 \(Int(fraction * 100))%）"
+    }
+}
+
+/// The menu bar's own icon — swaps `waveform` for a live download-progress
+/// readout while any model is downloading, so the download stays visible
+/// even with the menu closed (all `MenuBarContentView` itself can do is
+/// annotate its own "模型管理…" row, which is invisible until the menu is
+/// opened). Kept as its own tiny view (rather than inlined into
+/// `OmniVoiceApp`'s `MenuBarExtra` label closure) so it can hold its own
+/// `@ObservedObject` — `OmniVoiceApp` itself isn't a `View` and can't.
+struct MenuBarLabel: View {
+    @ObservedObject private var downloadManager: ModelDownloadManager
+
+    init(modelDownloadManager: ModelDownloadManager) {
+        self.downloadManager = modelDownloadManager
+    }
+
+    var body: some View {
+        if let fraction = downloadManager.downloadProgress.values.max() {
+            Label("\(Int(fraction * 100))%", systemImage: "arrow.down.circle")
+        } else if downloadManager.hasActiveDownloads {
+            Label("下载中", systemImage: "arrow.down.circle")
+        } else {
+            Image(systemName: "waveform")
+        }
     }
 }
