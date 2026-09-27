@@ -44,10 +44,25 @@ struct SettingsView: View {
             Section("识别引擎 (ASR)") {
                 HStack {
                     Picker("引擎", selection: $session.transcriptionEngineID) {
-                        ForEach(ProviderCatalog.transcriptionEngines.filter(isEngineAvailable)) { engine in
+                        ForEach(
+                            ProviderCatalog.transcriptionEngines.filter {
+                                isEngineAvailable($0, currentID: session.transcriptionEngineID)
+                            }
+                        ) { engine in
                             Text(engineLabel(for: engine)).tag(engine.id)
                         }
                     }
+                    .disabled(isBusy)
+                    // Deliberately *not* disabled — opening a window doesn't
+                    // touch engine/model selection, so there's no race with
+                    // an in-flight preload/recording to guard against.
+                    // `.disabled` must be applied to this button directly
+                    // (not to some shared ancestor covering both it and the
+                    // `Picker` above, then overridden here with
+                    // `.disabled(false)`): SwiftUI's `isEnabled` environment
+                    // value only ever goes *more* disabled going down the
+                    // view tree, so a descendant can never re-enable itself
+                    // once an ancestor already set it to `false`.
                     modelManagementButton
                 }
                 modelVariantPicker(
@@ -57,15 +72,21 @@ struct SettingsView: View {
                         set: { session.transcriptionModelVariantID = $0 }
                     )
                 )
+                .disabled(isBusy)
             }
 
             Section("翻译引擎") {
                 HStack {
                     Picker("引擎", selection: $session.translationEngineID) {
-                        ForEach(ProviderCatalog.translationEngines.filter(isEngineAvailable)) { engine in
+                        ForEach(
+                            ProviderCatalog.translationEngines.filter {
+                                isEngineAvailable($0, currentID: session.translationEngineID)
+                            }
+                        ) { engine in
                             Text(engineLabel(for: engine)).tag(engine.id)
                         }
                     }
+                    .disabled(isBusy)
                     modelManagementButton
                 }
                 modelVariantPicker(
@@ -75,6 +96,7 @@ struct SettingsView: View {
                         set: { session.translationModelVariantID = $0 }
                     )
                 )
+                .disabled(isBusy)
             }
 
             Section("语言") {
@@ -84,46 +106,52 @@ struct SettingsView: View {
                 )
                 TargetLanguagePicker(targetLanguageCode: $session.targetLanguageCode)
             }
+            .disabled(isBusy)
         }
         .padding(20)
         .frame(width: 440)
-        // `isPreloadingModel` alongside `isSessionActive`: switching engines
-        // mid-preload would race `preloadModel()`'s in-flight `loadModel()`
-        // calls against `discardLoadedModelsIfStale()` unloading the very
-        // providers it's still awaiting.
-        .disabled(session.isSessionActive || session.isPreloadingModel)
+    }
+
+    /// `isPreloadingModel` alongside `isSessionActive`: switching engines
+    /// mid-preload would race `preloadModel()`'s in-flight `loadModel()`
+    /// calls against `discardLoadedModelsIfStale()` unloading the very
+    /// providers it's still awaiting. Applied to each control individually
+    /// (not to a `Section`/the whole `Form`) specifically so
+    /// `modelManagementButton` can go undisabled sitting right next to a
+    /// disabled `Picker` — see that property's doc.
+    private var isBusy: Bool {
+        session.isSessionActive || session.isPreloadingModel
     }
 
     /// Next to each engine `Picker` (not buried at the bottom of the form) —
     /// downloading/deleting a `.model`-kind engine's weights always happens
     /// in "模型管理" (`ModelManagementView`) now, never inline here, so this
-    /// is the whole form's only way back to it. `.disabled(false)` overrides
-    /// the form-wide `.disabled` above — opening a window doesn't touch
-    /// engine/model selection, so there's no race with an in-flight
-    /// preload/recording to guard against.
+    /// is the whole form's only way back to it.
     private var modelManagementButton: some View {
         Button("模型管理…") {
             NSApp.activate(ignoringOtherApps: true)
             openWindow(id: "modelManagement")
         }
-        .disabled(false)
     }
 
     /// A `.model`-kind engine only shows up in the engine `Picker` above once
     /// something for it has been downloaded — bootstrapping a brand-new
     /// engine always goes through the "模型管理" window instead (see
     /// `ModelManagementView`), which lists every catalog variant regardless
-    /// of download state. The *currently selected* engine is always kept
-    /// visible even with nothing downloaded for it (e.g. its only variant
-    /// was just deleted via Model Management, or a synced `UserDefaults`
-    /// value names an engine this machine hasn't downloaded yet) — filtering
-    /// it out entirely left the `Picker`'s binding pointing at a tag no
-    /// longer in its options, which SwiftUI renders as a blank/no-selection
-    /// control instead of showing what's actually selected. `engineLabel(for:)`
-    /// marks that case "（未下载）" so it doesn't silently read as a normal,
-    /// ready-to-use option.
-    private func isEngineAvailable(_ engine: EngineDescriptor) -> Bool {
-        if engine.id == session.transcriptionEngineID || engine.id == session.translationEngineID {
+    /// of download state. The *currently selected* engine (`currentID` —
+    /// `session.transcriptionEngineID`/`translationEngineID` respectively,
+    /// passed in rather than checked against both here, since the two
+    /// selections are otherwise unrelated) is always kept visible even with
+    /// nothing downloaded for it (e.g. its only variant was just deleted via
+    /// Model Management, or a synced `UserDefaults` value names an engine
+    /// this machine hasn't downloaded yet) — filtering it out entirely left
+    /// the `Picker`'s binding pointing at a tag no longer in its options,
+    /// which SwiftUI renders as a blank/no-selection control instead of
+    /// showing what's actually selected. `engineLabel(for:)` marks that case
+    /// "（未下载）" so it doesn't silently read as a normal, ready-to-use
+    /// option.
+    private func isEngineAvailable(_ engine: EngineDescriptor, currentID: String) -> Bool {
+        if engine.id == currentID {
             return true
         }
         return hasDownloadedVariant(engine)

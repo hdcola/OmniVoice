@@ -182,6 +182,12 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         cancelDownload(for: variant)
         let url = localURL(for: variant)
         guard FileManager.default.fileExists(atPath: url.path) else { return }
+        // `isDownloaded(_:)` is a plain file-existence check, not a
+        // `@Published` property — nothing here would otherwise tell a
+        // SwiftUI observer (`ModelManagementView`/`SettingsView`) that it
+        // just changed, leaving a stale "已下载" row on screen until some
+        // unrelated `@Published` mutation happened to trigger a re-render.
+        objectWillChange.send()
         try FileManager.default.removeItem(at: url)
     }
 
@@ -245,6 +251,13 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
             }
             return try await self.runJob(for: variant)
         }
+        // `jobs` isn't `@Published` either — without this, `isDownloading(_:)`
+        // flipping to `true` right here (well before the first
+        // `downloadProgress` tick, which is what actually publishes) has
+        // nothing to prompt a SwiftUI observer to re-check it, leaving a
+        // "下载" button showing during the DNS/TLS/redirect gap instead of
+        // the "准备下载…" state it's meant to cover.
+        objectWillChange.send()
         jobs[variant.id] = job
         return try await job.value
     }

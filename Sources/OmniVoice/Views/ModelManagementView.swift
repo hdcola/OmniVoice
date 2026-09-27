@@ -98,7 +98,14 @@ struct ModelManagementView: View {
                         Text("准备下载…")
                             .foregroundStyle(.secondary)
                             .font(.caption)
+                        // `.linear`, not the default circular spinner — this
+                        // state flips to the determinate `ProgressView(value:)`
+                        // above the moment the first byte count arrives, and
+                        // a spinner-to-bar shape change read as a jarring
+                        // hiccup rather than the same download simply
+                        // gaining a known size.
                         ProgressView()
+                            .progressViewStyle(.linear)
                     }
                 } else if downloadManager.isDownloaded(variant) {
                     Text("已下载 · 约 \(variant.approximateSizeMB) MB")
@@ -149,6 +156,21 @@ struct ModelManagementView: View {
     private func delete(_ variant: ModelVariant) {
         do {
             try downloadManager.deleteCachedModel(for: variant)
+            // The disabled-while-active guard on the "删除" button above
+            // only covers a recording/preload in progress — a model that
+            // was preloaded earlier and left resident (`stop()` doesn't
+            // unload, see its own doc) can still be sitting in memory with
+            // nothing active. Deleting its file out from under that loaded
+            // instance would otherwise leave `isModelLoaded` reading "就绪"
+            // (and `start()`'s `reusingLoaded` happily reusing it) while
+            // Settings/Model Management both show "未下载" — unload it too
+            // so every view of the state agrees.
+            if session.isModelLoaded
+                && (session.currentTranscriptionModelVariant?.id == variant.id
+                    || session.currentTranslationModelVariant?.id == variant.id)
+            {
+                session.unloadModels()
+            }
         } catch {
             errorTitle = "删除失败"
             errorMessage = error.localizedDescription

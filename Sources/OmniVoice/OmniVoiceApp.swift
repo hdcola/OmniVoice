@@ -30,6 +30,12 @@ struct OmniVoiceApp: App {
             ModelManagementView(modelDownloadManager: appDelegate.session.modelDownloadManager)
                 .environmentObject(appDelegate.session)
         }
+        // Without this, the window's frame defaults to something larger
+        // than `ModelManagementView`'s own `.frame(width: 460)` content,
+        // leaving visible empty space the user could then drag even wider —
+        // `.contentSize` keeps the window sized to exactly what its content
+        // asks for.
+        .windowResizability(.contentSize)
 
         Settings {
             SettingsView(modelDownloadManager: appDelegate.session.modelDownloadManager)
