@@ -5,11 +5,6 @@ import Foundation
 public enum ModelDownloadError: LocalizedError, Sendable {
     /// `ModelVariant.downloadURL` is nil — nothing to fetch yet.
     case missingDownloadURL(variantID: String)
-    /// A download for this variant is already running — callers should
-    /// observe the existing one instead of starting a second, since two
-    /// concurrent downloads to the same destination would race each other's
-    /// temp file.
-    case alreadyInProgress(variantID: String)
     case httpError(statusCode: Int)
     /// The downloaded file's SHA-256 didn't match `ModelVariant.sha256` — the
     /// partial/corrupted download is discarded, never moved into the cache.
@@ -19,8 +14,6 @@ public enum ModelDownloadError: LocalizedError, Sendable {
         switch self {
         case .missingDownloadURL(let variantID):
             return "模型 \(variantID) 尚未配置下载地址"
-        case .alreadyInProgress(let variantID):
-            return "模型 \(variantID) 正在下载中"
         case .httpError(let statusCode):
             return "下载失败，服务器返回状态码 \(statusCode)"
         case .checksumMismatch(let variantID):
@@ -46,20 +39,44 @@ public enum ModelDownloadError: LocalizedError, Sendable {
 /// audio.cpp/llama.cpp with an unhelpful error (or, worse, load a truncated
 /// GGUF that happens to still parse).
 ///
+/// A whole `ensureDownloaded` run (network transfer → SHA-256 verify → move
+/// into the cache) is tracked as one `Task` per variant in `jobs`, not just
+/// the network phase — a second `ensureDownloaded(_:)` call for the same
+/// variant while one is already running joins that same `Task` instead of
+/// starting a redundant multi-gigabyte transfer, and `isDownloading(_:)`/
+/// `cancelDownload(for:)` stay accurate for the whole pipeline, not just
+/// while bytes are actually in flight.
+///
 /// Delegate callbacks (`URLSessionDownloadDelegate`) arrive off the main
 /// actor — same reasoning `SystemTranscriptionProvider`'s audio-path methods
 /// document for being `nonisolated` — so they're marked `nonisolated` and
 /// hop back to the main actor themselves for every mutation, rather than
-/// mutating `activeTasks`/`continuations`/`progressHandlers` directly.
+/// mutating this class's state directly.
 @MainActor
 public final class ModelDownloadManager: NSObject, ObservableObject {
     public static let shared = ModelDownloadManager()
 
     private let cacheDirectory: URL
-    private var activeTasks: [String: URLSessionDownloadTask] = [:]
-    private var continuations: [String: CheckedContinuation<URL, Error>] = [:]
-    private var progressHandlers: [String: @Sendable (Double) -> Void] = [:]
     private lazy var session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
+
+    /// The whole `ensureDownloaded` pipeline for a variant currently in
+    /// flight — see the type's doc for why this covers more than just the
+    /// network transfer.
+    private var jobs: [String: Task<URL, Error>] = [:]
+    private var networkTasks: [String: URLSessionDownloadTask] = [:]
+    private var networkContinuations: [String: CheckedContinuation<URL, Error>] = [:]
+    private var progressHandlers: [String: @Sendable (Double) -> Void] = [:]
+    /// The SHA-256/move phase's own task, kept only so a `cancelDownload(for:)`
+    /// that lands during this phase (after the network transfer already
+    /// finished) can still cancel promptly instead of running the hash to
+    /// completion regardless.
+    private var verifyAndMoveTasks: [String: Task<Void, Error>] = [:]
+
+    /// `0...1` per variant currently downloading — for a SwiftUI progress
+    /// view to observe directly, instead of every caller needing to thread
+    /// its own `progress` closure through. Cleared once `ensureDownloaded`
+    /// returns or throws.
+    @Published public private(set) var downloadProgress: [String: Double] = [:]
 
     public init(cacheDirectory: URL? = nil) {
         self.cacheDirectory = cacheDirectory ?? Self.defaultCacheDirectory()
@@ -82,46 +99,89 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         FileManager.default.fileExists(atPath: localURL(for: variant).path)
     }
 
+    public func isDownloading(_ variant: ModelVariant) -> Bool {
+        jobs[variant.id] != nil
+    }
+
+    /// Cancels `variant`'s in-flight `ensureDownloaded` pipeline, whichever
+    /// phase it's currently in (network transfer or SHA-256 verify/move) —
+    /// every awaiter of that same job (see `ensureDownloaded`'s doc on
+    /// joining an existing job) sees it throw `CancellationError`. A no-op
+    /// if nothing is in flight for this variant.
     public func cancelDownload(for variant: ModelVariant) {
-        activeTasks[variant.id]?.cancel()
+        jobs[variant.id]?.cancel()
+    }
+
+    /// Removes `variant`'s cached weights, if any — e.g. to let a user
+    /// recover from a corrupted/stale local file without waiting for an
+    /// engine switch (which doesn't touch the cache) or reinstalling the
+    /// app. A no-op if nothing is cached.
+    public func deleteCachedModel(for variant: ModelVariant) throws {
+        let url = localURL(for: variant)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        try FileManager.default.removeItem(at: url)
     }
 
     /// Downloads `variant`'s weights if not already cached, verifying their
     /// SHA-256 before the file is considered usable, and returns the local
     /// path either way. `progress` is called on the main actor with a
-    /// fraction in `0...1`; best-effort only — a response with no
-    /// `Content-Length` never calls it.
+    /// fraction in `0...1` (best-effort — a response with no
+    /// `Content-Length` never calls it); `downloadProgress` reflects the
+    /// same values for any caller that'd rather observe than pass a closure.
     ///
-    /// Throws `.alreadyInProgress` rather than joining an in-flight download
-    /// for the same variant — callers that want to observe an existing
-    /// download should read `isDownloading(_:)` first instead of racing a
-    /// second `ensureDownloaded` call.
+    /// If a download for this variant is already running, this call joins
+    /// it rather than starting a second, redundant one — the two calls'
+    /// results resolve together once the single underlying job finishes.
+    /// Only the joining call's own `progress` closure is not attached to
+    /// that job (the job already reports through `downloadProgress`, which
+    /// every caller can observe); the *initiating* call's `progress` closure
+    /// still fires for however many callers are waiting.
     public func ensureDownloaded(
         _ variant: ModelVariant,
         progress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> URL {
         let destination = localURL(for: variant)
         if isDownloaded(variant) { return destination }
+        guard variant.downloadURL != nil else {
+            throw ModelDownloadError.missingDownloadURL(variantID: variant.id)
+        }
+
+        if let existingJob = jobs[variant.id] {
+            return try await existingJob.value
+        }
+
+        let job = Task { [weak self] () throws -> URL in
+            guard let self else { throw CancellationError() }
+            return try await self.runJob(for: variant, progress: progress)
+        }
+        jobs[variant.id] = job
+        defer {
+            jobs[variant.id] = nil
+            downloadProgress[variant.id] = nil
+        }
+        return try await job.value
+    }
+
+    private func runJob(
+        for variant: ModelVariant, progress: (@Sendable (Double) -> Void)?
+    ) async throws -> URL {
+        let destination = localURL(for: variant)
         guard let downloadURL = variant.downloadURL else {
             throw ModelDownloadError.missingDownloadURL(variantID: variant.id)
         }
-        guard activeTasks[variant.id] == nil else {
-            throw ModelDownloadError.alreadyInProgress(variantID: variant.id)
-        }
         try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
 
-        let tempFileURL = try await runDownload(variantID: variant.id, from: downloadURL, progress: progress)
+        let tempFileURL = try await runDownload(variantID: variant.id, from: downloadURL) { [weak self] fraction in
+            Task { @MainActor in
+                self?.downloadProgress[variant.id] = fraction
+                progress?(fraction)
+            }
+        }
         do {
-            let expectedSHA256 = variant.sha256
-            try await Task.detached(priority: .utility) {
-                if let expectedSHA256 {
-                    let actual = try Self.sha256Hex(ofFileAt: tempFileURL)
-                    guard actual.caseInsensitiveCompare(expectedSHA256) == .orderedSame else {
-                        throw ModelDownloadError.checksumMismatch(variantID: variant.id)
-                    }
-                }
-                try FileManager.default.moveItem(at: tempFileURL, to: destination)
-            }.value
+            try await verifyAndMove(
+                variantID: variant.id, expectedSHA256: variant.sha256,
+                tempFileURL: tempFileURL, destination: destination
+            )
             return destination
         } catch {
             try? FileManager.default.removeItem(at: tempFileURL)
@@ -129,43 +189,73 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         }
     }
 
-    public func isDownloading(_ variant: ModelVariant) -> Bool {
-        activeTasks[variant.id] != nil
-    }
-
     private func runDownload(
-        variantID: String, from url: URL, progress: (@Sendable (Double) -> Void)?
+        variantID: String, from url: URL, progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
                 let task = session.downloadTask(with: url)
                 task.taskDescription = variantID
-                activeTasks[variantID] = task
-                continuations[variantID] = continuation
-                if let progress {
-                    progressHandlers[variantID] = progress
-                }
+                networkTasks[variantID] = task
+                networkContinuations[variantID] = continuation
+                progressHandlers[variantID] = progress
                 task.resume()
             }
         } onCancel: {
             Task { @MainActor [weak self] in
-                self?.activeTasks[variantID]?.cancel()
+                self?.networkTasks[variantID]?.cancel()
             }
         }
     }
 
+    /// SHA-256 verification (multi-GB files, a few seconds of pure hashing)
+    /// runs off the main actor entirely — same reasoning the `.model`
+    /// providers' own load-off-main-actor fix documents (see CHANGELOG) —
+    /// and checks `Task.checkCancellation()` between chunks so
+    /// `cancelDownload(for:)` lands promptly instead of running the whole
+    /// hash to completion regardless.
+    private func verifyAndMove(
+        variantID: String, expectedSHA256: String?, tempFileURL: URL, destination: URL
+    ) async throws {
+        let task = Task.detached(priority: .utility) {
+            if let expectedSHA256 {
+                let actual = try Self.sha256Hex(ofFileAt: tempFileURL)
+                guard actual.caseInsensitiveCompare(expectedSHA256) == .orderedSame else {
+                    throw ModelDownloadError.checksumMismatch(variantID: variantID)
+                }
+            }
+            try Task.checkCancellation()
+            // A stale file at `destination` (e.g. left over from a build
+            // that cached under a since-changed layout) would otherwise
+            // make `moveItem` throw `.fileWriteFileExists` and discard this
+            // freshly-verified download for nothing.
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.moveItem(at: tempFileURL, to: destination)
+        }
+        verifyAndMoveTasks[variantID] = task
+        defer { verifyAndMoveTasks[variantID] = nil }
+        try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
     private func finish(variantID: String, result: Result<URL, Error>) {
-        guard let continuation = continuations.removeValue(forKey: variantID) else { return }
-        activeTasks.removeValue(forKey: variantID)
+        guard let continuation = networkContinuations.removeValue(forKey: variantID) else { return }
+        networkTasks.removeValue(forKey: variantID)
         progressHandlers.removeValue(forKey: variantID)
         continuation.resume(with: result)
     }
 
-    nonisolated private static func sha256Hex(ofFileAt url: URL) throws -> String {
+    private nonisolated static func sha256Hex(ofFileAt url: URL) throws -> String {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         var hasher = SHA256()
         while let chunk = try handle.read(upToCount: 4 * 1024 * 1024), !chunk.isEmpty {
+            try Task.checkCancellation()
             hasher.update(data: chunk)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()

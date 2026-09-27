@@ -70,4 +70,22 @@ struct ModelDownloadManagerTests {
         let manager = ModelDownloadManager(cacheDirectory: makeTempCacheDirectory())
         #expect(!manager.isDownloading(variant))
     }
+
+    @Test func deleteCachedModelRemovesTheCachedFile() throws {
+        let cacheDirectory = makeTempCacheDirectory()
+        let manager = ModelDownloadManager(cacheDirectory: cacheDirectory)
+        try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: manager.localURL(for: variant).path, contents: Data([0x01]))
+        #expect(manager.isDownloaded(variant))
+
+        try manager.deleteCachedModel(for: variant)
+        #expect(!manager.isDownloaded(variant))
+
+        try FileManager.default.removeItem(at: cacheDirectory)
+    }
+
+    @Test func deleteCachedModelIsANoOpWhenNothingIsCached() throws {
+        let manager = ModelDownloadManager(cacheDirectory: makeTempCacheDirectory())
+        try manager.deleteCachedModel(for: variant)
+    }
 }
