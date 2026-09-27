@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>OmniVoice</string>
+    <key>CFBundleDisplayName</key>
+    <string>OmniVoice</string>
+    <key>CFBundleIdentifier</key>
+    <string>org.hdcola.omnivoice</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleExecutable</key>
+    <string>OmniVoice</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>26.0</string>
+    <!-- Menu-bar-only app: no Dock icon, no app-switcher entry, no default
+         window on launch. -->
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>需要访问麦克风以进行实时语音识别与翻译。</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>选择系统自带识别引擎时，需要使用语音识别以将麦克风/系统音频转写为文字。</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>
