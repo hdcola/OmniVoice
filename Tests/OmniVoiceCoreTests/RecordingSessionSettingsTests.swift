@@ -275,6 +275,27 @@ struct RecordingSessionSettingsTests {
         #expect(session.isModelLoaded)
     }
 
+    /// Same fix, translation side — `translationModelVariantID`'s `didSet`
+    /// must discard a model loaded under a different variant too, not just
+    /// `transcriptionModelVariantID`'s.
+    @Test func changingTranslationModelVariantIDDiscardsAModelLoadedUnderADifferentVariant() {
+        defer {
+            defaults.removeObject(forKey: PersistedSettingsKey.translationEngineID)
+            defaults.removeObject(forKey: PersistedSettingsKey.translationModelVariantID)
+        }
+        let session = RecordingSession()
+        session.translationEngineID = "model.t3po"
+        session.isModelLoaded = true
+        session.loadedEngineIDs = (
+            session.transcriptionEngineID, session.currentTranscriptionModelVariant?.id,
+            "model.t3po", "some-old-variant-id"
+        )
+
+        session.translationModelVariantID = "t3po-q5_k_m"
+
+        #expect(!session.isModelLoaded)
+    }
+
     @Test func usesOnDeviceModelEngineReflectsEitherEngineBeingModelKind() {
         defer {
             defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)

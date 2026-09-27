@@ -273,7 +273,13 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    variant per engine exists in the catalog today, so this mostly plumbs the
    mechanism through for whenever a second quantization/size is added — it
    doesn't yet expose
-   `cancelDownload(for:)`/`deleteCachedModel(for:)` from the UI.
+   `cancelDownload(for:)`/`deleteCachedModel(for:)` from the UI. Notably, a
+   user who triggers a `.model` engine's (multi-GB) download on a slow/flaky
+   connection currently has no way to back out short of quitting the app —
+   the panel/Settings just show "启动中…"/"加载中…" with everything else
+   disabled until it finishes or fails. Adding a "取消下载" affordance (panel
+   and/or Settings) that calls `cancelDownload(for:)` is a follow-up, not
+   blocking this step.
 4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,
