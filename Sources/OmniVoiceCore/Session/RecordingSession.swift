@@ -165,10 +165,14 @@ public final class RecordingSession: ObservableObject {
             translationEngineID = value
         }
         if let value = defaults.string(forKey: PersistedSettingsKey.sourceLanguageCode) {
-            sourceLanguageCode = value.isEmpty ? nil : value
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            sourceLanguageCode = trimmed.isEmpty ? nil : trimmed
         }
-        if let value = defaults.string(forKey: PersistedSettingsKey.targetLanguageCode), !value.isEmpty {
-            targetLanguageCode = value
+        if let value = defaults.string(forKey: PersistedSettingsKey.targetLanguageCode) {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                targetLanguageCode = trimmed
+            }
         }
         if defaults.object(forKey: PersistedSettingsKey.includeSystemAudio) != nil {
             includeSystemAudio = defaults.bool(forKey: PersistedSettingsKey.includeSystemAudio)
@@ -204,6 +208,15 @@ public final class RecordingSession: ObservableObject {
 
     public func refreshDevices() {
         inputDevices = [.systemDefault] + MicrophoneCapture.availableDevices()
+
+        // Reconciling/switching `selectedDeviceID` while a recording is
+        // active would just desync the UI from reality: `start()` already
+        // handed the *original* device to `MicrophoneCapture`, which can't
+        // hot-swap mid-recording, so changing this property now wouldn't
+        // change what's actually being captured. Still refresh
+        // `inputDevices` above so the (disabled) picker's list itself stays
+        // current.
+        guard !isSessionActive else { return }
 
         // Prefer the persisted device over whatever `selectedDeviceID`
         // currently holds: once a disconnect falls back to `.systemDefault`

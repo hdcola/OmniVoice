@@ -134,6 +134,27 @@ struct RecordingSessionSettingsTests {
         }
     }
 
+    @Test func whitespaceOnlyPersistedTargetLanguageCodeIsIgnored() {
+        withPersisted([PersistedSettingsKey.targetLanguageCode: "   "]) {
+            let session = RecordingSession()
+            #expect(session.targetLanguageCode == "zh-CN")
+        }
+    }
+
+    @Test func refreshDevicesDoesNotChangeSelectionWhileSessionIsActive() {
+        // A running session's MicrophoneCapture is already bound to
+        // whatever device start() handed it — reconciling selectedDeviceID
+        // mid-recording would desync the UI from what's actually being
+        // captured, since it can't hot-swap.
+        withPersisted([PersistedSettingsKey.selectedDeviceID: "disconnected-device-id"]) {
+            let session = RecordingSession()
+            session.isRunning = true
+            session.refreshDevices()
+            #expect(session.selectedDeviceID == "disconnected-device-id")
+            session.isRunning = false
+        }
+    }
+
     /// Covers only the "don't lose the preference" half of a disconnected
     /// mic — `refreshDevices()` reads real hardware via
     /// `MicrophoneCapture.availableDevices()`, so this suite can't fabricate

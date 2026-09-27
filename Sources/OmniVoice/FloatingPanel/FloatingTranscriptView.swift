@@ -140,6 +140,11 @@ struct FloatingTranscriptView: View {
             .foregroundStyle(.secondary)
             .lineLimit(1)
             .truncationMode(.tail)
+            // Longer messages (a localized error description tacked onto a
+            // permission hint, say) get cut off by `.lineLimit(1)` at the
+            // panel's default width — the tooltip is how the full text
+            // stays reachable without needing to widen the panel.
+            .help(session.statusMessage)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
