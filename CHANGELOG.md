@@ -18,6 +18,7 @@ for how testers install and run it).
 - feat(app): custom themed close button on the floating panel (semi-transparent circular ✕, brightens on hover), replacing the native traffic light — matches the panel's borderless/titlebar-hidden look (#3)
 - feat(session): persist engine choice, language pair, mic device, and system-audio inclusion across quits/relaunches (and system restarts) via `UserDefaults` — previously every one of these silently reset to hardcoded defaults on every launch (#3)
 - feat(app): Settings' language section uses the same `SourceLanguagePicker`/`TargetLanguagePicker` the floating panel does — the two can't offer different language sets by construction (#3)
+- build(release): `Scripts/build_dmg.sh` — wraps `Scripts/build_app.sh`'s output into an installable `.dmg` (app + `/Applications` symlink), for handing testers a single downloadable file instead of a bare `.app`
 
 ### Changed
 

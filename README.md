@@ -4,9 +4,14 @@ All-in-one real-time speech transcription &amp; translation assistant for
 lectures, meetings, and multilingual conversations — a macOS menu-bar app
 with a floating live-transcript panel.
 
-**Current version: 0.0.1 — internal test build.** Not released publicly,
-not notarized. See [`Docs/RELEASE_TESTING.md`](Docs/RELEASE_TESTING.md) if
-you've been given a build to try, and
+**Current version: 0.0.1 — internal test build.**
+
+### [⬇ Download OmniVoice 0.0.1 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.0.1/OmniVoice-0.0.1.dmg)
+
+This build is **ad-hoc signed only, not notarized** — macOS will refuse to
+open it straight out of the DMG until you clear its quarantine flag. See
+[`Docs/RELEASE_TESTING.md`](Docs/RELEASE_TESTING.md) for the one-line fix,
+required permissions, and current feature scope, and
 [`Docs/PROGRESS.md`](Docs/PROGRESS.md) for the full architecture/decision
 history and open items.
 
@@ -58,6 +63,7 @@ history and open items.
 swift build             # debug build
 swift test              # unit tests
 ./Scripts/build_app.sh  # packages an ad-hoc-signed .app into build/
+./Scripts/build_dmg.sh  # wraps that .app into an installable .dmg (run build_app.sh first)
 ```
 
 ## License
