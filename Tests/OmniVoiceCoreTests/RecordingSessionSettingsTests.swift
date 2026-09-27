@@ -440,6 +440,30 @@ struct RecordingSessionSettingsTests {
         session.finalizeActiveSessionBeforeQuit()
     }
 
+    /// `resolveModelPath` must fail fast with a friendly "尚未下载" status
+    /// message rather than attempt an implicit download — downloading is now
+    /// only ever triggered from `ModelManagementView`/`SettingsView`'s own
+    /// inline shortcut, never from `preloadModel()`/`start()`. A fresh
+    /// temp-directory `ModelDownloadManager` guarantees `isDownloaded` reads
+    /// `false` for any variant without touching the network, so this needs
+    /// no stubbing.
+    @Test func preloadModelFailsFastWithAFriendlyMessageWhenTheSelectedVariantIsntDownloaded() async throws {
+        defer { defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID) }
+        let tempCacheDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ModelManagementTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempCacheDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempCacheDirectory) }
+
+        let session = RecordingSession(modelDownloadManager: ModelDownloadManager(cacheDirectory: tempCacheDirectory))
+        session.transcriptionEngineID = "model.r2t2"
+
+        await session.preloadModel()
+
+        #expect(!session.isModelLoaded)
+        #expect(session.statusMessage.contains("尚未下载"))
+        #expect(session.statusMessage.contains(ProviderCatalog.modelVariants(forEngineID: "model.r2t2").first?.displayName ?? ""))
+    }
+
     @Test func isSessionActiveReflectsAnyLifecyclePhase() {
         let session = RecordingSession()
         #expect(!session.isSessionActive)

@@ -20,6 +20,10 @@ struct OmniVoiceApp: App {
                 .modelContainerIfAvailable(appDelegate.modelContainer)
         }
 
+        WindowGroup("模型管理", id: "modelManagement") {
+            ModelManagementView(modelDownloadManager: appDelegate.session.modelDownloadManager)
+        }
+
         Settings {
             SettingsView(modelDownloadManager: appDelegate.session.modelDownloadManager)
                 .environmentObject(appDelegate.session)

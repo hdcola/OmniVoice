@@ -19,8 +19,10 @@ struct SettingsView: View {
     @EnvironmentObject private var session: RecordingSession
     /// Observed directly (not just reached through `session`) so a variant
     /// row's "已下载"/"约 N MB" caption live-updates while
-    /// `ModelDownloadManager.ensureDownloaded(_:progress:)` runs during
-    /// `preloadModel()`/`start()` — `RecordingSession` itself doesn't
+    /// `ModelDownloadManager.ensureDownloaded(_:progress:)` runs (from this
+    /// view's own inline "下载" shortcut, or from "模型管理" —
+    /// `RecordingSession` no longer triggers downloads itself, see
+    /// `resolveModelPath`'s doc) — `RecordingSession` itself doesn't
     /// re-publish on every download tick, only on `statusMessage` changes.
     /// Passed in explicitly (not defaulted to `.shared`) and expected to be
     /// the exact same instance `session` (injected separately, via
@@ -40,7 +42,7 @@ struct SettingsView: View {
         Form {
             Section("识别引擎 (ASR)") {
                 Picker("引擎", selection: $session.transcriptionEngineID) {
-                    ForEach(ProviderCatalog.transcriptionEngines) { engine in
+                    ForEach(ProviderCatalog.transcriptionEngines.filter(isEngineAvailable)) { engine in
                         Text(engine.displayName).tag(engine.id)
                     }
                 }
@@ -55,7 +57,7 @@ struct SettingsView: View {
 
             Section("翻译引擎") {
                 Picker("引擎", selection: $session.translationEngineID) {
-                    ForEach(ProviderCatalog.translationEngines) { engine in
+                    ForEach(ProviderCatalog.translationEngines.filter(isEngineAvailable)) { engine in
                         Text(engine.displayName).tag(engine.id)
                     }
                 }
@@ -81,20 +83,55 @@ struct SettingsView: View {
         // `isPreloadingModel` alongside `isSessionActive`: switching engines
         // mid-preload would race `preloadModel()`'s in-flight `loadModel()`
         // calls against `discardLoadedModelsIfStale()` unloading the very
-        // providers it's still awaiting. Also covers a variant's own
-        // download: that only ever runs from inside `preloadModel()`/
-        // `start()`, both already gated by these same two flags.
+        // providers it's still awaiting. Also covers this view's own inline
+        // variant download shortcut — simplest to just keep the whole form
+        // (including that button) inert during the same window rather than
+        // reason about a download racing a load.
         .disabled(session.isSessionActive || session.isPreloadingModel)
     }
 
+    /// A `.model`-kind engine only shows up in the engine `Picker` above once
+    /// something for it has been downloaded — bootstrapping a brand-new
+    /// engine always goes through the "模型管理" window instead (see
+    /// `ModelManagementView`), which lists every catalog variant regardless
+    /// of download state.
+    private func isEngineAvailable(_ engine: EngineDescriptor) -> Bool {
+        guard engine.kind == .model else { return true }
+        return ProviderCatalog.modelVariants(forEngineID: engine.id)
+            .contains { downloadManager.isDownloaded($0) }
+    }
+
+    /// Only a *downloaded* variant is selectable here — an engine is only
+    /// ever listed above once at least one of its variants is downloaded
+    /// (see `isEngineAvailable(_:)`), so this `Picker` never ends up empty.
+    /// Any remaining not-yet-downloaded variant (relevant once a second
+    /// quantization/size is added — today only one exists per engine) still
+    /// gets a row here with an inline "下载" shortcut, so switching to a
+    /// smaller/larger variant of an already-available engine doesn't require
+    /// a trip to "模型管理".
     @ViewBuilder
     private func modelVariantPicker(for engineID: String, selection: Binding<String?>) -> some View {
         let variants = ProviderCatalog.modelVariants(forEngineID: engineID)
-        if !variants.isEmpty {
+        let downloaded = variants.filter { downloadManager.isDownloaded($0) }
+        let pending = variants.filter { !downloadManager.isDownloaded($0) }
+        if !downloaded.isEmpty {
             Picker("模型", selection: selection) {
-                ForEach(variants) { variant in
+                ForEach(downloaded) { variant in
                     Text("\(variant.displayName) · \(variantCaption(for: variant))")
                         .tag(Optional(variant.id))
+                }
+            }
+        }
+        ForEach(pending) { variant in
+            HStack {
+                Text("\(variant.displayName) · \(variantCaption(for: variant))")
+                Spacer()
+                if downloadManager.isDownloading(variant) {
+                    Button("取消") { downloadManager.cancelDownload(for: variant) }
+                } else {
+                    Button("下载") {
+                        Task { try? await downloadManager.ensureDownloaded(variant) }
+                    }
                 }
             }
         }

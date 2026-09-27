@@ -408,7 +408,11 @@ public final class RecordingSession: ObservableObject {
     /// ran inside `start()` itself, making the very first "开始" of a
     /// session look stalled with no visible progress beyond `statusMessage`.
     /// A no-op-ish fast path for `.system` engines (their `loadModel()` does
-    /// nothing) — still safe to call, just not very useful there.
+    /// nothing) — still safe to call, just not very useful there. Fails fast
+    /// with a friendly `statusMessage` (via `resolveModelPath`'s
+    /// `ModelNotDownloadedError`) if the selected `.model`-kind variant
+    /// hasn't been downloaded yet — downloading is no longer something this
+    /// does implicitly, see that error's doc.
     ///
     /// Leaves the loaded providers in `transcriptionProvider`/
     /// `translationProvider` for `start()` to adopt directly (skipping its
@@ -421,18 +425,24 @@ public final class RecordingSession: ObservableObject {
 
         let transcriptionModelPath: URL?
         do {
-            transcriptionModelPath = try await resolveModelPath(
+            transcriptionModelPath = try resolveModelPath(
                 kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant, statusPrefix: "识别引擎模型"
             )
+        } catch let error as ModelNotDownloadedError {
+            statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
+            return
         } catch {
             statusMessage = "识别引擎模型下载失败: \(error.localizedDescription)"
             return
         }
         let translationModelPath: URL?
         do {
-            translationModelPath = try await resolveModelPath(
+            translationModelPath = try resolveModelPath(
                 kind: translationEngineKind, variant: currentTranslationModelVariant, statusPrefix: "翻译引擎模型"
             )
+        } catch let error as ModelNotDownloadedError {
+            statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
+            return
         } catch {
             statusMessage = "翻译引擎模型下载失败: \(error.localizedDescription)"
             return
@@ -659,18 +669,24 @@ public final class RecordingSession: ObservableObject {
             // would just repeat a completed download for nothing.
             let transcriptionModelPath: URL?
             do {
-                transcriptionModelPath = try await resolveModelPath(
+                transcriptionModelPath = try resolveModelPath(
                     kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant, statusPrefix: "识别引擎模型"
                 )
+            } catch let error as ModelNotDownloadedError {
+                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
+                return
             } catch {
                 statusMessage = "识别引擎模型下载失败: \(error.localizedDescription)"
                 return
             }
             let translationModelPath: URL?
             do {
-                translationModelPath = try await resolveModelPath(
+                translationModelPath = try resolveModelPath(
                     kind: translationEngineKind, variant: currentTranslationModelVariant, statusPrefix: "翻译引擎模型"
                 )
+            } catch let error as ModelNotDownloadedError {
+                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
+                return
             } catch {
                 statusMessage = "翻译引擎模型下载失败: \(error.localizedDescription)"
                 return
@@ -982,30 +998,33 @@ public final class RecordingSession: ObservableObject {
         }
     }
 
-    /// Resolves `variant`'s local weights path for a `.model`-kind engine,
-    /// downloading it first (via `modelDownloadManager`) if it isn't already
-    /// cached — `statusMessage` shows live progress while that download runs.
+    /// Thrown by `resolveModelPath` when a `.model`-kind engine's selected
+    /// variant isn't cached yet. Downloading is no longer something
+    /// `start()`/`preloadModel()` do implicitly — a user must fetch it first
+    /// via the "模型管理" window (`ModelManagementView`), which is the only
+    /// place that calls `ModelDownloadManager.ensureDownloaded(_:progress:)`
+    /// now. This error exists so the catch sites below can show a friendly
+    /// "go download it" message instead of the generic download-failure one.
+    private struct ModelNotDownloadedError: Error {
+        let variant: ModelVariant
+    }
+
+    /// Resolves `variant`'s local weights path for a `.model`-kind engine.
     /// Returns `nil` for a `.system`-kind engine (nothing to resolve) or a
     /// `.model`-kind engine with no catalog variant (falls back to
     /// `InProcessTranscriber`/`InProcessTranslator.resolveModelPath`'s own
     /// env-var/local-`models/`-dir convention, same as passing `modelPath: nil`
-    /// always did before this method existed).
+    /// always did before this method existed). Throws `ModelNotDownloadedError`
+    /// rather than downloading if `variant` isn't cached yet — see that
+    /// error's doc.
     private func resolveModelPath(
         kind: EngineKind?, variant: ModelVariant?, statusPrefix: String
-    ) async throws -> URL? {
+    ) throws -> URL? {
         guard kind == .model, let variant else { return nil }
-        if modelDownloadManager.isDownloaded(variant) {
-            return modelDownloadManager.localURL(for: variant)
+        guard modelDownloadManager.isDownloaded(variant) else {
+            throw ModelNotDownloadedError(variant: variant)
         }
-        statusMessage = "下载\(statusPrefix)中… 0%"
-        // `progress` is declared `@MainActor @Sendable` (see
-        // `ensureDownloaded`'s doc), so this can mutate `statusMessage`
-        // directly — no per-callback `Task { @MainActor in ... }` hop needed
-        // for what can be several thousand progress callbacks on a fast
-        // connection.
-        return try await modelDownloadManager.ensureDownloaded(variant) { [weak self] fraction in
-            self?.statusMessage = "下载\(statusPrefix)中… \(Int(fraction * 100))%"
-        }
+        return modelDownloadManager.localURL(for: variant)
     }
 
     private static let defaults = UserDefaults.standard
