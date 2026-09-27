@@ -46,17 +46,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     func applicationDidFinishLaunching(_ notification: Notification) {
         session.refreshDevices()
 
-        let panel = FloatingTranscriptPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 240))
-        panel.contentView = DraggableHostingView(rootView: FloatingTranscriptView(session: session))
+        let panel = FloatingTranscriptPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 280))
+        panel.contentView = DraggableHostingView(
+            rootView: FloatingTranscriptView(session: session, onClose: { [weak panel] in
+                panel?.orderOut(nil)
+            })
+        )
         panel.center()
         floatingPanel = panel
 
-        // The panel is otherwise only shown/hidden manually via
-        // `toggleFloatingPanel()` (menu item) — without this, starting a
-        // recording from the menu gives no visible feedback at all, since
-        // the panel is created hidden and nothing else ever orders it front.
-        // Only auto-*show* on start; leave hiding to the manual toggle so
-        // the user can still review the transcript after stopping.
+        // Shown from launch (not just on demand) since the panel hosts the
+        // controls used most often (start/stop, language pickers) alongside
+        // the live transcript — `toggleFloatingPanel()`/the panel's own
+        // close button still let the user hide it manually.
+        panel.orderFrontRegardless()
+
+        // ...but the user can also hide it (menu toggle or the panel's own
+        // close button) and then start a recording from the menu bar's own
+        // start/stop button — without this, that recording would proceed
+        // with no visible feedback at all, since nothing else re-shows the
+        // panel once it's been hidden.
         isRunningCancellable = session.$isRunning
             .filter { $0 }
             .receive(on: DispatchQueue.main)

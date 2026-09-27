@@ -1,11 +1,20 @@
 import OmniVoiceCore
 import SwiftUI
 
-/// Engine/language/audio settings — data-driven from `ProviderCatalog`
-/// rather than one hand-written `case` per engine, so adding a new
-/// community model audio.cpp supports later is a catalog change, not a UI
-/// change. Disabled while a recording is running, same rule the POCs
-/// established (each provider's session is set up fresh at `start()`).
+/// Engine settings — data-driven from `ProviderCatalog` rather than one
+/// hand-written `case` per engine, so adding a new community model
+/// audio.cpp supports later is a catalog change, not a UI change. Disabled
+/// for the whole start→stop lifecycle (`isSessionActive`, not just
+/// `isRunning`) — each provider's session is set up fresh from these values
+/// at the top of `start()`, so changing them during that setup would either
+/// race the read or silently not apply to the run in progress.
+///
+/// The mic/system-audio toggle lives on the menu bar instead of here — it's
+/// adjusted often enough to want quicker access, while this window is
+/// reserved for the ones that aren't (which engine, eventually which model
+/// variant). Language uses the same `SourceLanguagePicker`/
+/// `TargetLanguagePicker` the floating panel does — not a free-text field —
+/// so the two can't ever offer different language options.
 struct SettingsView: View {
     @EnvironmentObject private var session: RecordingSession
 
@@ -30,17 +39,16 @@ struct SettingsView: View {
             }
 
             Section("语言") {
-                TextField("源语言（如 en-US；留空为自动，仅模型引擎支持）", text: sourceLanguageBinding)
-                TextField("目标语言（如 zh-CN）", text: $session.targetLanguageCode)
-            }
-
-            Section("音频") {
-                Toggle("包含系统声音（需要屏幕录制权限）", isOn: $session.includeSystemAudio)
+                SourceLanguagePicker(
+                    sourceLanguageCode: $session.sourceLanguageCode,
+                    transcriptionEngineKind: session.transcriptionEngineKind
+                )
+                TargetLanguagePicker(targetLanguageCode: $session.targetLanguageCode)
             }
         }
         .padding(20)
         .frame(width: 440)
-        .disabled(session.isRunning)
+        .disabled(session.isSessionActive)
     }
 
     @ViewBuilder
@@ -55,12 +63,5 @@ struct SettingsView: View {
             }
             .disabled(true) // TODO: enable once Model*Provider is implemented (see their doc comments).
         }
-    }
-
-    private var sourceLanguageBinding: Binding<String> {
-        Binding(
-            get: { session.sourceLanguageCode ?? "" },
-            set: { session.sourceLanguageCode = $0.isEmpty ? nil : $0 }
-        )
     }
 }

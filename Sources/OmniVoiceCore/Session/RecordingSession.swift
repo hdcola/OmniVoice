@@ -14,9 +14,33 @@ import Foundation
 @MainActor
 public final class RecordingSession: ObservableObject {
     @Published public var inputDevices: [AudioInputDevice] = []
-    @Published public var selectedDeviceID: String?
+    /// Persisted (see `PersistedSettingsKey`) — restored in `init()`, so a
+    /// device picked last session stays picked after quitting/relaunching
+    /// (or a system restart). `refreshDevices()` still reconciles it against
+    /// whatever's actually connected right now.
+    @Published public var selectedDeviceID: String? {
+        didSet {
+            guard !isReconcilingDevices else { return }
+            Self.defaults.set(selectedDeviceID, forKey: PersistedSettingsKey.selectedDeviceID)
+        }
+    }
     @Published public var isRunning = false
     @Published public var isStopping = false
+    /// True from the moment `start()` is called until its (possibly slow —
+    /// model loading, device init) setup finishes and `isRunning` flips to
+    /// `true`, or setup fails. Without this, `isRunning`/`isStopping` alone
+    /// don't guard the window *during* that setup: a second `start()` call
+    /// in that window would pass the same guard and create a second set of
+    /// providers/capture, leaking the first and double-starting capture.
+    @Published public var isStarting = false
+    /// True across the whole `start()`→`stop()` lifecycle, not just while
+    /// actually recording — use this (not `isRunning` alone) to gate any
+    /// control whose value is only read once, at the top of `start()`
+    /// (engine IDs, device, language, system-audio inclusion). `isRunning`
+    /// alone leaves a window open during `isStarting`/`isStopping` where
+    /// those controls look editable but a change either races the in-flight
+    /// setup or silently won't apply to the run in progress.
+    public var isSessionActive: Bool { isRunning || isStarting || isStopping }
     /// One row per ASR utterance/segment, source and translation aligned
     /// side by side.
     @Published public var lines: [TranscriptLine] = []
@@ -24,23 +48,60 @@ public final class RecordingSession: ObservableObject {
     @Published public var inputLevel: Float = 0
     /// Mix in system/output audio (ScreenCaptureKit) alongside the mic. Only
     /// changeable while stopped — the mixer/capture are constructed once in
-    /// `start()`.
-    @Published public var includeSystemAudio: Bool = false
+    /// `start()`. Persisted (see `PersistedSettingsKey`).
+    @Published public var includeSystemAudio: Bool = false {
+        didSet { Self.defaults.set(includeSystemAudio, forKey: PersistedSettingsKey.includeSystemAudio) }
+    }
     /// Set when `SystemAudioCapture.start()` throws — almost always means
     /// the Screen Recording TCC prompt hasn't been granted yet. Doesn't
     /// abort the run: mic-only transcription still proceeds.
     @Published public var screenRecordingPermissionNeeded = false
 
     /// Engine selection — only takes effect on the next `start()`, so a
-    /// picker bound to these should be disabled while `isRunning`.
-    @Published public var transcriptionEngineID: String = ProviderCatalog.transcriptionEngines[0].id
-    @Published public var translationEngineID: String = ProviderCatalog.translationEngines[0].id
+    /// picker bound to these should be disabled while `isSessionActive`.
+    /// Persisted (see `PersistedSettingsKey`).
+    @Published public var transcriptionEngineID: String = ProviderCatalog.transcriptionEngines[0].id {
+        didSet {
+            // Keeps the "system engine ⇒ usable source language" invariant
+            // that `start()` depends on (see `sourceLanguageCode`'s doc)
+            // even when the engine is switched (in Settings/the panel)
+            // *after* `sourceLanguageCode` was set to something only valid
+            // for a `.model` engine (nil "自动", or one of the languages
+            // `LanguageOption.supportsSystemASRSource` marks as
+            // system-unsupported) — without this, switching back to
+            // `.system` would leave a value guaranteed to throw at the next
+            // `start()`. Same check `validateAndNormalizeSourceLanguage()`
+            // runs after restoring persisted settings.
+            validateAndNormalizeSourceLanguage()
+            Self.defaults.set(transcriptionEngineID, forKey: PersistedSettingsKey.transcriptionEngineID)
+        }
+    }
+    @Published public var translationEngineID: String = ProviderCatalog.translationEngines[0].id {
+        didSet { Self.defaults.set(translationEngineID, forKey: PersistedSettingsKey.translationEngineID) }
+    }
     /// BCP-47-ish language tags. `sourceLanguageCode` nil means "auto", only
     /// meaningful for `.model`-kind ASR engines — `.system` (`SpeechTranscriber`)
     /// requires a concrete one; `start()` fails with `.localeNotSupported`
-    /// if left nil while a system engine is selected.
-    @Published public var sourceLanguageCode: String? = "en-US"
-    @Published public var targetLanguageCode: String = "zh-CN"
+    /// if left nil while a system engine is selected. A UI offering "自动"
+    /// should only do so while `transcriptionEngineKind == .model`. Persisted
+    /// (see `PersistedSettingsKey`) using `""` as nil's sentinel, since
+    /// `UserDefaults` can't distinguish "never set" from "explicitly set to
+    /// nil".
+    @Published public var sourceLanguageCode: String? = "en-US" {
+        didSet {
+            Self.defaults.set(sourceLanguageCode ?? "", forKey: PersistedSettingsKey.sourceLanguageCode)
+        }
+    }
+    @Published public var targetLanguageCode: String = "zh-CN" {
+        didSet { Self.defaults.set(targetLanguageCode, forKey: PersistedSettingsKey.targetLanguageCode) }
+    }
+
+    /// Nil only if `transcriptionEngineID` somehow doesn't match any known
+    /// engine (shouldn't happen — it's only ever set from
+    /// `ProviderCatalog.transcriptionEngines`).
+    public var transcriptionEngineKind: EngineKind? {
+        ProviderCatalog.transcriptionEngines.first { $0.id == transcriptionEngineID }?.kind
+    }
 
     private let sessionStore: SessionStore?
     private var activeSessionRecord: RecordingSessionRecord?
@@ -70,19 +131,147 @@ public final class RecordingSession: ObservableObject {
 
     public init(sessionStore: SessionStore? = nil) {
         self.sessionStore = sessionStore
+        restorePersistedSettings()
     }
+
+    /// Restores whatever settings were persisted from a previous run —
+    /// without this, every quit/relaunch (or system restart) silently reset
+    /// engine choice, language, mic, and system-audio inclusion back to
+    /// their hardcoded defaults above, which is surprising for anything the
+    /// user deliberately configured last time. Each property's own `didSet`
+    /// (see their declarations) does fire for these assignments (a stored
+    /// property that already has a declared default value, like all of
+    /// these, gets its `didSet` called even for an assignment made from
+    /// within `init()`) — but `transcriptionEngineID`'s self-heal `didSet`
+    /// runs *before* `sourceLanguageCode` below is restored, so it validates
+    /// against the not-yet-restored (still-default) value and can't catch
+    /// an invariant violation that only exists after both are restored.
+    /// `validateAndNormalizeSourceLanguage()` below re-checks once
+    /// everything's loaded, closing that gap.
+    private func restorePersistedSettings() {
+        let defaults = Self.defaults
+        // Guards against a value from a build where an engine ID was since
+        // renamed/removed (or, in principle, a corrupted defaults domain) —
+        // an unrecognized ID would make `transcriptionEngineKind` return
+        // `nil`, silently breaking every `.system`/`.model` check that
+        // depends on it (`makeTranscriptionProvider`'s `switch` still falls
+        // back to a concrete provider, but the *language* logic doesn't).
+        if let value = defaults.string(forKey: PersistedSettingsKey.transcriptionEngineID),
+           ProviderCatalog.transcriptionEngines.contains(where: { $0.id == value }) {
+            transcriptionEngineID = value
+        }
+        if let value = defaults.string(forKey: PersistedSettingsKey.translationEngineID),
+           ProviderCatalog.translationEngines.contains(where: { $0.id == value }) {
+            translationEngineID = value
+        }
+        if let value = defaults.string(forKey: PersistedSettingsKey.sourceLanguageCode) {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            sourceLanguageCode = trimmed.isEmpty ? nil : trimmed
+        }
+        if let value = defaults.string(forKey: PersistedSettingsKey.targetLanguageCode) {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                targetLanguageCode = trimmed
+            }
+        }
+        if defaults.object(forKey: PersistedSettingsKey.includeSystemAudio) != nil {
+            includeSystemAudio = defaults.bool(forKey: PersistedSettingsKey.includeSystemAudio)
+        }
+        selectedDeviceID = defaults.string(forKey: PersistedSettingsKey.selectedDeviceID)
+
+        validateAndNormalizeSourceLanguage()
+    }
+
+    /// Same invariant `transcriptionEngineID`'s `didSet` self-heals on an
+    /// engine switch — re-checked here because restoring settings can
+    /// arrive at an invalid combination that neither individual restore
+    /// step above would have caught on its own (see `restorePersistedSettings()`'s
+    /// doc).
+    private func validateAndNormalizeSourceLanguage() {
+        guard transcriptionEngineKind == .system else { return }
+        let isUnsupportedForSystemASR = sourceLanguageCode.map { code in
+            LanguageCatalog.common.first { $0.code == code }?.supportsSystemASRSource == false
+        } ?? true
+        if isUnsupportedForSystemASR {
+            sourceLanguageCode = "en-US"
+        }
+    }
+
+    /// `refreshDevices()`'s own fallback (below) intentionally does *not*
+    /// go through `selectedDeviceID`'s normal persisting `didSet` — without
+    /// this flag, plugging out a USB mic/disconnecting Bluetooth earbuds and
+    /// then just opening the menu (which calls `refreshDevices()`) would
+    /// silently overwrite the persisted device preference with
+    /// `.systemDefault`, permanently forgetting it even after the real
+    /// device is reconnected.
+    private var isReconcilingDevices = false
 
     public func refreshDevices() {
         inputDevices = [.systemDefault] + MicrophoneCapture.availableDevices()
-        if selectedDeviceID == nil || !inputDevices.contains(where: { $0.id == selectedDeviceID }) {
+
+        // Reconciling/switching `selectedDeviceID` while a recording is
+        // active would just desync the UI from reality: `start()` already
+        // handed the *original* device to `MicrophoneCapture`, which can't
+        // hot-swap mid-recording, so changing this property now wouldn't
+        // change what's actually being captured. Still refresh
+        // `inputDevices` above so the (disabled) picker's list itself stays
+        // current.
+        guard !isSessionActive else { return }
+
+        // Prefer the persisted device over whatever `selectedDeviceID`
+        // currently holds: once a disconnect falls back to `.systemDefault`
+        // (below), `.systemDefault` is *always* present in `inputDevices`,
+        // so the plain "is the current selection still valid" check below
+        // would never re-trigger once the preferred device reconnects —
+        // this in-session switch-back needs its own check against the
+        // persisted preference, not just against the current selection.
+        let preferredID = Self.defaults.string(forKey: PersistedSettingsKey.selectedDeviceID)
+        if let preferredID, inputDevices.contains(where: { $0.id == preferredID }) {
+            if selectedDeviceID != preferredID {
+                isReconcilingDevices = true
+                selectedDeviceID = preferredID
+                isReconcilingDevices = false
+            }
+        } else if selectedDeviceID == nil || !inputDevices.contains(where: { $0.id == selectedDeviceID }) {
+            isReconcilingDevices = true
             selectedDeviceID = inputDevices.first?.id
+            isReconcilingDevices = false
         }
     }
 
     // MARK: - Lifecycle
 
     public func start() async {
-        guard !isRunning, !isStopping else { return }
+        guard !isRunning, !isStopping, !isStarting else { return }
+        isStarting = true
+        defer { isStarting = false }
+        // `activeSessionRecord` is created below, before translation/
+        // transcription/mic are actually up — any of those failing (several
+        // `catch` blocks below `return` early) left that record as a
+        // permanent orphan: no `endedAt`, no utterances, and un-reachable
+        // once the *next* successful `start()` overwrites
+        // `activeSessionRecord` with a new one. `isRunning` only ever
+        // becomes `true` on the success path at the very end, so "this
+        // defer still finds `isRunning == false`" reliably means "we're
+        // exiting via one of the early-failure returns" — clean up the
+        // orphan there instead of duplicating cleanup in every `catch`.
+        // `lines` is reset the same way: `lines = [TranscriptLine(id: 0)]`
+        // below runs before any of those same failure points, so without
+        // this a failed `start()` left one empty row behind — `lines.isEmpty`
+        // then reads `false`, so `FloatingTranscriptView`'s "等待开始…"
+        // placeholder never shows and the panel just looks blank, with no
+        // indication anything went wrong (that's `statusMessage`'s job —
+        // see `FloatingTranscriptView.statusBar`).
+        defer {
+            if !isRunning {
+                lines = []
+                if let sessionStore, let orphan = activeSessionRecord {
+                    sessionStore.delete(orphan)
+                    try? sessionStore.save()
+                    activeSessionRecord = nil
+                }
+            }
+        }
 
         let transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID)
         let translation = Self.makeTranslationProvider(engineID: translationEngineID)
@@ -335,4 +524,20 @@ public final class RecordingSession: ObservableObject {
         default: return SystemTranslationProvider()
         }
     }
+
+    private static let defaults = UserDefaults.standard
+}
+
+/// Namespaced (`org.omnivoice.*`) to avoid colliding with anything else
+/// ever written into the app's `UserDefaults` domain. Internal, not
+/// `private`, so `RecordingSessionSettingsTests` can drive
+/// `restorePersistedSettings()`'s self-heal paths through the same
+/// `UserDefaults` keys `RecordingSession` itself reads/writes.
+enum PersistedSettingsKey {
+    static let transcriptionEngineID = "org.omnivoice.transcriptionEngineID"
+    static let translationEngineID = "org.omnivoice.translationEngineID"
+    static let sourceLanguageCode = "org.omnivoice.sourceLanguageCode"
+    static let targetLanguageCode = "org.omnivoice.targetLanguageCode"
+    static let includeSystemAudio = "org.omnivoice.includeSystemAudio"
+    static let selectedDeviceID = "org.omnivoice.selectedDeviceID"
 }

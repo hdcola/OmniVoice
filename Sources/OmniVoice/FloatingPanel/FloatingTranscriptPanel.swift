@@ -36,8 +36,17 @@ final class FloatingTranscriptPanel: NSPanel {
         hasShadow = true
         isMovableByWindowBackground = true
         hidesOnDeactivate = false
+        // Matches `FloatingTranscriptView`'s `.frame(minWidth:minHeight:...)`
+        // — without this, `.resizable` in the style mask lets the user drag
+        // the window smaller than the SwiftUI content can actually shrink to.
+        minSize = NSSize(width: 380, height: 200)
         standardWindowButton(.zoomButton)?.isHidden = true
         standardWindowButton(.miniaturizeButton)?.isHidden = true
+        // Replaced by a custom close button in the control bar
+        // (`FloatingTranscriptView`) that calls `orderOut(nil)` — same
+        // effect, but themed to match the panel instead of a stray native
+        // traffic light sitting on top of a titlebar-less panel.
+        standardWindowButton(.closeButton)?.isHidden = true
     }
 
     /// Never becomes key — clicking/dragging the panel must not steal focus

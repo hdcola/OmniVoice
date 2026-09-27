@@ -28,7 +28,11 @@ struct MenuBarContentView: View {
 
     @ViewBuilder
     private var content: some View {
-        Button(session.isRunning ? "停止转录" : "开始转录") {
+        // Kept here alongside the floating panel's own start/stop button
+        // (not removed in favor of it) — if the user has hidden the panel,
+        // this is the only way to start/stop without first digging it back
+        // out via "显示/隐藏悬浮窗" below.
+        Button(session.isRunning ? "停止转录" : (session.isStarting ? "启动中…" : "开始转录")) {
             Task {
                 if session.isRunning {
                     await session.stop()
@@ -37,11 +41,34 @@ struct MenuBarContentView: View {
                 }
             }
         }
-        .disabled(session.isStopping)
+        .disabled(session.isStopping || session.isStarting)
 
         Button("显示/隐藏悬浮窗") {
             appDelegate.toggleFloatingPanel()
         }
+
+        Divider()
+
+        // Audio source — changed far less often than start/stop or the
+        // language pair (which live on the floating panel instead), but
+        // still frequent enough to want here rather than buried in
+        // Settings. Disabled for the whole start→stop lifecycle
+        // (isSessionActive, not just isRunning): `RecordingSession.start()`
+        // reads these once, at the top, to configure that recording's audio
+        // pipeline — changing them during setup would either race that read
+        // or silently not apply to the run in progress.
+        Picker("麦克风", selection: $session.selectedDeviceID) {
+            ForEach(session.inputDevices) { device in
+                Text(device.name).tag(Optional(device.id))
+            }
+        }
+        .disabled(session.isSessionActive)
+
+        // Permission requirement is explained by the
+        // `screenRecordingPermissionNeeded` caption below instead of in this
+        // label — keeps the menu item itself from wrapping/getting cut off.
+        Toggle("包含系统声音", isOn: $session.includeSystemAudio)
+            .disabled(session.isSessionActive)
 
         Divider()
 
