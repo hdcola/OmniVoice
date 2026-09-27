@@ -170,6 +170,150 @@ struct RecordingSessionSettingsTests {
         }
     }
 
+    @Test func usesOnDeviceModelEngineReflectsEitherEngineBeingModelKind() {
+        defer {
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)
+            defaults.removeObject(forKey: PersistedSettingsKey.translationEngineID)
+        }
+        let session = RecordingSession()
+        #expect(!session.usesOnDeviceModelEngine)
+
+        session.transcriptionEngineID = "model.r2t2"
+        #expect(session.usesOnDeviceModelEngine)
+        session.transcriptionEngineID = "system.speech"
+        #expect(!session.usesOnDeviceModelEngine)
+
+        session.translationEngineID = "model.t3po"
+        #expect(session.usesOnDeviceModelEngine)
+    }
+
+    /// Uses the default `.system` engines (no-op `loadModel()`, see
+    /// `SystemTranscriptionProvider`/`SystemTranslationProvider`) so this
+    /// exercises `preloadModel()`'s own state machine without depending on
+    /// real R2T2/T3PO weights being present on the test machine.
+    @Test func preloadModelSetsIsModelLoadedForCurrentEngines() async {
+        let session = RecordingSession()
+        #expect(!session.isModelLoaded)
+        #expect(!session.isPreloadingModel)
+
+        await session.preloadModel()
+
+        #expect(session.isModelLoaded)
+        #expect(!session.isPreloadingModel)
+    }
+
+    /// Guards `discardLoadedModelsIfStale()` — without it, switching engines
+    /// after a load would leave `isModelLoaded` true for an engine pair
+    /// `start()` was never actually asked to run, letting it wrongly skip
+    /// `loadModel()` for the newly-selected engine.
+    @Test func switchingEngineAfterPreloadDiscardsIt() async {
+        defer { defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID) }
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.isModelLoaded)
+
+        session.transcriptionEngineID = "model.r2t2"
+        #expect(!session.isModelLoaded)
+    }
+
+    /// Guards `discardLoadedModelsIfStale()`'s `statusMessage` cleanup —
+    /// without it, switching engines right after a successful preload left
+    /// the panel's status bar permanently reading "模型已预加载" even though
+    /// that model was just unloaded.
+    @Test func switchingEngineAfterPreloadResetsTheStaleStatusMessage() async {
+        defer { defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID) }
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.statusMessage == "模型已预加载")
+
+        session.transcriptionEngineID = "model.r2t2"
+        #expect(session.statusMessage == "未启动")
+    }
+
+    /// Guards `discardLoadedModelsIfStale()`'s staleness check — a
+    /// `didSet` fires on *any* assignment, including one that re-sets the
+    /// same value a `Picker` already had selected, so without comparing
+    /// against the previously-loaded id this used to discard a perfectly
+    /// good, still-matching load.
+    @Test func reassigningTheSameEngineIDDoesNotDiscardALoadedModel() async {
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.isModelLoaded)
+
+        session.transcriptionEngineID = session.transcriptionEngineID
+        #expect(session.isModelLoaded)
+    }
+
+    /// `preloadModel()` is a no-op once already loaded — without this guard
+    /// (see its own `!isModelLoaded` precondition), a second call would
+    /// pointlessly reload an already-resident model.
+    @Test func preloadModelIsANoOpOnceAlreadyLoaded() async {
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.isModelLoaded)
+
+        session.statusMessage = "未启动"
+        await session.preloadModel()
+        // Didn't re-run the "预加载…" messaging path a second time.
+        #expect(session.statusMessage == "未启动")
+    }
+
+    @Test func unloadModelsReleasesAPreloadedModel() async {
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.isModelLoaded)
+
+        session.unloadModels()
+        #expect(!session.isModelLoaded)
+        #expect(session.statusMessage == "未启动")
+    }
+
+    /// Guards the one thing that makes `unloadModels()` (a user-initiated
+    /// action, unlike `unloadModelsBeforeQuit()`) different from that
+    /// quit-time counterpart: it must never pull a model out from under an
+    /// active recording.
+    @Test func unloadModelsIsANoOpWhileSessionIsActive() async {
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.isModelLoaded)
+
+        session.isRunning = true
+        session.unloadModels()
+        #expect(session.isModelLoaded)
+        session.isRunning = false
+    }
+
+    /// Guards against `unloadModels()` racing `preloadModel()`'s own
+    /// in-flight `loadModel()` calls — `isPreloadingModel` isn't part of
+    /// `isSessionActive`, so without its own guard, calling this mid-preload
+    /// would nil out the provider ivars right before `preloadModel()`
+    /// resumes and unconditionally sets `isModelLoaded = true`, leaving
+    /// `isModelLoaded == true` with both providers actually `nil`.
+    @Test func unloadModelsIsANoOpWhilePreloadingModel() async {
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.isModelLoaded)
+
+        session.isPreloadingModel = true
+        session.unloadModels()
+        #expect(session.isModelLoaded)
+        session.isPreloadingModel = false
+    }
+
+    /// `finalizeActiveSessionBeforeQuit()`'s no-op guard, for the common
+    /// case (no `sessionStore` — the default `RecordingSession()` used
+    /// throughout this suite — or nothing currently recording). The
+    /// "actually closes out an orphaned in-progress session" path isn't
+    /// covered here: reaching it requires `start()` to fully succeed
+    /// (`isRunning == true`), which needs real mic capture/ASR permissions
+    /// this sandboxed test environment can't reliably grant — any earlier
+    /// failure already deletes the just-created `activeSessionRecord` via
+    /// `start()`'s own cleanup `defer`.
+    @Test func finalizeActiveSessionBeforeQuitIsANoOpWithNoActiveSession() {
+        let session = RecordingSession()
+        session.finalizeActiveSessionBeforeQuit()
+    }
+
     @Test func isSessionActiveReflectsAnyLifecyclePhase() {
         let session = RecordingSession()
         #expect(!session.isSessionActive)

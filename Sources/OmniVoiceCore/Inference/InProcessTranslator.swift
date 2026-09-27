@@ -109,7 +109,12 @@ struct TranslationTuning {
 /// point funnels through one serial `queue`; a llama.cpp context handle is
 /// no more safe to touch from two threads at once than an audiocpp session
 /// was.
-final class InProcessTranslator {
+/// `@unchecked Sendable`: honest given this class's own documented
+/// thread-safety contract above (every entry point funnels through the
+/// serial `queue`) — needed so `loadModel(modelPath:)`'s `queue.async`
+/// closure (a `@Sendable` closure, unlike the `queue.sync` ones elsewhere in
+/// this file) can capture `self` without a compiler warning.
+final class InProcessTranslator: @unchecked Sendable {
     /// Fires once per **committed** (TRANS) probe — append-only, like
     /// `InProcessTranscriber.onDelta`, not a tentative value that might later
     /// be revised. A WAIT probe fires nothing.
@@ -198,11 +203,31 @@ final class InProcessTranslator {
 
     /// Loads the model and creates a decode context. Call once before the
     /// first `feed(sourceDelta:)`; safe to call again after `unload()`.
-    func loadModel(modelPath: URL? = nil) throws {
-        try queue.sync { try loadModelLocked(modelPath: modelPath) }
+    ///
+    /// Dispatches onto `queue` **asynchronously** — see
+    /// `InProcessTranscriber.loadModel(modelPath:)`'s doc for why a
+    /// `queue.sync` here would instead freeze the whole (`@MainActor`-bound)
+    /// app UI for the whole load: the same reasoning applies verbatim to
+    /// T3PO's weights load + `llama_init_from_model`.
+    func loadModel(modelPath: URL? = nil) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                do {
+                    try self.loadModelLocked(modelPath: modelPath)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     private func loadModelLocked(modelPath: URL?) throws {
+        // Same defensive guard as `InProcessTranscriber.loadModelLocked`'s
+        // — see its doc. Here the leak would be `model`/`ctx` (plus a
+        // redundant `llama_backend_init()`), never freed since `unload()`
+        // only ever sees whichever handles are current by the time it runs.
+        guard model == nil else { return }
         let path = Self.resolveModelPath(override: modelPath)
         guard FileManager.default.fileExists(atPath: path) else {
             throw TranslatorError.modelMissing(path)
@@ -213,9 +238,17 @@ final class InProcessTranslator {
         var modelParams = llama_model_default_params()
         modelParams.n_gpu_layers = -1 // negative = offload every layer (Metal)
         guard let mdl = path.withCString({ llama_model_load_from_file($0, modelParams) }) else {
+            // Undo the `llama_backend_init()` above before throwing —
+            // nothing else has been allocated yet, so this is the only
+            // thing to unwind. Without it, a failure here leaves backend
+            // state initialized with `model`/`ctx` still both `nil`, and
+            // `unload()` (every caller's failure path already calls it
+            // unconditionally) skips freeing anything when both are `nil`
+            // — see its own doc — leaving this `llama_backend_init()`
+            // permanently unpaired.
+            llama_backend_free()
             throw TranslatorError.llamaCallFailed("加载 T3PO 模型失败")
         }
-        model = mdl
 
         var ctxParams = llama_context_default_params()
         ctxParams.n_ctx = 4096
@@ -228,9 +261,22 @@ final class InProcessTranslator {
         // the other half of this fix (keeping the prompt itself under
         // `n_ctx`, since this alone only raises the ceiling).
         ctxParams.n_batch = ctxParams.n_ctx
+        // `model`/`ctx` only get assigned to the stored properties once
+        // *both* succeed, not right after `llama_model_load_from_file`
+        // above — same reasoning as `InProcessTranscriber.loadModelLocked`'s
+        // registry/model fix: assigning `model` eagerly would leave it set
+        // (passing the `guard model == nil` retry check) while `ctx` stayed
+        // `nil` if this call failed, silently wedging every future
+        // `feed`/`flush` call (which both require `ctx != nil`) with no
+        // error ever surfaced and no way to recover short of `unload()`.
         guard let context = llama_init_from_model(mdl, ctxParams) else {
+            // Same unwind reasoning as `llama_model_load_from_file`'s
+            // failure above — `model`/`ctx` are still both `nil` here too.
+            llama_model_free(mdl)
+            llama_backend_free()
             throw TranslatorError.llamaCallFailed("创建 T3PO 推理上下文失败")
         }
+        model = mdl
         ctx = context
     }
 
@@ -500,6 +546,20 @@ final class InProcessTranslator {
         return output
     }
 
+    /// Ends this recording's session — clears the buffered source text and
+    /// windowed history so a new recording's first `feed(sourceDelta:)`
+    /// doesn't leak the previous one's context into its prompt — without
+    /// releasing `model`/`ctx` (contrast `unload()` below, the actual
+    /// teardown). Cheap: no GPU/model resources are touched, just the two
+    /// in-memory arrays.
+    func resetSession() {
+        queue.sync {
+            pendingPreviewWorkItem?.cancel()
+            buffer.removeAll()
+            history.removeAll()
+        }
+    }
+
     /// Releases the context/model. Also frees the llama.cpp backend
     /// (`llama_backend_free`) — like `InProcessTranscriber.unload()`'s
     /// audiocpp teardown, this matters for ggml's Metal backend exit-time
@@ -508,13 +568,44 @@ final class InProcessTranslator {
     func unload() {
         queue.sync {
             pendingPreviewWorkItem?.cancel()
+            buffer.removeAll()
+            history.removeAll()
+            // Every caller in `RecordingSession` calls this unconditionally
+            // on any `loadModel()` failure, including one that threw before
+            // `loadModelLocked` ever called `llama_backend_init()` (e.g.
+            // `TranslatorError.modelMissing`) — `model`/`ctx` both `nil`
+            // here is exactly that case, and `llama_backend_free()` would
+            // free global backend state that was never initialized in the
+            // first place. `loadModelLocked`'s own failure paths already
+            // pair every `llama_backend_init()` they perform with a
+            // matching `llama_backend_free()` before throwing, so by the
+            // time this runs, "backend was initialized" and "`model`/`ctx`
+            // non-`nil`" are the same condition.
+            guard model != nil || ctx != nil else { return }
             if let ctx { llama_free(ctx) }
             if let model { llama_model_free(model) }
             ctx = nil
             model = nil
-            buffer.removeAll()
-            history.removeAll()
             llama_backend_free()
         }
+    }
+
+    /// A safety net, not the normal teardown path — see
+    /// `InProcessTranscriber.deinit`'s doc, which applies here verbatim
+    /// (same risk: a leaked, Metal-backed `ctx`/`model` past process exit
+    /// trips ggml's exit-time assert). No `queue.sync`, for the same reason
+    /// given there.
+    ///
+    /// Unlike that one, this guards on `ctx`/`model` still being non-nil —
+    /// `llama_backend_free()` looks to be global/singleton teardown (unlike
+    /// audiocpp's per-handle frees, which are null-safe to call twice by
+    /// this class's own contract), so calling it again here after `unload()`
+    /// already ran (leaving both `nil`) would double-free global backend
+    /// state instead of safely no-op'ing.
+    deinit {
+        guard ctx != nil || model != nil else { return }
+        if let ctx { llama_free(ctx) }
+        if let model { llama_model_free(model) }
+        llama_backend_free()
     }
 }

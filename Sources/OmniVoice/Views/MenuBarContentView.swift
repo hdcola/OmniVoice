@@ -32,7 +32,16 @@ struct MenuBarContentView: View {
         // (not removed in favor of it) — if the user has hidden the panel,
         // this is the only way to start/stop without first digging it back
         // out via "显示/隐藏悬浮窗" below.
-        Button(session.isRunning ? "停止转录" : (session.isStarting ? "启动中…" : "开始转录")) {
+        // The `isPreloadingModel` case matters specifically here (unlike the
+        // floating panel's own start/stop button, which sits right next to
+        // a "预加载模型"/"加载中…" button of its own): if the panel is
+        // hidden, this dropdown is the only place the user can see *why*
+        // the button below is grayed out — a plain "开始转录" that just
+        // doesn't respond reads as broken, not as "busy".
+        Button(
+            session.isRunning ? "停止转录"
+                : (session.isStarting ? "启动中…" : (session.isPreloadingModel ? "预加载中…" : "开始转录"))
+        ) {
             Task {
                 if session.isRunning {
                     await session.stop()
@@ -41,7 +50,11 @@ struct MenuBarContentView: View {
                 }
             }
         }
-        .disabled(session.isStopping || session.isStarting)
+        // `isPreloadingModel` too — `start()` itself already no-ops while a
+        // preload is in flight (see its own guard), but without disabling
+        // this button too, clicking it here felt like nothing happened
+        // rather than the button visibly reflecting why.
+        .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
 
         Button("显示/隐藏悬浮窗") {
             appDelegate.toggleFloatingPanel()
@@ -64,9 +77,12 @@ struct MenuBarContentView: View {
         }
         .disabled(session.isSessionActive)
 
-        // Permission requirement is explained by the
-        // `screenRecordingPermissionNeeded` caption below instead of in this
-        // label — keeps the menu item itself from wrapping/getting cut off.
+        // A missing Screen Recording permission (needed for this toggle to
+        // actually capture anything) surfaces via `session.statusMessage`
+        // on the floating panel instead of a caption here — kept out of
+        // this label so it doesn't wrap/get cut off, and out of this menu
+        // entirely so the panel stays the one place status text lives (see
+        // `FloatingTranscriptView.statusBar`).
         Toggle("包含系统声音", isOn: $session.includeSystemAudio)
             .disabled(session.isSessionActive)
 
@@ -84,17 +100,6 @@ struct MenuBarContentView: View {
         Button("设置…") {
             NSApp.activate(ignoringOtherApps: true)
             openSettings()
-        }
-
-        Divider()
-
-        Text(session.statusMessage)
-            .font(.caption)
-
-        if session.screenRecordingPermissionNeeded {
-            Text("需要在系统设置里授权屏幕录制权限，才能捕获系统声音")
-                .font(.caption)
-                .foregroundStyle(.orange)
         }
 
         Divider()

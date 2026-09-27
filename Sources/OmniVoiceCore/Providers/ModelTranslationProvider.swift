@@ -29,7 +29,7 @@ public final class ModelTranslationProvider: TranslationProvider {
     }
 
     public func loadModel() async throws {
-        try translator.loadModel(modelPath: modelPath)
+        try await translator.loadModel(modelPath: modelPath)
     }
 
     public func unload() {
@@ -44,6 +44,10 @@ public final class ModelTranslationProvider: TranslationProvider {
         translator.setTargetLanguage(ModelLanguageMapping.t3poTargetLanguage(forCode: config.targetLanguageCode))
     }
 
+    public func updateTargetLanguage(_ code: String) {
+        translator.setTargetLanguage(ModelLanguageMapping.t3poTargetLanguage(forCode: code))
+    }
+
     public func feed(_ text: String) {
         translator.feed(sourceDelta: text)
     }
@@ -53,6 +57,10 @@ public final class ModelTranslationProvider: TranslationProvider {
     }
 
     public func stop() async {
-        translator.unload()
+        // Ends this recording's buffered/history state but leaves the model
+        // loaded — see `ModelTranscriptionProvider.stop()`'s doc for why
+        // unloading on every stop (an earlier version of this method did)
+        // was wrong.
+        translator.resetSession()
     }
 }

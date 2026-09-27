@@ -102,7 +102,13 @@ struct StreamingTuning {
 /// funnels through one serial `queue`, and the `_locked` helpers assume
 /// they're already running on it (so `rotateStream` can call
 /// `_startStreamLocked` internally without a nested `queue.sync` deadlock).
-final class InProcessTranscriber {
+/// `@unchecked Sendable`: honest given this class's own documented
+/// thread-safety contract above (every mutable field is only ever touched
+/// from inside `queue`, synchronously or, since `loadModel(modelPath:)`,
+/// asynchronously) — needed so `loadModel(modelPath:)`'s `queue.async`
+/// closure (a `@Sendable` closure, unlike the `queue.sync` ones elsewhere in
+/// this file) can capture `self` without a compiler warning.
+final class InProcessTranscriber: @unchecked Sendable {
     var onDelta: ((String) -> Void)?
     var onFinalTail: ((String) -> Void)?
     /// Read by `startStream()` when it creates a session — i.e. changes only
@@ -149,11 +155,39 @@ final class InProcessTranscriber {
     /// Loads the registry and model. Call once before the first
     /// `startStream()`; safe to call again after `unload()`. Does not create
     /// a session — `startStream()` creates one on demand.
-    func loadModel(modelPath: URL? = nil) throws {
-        try queue.sync { try loadModelLocked(modelPath: modelPath) }
+    ///
+    /// Dispatches onto `queue` **asynchronously** (`queue.async`, not the
+    /// `queue.sync` every other entry point here uses) — reading a
+    /// multi-hundred-MB weights file plus backend init is the one operation
+    /// on this type that can take real seconds, and every caller of this is
+    /// `@MainActor`-isolated (`ModelTranscriptionProvider`). A `queue.sync`
+    /// call from the main actor blocks that actor's executor for the whole
+    /// load — the app's entire UI (including whatever "loading…" spinner is
+    /// meant to show progress) would freeze solid for that duration, not
+    /// just look busy. Suspending via a continuation instead lets the main
+    /// actor keep servicing SwiftUI/AppKit while this runs on `queue`.
+    func loadModel(modelPath: URL? = nil) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                do {
+                    try self.loadModelLocked(modelPath: modelPath)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     private func loadModelLocked(modelPath: URL?) throws {
+        // A defensive guard, not the expected path — every caller already
+        // pairs `loadModel()` with `unload()` before ever calling it again
+        // (see `RecordingSession`'s `isModelLoaded` bookkeeping), but
+        // without this, an unexpected duplicate call would overwrite
+        // `registry`/`model` with fresh handles while leaking the old ones
+        // — `unload()` never gets to free them, since it only ever reads
+        // whatever's currently in these two properties.
+        guard model == nil else { return }
         let path = Self.resolveModelPath(override: modelPath)
         guard FileManager.default.fileExists(atPath: path) else {
             throw TranscriberError.modelMissing(path)
@@ -161,18 +195,32 @@ final class InProcessTranscriber {
 
         var reg: OpaquePointer?
         try check(audiocpp_registry_create(nil, &reg), "创建 registry 失败")
-        registry = reg
 
+        // `reg` only gets assigned to the stored `registry` once `model`
+        // load has *also* succeeded, below — not right after creation.
+        // Assigning it eagerly (an earlier version of this did) meant a
+        // `audiocpp_model_load` failure below still left `registry` holding
+        // a real handle while `model` stayed `nil`; the guard above only
+        // checks `model == nil`, so a caller retrying `loadModel()` after
+        // that failure would create and assign a *second* registry,
+        // orphaning the first one (never freed — `unload()` only ever sees
+        // whichever handle is current).
         var mdl: OpaquePointer?
-        try "confucius4_r2t2".withCString { familyPtr -> Void in
-            var config = audiocpp_model_config(
-                family_hint: familyPtr,
-                config_id: nil,
-                weight_id: nil,
-                model_spec_override: nil
-            )
-            try check(audiocpp_model_load(reg, path, &config, nil, &mdl), "加载模型失败")
+        do {
+            try "confucius4_r2t2".withCString { familyPtr -> Void in
+                var config = audiocpp_model_config(
+                    family_hint: familyPtr,
+                    config_id: nil,
+                    weight_id: nil,
+                    model_spec_override: nil
+                )
+                try check(audiocpp_model_load(reg, path, &config, nil, &mdl), "加载模型失败")
+            }
+        } catch {
+            audiocpp_registry_free(reg)
+            throw error
         }
+        registry = reg
         model = mdl
     }
 
@@ -305,6 +353,22 @@ final class InProcessTranscriber {
             model = nil
             registry = nil
         }
+    }
+
+    /// A safety net, not the normal teardown path — every caller in this
+    /// codebase already unloads explicitly (`RecordingSession.unloadModelsBeforeQuit()`/
+    /// `discardLoadedModelsIfStale()`), but if some future caller ever drops
+    /// or replaces an instance without going through that, this is what
+    /// stops the underlying registry/model/session C handles from leaking
+    /// silently — and, for the Metal-backed ones, risking the ggml
+    /// exit-time assert `unload()`'s doc describes. No `queue.sync` here:
+    /// by the time `deinit` runs, no other reference (and so no concurrent
+    /// caller) can exist, so the lock `unload()` needs elsewhere isn't
+    /// needed for this one guaranteed-exclusive access.
+    deinit {
+        audiocpp_session_free(session)
+        audiocpp_model_free(model)
+        audiocpp_registry_free(registry)
     }
 
     private static func makeSessionOptions(_ tuning: StreamingTuning) -> OpaquePointer? {

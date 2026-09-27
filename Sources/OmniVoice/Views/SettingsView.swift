@@ -48,7 +48,11 @@ struct SettingsView: View {
         }
         .padding(20)
         .frame(width: 440)
-        .disabled(session.isSessionActive)
+        // `isPreloadingModel` alongside `isSessionActive`: switching engines
+        // mid-preload would race `preloadModel()`'s in-flight `loadModel()`
+        // calls against `discardLoadedModelsIfStale()` unloading the very
+        // providers it's still awaiting.
+        .disabled(session.isSessionActive || session.isPreloadingModel)
     }
 
     @ViewBuilder

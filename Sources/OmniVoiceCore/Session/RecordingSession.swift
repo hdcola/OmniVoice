@@ -33,6 +33,23 @@ public final class RecordingSession: ObservableObject {
     /// in that window would pass the same guard and create a second set of
     /// providers/capture, leaking the first and double-starting capture.
     @Published public var isStarting = false
+    /// True while `preloadModel()`'s `loadModel()` calls are in flight —
+    /// mirrors `isStarting`'s role but for the standalone preload path (see
+    /// `preloadModel()`'s doc for why that's a separate entry point from
+    /// `start()`).
+    @Published public var isPreloadingModel = false
+    /// True whenever `transcriptionProvider`/`translationProvider` currently
+    /// hold a loaded pair matching today's engine selection
+    /// (`loadedEngineIDs`) — whether that load happened via an explicit
+    /// `preloadModel()` call or as a side effect of a previous `start()`.
+    /// Deliberately survives `stop()`: a `.model`-kind engine's weights stay
+    /// resident in memory across stop/start cycles (see `stop()`'s doc)
+    /// instead of being reloaded from scratch on every "开始" — this flag
+    /// (and the "预加载模型"/"模型已就绪" UI reading it) is what makes that
+    /// visible instead of silently reloading anyway. Only goes false when
+    /// the engine selection changes (`discardLoadedModelsIfStale()`) or the
+    /// app is about to quit (`unloadModelsBeforeQuit()`).
+    @Published public var isModelLoaded = false
     /// True across the whole `start()`→`stop()` lifecycle, not just while
     /// actually recording — use this (not `isRunning` alone) to gate any
     /// control whose value is only read once, at the top of `start()`
@@ -74,10 +91,14 @@ public final class RecordingSession: ObservableObject {
             // runs after restoring persisted settings.
             validateAndNormalizeSourceLanguage()
             Self.defaults.set(transcriptionEngineID, forKey: PersistedSettingsKey.transcriptionEngineID)
+            discardLoadedModelsIfStale()
         }
     }
     @Published public var translationEngineID: String = ProviderCatalog.translationEngines[0].id {
-        didSet { Self.defaults.set(translationEngineID, forKey: PersistedSettingsKey.translationEngineID) }
+        didSet {
+            Self.defaults.set(translationEngineID, forKey: PersistedSettingsKey.translationEngineID)
+            discardLoadedModelsIfStale()
+        }
     }
     /// BCP-47-ish language tags. `sourceLanguageCode` nil means "auto", only
     /// meaningful for `.model`-kind ASR engines — `.system` (`SpeechTranscriber`)
@@ -93,7 +114,22 @@ public final class RecordingSession: ObservableObject {
         }
     }
     @Published public var targetLanguageCode: String = "zh-CN" {
-        didSet { Self.defaults.set(targetLanguageCode, forKey: PersistedSettingsKey.targetLanguageCode) }
+        didSet {
+            Self.defaults.set(targetLanguageCode, forKey: PersistedSettingsKey.targetLanguageCode)
+            // Unlike `sourceLanguageCode`/the engine ID properties, this one
+            // stays editable *while* a recording is running (see
+            // `TargetLanguagePicker`'s doc in `FloatingTranscriptView`) —
+            // for `SystemTranslationProvider`, that already worked via
+            // `.translationTask` rebuilding on every change, but a
+            // `.model`-kind engine like T3PO has no such rebuild hook and
+            // was silently continuing to translate into whatever language
+            // `start(config:)` set until this was added. Safe to call
+            // whether or not a recording is active — `translationProvider`
+            // is nil when stopped, and `updateTargetLanguage(_:)`'s default
+            // no-op is a deliberate no-op for providers with nothing to
+            // retarget (see that method's doc).
+            translationProvider?.updateTargetLanguage(targetLanguageCode)
+        }
     }
 
     /// Nil only if `transcriptionEngineID` somehow doesn't match any known
@@ -103,11 +139,31 @@ public final class RecordingSession: ObservableObject {
         ProviderCatalog.transcriptionEngines.first { $0.id == transcriptionEngineID }?.kind
     }
 
+    public var translationEngineKind: EngineKind? {
+        ProviderCatalog.translationEngines.first { $0.id == translationEngineID }?.kind
+    }
+
+    /// Whether preloading is actually worth offering — a `.system` engine's
+    /// `loadModel()` is a no-op, so a preload button would just be a slower
+    /// no-op button when neither selected engine is `.model`-kind.
+    public var usesOnDeviceModelEngine: Bool {
+        transcriptionEngineKind == .model || translationEngineKind == .model
+    }
+
     private let sessionStore: SessionStore?
     private var activeSessionRecord: RecordingSessionRecord?
 
     private var transcriptionProvider: TranscriptionProvider?
     private var translationProvider: TranslationProvider?
+    /// The `(transcriptionEngineID, translationEngineID)` pair
+    /// `transcriptionProvider`/`translationProvider` are currently loaded
+    /// for, whenever they hold a loaded pair rather than `nil`/stale
+    /// instances. Distinct from just checking `isModelLoaded` because
+    /// `start()` needs to know the load actually matches the *current*
+    /// engine selection, not a stale one left over before a switch
+    /// (`discardLoadedModelsIfStale()` normally clears this first, but the
+    /// two aren't atomic with each other, so `start()` re-checks).
+    private var loadedEngineIDs: (transcription: String, translation: String)?
     private var micCapture: MicrophoneCapture?
     private var systemAudioCapture: SystemAudioCapture?
     private var mixer: AudioMixer?
@@ -241,8 +297,169 @@ public final class RecordingSession: ObservableObject {
 
     // MARK: - Lifecycle
 
+    /// Loads the currently-selected transcription/translation engines ahead
+    /// of `start()`, so a `.model`-kind engine's (often multi-second) weight
+    /// load happens while the user is still deciding to record rather than
+    /// after they've already asked to — without this, that load only ever
+    /// ran inside `start()` itself, making the very first "开始" of a
+    /// session look stalled with no visible progress beyond `statusMessage`.
+    /// A no-op-ish fast path for `.system` engines (their `loadModel()` does
+    /// nothing) — still safe to call, just not very useful there.
+    ///
+    /// Leaves the loaded providers in `transcriptionProvider`/
+    /// `translationProvider` for `start()` to adopt directly (skipping its
+    /// own `loadModel()` calls) as long as the engine selection hasn't
+    /// changed since — see `loadedEngineIDs`.
+    public func preloadModel() async {
+        guard !isSessionActive, !isPreloadingModel, !isModelLoaded else { return }
+        isPreloadingModel = true
+        defer { isPreloadingModel = false }
+
+        let transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID)
+        let translation = Self.makeTranslationProvider(engineID: translationEngineID)
+        // Wired into the ivars immediately — *before* either `loadModel()`
+        // call below resolves, not after both succeed. `unloadModelsBeforeQuit()`
+        // reads these same ivars, and it needs something to reach even if
+        // the app quits mid-load: leaving them `nil` until success meant
+        // quitting during a multi-second preload skipped `unload()`
+        // entirely, risking exactly the ggml Metal exit-time assert
+        // `unloadModelsBeforeQuit()` exists to prevent (see its doc).
+        transcriptionProvider = transcription
+        translationProvider = translation
+
+        statusMessage = "预加载翻译引擎中…"
+        do {
+            try await translation.loadModel()
+        } catch {
+            statusMessage = "翻译引擎预加载失败: \(error.localizedDescription)"
+            translation.unload()
+            // `transcription.loadModel()` was never even called at this
+            // point, so it holds no C resources to release yet — but
+            // `transcriptionProvider` is about to be nil'd (dropping this
+            // app's only reference to it) regardless, so unloading it
+            // first keeps this symmetric with the `transcription.loadModel()`
+            // catch just below, and isn't relying on "nothing to release
+            // yet" staying true if `makeTranscriptionProvider`/a future
+            // engine ever allocates anything at construction time.
+            transcription.unload()
+            transcriptionProvider = nil
+            translationProvider = nil
+            return
+        }
+
+        statusMessage = "预加载识别引擎中…"
+        do {
+            try await transcription.loadModel()
+        } catch {
+            statusMessage = "识别引擎预加载失败: \(error.localizedDescription)"
+            translation.unload()
+            transcription.unload()
+            transcriptionProvider = nil
+            translationProvider = nil
+            return
+        }
+
+        loadedEngineIDs = (transcriptionEngineID, translationEngineID)
+        isModelLoaded = true
+        statusMessage = "模型已预加载"
+    }
+
+    /// Unloads and discards a load left over from before an engine switch —
+    /// called from `transcriptionEngineID`/`translationEngineID`'s `didSet`.
+    /// Without this, switching engines after loading kept the *old*
+    /// engine's provider sitting in `transcriptionProvider`/
+    /// `translationProvider`, which `start()`'s reuse check below would
+    /// never actually pick (its own engine-ID comparison catches that), but
+    /// would otherwise just leak a loaded model that's no longer reachable
+    /// through `preloadModel()`'s `isModelLoaded` guard.
+    private func discardLoadedModelsIfStale() {
+        guard let loaded = loadedEngineIDs else { return }
+        // Re-assigning the *same* engine ID a Picker already has selected
+        // still fires this `didSet` — without this check, that (a no-op as
+        // far as the actual selection goes) would unconditionally discard a
+        // perfectly good, still-matching load.
+        guard loaded.transcription != transcriptionEngineID || loaded.translation != translationEngineID else {
+            return
+        }
+        transcriptionProvider?.unload()
+        translationProvider?.unload()
+        transcriptionProvider = nil
+        translationProvider = nil
+        loadedEngineIDs = nil
+        isModelLoaded = false
+        // Only when it's still showing what `preloadModel()` last set it to
+        // — never stomps a message from something else entirely unrelated
+        // to preloading (a recording in progress, a prior error, ...).
+        // Without this, switching engines right after a successful preload
+        // left the panel's status bar reading "模型已预加载" indefinitely,
+        // even though that model was just unloaded.
+        if statusMessage == "模型已预加载" {
+            statusMessage = "未启动"
+        }
+    }
+
+    /// Synchronously releases any loaded model backend before the app quits
+    /// — call from `applicationWillTerminate`. Required specifically for
+    /// `.model`-kind engines: leaving R2T2/T3PO's GPU (Metal) resources
+    /// alive past process exit trips ggml's exit-time assert (see
+    /// `InProcessTranslator.unload()`'s doc); `.system` providers' `unload()`
+    /// is a no-op, so this is harmless to call unconditionally. Not `async`
+    /// on purpose — every concrete `unload()` is synchronous, and
+    /// `applicationWillTerminate` gives no opportunity to await one that
+    /// wasn't.
+    public func unloadModelsBeforeQuit() {
+        performModelUnload()
+    }
+
+    /// Synchronously closes out an in-progress recording's persisted
+    /// history record before the app quits — call from
+    /// `applicationWillTerminate` alongside `unloadModelsBeforeQuit()`.
+    /// Without this, quitting mid-recording (Cmd+Q, system shutdown, ...)
+    /// left `activeSessionRecord` with no `endedAt`, showing up in history
+    /// as a session that never properly ended. Deliberately does **not**
+    /// call `stop()` — that does real async teardown of the mic/providers
+    /// the app has no time left to await; only the persisted record needs
+    /// closing out here, not the live capture.
+    public func finalizeActiveSessionBeforeQuit() {
+        guard let sessionStore, let activeSessionRecord else { return }
+        sessionStore.endSession(activeSessionRecord)
+        try? sessionStore.save()
+        self.activeSessionRecord = nil
+    }
+
+    /// User-initiated release of a currently-loaded `.model`-kind engine —
+    /// e.g. the floating panel's "模型已就绪" context menu offering "释放模型".
+    /// `isModelLoaded` otherwise only goes away on an engine switch or quit
+    /// (see its own doc); this is for reclaiming the memory/VRAM sooner on
+    /// a memory-constrained machine, without either of those. Guarded by
+    /// `!isSessionActive` — unlike `unloadModelsBeforeQuit()` (called at
+    /// quit, when nothing else matters), unloading out from under an active
+    /// recording would break it outright. Also guarded by `!isPreloadingModel`
+    /// (not part of `isSessionActive`): without it, calling this during
+    /// `preloadModel()`'s in-flight `loadModel()` calls would nil out
+    /// `transcriptionProvider`/`translationProvider` right before
+    /// `preloadModel()` resumes and unconditionally sets `isModelLoaded =
+    /// true` on success — leaving `isModelLoaded == true` (and the panel
+    /// reading "模型已就绪") while both provider ivars are actually `nil`.
+    public func unloadModels() {
+        guard !isSessionActive, !isPreloadingModel else { return }
+        performModelUnload()
+    }
+
+    private func performModelUnload() {
+        transcriptionProvider?.unload()
+        translationProvider?.unload()
+        transcriptionProvider = nil
+        translationProvider = nil
+        loadedEngineIDs = nil
+        isModelLoaded = false
+        if statusMessage == "模型已预加载" {
+            statusMessage = "未启动"
+        }
+    }
+
     public func start() async {
-        guard !isRunning, !isStopping, !isStarting else { return }
+        guard !isRunning, !isStopping, !isStarting, !isPreloadingModel else { return }
         isStarting = true
         defer { isStarting = false }
         // `activeSessionRecord` is created below, before translation/
@@ -273,8 +490,37 @@ public final class RecordingSession: ObservableObject {
             }
         }
 
-        let transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID)
-        let translation = Self.makeTranslationProvider(engineID: translationEngineID)
+        // Adopt an already-loaded pair rather than loading fresh below —
+        // whether that pair came from an explicit `preloadModel()` call or
+        // (just as often) is simply left over from a previous recording's
+        // `start()`, since `stop()` deliberately doesn't unload (see its
+        // doc). The engine-ID comparison guards against a load left over
+        // for a since-switched-away-from engine slipping through if
+        // `discardLoadedModelsIfStale()` hasn't run for some reason. The
+        // `transcriptionProvider`/`translationProvider` non-nil checks are
+        // folded into this same boolean, not left as a separate `if let`
+        // below — `reusingLoaded` is also read much further down (guarding
+        // whether `loadModel()` gets called at all), so if those checks
+        // lived only in the branch condition, an `isModelLoaded`-true-but-
+        // `transcriptionProvider`-nil edge case would fall into the `else`
+        // branch (creating fresh, unloaded providers) while `reusingLoaded`
+        // itself stayed `true` — skipping `loadModel()` for a provider that
+        // was never actually loaded, and failing at `startStream()` with
+        // `TranscriberError.notLoaded`.
+        let reusingLoaded = isModelLoaded
+            && loadedEngineIDs?.transcription == transcriptionEngineID
+            && loadedEngineIDs?.translation == translationEngineID
+            && transcriptionProvider != nil
+            && translationProvider != nil
+        let transcription: TranscriptionProvider
+        let translation: TranslationProvider
+        if reusingLoaded, let loadedTranscription = transcriptionProvider, let loadedTranslation = translationProvider {
+            transcription = loadedTranscription
+            translation = loadedTranslation
+        } else {
+            transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID)
+            translation = Self.makeTranslationProvider(engineID: translationEngineID)
+        }
         transcriptionProvider = transcription
         translationProvider = translation
 
@@ -309,15 +555,41 @@ public final class RecordingSession: ObservableObject {
             Task { @MainActor in self?.advanceTranslationRow() }
         }
 
-        statusMessage = "加载翻译引擎中…"
+        statusMessage = reusingLoaded ? "启动翻译引擎中…" : "加载翻译引擎中…"
         do {
-            try await translation.loadModel()
+            if !reusingLoaded {
+                try await translation.loadModel()
+            }
             try await translation.start(config: TranslationConfig(
                 sourceLanguageCode: sourceLanguageCode,
                 targetLanguageCode: targetLanguageCode
             ))
         } catch {
             statusMessage = "翻译引擎启动失败: \(error.localizedDescription)"
+            // Only tear down a load this call itself just performed — if
+            // `reusingLoaded`, the model was already loaded fine before
+            // this `start()` even ran; this failure is `start(config:)`'s
+            // alone, so leave it loaded for a retry instead of discarding
+            // a perfectly good load.
+            if !reusingLoaded {
+                translation.unload()
+                // Symmetric with the `transcription.loadModel()`/`start(config:)`
+                // catch below, even though `transcription` hasn't been
+                // touched yet at this point — see `preloadModel()`'s
+                // matching catch for the same reasoning.
+                transcription.unload()
+                transcriptionProvider = nil
+                translationProvider = nil
+                // Not reached via `reusingLoaded`, so neither was true
+                // beforehand in the ordinary case — but reset both
+                // defensively anyway: if `isModelLoaded` were ever `true`
+                // here despite `reusingLoaded` being `false` (engine IDs
+                // changed underneath it, say), leaving it `true` after
+                // just nil-ing the providers above would read as "模型已就绪"
+                // while nothing is actually loaded.
+                loadedEngineIDs = nil
+                isModelLoaded = false
+            }
             return
         }
 
@@ -325,15 +597,34 @@ public final class RecordingSession: ObservableObject {
             Task { @MainActor in self?.handle(event) }
         }
 
-        statusMessage = "加载识别引擎中…"
+        statusMessage = reusingLoaded ? "启动识别引擎中…" : "加载识别引擎中…"
         do {
-            try await transcription.loadModel()
+            if !reusingLoaded {
+                try await transcription.loadModel()
+            }
             try await transcription.start(config: TranscriptionConfig(languageCode: sourceLanguageCode))
         } catch {
             statusMessage = "识别引擎启动失败: \(error.localizedDescription)"
             await translation.stop()
+            // Same reasoning as the translation catch above.
+            if !reusingLoaded {
+                translation.unload()
+                transcription.unload()
+                transcriptionProvider = nil
+                translationProvider = nil
+                // Same defensive reset as the translation catch above.
+                loadedEngineIDs = nil
+                isModelLoaded = false
+            }
             return
         }
+
+        // Both engines are now loaded and started for this exact pair —
+        // record that regardless of whether this call freshly loaded them
+        // or reused an already-loaded pair, so `stop()` (which doesn't
+        // unload) leaves them ready for the *next* `start()` to reuse too.
+        loadedEngineIDs = (transcriptionEngineID, translationEngineID)
+        isModelLoaded = true
 
         let segmenter = UtteranceSegmenter()
         segmenter.onUtteranceBoundary = { [weak transcription] in
@@ -393,6 +684,12 @@ public final class RecordingSession: ObservableObject {
         mixer = nil
         vadSegmenter = nil
 
+        // Ends this recording's stream/session on each provider without
+        // unloading its model — `transcriptionProvider`/`translationProvider`
+        // (and `isModelLoaded`) stay as they are so the *next* `start()`
+        // reuses them instead of reloading weights from scratch. Only an
+        // engine switch (`discardLoadedModelsIfStale()`) or quitting
+        // (`unloadModelsBeforeQuit()`) actually unloads.
         await transcriptionProvider?.stop()
         await translationProvider?.stop()
 

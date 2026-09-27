@@ -54,6 +54,21 @@ public protocol TranslationProvider: AnyObject {
     /// previous recording.
     func start(config: TranslationConfig) async throws
 
+    /// Retargets an already-running session to a new target language,
+    /// without a full stop/start — for a provider that reads the target
+    /// language on every request rather than baking it into a persistent
+    /// session (a streaming `.model`-kind engine like T3PO), this is what
+    /// lets `RecordingSession.targetLanguageCode` changing mid-recording
+    /// actually apply to the *next* translation instead of silently
+    /// continuing to translate into whatever language `start(config:)` set.
+    /// The default implementation is a no-op, which is correct (not just a
+    /// placeholder) for a provider with nothing to retarget here —
+    /// `SystemTranslationProvider` already reads target language fresh from
+    /// `RecordingSession` on every `.translationTask` rebuild instead (see
+    /// `FloatingTranscriptView.rebuildConfiguration()`), so it has no
+    /// persistent per-session target to update.
+    func updateTargetLanguage(_ code: String)
+
     /// Appends new source text to translate. Safe to call at any point after
     /// `start(config:)`.
     func feed(_ text: String)
@@ -64,4 +79,8 @@ public protocol TranslationProvider: AnyObject {
     func flush()
 
     func stop() async
+}
+
+extension TranslationProvider {
+    public func updateTargetLanguage(_ code: String) {}
 }

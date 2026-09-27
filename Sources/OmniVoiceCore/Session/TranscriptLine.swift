@@ -5,7 +5,7 @@ import Foundation
 /// `TranscriptionEvent.segmentClosed` has been handled) are ever persisted
 /// as an `UtteranceRecord`; `sourceTentative`/`translationPreview` are
 /// display-only and never written to disk.
-public struct TranscriptLine: Identifiable, Sendable {
+public struct TranscriptLine: Identifiable, Sendable, Equatable {
     public let id: Int
     /// Committed source text — append-only, never revised.
     public var source: String = ""

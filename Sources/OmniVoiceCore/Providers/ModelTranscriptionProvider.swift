@@ -8,15 +8,14 @@ import Foundation
 public final class ModelTranscriptionProvider: TranscriptionProvider {
     public var onEvent: ((TranscriptionEvent) -> Void)?
 
-    // `nonisolated(unsafe)`: `ModelTranscriptionProvider` is inferred
-    // `@MainActor` (via `TranscriptionProvider`), but `push`/
-    // `notifyUtteranceBoundary` are `nonisolated` and must reach
-    // `transcriber` from whatever background audio/VAD queue calls them —
-    // safe here because `InProcessTranscriber` is itself internally
-    // thread-safe (one serial queue guards all its state, see its own doc),
-    // the same justification `SystemTranscriptionProvider`'s
-    // `nonisolated(unsafe)` fields document.
-    private nonisolated(unsafe) let transcriber = InProcessTranscriber()
+    // No `nonisolated(unsafe)` needed here (unlike `SystemTranscriptionProvider`'s
+    // fields): `push`/`notifyUtteranceBoundary` are `nonisolated` and must
+    // reach `transcriber` from whatever background audio/VAD queue calls
+    // them despite this class itself being inferred `@MainActor` (via
+    // `TranscriptionProvider`), but `InProcessTranscriber` is declared
+    // `@unchecked Sendable` (see its own doc — one serial queue guards all
+    // its state), so a plain `let` already satisfies that from any isolation.
+    private let transcriber = InProcessTranscriber()
     /// Resolved weights path, if the caller (`RecordingSession.makeTranscriptionProvider`)
     /// already knows one — e.g. a downloaded model cache location. `nil`
     /// falls back to `InProcessTranscriber.resolveModelPath`'s env-var/local-
@@ -36,7 +35,7 @@ public final class ModelTranscriptionProvider: TranscriptionProvider {
     }
 
     public func loadModel() async throws {
-        try transcriber.loadModel(modelPath: modelPath)
+        try await transcriber.loadModel(modelPath: modelPath)
     }
 
     public func unload() {
@@ -57,7 +56,15 @@ public final class ModelTranscriptionProvider: TranscriptionProvider {
     }
 
     public func stop() async {
+        // Ends the stream but deliberately leaves the model loaded — an
+        // earlier version of this also called `transcriber.unload()` here,
+        // which meant every "停止" silently freed R2T2's weights, forcing
+        // the *next* "开始" to reload them from scratch (a multi-second
+        // stall) even though nothing asked for that. `RecordingSession` now
+        // owns the model's loaded lifetime independently of any one
+        // recording's start/stop — see its `isModelLoaded` doc — and calls
+        // `unload()` itself when that's actually warranted (an engine
+        // switch, or quitting).
         transcriber.finishStream()
-        transcriber.unload()
     }
 }
