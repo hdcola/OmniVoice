@@ -195,18 +195,32 @@ final class InProcessTranscriber: @unchecked Sendable {
 
         var reg: OpaquePointer?
         try check(audiocpp_registry_create(nil, &reg), "创建 registry 失败")
-        registry = reg
 
+        // `reg` only gets assigned to the stored `registry` once `model`
+        // load has *also* succeeded, below — not right after creation.
+        // Assigning it eagerly (an earlier version of this did) meant a
+        // `audiocpp_model_load` failure below still left `registry` holding
+        // a real handle while `model` stayed `nil`; the guard above only
+        // checks `model == nil`, so a caller retrying `loadModel()` after
+        // that failure would create and assign a *second* registry,
+        // orphaning the first one (never freed — `unload()` only ever sees
+        // whichever handle is current).
         var mdl: OpaquePointer?
-        try "confucius4_r2t2".withCString { familyPtr -> Void in
-            var config = audiocpp_model_config(
-                family_hint: familyPtr,
-                config_id: nil,
-                weight_id: nil,
-                model_spec_override: nil
-            )
-            try check(audiocpp_model_load(reg, path, &config, nil, &mdl), "加载模型失败")
+        do {
+            try "confucius4_r2t2".withCString { familyPtr -> Void in
+                var config = audiocpp_model_config(
+                    family_hint: familyPtr,
+                    config_id: nil,
+                    weight_id: nil,
+                    model_spec_override: nil
+                )
+                try check(audiocpp_model_load(reg, path, &config, nil, &mdl), "加载模型失败")
+            }
+        } catch {
+            audiocpp_registry_free(reg)
+            throw error
         }
+        registry = reg
         model = mdl
     }
 

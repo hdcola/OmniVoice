@@ -146,7 +146,14 @@ struct FloatingTranscriptView: View {
 
             Spacer()
 
+            // `.layoutPriority(1)`: without it, a long `statusMessage` (a
+            // localized error tacked onto a permission hint, say) could
+            // compress this down to nothing at a narrow panel width instead
+            // of truncating the `Text` above further — the button/label
+            // here is what's actionable, so it should be what keeps its
+            // full width, not what gets squeezed out first.
             modelStatusControl
+                .layoutPriority(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
@@ -285,8 +292,14 @@ private struct TranscriptListView: View, Equatable {
     /// drag away from the bottom — and would flip `isPinnedToBottom` back
     /// to `false` mid-animation, missing any content that arrives in that
     /// window. Cleared the moment the animation actually lands at the
-    /// bottom (`isAtBottom == true` below), not on a timer, so it can't
-    /// outlive the animation it's guarding.
+    /// bottom (`isAtBottom == true` below) — normally, not on a timer — but
+    /// `jumpToLatestButton` also clears it unconditionally ~350ms after
+    /// starting the scroll, as a fallback: if the animation gets
+    /// interrupted (a hard scroll-wheel/trackpad swipe mid-flight) or never
+    /// quite lands within `bottomProximityTolerance`, `isAtBottom` would
+    /// never fire and this would otherwise get stuck `true` forever,
+    /// permanently disabling the real "user scrolled away" detection this
+    /// flag exists to protect from a false positive.
     @State private var isProgrammaticScrollInFlight = false
 
     /// Id of the zero-height row appended after the real transcript lines —
@@ -403,6 +416,12 @@ private struct TranscriptListView: View, Equatable {
             isProgrammaticScrollInFlight = true
             withAnimation(.easeOut(duration: 0.2)) {
                 proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+            }
+            // Fallback clear — see `isProgrammaticScrollInFlight`'s doc for
+            // why this can't just rely on `isAtBottom` firing.
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(350))
+                isProgrammaticScrollInFlight = false
             }
         } label: {
             Label("最新内容", systemImage: "arrow.down.circle.fill")

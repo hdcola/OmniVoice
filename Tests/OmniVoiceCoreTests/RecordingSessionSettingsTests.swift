@@ -283,6 +283,23 @@ struct RecordingSessionSettingsTests {
         session.isRunning = false
     }
 
+    /// Guards against `unloadModels()` racing `preloadModel()`'s own
+    /// in-flight `loadModel()` calls — `isPreloadingModel` isn't part of
+    /// `isSessionActive`, so without its own guard, calling this mid-preload
+    /// would nil out the provider ivars right before `preloadModel()`
+    /// resumes and unconditionally sets `isModelLoaded = true`, leaving
+    /// `isModelLoaded == true` with both providers actually `nil`.
+    @Test func unloadModelsIsANoOpWhilePreloadingModel() async {
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.isModelLoaded)
+
+        session.isPreloadingModel = true
+        session.unloadModels()
+        #expect(session.isModelLoaded)
+        session.isPreloadingModel = false
+    }
+
     @Test func isSessionActiveReflectsAnyLifecyclePhase() {
         let session = RecordingSession()
         #expect(!session.isSessionActive)

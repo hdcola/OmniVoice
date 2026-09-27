@@ -409,9 +409,15 @@ public final class RecordingSession: ObservableObject {
     /// a memory-constrained machine, without either of those. Guarded by
     /// `!isSessionActive` — unlike `unloadModelsBeforeQuit()` (called at
     /// quit, when nothing else matters), unloading out from under an active
-    /// recording would break it outright.
+    /// recording would break it outright. Also guarded by `!isPreloadingModel`
+    /// (not part of `isSessionActive`): without it, calling this during
+    /// `preloadModel()`'s in-flight `loadModel()` calls would nil out
+    /// `transcriptionProvider`/`translationProvider` right before
+    /// `preloadModel()` resumes and unconditionally sets `isModelLoaded =
+    /// true` on success — leaving `isModelLoaded == true` (and the panel
+    /// reading "模型已就绪") while both provider ivars are actually `nil`.
     public func unloadModels() {
-        guard !isSessionActive else { return }
+        guard !isSessionActive, !isPreloadingModel else { return }
         performModelUnload()
     }
 
@@ -544,6 +550,15 @@ public final class RecordingSession: ObservableObject {
                 translation.unload()
                 transcriptionProvider = nil
                 translationProvider = nil
+                // Not reached via `reusingLoaded`, so neither was true
+                // beforehand in the ordinary case — but reset both
+                // defensively anyway: if `isModelLoaded` were ever `true`
+                // here despite `reusingLoaded` being `false` (engine IDs
+                // changed underneath it, say), leaving it `true` after
+                // just nil-ing the providers above would read as "模型已就绪"
+                // while nothing is actually loaded.
+                loadedEngineIDs = nil
+                isModelLoaded = false
             }
             return
         }
@@ -567,6 +582,9 @@ public final class RecordingSession: ObservableObject {
                 transcription.unload()
                 transcriptionProvider = nil
                 translationProvider = nil
+                // Same defensive reset as the translation catch above.
+                loadedEngineIDs = nil
+                isModelLoaded = false
             }
             return
         }

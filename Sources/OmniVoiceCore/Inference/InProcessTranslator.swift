@@ -240,7 +240,6 @@ final class InProcessTranslator: @unchecked Sendable {
         guard let mdl = path.withCString({ llama_model_load_from_file($0, modelParams) }) else {
             throw TranslatorError.llamaCallFailed("加载 T3PO 模型失败")
         }
-        model = mdl
 
         var ctxParams = llama_context_default_params()
         ctxParams.n_ctx = 4096
@@ -253,9 +252,19 @@ final class InProcessTranslator: @unchecked Sendable {
         // the other half of this fix (keeping the prompt itself under
         // `n_ctx`, since this alone only raises the ceiling).
         ctxParams.n_batch = ctxParams.n_ctx
+        // `model`/`ctx` only get assigned to the stored properties once
+        // *both* succeed, not right after `llama_model_load_from_file`
+        // above — same reasoning as `InProcessTranscriber.loadModelLocked`'s
+        // registry/model fix: assigning `model` eagerly would leave it set
+        // (passing the `guard model == nil` retry check) while `ctx` stayed
+        // `nil` if this call failed, silently wedging every future
+        // `feed`/`flush` call (which both require `ctx != nil`) with no
+        // error ever surfaced and no way to recover short of `unload()`.
         guard let context = llama_init_from_model(mdl, ctxParams) else {
+            llama_model_free(mdl)
             throw TranslatorError.llamaCallFailed("创建 T3PO 推理上下文失败")
         }
+        model = mdl
         ctx = context
     }
 
