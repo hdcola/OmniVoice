@@ -22,6 +22,18 @@ public struct LanguageOption: Identifiable, Hashable, Sendable {
 /// runtime-dependent — Apple doesn't expose a stable static list for either
 /// framework in a form worth hardcoding here). `SettingsView` keeps an
 /// advanced free-text entry for any BCP-47 tag not in this list.
+///
+/// **Known source/target asymmetry** (verified against the current system
+/// frameworks, macOS 26): `ru-RU`/`ar-SA`/`vi-VN`/`th-TH` all work as a
+/// `TranslationSession` *target*, but the system `SpeechTranscriber` does
+/// **not** support them as a recognition *source* — picking one as
+/// `sourceLanguageCode` with the `.system` transcription engine throws at
+/// `start()`. This list doesn't split "source-capable" from
+/// "target-capable" sets (both pickers share the same list — see
+/// `FloatingTranscriptView`), so these four are currently a trap in the
+/// *source* picker specifically. Once `ModelTranscriptionProvider` (R2T2)
+/// lands, its locale support may differ and could resolve this; until then,
+/// this is just documented, not gated, in the UI.
 public enum LanguageCatalog {
     public static let common: [LanguageOption] = [
         LanguageOption(code: "zh-CN", displayName: "简体中文"),
@@ -35,9 +47,10 @@ public enum LanguageCatalog {
         LanguageOption(code: "es-ES", displayName: "西班牙语"),
         LanguageOption(code: "it-IT", displayName: "意大利语"),
         LanguageOption(code: "pt-PT", displayName: "葡萄牙语"),
+        LanguageOption(code: "hi-IN", displayName: "印地语"),
+        // Verified target-only for the system engines — see this enum's doc.
         LanguageOption(code: "ru-RU", displayName: "俄语"),
         LanguageOption(code: "ar-SA", displayName: "阿拉伯语"),
-        LanguageOption(code: "hi-IN", displayName: "印地语"),
         LanguageOption(code: "vi-VN", displayName: "越南语"),
         LanguageOption(code: "th-TH", displayName: "泰语"),
     ]

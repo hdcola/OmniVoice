@@ -52,21 +52,23 @@ struct MenuBarContentView: View {
         // Audio source — changed far less often than start/stop or the
         // language pair (which live on the floating panel instead), but
         // still frequent enough to want here rather than buried in
-        // Settings. Disabled while running: `RecordingSession.start()`
-        // reads these once to configure that recording's audio pipeline,
-        // so switching mid-recording wouldn't take effect anyway.
+        // Settings. Disabled for the whole start→stop lifecycle
+        // (isSessionActive, not just isRunning): `RecordingSession.start()`
+        // reads these once, at the top, to configure that recording's audio
+        // pipeline — changing them during setup would either race that read
+        // or silently not apply to the run in progress.
         Picker("麦克风", selection: $session.selectedDeviceID) {
             ForEach(session.inputDevices) { device in
                 Text(device.name).tag(Optional(device.id))
             }
         }
-        .disabled(session.isRunning)
+        .disabled(session.isSessionActive)
 
         // Permission requirement is explained by the
         // `screenRecordingPermissionNeeded` caption below instead of in this
         // label — keeps the menu item itself from wrapping/getting cut off.
         Toggle("包含系统声音", isOn: $session.includeSystemAudio)
-            .disabled(session.isRunning)
+            .disabled(session.isSessionActive)
 
         Divider()
 

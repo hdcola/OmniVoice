@@ -45,7 +45,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         session.refreshDevices()
 
         let panel = FloatingTranscriptPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 280))
-        panel.contentView = DraggableHostingView(rootView: FloatingTranscriptView(session: session))
+        panel.contentView = DraggableHostingView(
+            rootView: FloatingTranscriptView(session: session, onClose: { [weak panel] in
+                panel?.orderOut(nil)
+            })
+        )
         panel.center()
         floatingPanel = panel
 

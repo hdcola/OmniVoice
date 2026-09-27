@@ -13,6 +13,12 @@ import Translation
 /// which is exactly what that bridge's continuation needs.
 struct FloatingTranscriptView: View {
     @ObservedObject var session: RecordingSession
+    /// Hides the panel — `panel.orderOut(nil)` via `AppDelegate`. Threaded
+    /// in as a closure rather than reaching for `NSApp.delegate`/environment
+    /// injection: this view is constructed directly as the panel's own
+    /// content view, outside any SwiftUI `Scene`, so there's no environment
+    /// to inject it through in the first place.
+    let onClose: () -> Void
     @State private var translationConfiguration: TranslationSession.Configuration?
 
     var body: some View {
@@ -21,7 +27,7 @@ struct FloatingTranscriptView: View {
             Divider()
             transcriptList
         }
-        .frame(width: 420, height: 280)
+        .frame(minWidth: 380, maxWidth: .infinity, minHeight: 200, maxHeight: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
         .onAppear { rebuildConfiguration() }
         .onChange(of: session.sourceLanguageCode) { rebuildConfiguration() }
@@ -53,18 +59,34 @@ struct FloatingTranscriptView: View {
             }
             .disabled(session.isStopping || session.isStarting)
 
-            // Source is disabled while running: it's only read once, at
-            // `start()`, to configure the ASR engine for that recording
-            // (`SpeechAnalyzer`'s locale can't change mid-session) — editing
-            // it here wouldn't take effect until the next start.
+            // Source is disabled for the whole start→stop lifecycle
+            // (isSessionActive, not just isRunning): it's only read once, at
+            // the top of `start()`, to configure the ASR engine for that
+            // recording (`SpeechAnalyzer`'s locale can't change mid-session)
+            // — editing it during setup would either race that read or
+            // silently not apply until the next start.
             Picker("源语言", selection: $session.sourceLanguageCode) {
-                Text("自动").tag(String?.none)
+                // "自动" only means anything for a `.model`-kind engine —
+                // the only ASR engine implemented so far (`SystemTranscriptionProvider`)
+                // requires a concrete locale and throws `.localeNotSupported`
+                // for `nil` (see `sourceLanguageCode`'s doc).
+                if session.transcriptionEngineKind == .model {
+                    Text("自动").tag(String?.none)
+                }
                 ForEach(LanguageCatalog.common) { option in
                     Text(option.displayName).tag(Optional(option.code))
                 }
+                // A code set via Settings' advanced free-text entry (e.g.
+                // "de-CH") isn't in the curated list above — without this,
+                // the picker would show a blank/mismatched selection and
+                // picking anything from the list would silently discard it.
+                if let custom = session.sourceLanguageCode,
+                   !LanguageCatalog.common.contains(where: { $0.code == custom }) {
+                    Text("\(custom)（自定义）").tag(Optional(custom))
+                }
             }
             .labelsHidden()
-            .disabled(session.isRunning)
+            .disabled(session.isSessionActive)
 
             Image(systemName: "arrow.right")
                 .foregroundStyle(.secondary)
@@ -79,8 +101,15 @@ struct FloatingTranscriptView: View {
                 ForEach(LanguageCatalog.common) { option in
                     Text(option.displayName).tag(option.code)
                 }
+                if !LanguageCatalog.common.contains(where: { $0.code == session.targetLanguageCode }) {
+                    Text("\(session.targetLanguageCode)（自定义）").tag(session.targetLanguageCode)
+                }
             }
             .labelsHidden()
+
+            Spacer()
+
+            PanelCloseButton(action: onClose)
         }
         .padding(10)
     }
@@ -116,5 +145,27 @@ struct FloatingTranscriptView: View {
             source: session.currentSourceLanguage,
             target: session.currentTargetLanguage
         )
+    }
+}
+
+/// Themed replacement for the panel's native close button (hidden in
+/// `FloatingTranscriptPanel` — a native traffic light looked out of place
+/// with no titlebar). Understated by default, only picking up contrast on
+/// hover, so it doesn't compete with the transcript for attention.
+private struct PanelCloseButton: View {
+    let action: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(isHovering ? .primary : .secondary)
+                .frame(width: 18, height: 18)
+                .background(.primary.opacity(isHovering ? 0.16 : 0.08), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .help("隐藏悬浮窗")
     }
 }

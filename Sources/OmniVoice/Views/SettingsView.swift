@@ -4,8 +4,10 @@ import SwiftUI
 /// Engine settings — data-driven from `ProviderCatalog` rather than one
 /// hand-written `case` per engine, so adding a new community model
 /// audio.cpp supports later is a catalog change, not a UI change. Disabled
-/// while a recording is running, same rule the POCs established (each
-/// provider's session is set up fresh at `start()`).
+/// for the whole start→stop lifecycle (`isSessionActive`, not just
+/// `isRunning`) — each provider's session is set up fresh from these values
+/// at the top of `start()`, so changing them during that setup would either
+/// race the read or silently not apply to the run in progress.
 ///
 /// The common-language pickers and the mic/system-audio toggle live on the
 /// floating panel and the menu bar respectively instead of here — those are
@@ -48,7 +50,7 @@ struct SettingsView: View {
         }
         .padding(20)
         .frame(width: 440)
-        .disabled(session.isRunning)
+        .disabled(session.isSessionActive)
     }
 
     private var sourceLanguageBinding: Binding<String> {

@@ -14,7 +14,13 @@ import Foundation
 @MainActor
 public final class RecordingSession: ObservableObject {
     @Published public var inputDevices: [AudioInputDevice] = []
-    @Published public var selectedDeviceID: String?
+    /// Persisted (see `PersistedSettingsKey`) — restored in `init()`, so a
+    /// device picked last session stays picked after quitting/relaunching
+    /// (or a system restart). `refreshDevices()` still reconciles it against
+    /// whatever's actually connected right now.
+    @Published public var selectedDeviceID: String? {
+        didSet { Self.defaults.set(selectedDeviceID, forKey: PersistedSettingsKey.selectedDeviceID) }
+    }
     @Published public var isRunning = false
     @Published public var isStopping = false
     /// True from the moment `start()` is called until its (possibly slow —
@@ -24,6 +30,14 @@ public final class RecordingSession: ObservableObject {
     /// in that window would pass the same guard and create a second set of
     /// providers/capture, leaking the first and double-starting capture.
     @Published public var isStarting = false
+    /// True across the whole `start()`→`stop()` lifecycle, not just while
+    /// actually recording — use this (not `isRunning` alone) to gate any
+    /// control whose value is only read once, at the top of `start()`
+    /// (engine IDs, device, language, system-audio inclusion). `isRunning`
+    /// alone leaves a window open during `isStarting`/`isStopping` where
+    /// those controls look editable but a change either races the in-flight
+    /// setup or silently won't apply to the run in progress.
+    public var isSessionActive: Bool { isRunning || isStarting || isStopping }
     /// One row per ASR utterance/segment, source and translation aligned
     /// side by side.
     @Published public var lines: [TranscriptLine] = []
@@ -31,23 +45,60 @@ public final class RecordingSession: ObservableObject {
     @Published public var inputLevel: Float = 0
     /// Mix in system/output audio (ScreenCaptureKit) alongside the mic. Only
     /// changeable while stopped — the mixer/capture are constructed once in
-    /// `start()`.
-    @Published public var includeSystemAudio: Bool = false
+    /// `start()`. Persisted (see `PersistedSettingsKey`).
+    @Published public var includeSystemAudio: Bool = false {
+        didSet { Self.defaults.set(includeSystemAudio, forKey: PersistedSettingsKey.includeSystemAudio) }
+    }
     /// Set when `SystemAudioCapture.start()` throws — almost always means
     /// the Screen Recording TCC prompt hasn't been granted yet. Doesn't
     /// abort the run: mic-only transcription still proceeds.
     @Published public var screenRecordingPermissionNeeded = false
 
     /// Engine selection — only takes effect on the next `start()`, so a
-    /// picker bound to these should be disabled while `isRunning`.
-    @Published public var transcriptionEngineID: String = ProviderCatalog.transcriptionEngines[0].id
-    @Published public var translationEngineID: String = ProviderCatalog.translationEngines[0].id
+    /// picker bound to these should be disabled while `isSessionActive`.
+    /// Persisted (see `PersistedSettingsKey`).
+    @Published public var transcriptionEngineID: String = ProviderCatalog.transcriptionEngines[0].id {
+        didSet {
+            // Keeps the "system engine ⇒ concrete source language" invariant
+            // that `start()` depends on (see `sourceLanguageCode`'s doc)
+            // even when the engine is switched (in Settings) *after* the
+            // user picked "自动" while a `.model` engine was selected —
+            // without this, switching back to a `.system` engine would
+            // leave `sourceLanguageCode` at `nil` and the next `start()`
+            // would throw `.localeNotSupported`.
+            if transcriptionEngineKind == .system, sourceLanguageCode == nil {
+                sourceLanguageCode = "en-US"
+            }
+            Self.defaults.set(transcriptionEngineID, forKey: PersistedSettingsKey.transcriptionEngineID)
+        }
+    }
+    @Published public var translationEngineID: String = ProviderCatalog.translationEngines[0].id {
+        didSet { Self.defaults.set(translationEngineID, forKey: PersistedSettingsKey.translationEngineID) }
+    }
     /// BCP-47-ish language tags. `sourceLanguageCode` nil means "auto", only
     /// meaningful for `.model`-kind ASR engines — `.system` (`SpeechTranscriber`)
     /// requires a concrete one; `start()` fails with `.localeNotSupported`
-    /// if left nil while a system engine is selected.
-    @Published public var sourceLanguageCode: String? = "en-US"
-    @Published public var targetLanguageCode: String = "zh-CN"
+    /// if left nil while a system engine is selected. A UI offering "自动"
+    /// should only do so while `transcriptionEngineKind == .model`. Persisted
+    /// (see `PersistedSettingsKey`) using `""` as nil's sentinel — same
+    /// convention `SettingsView.sourceLanguageBinding` already uses for its
+    /// empty-means-auto `TextField`, since `UserDefaults` can't distinguish
+    /// "never set" from "explicitly set to nil".
+    @Published public var sourceLanguageCode: String? = "en-US" {
+        didSet {
+            Self.defaults.set(sourceLanguageCode ?? "", forKey: PersistedSettingsKey.sourceLanguageCode)
+        }
+    }
+    @Published public var targetLanguageCode: String = "zh-CN" {
+        didSet { Self.defaults.set(targetLanguageCode, forKey: PersistedSettingsKey.targetLanguageCode) }
+    }
+
+    /// Nil only if `transcriptionEngineID` somehow doesn't match any known
+    /// engine (shouldn't happen — it's only ever set from
+    /// `ProviderCatalog.transcriptionEngines`).
+    public var transcriptionEngineKind: EngineKind? {
+        ProviderCatalog.transcriptionEngines.first { $0.id == transcriptionEngineID }?.kind
+    }
 
     private let sessionStore: SessionStore?
     private var activeSessionRecord: RecordingSessionRecord?
@@ -77,6 +128,33 @@ public final class RecordingSession: ObservableObject {
 
     public init(sessionStore: SessionStore? = nil) {
         self.sessionStore = sessionStore
+        restorePersistedSettings()
+    }
+
+    /// Restores whatever settings were persisted from a previous run —
+    /// without this, every quit/relaunch (or system restart) silently reset
+    /// engine choice, language, mic, and system-audio inclusion back to
+    /// their hardcoded defaults above, which is surprising for anything the
+    /// user deliberately configured last time. Each property's own `didSet`
+    /// (see their declarations) is what keeps this in sync going forward.
+    private func restorePersistedSettings() {
+        let defaults = Self.defaults
+        if let value = defaults.string(forKey: PersistedSettingsKey.transcriptionEngineID) {
+            transcriptionEngineID = value
+        }
+        if let value = defaults.string(forKey: PersistedSettingsKey.translationEngineID) {
+            translationEngineID = value
+        }
+        if let value = defaults.string(forKey: PersistedSettingsKey.sourceLanguageCode) {
+            sourceLanguageCode = value.isEmpty ? nil : value
+        }
+        if let value = defaults.string(forKey: PersistedSettingsKey.targetLanguageCode) {
+            targetLanguageCode = value
+        }
+        if defaults.object(forKey: PersistedSettingsKey.includeSystemAudio) != nil {
+            includeSystemAudio = defaults.bool(forKey: PersistedSettingsKey.includeSystemAudio)
+        }
+        selectedDeviceID = defaults.string(forKey: PersistedSettingsKey.selectedDeviceID)
     }
 
     public func refreshDevices() {
@@ -344,4 +422,17 @@ public final class RecordingSession: ObservableObject {
         default: return SystemTranslationProvider()
         }
     }
+
+    private static let defaults = UserDefaults.standard
+}
+
+/// Namespaced (`org.omnivoice.*`) to avoid colliding with anything else
+/// ever written into the app's `UserDefaults` domain.
+private enum PersistedSettingsKey {
+    static let transcriptionEngineID = "org.omnivoice.transcriptionEngineID"
+    static let translationEngineID = "org.omnivoice.translationEngineID"
+    static let sourceLanguageCode = "org.omnivoice.sourceLanguageCode"
+    static let targetLanguageCode = "org.omnivoice.targetLanguageCode"
+    static let includeSystemAudio = "org.omnivoice.includeSystemAudio"
+    static let selectedDeviceID = "org.omnivoice.selectedDeviceID"
 }
