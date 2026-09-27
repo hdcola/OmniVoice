@@ -115,11 +115,20 @@ public final class RecordingSession: ObservableObject {
     @Published public var transcriptionModelVariantID: String? {
         didSet {
             Self.defaults.set(transcriptionModelVariantID, forKey: PersistedSettingsKey.transcriptionModelVariantID)
+            // Without this, switching variants while the *previous* one's
+            // weights were already loaded left `isModelLoaded`/`loadedEngineIDs`
+            // reading "still matches" (they only ever compared engine IDs) —
+            // `start()`/`preloadModel()` then silently kept reusing the old
+            // variant's provider forever instead of downloading/loading the
+            // newly-selected one. Same reasoning as `transcriptionEngineID`'s
+            // own `didSet`.
+            discardLoadedModelsIfStale()
         }
     }
     @Published public var translationModelVariantID: String? {
         didSet {
             Self.defaults.set(translationModelVariantID, forKey: PersistedSettingsKey.translationModelVariantID)
+            discardLoadedModelsIfStale()
         }
     }
     /// BCP-47-ish language tags. `sourceLanguageCode` nil means "auto", only
@@ -196,20 +205,40 @@ public final class RecordingSession: ObservableObject {
     }
 
     private let sessionStore: SessionStore?
-    private let modelDownloadManager: ModelDownloadManager
+    /// Not `private` — `SettingsView` (a different module) observes this
+    /// same instance (rather than hardcoding `ModelDownloadManager.shared`
+    /// itself) so a test/preview that constructs `RecordingSession` with an
+    /// injected manager still sees a UI that reflects *that* instance's
+    /// `downloadProgress`/cached files, not always the real shared one.
+    public let modelDownloadManager: ModelDownloadManager
     private var activeSessionRecord: RecordingSessionRecord?
 
     private var transcriptionProvider: TranscriptionProvider?
     private var translationProvider: TranslationProvider?
-    /// The `(transcriptionEngineID, translationEngineID)` pair
-    /// `transcriptionProvider`/`translationProvider` are currently loaded
-    /// for, whenever they hold a loaded pair rather than `nil`/stale
-    /// instances. Distinct from just checking `isModelLoaded` because
-    /// `start()` needs to know the load actually matches the *current*
-    /// engine selection, not a stale one left over before a switch
-    /// (`discardLoadedModelsIfStale()` normally clears this first, but the
-    /// two aren't atomic with each other, so `start()` re-checks).
-    private var loadedEngineIDs: (transcription: String, translation: String)?
+    /// The engine + model-variant selection `transcriptionProvider`/
+    /// `translationProvider` are currently loaded for, whenever they hold a
+    /// loaded pair rather than `nil`/stale instances. Distinct from just
+    /// checking `isModelLoaded` because `start()` needs to know the load
+    /// actually matches the *current* selection, not a stale one left over
+    /// before a switch (`discardLoadedModelsIfStale()` normally clears this
+    /// first, but the two aren't atomic with each other, so `start()`
+    /// re-checks). Variant IDs (not just engine IDs) are part of this tuple
+    /// — without them, switching a `.model` engine's selected variant while
+    /// the *previous* variant's weights were already loaded left
+    /// `loadedEngineIDs`'s engine-ID-only comparison reading "still matches",
+    /// so `start()`/`preloadModel()` silently kept running the old variant
+    /// forever instead of downloading/loading the newly-selected one.
+    ///
+    /// Internal, not `private` — `RecordingSessionSettingsTests` sets this
+    /// directly to simulate an already-loaded `.model` engine without
+    /// actually running `preloadModel()`'s real load, which (for a `.model`
+    /// engine) needs real R2T2/T3PO weights on the test machine (or would
+    /// attempt a real network download); same reasoning `PersistedSettingsKey`
+    /// documents for its own internal, not private, visibility.
+    var loadedEngineIDs: (
+        transcription: String, transcriptionVariant: String?,
+        translation: String, translationVariant: String?
+    )?
     private var micCapture: MicrophoneCapture?
     private var systemAudioCapture: SystemAudioCapture?
     private var mixer: AudioMixer?
@@ -453,7 +482,10 @@ public final class RecordingSession: ObservableObject {
             return
         }
 
-        loadedEngineIDs = (transcriptionEngineID, translationEngineID)
+        loadedEngineIDs = (
+            transcriptionEngineID, currentTranscriptionModelVariant?.id,
+            translationEngineID, currentTranslationModelVariant?.id
+        )
         isModelLoaded = true
         statusMessage = "模型已预加载"
     }
@@ -468,11 +500,17 @@ public final class RecordingSession: ObservableObject {
     /// through `preloadModel()`'s `isModelLoaded` guard.
     private func discardLoadedModelsIfStale() {
         guard let loaded = loadedEngineIDs else { return }
-        // Re-assigning the *same* engine ID a Picker already has selected
-        // still fires this `didSet` — without this check, that (a no-op as
-        // far as the actual selection goes) would unconditionally discard a
-        // perfectly good, still-matching load.
-        guard loaded.transcription != transcriptionEngineID || loaded.translation != translationEngineID else {
+        // Re-assigning the *same* engine ID (or the same variant ID) a
+        // Picker already has selected still fires this `didSet` — without
+        // this check, that (a no-op as far as the actual selection goes)
+        // would unconditionally discard a perfectly good, still-matching
+        // load.
+        guard
+            loaded.transcription != transcriptionEngineID
+                || loaded.translation != translationEngineID
+                || loaded.transcriptionVariant != currentTranscriptionModelVariant?.id
+                || loaded.translationVariant != currentTranslationModelVariant?.id
+        else {
             return
         }
         transcriptionProvider?.unload()
@@ -604,6 +642,8 @@ public final class RecordingSession: ObservableObject {
         let reusingLoaded = isModelLoaded
             && loadedEngineIDs?.transcription == transcriptionEngineID
             && loadedEngineIDs?.translation == translationEngineID
+            && loadedEngineIDs?.transcriptionVariant == currentTranscriptionModelVariant?.id
+            && loadedEngineIDs?.translationVariant == currentTranslationModelVariant?.id
             && transcriptionProvider != nil
             && translationProvider != nil
         let transcription: TranscriptionProvider
@@ -740,7 +780,10 @@ public final class RecordingSession: ObservableObject {
         // record that regardless of whether this call freshly loaded them
         // or reused an already-loaded pair, so `stop()` (which doesn't
         // unload) leaves them ready for the *next* `start()` to reuse too.
-        loadedEngineIDs = (transcriptionEngineID, translationEngineID)
+        loadedEngineIDs = (
+            transcriptionEngineID, currentTranscriptionModelVariant?.id,
+            translationEngineID, currentTranslationModelVariant?.id
+        )
         isModelLoaded = true
 
         let segmenter = UtteranceSegmenter()
@@ -955,14 +998,13 @@ public final class RecordingSession: ObservableObject {
             return modelDownloadManager.localURL(for: variant)
         }
         statusMessage = "下载\(statusPrefix)中… 0%"
+        // `progress` is declared `@MainActor @Sendable` (see
+        // `ensureDownloaded`'s doc), so this can mutate `statusMessage`
+        // directly — no per-callback `Task { @MainActor in ... }` hop needed
+        // for what can be several thousand progress callbacks on a fast
+        // connection.
         return try await modelDownloadManager.ensureDownloaded(variant) { [weak self] fraction in
-            // `progress` is declared `@Sendable` (see `ensureDownloaded`'s
-            // doc) even though every actual call lands on the main actor —
-            // hop explicitly rather than assuming that from inside a
-            // `@Sendable` closure body.
-            Task { @MainActor in
-                self?.statusMessage = "下载\(statusPrefix)中… \(Int(fraction * 100))%"
-            }
+            self?.statusMessage = "下载\(statusPrefix)中… \(Int(fraction * 100))%"
         }
     }
 

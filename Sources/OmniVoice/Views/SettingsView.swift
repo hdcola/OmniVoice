@@ -22,7 +22,19 @@ struct SettingsView: View {
     /// `ModelDownloadManager.ensureDownloaded(_:progress:)` runs during
     /// `preloadModel()`/`start()` — `RecordingSession` itself doesn't
     /// re-publish on every download tick, only on `statusMessage` changes.
-    @ObservedObject private var downloadManager = ModelDownloadManager.shared
+    /// Passed in explicitly (not defaulted to `.shared`) and expected to be
+    /// the exact same instance `session` (injected separately, via
+    /// `.environmentObject`, since `SettingsView()` is constructed before
+    /// that's available) was itself given — see `RecordingSession.init`'s
+    /// own injectable `modelDownloadManager` parameter. Hardcoding `.shared`
+    /// here instead would silently observe the wrong manager for any
+    /// `RecordingSession` constructed with a non-`shared` one (a test, an
+    /// eventual SwiftUI preview).
+    @ObservedObject private var downloadManager: ModelDownloadManager
+
+    init(modelDownloadManager: ModelDownloadManager) {
+        self.downloadManager = modelDownloadManager
+    }
 
     var body: some View {
         Form {
@@ -88,7 +100,7 @@ struct SettingsView: View {
         }
     }
 
-    /// "约 N MB" for a not-yet-downloaded variant, "已下载 (N MB)" once
+    /// "约 N MB" for a not-yet-downloaded variant, "已下载 · 约 N MB" once
     /// `ModelDownloadManager` has it cached, or a live "下载中… N%" while
     /// `preloadModel()`/`start()` are actively fetching it — the same
     /// `downloadProgress` a floating-panel progress view would observe.

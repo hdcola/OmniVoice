@@ -222,6 +222,59 @@ struct RecordingSessionSettingsTests {
         #expect(session.transcriptionModelVariantID == nil)
     }
 
+    /// Guards a real bug: `loadedEngineIDs` used to only compare engine IDs,
+    /// so switching a `.model` engine's selected variant while the
+    /// *previous* variant's weights were already loaded left `isModelLoaded`
+    /// reading "still matches" — `start()`/`preloadModel()` then silently
+    /// kept running the stale variant forever instead of downloading/loading
+    /// the newly-selected one. Simulates the "already loaded" state directly
+    /// (`isModelLoaded`/`loadedEngineIDs`, both accessible for exactly this
+    /// reason — see `loadedEngineIDs`'s own doc) rather than through a real
+    /// `preloadModel()` call, which for a `.model` engine needs real
+    /// R2T2/T3PO weights on the test machine or would attempt a real network
+    /// download (same reasoning `preloadModelSetsIsModelLoadedForCurrentEngines`
+    /// documents for using `.system` engines instead).
+    @Test func changingModelVariantIDDiscardsAModelLoadedUnderADifferentVariant() {
+        defer {
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionModelVariantID)
+        }
+        let session = RecordingSession()
+        session.transcriptionEngineID = "model.r2t2"
+        session.isModelLoaded = true
+        session.loadedEngineIDs = (
+            "model.r2t2", "some-old-variant-id",
+            session.translationEngineID, session.currentTranslationModelVariant?.id
+        )
+
+        session.transcriptionModelVariantID = "r2t2-q8_0"
+
+        #expect(!session.isModelLoaded)
+    }
+
+    /// Complements the above — reassigning the *same* (already-loaded)
+    /// resolved variant must not discard a perfectly good load, same
+    /// reasoning `reassigningTheSameEngineIDDoesNotDiscardALoadedModel`
+    /// documents for engine IDs.
+    @Test func reassigningTheSameResolvedModelVariantDoesNotDiscardALoadedModel() {
+        defer {
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionModelVariantID)
+        }
+        let session = RecordingSession()
+        session.transcriptionEngineID = "model.r2t2"
+        session.transcriptionModelVariantID = "r2t2-q8_0"
+        session.isModelLoaded = true
+        session.loadedEngineIDs = (
+            "model.r2t2", "r2t2-q8_0",
+            session.translationEngineID, session.currentTranslationModelVariant?.id
+        )
+
+        session.transcriptionModelVariantID = "r2t2-q8_0"
+
+        #expect(session.isModelLoaded)
+    }
+
     @Test func usesOnDeviceModelEngineReflectsEitherEngineBeingModelKind() {
         defer {
             defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)

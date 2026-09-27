@@ -21,7 +21,7 @@ struct OmniVoiceApp: App {
         }
 
         Settings {
-            SettingsView()
+            SettingsView(modelDownloadManager: appDelegate.session.modelDownloadManager)
                 .environmentObject(appDelegate.session)
         }
     }
