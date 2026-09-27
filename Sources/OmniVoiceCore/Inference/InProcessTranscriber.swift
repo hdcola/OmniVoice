@@ -272,16 +272,15 @@ final class InProcessTranscriber {
     /// the finish result's full transcript beyond what deltas already
     /// reported), or nil if there's nothing new.
     ///
-    /// **Known crash risk (upstream, not this file)**: `audiocpp_stream_finish`
-    /// can SIGSEGV inside `R2T2ASRSession::finalize()`'s `decode_stream_chunk`
-    /// path when there's a longer buffered tail to flush — confirmed
-    /// reproducible with the *unmodified* upstream reference
-    /// (`mac-poc-hybrid`, same pinned commit, same dylib), not something this
-    /// port introduced or can work around from the C API surface (no lever
-    /// to influence audio.cpp's internal `buffer_`/graph-reuse state). Speak
-    /// briefly before stopping/pausing to reduce (not eliminate) the odds of
-    /// hitting it until this is understood/fixed upstream — see
-    /// `Docs/PROGRESS.md`'s Known gaps section.
+    /// **Requires the patched audio.cpp**: on an unpatched build,
+    /// `audiocpp_stream_finish` SIGSEGVs the whole process whenever the
+    /// session's decoded text is empty at finish time (a trailing pause, or
+    /// silence) — a null dereference in audio.cpp's own
+    /// `R2T2ASRSession::build_stream_prefix(final_flush:)`, nothing this file
+    /// can guard against from the C API surface. Fixed by
+    /// `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`,
+    /// applied as part of `Docs/MODEL_ENGINE_SETUP.md`; see
+    /// `Docs/PROGRESS.md`'s Known gaps section for the root cause.
     private func finishLocked() -> String? {
         guard let session else { return nil }
         var result: OpaquePointer?

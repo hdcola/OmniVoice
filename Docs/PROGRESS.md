@@ -141,9 +141,16 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       (`ProviderCatalog.ModelVariant.downloadURL`/`sha256`, still nil
       placeholders) is a separate follow-up, see Open Items #1.
       **T3PO translation verified working end-to-end (mic → live translation
-      → stop, no crash). R2T2 transcription has a known upstream crash bug —
-      see "Known gaps" below; not recommended for real use until that's
-      understood/fixed.**
+      → stop, no crash). R2T2 transcription needs the upstream audio.cpp
+      patch in `Patches/audio.cpp/` applied to the `third_party` checkout —
+      unpatched it SIGSEGVs on stop; see "Known gaps" below.**
+- [x] **R2T2 stop/rotate crash root-caused and fixed** (2026-09-27): a null
+      dereference in audio.cpp's own
+      `R2T2ASRSession::build_stream_prefix(final_flush=true)`, reproduced
+      deterministically from the C API with silence alone. Fix lives in
+      `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`
+      and is a required step in `Docs/MODEL_ENGINE_SETUP.md`. Full writeup in
+      "Known gaps" below.
 
 ### Code review findings (fixed)
 
@@ -200,13 +207,15 @@ real UI bugs, all fixed:
 
 Roughly in the order they'll likely get tackled — not a hard commitment.
 
-1. **R2T2 crash bug (upstream, blocking real use)**: see "Known gaps" below
-   for the full writeup — `audiocpp_stream_finish` can SIGSEGV the whole
-   process after a longer buffered utterance, reproduced identically in the
-   unmodified `mac-poc-hybrid` reference. Needs either an upstream
-   audio.cpp fix/patch release, or a mitigation found on our side (none
-   identified yet — the C API gives no lever into the internal state that
-   appears to trigger it).
+1. **Land the R2T2 fix upstream**: the crash is root-caused and fixed locally
+   (see "Known gaps" below), and submitted as
+   [0xShug0/audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712)
+   (verified still broken on upstream `main`, `90c56c2e`). Until that merges
+   and a release carrying it is pinned, the fix lives only as
+   `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch` and
+   every checkout has to apply it by hand. When it lands: bump the pin, drop
+   the patch, and drop the `git apply` step from
+   `Docs/MODEL_ENGINE_SETUP.md`.
 2. **Model download-on-first-use**: `ModelTranscriptionProvider`/
    `ModelTranslationProvider` are wired up (see Done above), but still
    resolve weights via an env var / repo-relative `models/` directory, not a
@@ -233,28 +242,46 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
 
 ### Known gaps / things to double check when touching nearby code
 
-- **R2T2 (`model.r2t2`) can SIGSEGV the whole process — upstream audio.cpp
-  bug, not this repo's code.** After a longer buffered utterance (a few
-  seconds of continuous speech with no VAD-detected pause), the *next* call
-  into `audiocpp_stream_finish` — whether from `InProcessTranscriber.rotateStream()`
-  (a VAD boundary mid-recording) or `finishStream()` (Stop) — crashes 3
-  frames deep inside `libaudiocpp` (null-pointer deref in
-  `R2T2ASRSession::finalize()`'s `decode_stream_chunk` path, likely its
-  `reuse_graph=true` decode graph reacting badly to a longer/differently-shaped
-  final chunk than the fixed-size ones `push()` streams). Confirmed via:
-  hashing/swapping in the *exact* prebuilt `libaudiocpp.dylib` the untouched
-  `mac-poc-hybrid` reference uses (same crash); reproducing the identical
-  crash signature (same `libaudiocpp` offsets) by running `mac-poc-hybrid`
-  itself, unmodified, after a longer utterance; ruling out Metal-vs-CPU
-  backend and our calling thread/`Task.detached` wrapping (neither changed
-  the outcome). `mac-poc-hybrid`'s own CHANGELOG is honest that this exact
-  interactive flow was "not yet manually run" before — this is a real gap in
-  the upstream library that nobody had hit yet, not a regression from
-  porting it. No mitigation identified from the C API surface (no lever into
-  audio.cpp's internal buffering/graph-reuse state); a real fix needs
-  upstream audio.cpp changes. **Do not select "R2T2 模型" for real use until
-  this is understood/fixed** (see Open Items #1) — T3PO translation
-  (llama.cpp) is unaffected and verified working.
+- **R2T2 (`model.r2t2`) SIGSEGVs the whole process on an unpatched
+  audio.cpp — root-caused and fixed, but the fix is a local patch.**
+  `audiocpp_stream_finish` — reached from `InProcessTranscriber.finishStream()`
+  (Stop) or `rotateStream()` (a VAD boundary mid-recording) — crashes 3
+  frames deep inside `libaudiocpp`. The earlier guess ("`reuse_graph=true`
+  reacting badly to a differently-shaped final chunk") was wrong; the real
+  cause is plain:
+
+  `R2T2ASRSession::build_stream_prefix(final_flush=true)`
+  (`src/community_models/confucius4_r2t2/session.cpp:304`) clamps its
+  rollback end index to a minimum of 1 — "never roll back past the first
+  token" — then builds a `std::vector<int32_t>` from
+  `[ids.begin(), ids.begin() + end_index)`. With `ids` empty there is no
+  first token: `begin()` is null and the range ctor `memmove`s 4 bytes from
+  address `0` (the crash reports show exactly that — `x1=0x0`, `x2=0x4`,
+  faulting in `_platform_memmove`). `ids` is empty whenever the session's
+  `raw_decoded_` has decoded to `""` by finish time, reachable once
+  `chunk_id_ >= unfixed_chunk_num` (2, i.e. ~640 ms at our 320 ms chunks).
+  A forced request language makes it easy to hit: the "no `<asr_text>` tag
+  yet, nothing to commit" early-out in `decode_stream_chunk()` only applies
+  when `force_language_` is empty, so `chunk_id_` keeps advancing over chunks
+  that decode to nothing (silence, a trailing pause), and any partial chunk
+  left in `buffer_` then sends `finalize()` down the final-flush path.
+
+  Reproduced deterministically against the unpatched dylib from the C API
+  alone — force a language, push four 320 ms chunks of *silence* plus a
+  2000-frame partial chunk, `audiocpp_stream_finish()` — matching the app's
+  crash reports frame for frame, offset for offset, register for register.
+  No mic, no long utterance needed; "after a longer utterance" was just the
+  easiest way to reach `chunk_id_ >= 2` with an empty tail. Fixed by
+  `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`
+  (bail out early when `ids` is empty). **Every `third_party/audio.cpp`
+  checkout must apply that patch** — it is a step in
+  `Docs/MODEL_ENGINE_SETUP.md`, and it is not upstream yet
+  ([audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712), Open
+  Items #1).
+  This was never a regression from porting `mac-poc-hybrid`; that reference
+  has the same bug, which is consistent with its CHANGELOG admitting this
+  interactive flow had never been manually run. T3PO translation
+  (llama.cpp) was never affected.
 - `RecordingSession.translationBridgeStream()` assumes the SwiftUI view that
   drains it never remounts independent of the app's lifetime. If
   `FloatingTranscriptView` ever gets recreated (e.g. panel is destroyed and
