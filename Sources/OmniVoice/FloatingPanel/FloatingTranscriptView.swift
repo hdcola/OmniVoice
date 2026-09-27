@@ -45,7 +45,10 @@ struct FloatingTranscriptView: View {
     /// Pickers, not free-text fields: this panel is a non-activating,
     /// never-key `NSPanel` (see `FloatingTranscriptPanel.canBecomeKey`), and
     /// a `TextField` can't take keyboard input without a key window, while a
-    /// menu-based `Picker` still works via a plain mouse click.
+    /// menu-based `Picker` still works via a plain mouse click. (Settings
+    /// uses the same `SourceLanguagePicker`/`TargetLanguagePicker` — not
+    /// because it has this panel's key-window constraint, but so the two
+    /// don't offer different language options.)
     private var controlBar: some View {
         HStack(spacing: 10) {
             Button(session.isRunning ? "停止" : (session.isStarting ? "启动中…" : "开始")) {
@@ -59,32 +62,16 @@ struct FloatingTranscriptView: View {
             }
             .disabled(session.isStopping || session.isStarting)
 
-            // Source is disabled for the whole start→stop lifecycle
-            // (isSessionActive, not just isRunning): it's only read once, at
-            // the top of `start()`, to configure the ASR engine for that
-            // recording (`SpeechAnalyzer`'s locale can't change mid-session)
-            // — editing it during setup would either race that read or
-            // silently not apply until the next start.
-            Picker("源语言", selection: $session.sourceLanguageCode) {
-                // "自动" only means anything for a `.model`-kind engine —
-                // the only ASR engine implemented so far (`SystemTranscriptionProvider`)
-                // requires a concrete locale and throws `.localeNotSupported`
-                // for `nil` (see `sourceLanguageCode`'s doc).
-                if session.transcriptionEngineKind == .model {
-                    Text("自动").tag(String?.none)
-                }
-                ForEach(LanguageCatalog.common) { option in
-                    Text(option.displayName).tag(Optional(option.code))
-                }
-                // A code set via Settings' advanced free-text entry (e.g.
-                // "de-CH") isn't in the curated list above — without this,
-                // the picker would show a blank/mismatched selection and
-                // picking anything from the list would silently discard it.
-                if let custom = session.sourceLanguageCode,
-                   !LanguageCatalog.common.contains(where: { $0.code == custom }) {
-                    Text("\(custom)（自定义）").tag(Optional(custom))
-                }
-            }
+            // Disabled for the whole start→stop lifecycle (isSessionActive,
+            // not just isRunning): it's only read once, at the top of
+            // `start()`, to configure the ASR engine for that recording
+            // (`SpeechAnalyzer`'s locale can't change mid-session) — editing
+            // it during setup would either race that read or silently not
+            // apply until the next start.
+            SourceLanguagePicker(
+                sourceLanguageCode: $session.sourceLanguageCode,
+                transcriptionEngineKind: session.transcriptionEngineKind
+            )
             .labelsHidden()
             .disabled(session.isSessionActive)
 
@@ -97,15 +84,8 @@ struct FloatingTranscriptView: View {
             // above rebuilds `translationConfiguration` on every change, so
             // switching it mid-recording actually retargets the next
             // translated segment.
-            Picker("目标语言", selection: $session.targetLanguageCode) {
-                ForEach(LanguageCatalog.common) { option in
-                    Text(option.displayName).tag(option.code)
-                }
-                if !LanguageCatalog.common.contains(where: { $0.code == session.targetLanguageCode }) {
-                    Text("\(session.targetLanguageCode)（自定义）").tag(session.targetLanguageCode)
-                }
-            }
-            .labelsHidden()
+            TargetLanguagePicker(targetLanguageCode: $session.targetLanguageCode)
+                .labelsHidden()
 
             Spacer()
 

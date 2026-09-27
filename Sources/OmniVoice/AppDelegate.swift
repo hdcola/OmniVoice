@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import OmniVoiceCore
 import SwiftData
 import SwiftUI
@@ -25,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published private(set) var session: RecordingSession
     private let sessionStore: SessionStore?
     private(set) var floatingPanel: FloatingTranscriptPanel?
+    private var isRunningCancellable: AnyCancellable?
 
     override init() {
         // A failed store (disk full, corrupted schema after a migration
@@ -53,11 +55,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         panel.center()
         floatingPanel = panel
 
-        // The panel now hosts the controls used most often (start/stop,
-        // language pickers) alongside the live transcript, so it's shown
-        // from launch rather than only on demand — `toggleFloatingPanel()`
-        // (menu item) still lets the user hide it manually.
+        // Shown from launch (not just on demand) since the panel hosts the
+        // controls used most often (start/stop, language pickers) alongside
+        // the live transcript — `toggleFloatingPanel()`/the panel's own
+        // close button still let the user hide it manually.
         panel.orderFrontRegardless()
+
+        // ...but the user can also hide it (menu toggle or the panel's own
+        // close button) and then start a recording from the menu bar's own
+        // start/stop button — without this, that recording would proceed
+        // with no visible feedback at all, since nothing else re-shows the
+        // panel once it's been hidden.
+        isRunningCancellable = session.$isRunning
+            .filter { $0 }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak panel] _ in
+                panel?.orderFrontRegardless()
+            }
     }
 
     func toggleFloatingPanel() {

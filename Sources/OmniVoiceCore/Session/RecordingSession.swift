@@ -59,15 +59,22 @@ public final class RecordingSession: ObservableObject {
     /// Persisted (see `PersistedSettingsKey`).
     @Published public var transcriptionEngineID: String = ProviderCatalog.transcriptionEngines[0].id {
         didSet {
-            // Keeps the "system engine ⇒ concrete source language" invariant
+            // Keeps two "system engine ⇒ usable source language" invariants
             // that `start()` depends on (see `sourceLanguageCode`'s doc)
-            // even when the engine is switched (in Settings) *after* the
-            // user picked "自动" while a `.model` engine was selected —
-            // without this, switching back to a `.system` engine would
-            // leave `sourceLanguageCode` at `nil` and the next `start()`
-            // would throw `.localeNotSupported`.
-            if transcriptionEngineKind == .system, sourceLanguageCode == nil {
-                sourceLanguageCode = "en-US"
+            // even when the engine is switched (in Settings/the panel)
+            // *after* `sourceLanguageCode` was set to something only valid
+            // for a `.model` engine — without this, switching back to
+            // `.system` would leave a value guaranteed to throw at the next
+            // `start()`.
+            if transcriptionEngineKind == .system {
+                // 1. "自动" (nil) was picked while a `.model` engine was
+                //    selected — `SpeechTranscriber` requires a concrete locale.
+                let isUnsupportedForSystemASR = sourceLanguageCode.map { code in
+                    LanguageCatalog.common.first { $0.code == code }?.supportsSystemASRSource == false
+                } ?? true
+                if isUnsupportedForSystemASR {
+                    sourceLanguageCode = "en-US"
+                }
             }
             Self.defaults.set(transcriptionEngineID, forKey: PersistedSettingsKey.transcriptionEngineID)
         }
