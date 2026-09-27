@@ -58,19 +58,49 @@ public final class SystemTranslationProvider: TranslationProvider {
         buffer += text
     }
 
+    /// Unlike a streaming engine (where a forced probe commits synchronously,
+    /// inline in `flush()`), the actual translation here only happens later,
+    /// asynchronously, once the bridging view's `.translationTask` picks up
+    /// the yielded request — so `onFlushBoundary` must **not** fire here.
+    /// Firing it immediately would violate `TranslationProvider`'s own
+    /// contract ("no more `onCommit` calls belong to text fed before this
+    /// flush"): `RecordingSession.advanceTranslationRow()` would advance to
+    /// the next row before this row's translation ever arrived, permanently
+    /// misaligning every row after it and persisting an empty
+    /// `translationText`. The boundary instead fires from `receiveResult(_:)`,
+    /// once the commit it belongs to has actually happened.
+    ///
+    /// If nothing is buffered, there's nothing to wait on, so the boundary
+    /// fires immediately — same as before.
     public func flush() {
-        defer { onFlushBoundary?() }
-        guard !buffer.isEmpty else { return }
+        guard !buffer.isEmpty else {
+            onFlushBoundary?()
+            return
+        }
         let text = buffer
         buffer = ""
-        onBridgeRequest?(TranslationBridgeRequest(text: text))
+        guard let onBridgeRequest else {
+            // No bridging view attached yet (e.g. the floating panel hasn't
+            // been created) — there is nowhere for this request to go and
+            // nothing will ever call `receiveResult(_:)` for it. Firing the
+            // boundary anyway loses this one row's translation, but *not*
+            // firing it would permanently stall `translationRowIndex` and
+            // misalign every row after it — losing one translation is the
+            // smaller failure.
+            onFlushBoundary?()
+            return
+        }
+        onBridgeRequest(TranslationBridgeRequest(text: text))
     }
 
     public func stop() async {}
 
-    /// Called by the bridging view once a request's `translate(_:)` resolves.
+    /// Called by the bridging view once a request's `translate(_:)` resolves —
+    /// this, not `flush()`, is what actually marks this row's translation as
+    /// done; see `flush()`'s doc.
     public func receiveResult(_ text: String) {
         onCommit?(text)
+        onFlushBoundary?()
     }
 
     public var currentSourceLanguageCode: String? { config?.sourceLanguageCode }
