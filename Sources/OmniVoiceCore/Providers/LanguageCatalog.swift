@@ -30,8 +30,7 @@ public struct LanguageOption: Identifiable, Hashable, Sendable {
 /// This is a curated subset, not an exhaustive list of what `SpeechTranscriber`/
 /// `TranslationSession` actually support (which is both larger and
 /// runtime-dependent — Apple doesn't expose a stable static list for either
-/// framework in a form worth hardcoding here). `SettingsView` keeps an
-/// advanced free-text entry for any BCP-47 tag not in this list.
+/// framework in a form worth hardcoding here).
 ///
 /// **Known source/target asymmetry** (verified against the current system
 /// frameworks, macOS 26): `ru-RU`/`ar-SA`/`vi-VN`/`th-TH` all work as a

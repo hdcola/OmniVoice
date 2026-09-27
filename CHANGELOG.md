@@ -9,9 +9,10 @@ The format is based on Keep a Changelog.
 ### Added
 
 - feat(scaffold): initial project skeleton — `TranscriptionProvider`/`TranslationProvider` protocols, ported audio capture/mixing pipeline, SwiftData-backed session history with Markdown export, and a menu-bar app shell with a floating live-transcript panel (ee5f43d)
-- feat(app): move the most-frequently-adjusted controls onto the floating panel and menu bar, out of the Settings window — the panel now shows from launch and hosts a start/stop button plus source/target language pickers (target stays editable mid-recording, source doesn't — see its doc comment for why), and the menu bar gained a microphone picker and a "包含系统声音" toggle; Settings keeps just engine selection plus an advanced free-text BCP-47 entry for languages outside the new shared `LanguageCatalog`'s quick-pick list
+- feat(app): move the most-frequently-adjusted controls onto the floating panel and menu bar, out of the Settings window — the panel now shows from launch and hosts a start/stop button plus source/target language pickers (target stays editable mid-recording, source doesn't — see its doc comment for why), and the menu bar gained a microphone picker and a "包含系统声音" toggle
 - feat(app): custom themed close button on the floating panel (semi-transparent circular ✕, brightens on hover), replacing the native traffic light — matches the panel's borderless/titlebar-hidden look
 - feat(session): persist engine choice, language pair, mic device, and system-audio inclusion across quits/relaunches (and system restarts) via `UserDefaults` — previously every one of these silently reset to hardcoded defaults on every launch
+- feat(app): Settings' language section uses the same `SourceLanguagePicker`/`TargetLanguagePicker` the floating panel does — the two can't offer different language sets by construction
 
 ### Changed
 
@@ -33,7 +34,6 @@ The format is based on Keep a Changelog.
 - fix(app): make the floating panel's SwiftUI content actually resize with the window — its `.frame` was a fixed 420×280 despite the panel's `.resizable` style mask, leaving blank space when dragged larger; now `minWidth`/`minHeight` with `.infinity` max, plus a matching `NSPanel.minSize`
 - fix(app): filter `ru-RU`/`ar-SA`/`vi-VN`/`th-TH` out of the source-language picker while the `.system` ASR engine is selected — confirmed `TranslationSession` targets, but not supported as a `SpeechTranscriber` source, so picking one there threw at `start()` with 100% certainty; `LanguageOption.supportsSystemASRSource` now drives the filter (still offered as translation targets), and the engine-switch self-heal covers this case too, not just the "自动"/nil one
 - fix(app): re-show the floating panel when a recording starts even if it was previously hidden — removing the old `isRunningCancellable` auto-show subscription (in favor of "always shown from launch") meant starting a recording from the menu bar after manually hiding the panel gave no visual feedback at all
-- feat(app): Settings' language section now uses the same `SourceLanguagePicker`/`TargetLanguagePicker` the floating panel does, instead of a separate free-text BCP-47 entry — the two could never offer different language sets by construction now
 - fix(session): re-validate the "system engine ⇒ usable source language" invariant once at the end of `restorePersistedSettings()`, not only inside `transcriptionEngineID`'s own `didSet` — restoring `transcriptionEngineID` from `UserDefaults` runs that `didSet` *before* `sourceLanguageCode` is restored, so it could validate against the still-default value and miss an invalid combination that only exists once both are loaded
 - fix(session): validate a persisted `transcriptionEngineID`/`translationEngineID` against `ProviderCatalog` before restoring it — an ID from a build where an engine was since renamed/removed would otherwise silently make `transcriptionEngineKind` return `nil`, breaking every `.system`/`.model` check that depends on it
 - fix(session): stop `refreshDevices()`'s automatic fallback (when the persisted mic isn't currently connected) from overwriting the persisted device preference in `UserDefaults` — previously, opening the menu with a USB mic unplugged (or Bluetooth earbuds not connected) permanently forgot that device as the preference, even after reconnecting it
@@ -48,3 +48,4 @@ The format is based on Keep a Changelog.
 ### Tests
 
 - test(scaffold): unit tests for `SentenceBoundary` and `ProviderCatalog` (ee5f43d)
+- test(session): `RecordingSessionSettingsTests` covering `RecordingSession`'s settings self-heal contracts — unrecognized persisted engine IDs falling back to the catalog default, the system-engine/source-language invariant re-validating after a full settings restore (not just on a live engine switch), and `isSessionActive` reflecting `isRunning`/`isStarting`/`isStopping`

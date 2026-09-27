@@ -84,10 +84,9 @@ public final class RecordingSession: ObservableObject {
     /// requires a concrete one; `start()` fails with `.localeNotSupported`
     /// if left nil while a system engine is selected. A UI offering "自动"
     /// should only do so while `transcriptionEngineKind == .model`. Persisted
-    /// (see `PersistedSettingsKey`) using `""` as nil's sentinel — same
-    /// convention `SettingsView.sourceLanguageBinding` already uses for its
-    /// empty-means-auto `TextField`, since `UserDefaults` can't distinguish
-    /// "never set" from "explicitly set to nil".
+    /// (see `PersistedSettingsKey`) using `""` as nil's sentinel, since
+    /// `UserDefaults` can't distinguish "never set" from "explicitly set to
+    /// nil".
     @Published public var sourceLanguageCode: String? = "en-US" {
         didSet {
             Self.defaults.set(sourceLanguageCode ?? "", forKey: PersistedSettingsKey.sourceLanguageCode)
@@ -492,8 +491,11 @@ public final class RecordingSession: ObservableObject {
 }
 
 /// Namespaced (`org.omnivoice.*`) to avoid colliding with anything else
-/// ever written into the app's `UserDefaults` domain.
-private enum PersistedSettingsKey {
+/// ever written into the app's `UserDefaults` domain. Internal, not
+/// `private`, so `RecordingSessionSettingsTests` can drive
+/// `restorePersistedSettings()`'s self-heal paths through the same
+/// `UserDefaults` keys `RecordingSession` itself reads/writes.
+enum PersistedSettingsKey {
     static let transcriptionEngineID = "org.omnivoice.transcriptionEngineID"
     static let translationEngineID = "org.omnivoice.translationEngineID"
     static let sourceLanguageCode = "org.omnivoice.sourceLanguageCode"
