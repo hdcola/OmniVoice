@@ -238,6 +238,15 @@ final class InProcessTranslator: @unchecked Sendable {
         var modelParams = llama_model_default_params()
         modelParams.n_gpu_layers = -1 // negative = offload every layer (Metal)
         guard let mdl = path.withCString({ llama_model_load_from_file($0, modelParams) }) else {
+            // Undo the `llama_backend_init()` above before throwing —
+            // nothing else has been allocated yet, so this is the only
+            // thing to unwind. Without it, a failure here leaves backend
+            // state initialized with `model`/`ctx` still both `nil`, and
+            // `unload()` (every caller's failure path already calls it
+            // unconditionally) skips freeing anything when both are `nil`
+            // — see its own doc — leaving this `llama_backend_init()`
+            // permanently unpaired.
+            llama_backend_free()
             throw TranslatorError.llamaCallFailed("加载 T3PO 模型失败")
         }
 
@@ -261,7 +270,10 @@ final class InProcessTranslator: @unchecked Sendable {
         // `feed`/`flush` call (which both require `ctx != nil`) with no
         // error ever surfaced and no way to recover short of `unload()`.
         guard let context = llama_init_from_model(mdl, ctxParams) else {
+            // Same unwind reasoning as `llama_model_load_from_file`'s
+            // failure above — `model`/`ctx` are still both `nil` here too.
             llama_model_free(mdl)
+            llama_backend_free()
             throw TranslatorError.llamaCallFailed("创建 T3PO 推理上下文失败")
         }
         model = mdl
@@ -556,12 +568,24 @@ final class InProcessTranslator: @unchecked Sendable {
     func unload() {
         queue.sync {
             pendingPreviewWorkItem?.cancel()
+            buffer.removeAll()
+            history.removeAll()
+            // Every caller in `RecordingSession` calls this unconditionally
+            // on any `loadModel()` failure, including one that threw before
+            // `loadModelLocked` ever called `llama_backend_init()` (e.g.
+            // `TranslatorError.modelMissing`) — `model`/`ctx` both `nil`
+            // here is exactly that case, and `llama_backend_free()` would
+            // free global backend state that was never initialized in the
+            // first place. `loadModelLocked`'s own failure paths already
+            // pair every `llama_backend_init()` they perform with a
+            // matching `llama_backend_free()` before throwing, so by the
+            // time this runs, "backend was initialized" and "`model`/`ctx`
+            // non-`nil`" are the same condition.
+            guard model != nil || ctx != nil else { return }
             if let ctx { llama_free(ctx) }
             if let model { llama_model_free(model) }
             ctx = nil
             model = nil
-            buffer.removeAll()
-            history.removeAll()
             llama_backend_free()
         }
     }
