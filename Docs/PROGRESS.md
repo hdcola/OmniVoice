@@ -104,9 +104,12 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
     `.app` packaging (not a release pipeline — see Open Items).
   - 3 unit tests (`SentenceBoundary`, `ProviderCatalog`).
 - [x] Verified: `swift build` (debug + release), `swift test`, packaged
-      `.app` launches and quits cleanly with no crash. **Not yet
-      manually verified in the actual UI** — no mic-in-hand smoke test of a
-      real recording session (see Open Items).
+      `.app` launches and quits cleanly with no crash.
+- [x] Manual smoke test of the running app (mic-in-hand): start/stop
+      recording, floating panel show + drag, panel toggle, history window,
+      settings window — full flow confirmed working end to end. Surfaced 4
+      real UI bugs, all fixed on `fixbug/show-floating-panel-on-start`
+      (PR #2) — see "Smoke test findings (fixed)" below.
 
 ### Code review findings (fixed)
 
@@ -133,33 +136,59 @@ A review of the scaffold PR caught three real bugs, all fixed on
   document that this is the hot audio-path exception to the rest of the
   protocol's `@MainActor` default.
 
+### Smoke test findings (fixed)
+
+Manual smoke test (`fixbug/show-floating-panel-on-start`, PR #2) caught four
+real UI bugs, all fixed:
+
+- **Floating panel never showed on "开始转录"**: its visibility was never
+  wired to `RecordingSession.isRunning`, only to a manual menu toggle. Fixed
+  by subscribing to `session.$isRunning` in `AppDelegate` and ordering the
+  panel front as soon as it goes `true` (hiding stays manual, so the
+  transcript is still reviewable after stopping).
+- **Panel couldn't be dragged**: `NSHostingView` consumes `mouseDown` for its
+  own SwiftUI gesture recognition and never lets it bubble to the window, so
+  `isMovableByWindowBackground` silently never fired. Fixed with a
+  `DraggableHostingView` subclass that falls back to `performDrag(with:)` for
+  any `mouseDown` no SwiftUI control handled.
+- **"显示/隐藏悬浮窗" menu toggle did nothing**: it reached `AppDelegate` via
+  `NSApp.delegate as? AppDelegate`, unreliable from a `MenuBarExtra`-only (no
+  primary window) app. Fixed by injecting `AppDelegate` through the SwiftUI
+  environment instead, the same way `RecordingSession` already is.
+- **History/settings windows opened behind other apps**: as an accessory app
+  (`LSUIElement`), OmniVoice never becomes frontmost on its own. Fixed by
+  calling `NSApp.activate(ignoringOtherApps: true)` before opening each
+  window (and switching the settings menu item from `SettingsLink` to a
+  `Button` + `openSettings`, since `SettingsLink` offers no hook to activate
+  first).
+
 ### Open items / next up
 
 Roughly in the order they'll likely get tackled — not a hard commitment.
 
-1. **Manual smoke test of the running app**: start a real recording with the
-   system engines, confirm mic capture → transcript → translation →
-   persisted history round-trip actually works end to end, not just "it
-   compiles and launches."
-2. **Model providers**: port `InProcessTranscriber`/`InProcessTranslator` from
+1. **Model providers**: port `InProcessTranscriber`/`InProcessTranslator` from
    `mac-poc-hybrid` behind `ModelTranscriptionProvider`/
    `ModelTranslationProvider` — needs adding `CAudioCpp`/`CLlamaCpp` C target
    shims + `third_party/audio.cpp`+`third_party/llama.cpp` linker flags to
    `Package.swift` (see those two provider files' doc comments for the exact
    plan) and a first real download source for `ProviderCatalog`'s model
    variants (`downloadURL`/`sha256` are currently `nil` placeholders).
-3. **Settings UI wiring**: model-variant picker is currently `.disabled(true)`
-   (`SettingsView.modelVariantPicker`) — enable once #2 lands. Also currently
+2. **Settings UI wiring**: model-variant picker is currently `.disabled(true)`
+   (`SettingsView.modelVariantPicker`) — enable once #1 lands. Also currently
    no device picker in Settings (`RecordingSession.inputDevices` exists but
    nothing in the UI binds to it yet).
-4. **Release pipeline**: Developer ID signing + notarization + stapling
+3. **Release pipeline**: Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh` is ad-hoc-signed, dev-only), plus an
    update mechanism (Sparkle-shaped) and a real weights-hosting location for
    downloaded models.
-5. **Privacy copy, crash/error log export, localization scaffolding** — all
+4. **Privacy copy, crash/error log export, localization scaffolding** — all
    explicitly deferred ("搭架子" / stub first) per the product discussion;
    none of the actual placeholder work has been started yet.
-6. **Model license re-check** — before any commercial use, not before this.
+5. **Model license re-check** — before any commercial use, not before this.
+6. **Floating panel close button**: the red traffic-light close button is
+   still live despite the hidden titlebar — clicking it closes the panel
+   outside the toggle's tracked `isVisible` state. Flagged during the smoke
+   test, not fixed yet (low priority unless it turns out to bite).
 
 ### Known gaps / things to double check when touching nearby code
 

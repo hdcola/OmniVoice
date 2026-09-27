@@ -10,6 +10,7 @@ struct OmniVoiceApp: App {
         MenuBarExtra("OmniVoice", systemImage: "waveform") {
             MenuBarContentView()
                 .environmentObject(appDelegate.session)
+                .environmentObject(appDelegate)
         }
         .menuBarExtraStyle(.menu)
 
