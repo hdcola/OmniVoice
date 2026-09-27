@@ -259,9 +259,20 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    load-failure messages. `SettingsView.modelVariantPicker` is a real,
    enabled `Picker` now (dropped the `.disabled(true)` TODO), showing each
    variant's size and live "已下载"/"下载中… N%" status via an
-   `@ObservedObject ModelDownloadManager.shared`. Only one variant per engine
-   exists in the catalog today, so this mostly plumbs the mechanism through
-   for whenever a second quantization/size is added — it doesn't yet expose
+   `@ObservedObject` bound to the same `ModelDownloadManager` instance
+   `RecordingSession` was constructed with (injected explicitly through
+   `SettingsView.init`, not hardcoded to `.shared` — a test/preview
+   constructing `RecordingSession` with a non-`shared` manager needs
+   `SettingsView` observing that same instance). Review also caught
+   `loadedEngineIDs`/`start()`'s `reusingLoaded` only ever comparing engine
+   IDs, not the selected variant — switching a `.model` engine's variant
+   while the *previous* one was already loaded left `isModelLoaded` reading
+   "still matches", silently running the stale variant forever; fixed by
+   folding variant IDs into that comparison and having the variant
+   properties' `didSet` call `discardLoadedModelsIfStale()` too. Only one
+   variant per engine exists in the catalog today, so this mostly plumbs the
+   mechanism through for whenever a second quantization/size is added — it
+   doesn't yet expose
    `cancelDownload(for:)`/`deleteCachedModel(for:)` from the UI.
 4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
