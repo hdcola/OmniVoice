@@ -180,6 +180,14 @@ final class InProcessTranscriber: @unchecked Sendable {
     }
 
     private func loadModelLocked(modelPath: URL?) throws {
+        // A defensive guard, not the expected path — every caller already
+        // pairs `loadModel()` with `unload()` before ever calling it again
+        // (see `RecordingSession`'s `isModelLoaded` bookkeeping), but
+        // without this, an unexpected duplicate call would overwrite
+        // `registry`/`model` with fresh handles while leaking the old ones
+        // — `unload()` never gets to free them, since it only ever reads
+        // whatever's currently in these two properties.
+        guard model == nil else { return }
         let path = Self.resolveModelPath(override: modelPath)
         guard FileManager.default.fileExists(atPath: path) else {
             throw TranscriberError.modelMissing(path)

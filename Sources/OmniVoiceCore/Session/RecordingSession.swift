@@ -114,7 +114,22 @@ public final class RecordingSession: ObservableObject {
         }
     }
     @Published public var targetLanguageCode: String = "zh-CN" {
-        didSet { Self.defaults.set(targetLanguageCode, forKey: PersistedSettingsKey.targetLanguageCode) }
+        didSet {
+            Self.defaults.set(targetLanguageCode, forKey: PersistedSettingsKey.targetLanguageCode)
+            // Unlike `sourceLanguageCode`/the engine ID properties, this one
+            // stays editable *while* a recording is running (see
+            // `TargetLanguagePicker`'s doc in `FloatingTranscriptView`) —
+            // for `SystemTranslationProvider`, that already worked via
+            // `.translationTask` rebuilding on every change, but a
+            // `.model`-kind engine like T3PO has no such rebuild hook and
+            // was silently continuing to translate into whatever language
+            // `start(config:)` set until this was added. Safe to call
+            // whether or not a recording is active — `translationProvider`
+            // is nil when stopped, and `updateTargetLanguage(_:)`'s default
+            // no-op is a deliberate no-op for providers with nothing to
+            // retarget (see that method's doc).
+            translationProvider?.updateTargetLanguage(targetLanguageCode)
+        }
     }
 
     /// Nil only if `transcriptionEngineID` somehow doesn't match any known

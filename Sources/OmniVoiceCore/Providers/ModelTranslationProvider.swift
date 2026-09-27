@@ -44,6 +44,10 @@ public final class ModelTranslationProvider: TranslationProvider {
         translator.setTargetLanguage(ModelLanguageMapping.t3poTargetLanguage(forCode: config.targetLanguageCode))
     }
 
+    public func updateTargetLanguage(_ code: String) {
+        translator.setTargetLanguage(ModelLanguageMapping.t3poTargetLanguage(forCode: code))
+    }
+
     public func feed(_ text: String) {
         translator.feed(sourceDelta: text)
     }

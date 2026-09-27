@@ -223,6 +223,11 @@ final class InProcessTranslator: @unchecked Sendable {
     }
 
     private func loadModelLocked(modelPath: URL?) throws {
+        // Same defensive guard as `InProcessTranscriber.loadModelLocked`'s
+        // — see its doc. Here the leak would be `model`/`ctx` (plus a
+        // redundant `llama_backend_init()`), never freed since `unload()`
+        // only ever sees whichever handles are current by the time it runs.
+        guard model == nil else { return }
         let path = Self.resolveModelPath(override: modelPath)
         guard FileManager.default.fileExists(atPath: path) else {
             throw TranslatorError.modelMissing(path)
