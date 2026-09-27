@@ -170,6 +170,58 @@ struct RecordingSessionSettingsTests {
         }
     }
 
+    @Test func currentModelVariantDefaultsToTheCatalogsFirstEntryWhenUnselected() {
+        defer { defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID) }
+        let session = RecordingSession()
+        session.transcriptionEngineID = "model.r2t2"
+        #expect(session.transcriptionModelVariantID == nil)
+        #expect(session.currentTranscriptionModelVariant?.id == ProviderCatalog.modelVariants(forEngineID: "model.r2t2").first?.id)
+    }
+
+    @Test func recognizedPersistedModelVariantIDIsRestored() {
+        withPersisted([
+            PersistedSettingsKey.transcriptionEngineID: "model.r2t2",
+            PersistedSettingsKey.transcriptionModelVariantID: "r2t2-q8_0",
+        ]) {
+            let session = RecordingSession()
+            #expect(session.transcriptionModelVariantID == "r2t2-q8_0")
+            #expect(session.currentTranscriptionModelVariant?.id == "r2t2-q8_0")
+        }
+    }
+
+    /// Guards `validateAndNormalizeModelVariantSelections()` — a variant ID
+    /// left over from a since-renamed/removed catalog entry (or a corrupted
+    /// defaults domain) must fall back to the current engine's first variant
+    /// rather than resolving to no variant at all.
+    @Test func unrecognizedPersistedModelVariantIDFallsBackToDefault() {
+        withPersisted([
+            PersistedSettingsKey.transcriptionEngineID: "model.r2t2",
+            PersistedSettingsKey.transcriptionModelVariantID: "bogus.variant.id",
+        ]) {
+            let session = RecordingSession()
+            #expect(session.transcriptionModelVariantID == nil)
+            #expect(session.currentTranscriptionModelVariant?.id == ProviderCatalog.modelVariants(forEngineID: "model.r2t2").first?.id)
+        }
+    }
+
+    /// A variant selection only makes sense for the engine it was picked
+    /// under — switching engines must drop a selection that doesn't belong
+    /// to the new one, the same way `sourceLanguageCode` self-heals on an
+    /// engine switch.
+    @Test func switchingEngineDropsAModelVariantSelectionThatBelongsToTheOldEngine() {
+        defer {
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionModelVariantID)
+        }
+        let session = RecordingSession()
+        session.transcriptionEngineID = "model.r2t2"
+        session.transcriptionModelVariantID = "r2t2-q8_0"
+        #expect(session.transcriptionModelVariantID == "r2t2-q8_0")
+
+        session.transcriptionEngineID = "system.speech"
+        #expect(session.transcriptionModelVariantID == nil)
+    }
+
     @Test func usesOnDeviceModelEngineReflectsEitherEngineBeingModelKind() {
         defer {
             defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)

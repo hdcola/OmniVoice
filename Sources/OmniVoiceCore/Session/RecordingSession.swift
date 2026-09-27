@@ -91,13 +91,35 @@ public final class RecordingSession: ObservableObject {
             // runs after restoring persisted settings.
             validateAndNormalizeSourceLanguage()
             Self.defaults.set(transcriptionEngineID, forKey: PersistedSettingsKey.transcriptionEngineID)
+            validateAndNormalizeModelVariantSelections()
             discardLoadedModelsIfStale()
         }
     }
     @Published public var translationEngineID: String = ProviderCatalog.translationEngines[0].id {
         didSet {
             Self.defaults.set(translationEngineID, forKey: PersistedSettingsKey.translationEngineID)
+            validateAndNormalizeModelVariantSelections()
             discardLoadedModelsIfStale()
+        }
+    }
+    /// Selected `ModelVariant.id` for `transcriptionEngineID`/`translationEngineID`
+    /// respectively — `nil` means "use the catalog's first variant for this
+    /// engine" (today's only choice, since each `.model` engine has exactly
+    /// one catalog entry; this exists so `SettingsView`'s picker has
+    /// something real to bind once a second quantization/size is added).
+    /// Persisted (see `PersistedSettingsKey`); self-healed against
+    /// `ProviderCatalog.modelVariants(forEngineID:)` by
+    /// `validateAndNormalizeModelVariantSelections()` whenever the owning
+    /// engine ID changes, same reasoning `sourceLanguageCode`'s self-heal
+    /// documents.
+    @Published public var transcriptionModelVariantID: String? {
+        didSet {
+            Self.defaults.set(transcriptionModelVariantID, forKey: PersistedSettingsKey.transcriptionModelVariantID)
+        }
+    }
+    @Published public var translationModelVariantID: String? {
+        didSet {
+            Self.defaults.set(translationModelVariantID, forKey: PersistedSettingsKey.translationModelVariantID)
         }
     }
     /// BCP-47-ish language tags. `sourceLanguageCode` nil means "auto", only
@@ -150,7 +172,31 @@ public final class RecordingSession: ObservableObject {
         transcriptionEngineKind == .model || translationEngineKind == .model
     }
 
+    /// The `ModelVariant` `transcriptionEngineID`/`translationEngineID`
+    /// would actually download/load — `transcriptionModelVariantID`/
+    /// `translationModelVariantID` if it still names one of that engine's
+    /// catalog entries, else the catalog's first for that engine. `nil` only
+    /// if the engine has none (a `.system` engine, or a `.model` engine not
+    /// yet given a catalog entry). `SettingsView`'s picker binds to this
+    /// (not the raw persisted ID) so it always shows a real selection.
+    public var currentTranscriptionModelVariant: ModelVariant? {
+        Self.resolveModelVariant(engineID: transcriptionEngineID, selectedID: transcriptionModelVariantID)
+    }
+
+    public var currentTranslationModelVariant: ModelVariant? {
+        Self.resolveModelVariant(engineID: translationEngineID, selectedID: translationModelVariantID)
+    }
+
+    private static func resolveModelVariant(engineID: String, selectedID: String?) -> ModelVariant? {
+        let variants = ProviderCatalog.modelVariants(forEngineID: engineID)
+        if let selectedID, let match = variants.first(where: { $0.id == selectedID }) {
+            return match
+        }
+        return variants.first
+    }
+
     private let sessionStore: SessionStore?
+    private let modelDownloadManager: ModelDownloadManager
     private var activeSessionRecord: RecordingSessionRecord?
 
     private var transcriptionProvider: TranscriptionProvider?
@@ -185,8 +231,15 @@ public final class RecordingSession: ObservableObject {
     /// `RecordingSession` doesn't assume that.
     private var translationRowIndex = 0
 
-    public init(sessionStore: SessionStore? = nil) {
+    public init(sessionStore: SessionStore? = nil, modelDownloadManager: ModelDownloadManager? = nil) {
         self.sessionStore = sessionStore
+        // Not a default parameter value (`= .shared`) — evaluating a
+        // `@MainActor`-isolated static property as a default argument
+        // expression is only diagnosed as a warning under today's Swift
+        // version, but is a hard error under the Swift 6 language mode;
+        // resolving it here, inside this already-`@MainActor` initializer
+        // body, avoids depending on that being fixed later.
+        self.modelDownloadManager = modelDownloadManager ?? .shared
         restorePersistedSettings()
     }
 
@@ -234,8 +287,30 @@ public final class RecordingSession: ObservableObject {
             includeSystemAudio = defaults.bool(forKey: PersistedSettingsKey.includeSystemAudio)
         }
         selectedDeviceID = defaults.string(forKey: PersistedSettingsKey.selectedDeviceID)
+        transcriptionModelVariantID = defaults.string(forKey: PersistedSettingsKey.transcriptionModelVariantID)
+        translationModelVariantID = defaults.string(forKey: PersistedSettingsKey.translationModelVariantID)
 
         validateAndNormalizeSourceLanguage()
+        validateAndNormalizeModelVariantSelections()
+    }
+
+    /// Drops a persisted variant selection that no longer names one of its
+    /// engine's current catalog entries (a since-renamed/removed variant, or
+    /// simply stale from before an engine switch) — `currentTranscriptionModelVariant`/
+    /// `currentTranslationModelVariant` already fall back to the catalog's
+    /// first entry for a mismatched ID, but leaving the stale ID sitting in
+    /// `UserDefaults` would keep re-selecting a variant that may no longer
+    /// even apply to a *different* engine's variant list should IDs ever
+    /// collide across engines.
+    private func validateAndNormalizeModelVariantSelections() {
+        if let id = transcriptionModelVariantID,
+            !ProviderCatalog.modelVariants(forEngineID: transcriptionEngineID).contains(where: { $0.id == id }) {
+            transcriptionModelVariantID = nil
+        }
+        if let id = translationModelVariantID,
+            !ProviderCatalog.modelVariants(forEngineID: translationEngineID).contains(where: { $0.id == id }) {
+            translationModelVariantID = nil
+        }
     }
 
     /// Same invariant `transcriptionEngineID`'s `didSet` self-heals on an
@@ -315,8 +390,27 @@ public final class RecordingSession: ObservableObject {
         isPreloadingModel = true
         defer { isPreloadingModel = false }
 
-        let transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID)
-        let translation = Self.makeTranslationProvider(engineID: translationEngineID)
+        let transcriptionModelPath: URL?
+        do {
+            transcriptionModelPath = try await resolveModelPath(
+                kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant, statusPrefix: "识别引擎模型"
+            )
+        } catch {
+            statusMessage = "识别引擎模型下载失败: \(error.localizedDescription)"
+            return
+        }
+        let translationModelPath: URL?
+        do {
+            translationModelPath = try await resolveModelPath(
+                kind: translationEngineKind, variant: currentTranslationModelVariant, statusPrefix: "翻译引擎模型"
+            )
+        } catch {
+            statusMessage = "翻译引擎模型下载失败: \(error.localizedDescription)"
+            return
+        }
+
+        let transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID, modelPath: transcriptionModelPath)
+        let translation = Self.makeTranslationProvider(engineID: translationEngineID, modelPath: translationModelPath)
         // Wired into the ivars immediately — *before* either `loadModel()`
         // call below resolves, not after both succeed. `unloadModelsBeforeQuit()`
         // reads these same ivars, and it needs something to reach even if
@@ -518,8 +612,31 @@ public final class RecordingSession: ObservableObject {
             transcription = loadedTranscription
             translation = loadedTranslation
         } else {
-            transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID)
-            translation = Self.makeTranslationProvider(engineID: translationEngineID)
+            // Only resolved (and, for a not-yet-cached `.model` variant,
+            // downloaded) when actually about to construct fresh providers —
+            // `reusingLoaded` already means a matching pair is loaded with
+            // whatever path it was originally given, so re-resolving here
+            // would just repeat a completed download for nothing.
+            let transcriptionModelPath: URL?
+            do {
+                transcriptionModelPath = try await resolveModelPath(
+                    kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant, statusPrefix: "识别引擎模型"
+                )
+            } catch {
+                statusMessage = "识别引擎模型下载失败: \(error.localizedDescription)"
+                return
+            }
+            let translationModelPath: URL?
+            do {
+                translationModelPath = try await resolveModelPath(
+                    kind: translationEngineKind, variant: currentTranslationModelVariant, statusPrefix: "翻译引擎模型"
+                )
+            } catch {
+                statusMessage = "翻译引擎模型下载失败: \(error.localizedDescription)"
+                return
+            }
+            transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID, modelPath: transcriptionModelPath)
+            translation = Self.makeTranslationProvider(engineID: translationEngineID, modelPath: translationModelPath)
         }
         transcriptionProvider = transcription
         translationProvider = translation
@@ -808,17 +925,44 @@ public final class RecordingSession: ObservableObject {
         return formatter.string(from: .now)
     }
 
-    private static func makeTranscriptionProvider(engineID: String) -> TranscriptionProvider {
+    private static func makeTranscriptionProvider(engineID: String, modelPath: URL?) -> TranscriptionProvider {
         switch ProviderCatalog.transcriptionEngines.first(where: { $0.id == engineID })?.kind {
-        case .model: return ModelTranscriptionProvider()
+        case .model: return ModelTranscriptionProvider(modelPath: modelPath)
         default: return SystemTranscriptionProvider()
         }
     }
 
-    private static func makeTranslationProvider(engineID: String) -> TranslationProvider {
+    private static func makeTranslationProvider(engineID: String, modelPath: URL?) -> TranslationProvider {
         switch ProviderCatalog.translationEngines.first(where: { $0.id == engineID })?.kind {
-        case .model: return ModelTranslationProvider()
+        case .model: return ModelTranslationProvider(modelPath: modelPath)
         default: return SystemTranslationProvider()
+        }
+    }
+
+    /// Resolves `variant`'s local weights path for a `.model`-kind engine,
+    /// downloading it first (via `modelDownloadManager`) if it isn't already
+    /// cached — `statusMessage` shows live progress while that download runs.
+    /// Returns `nil` for a `.system`-kind engine (nothing to resolve) or a
+    /// `.model`-kind engine with no catalog variant (falls back to
+    /// `InProcessTranscriber`/`InProcessTranslator.resolveModelPath`'s own
+    /// env-var/local-`models/`-dir convention, same as passing `modelPath: nil`
+    /// always did before this method existed).
+    private func resolveModelPath(
+        kind: EngineKind?, variant: ModelVariant?, statusPrefix: String
+    ) async throws -> URL? {
+        guard kind == .model, let variant else { return nil }
+        if modelDownloadManager.isDownloaded(variant) {
+            return modelDownloadManager.localURL(for: variant)
+        }
+        statusMessage = "下载\(statusPrefix)中… 0%"
+        return try await modelDownloadManager.ensureDownloaded(variant) { [weak self] fraction in
+            // `progress` is declared `@Sendable` (see `ensureDownloaded`'s
+            // doc) even though every actual call lands on the main actor —
+            // hop explicitly rather than assuming that from inside a
+            // `@Sendable` closure body.
+            Task { @MainActor in
+                self?.statusMessage = "下载\(statusPrefix)中… \(Int(fraction * 100))%"
+            }
         }
     }
 
@@ -837,4 +981,6 @@ enum PersistedSettingsKey {
     static let targetLanguageCode = "org.omnivoice.targetLanguageCode"
     static let includeSystemAudio = "org.omnivoice.includeSystemAudio"
     static let selectedDeviceID = "org.omnivoice.selectedDeviceID"
+    static let transcriptionModelVariantID = "org.omnivoice.transcriptionModelVariantID"
+    static let translationModelVariantID = "org.omnivoice.translationModelVariantID"
 }

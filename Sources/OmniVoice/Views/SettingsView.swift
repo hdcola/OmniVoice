@@ -17,6 +17,12 @@ import SwiftUI
 /// so the two can't ever offer different language options.
 struct SettingsView: View {
     @EnvironmentObject private var session: RecordingSession
+    /// Observed directly (not just reached through `session`) so a variant
+    /// row's "已下载"/"约 N MB" caption live-updates while
+    /// `ModelDownloadManager.ensureDownloaded(_:progress:)` runs during
+    /// `preloadModel()`/`start()` — `RecordingSession` itself doesn't
+    /// re-publish on every download tick, only on `statusMessage` changes.
+    @ObservedObject private var downloadManager = ModelDownloadManager.shared
 
     var body: some View {
         Form {
@@ -26,7 +32,13 @@ struct SettingsView: View {
                         Text(engine.displayName).tag(engine.id)
                     }
                 }
-                modelVariantPicker(for: session.transcriptionEngineID)
+                modelVariantPicker(
+                    for: session.transcriptionEngineID,
+                    selection: Binding(
+                        get: { session.currentTranscriptionModelVariant?.id },
+                        set: { session.transcriptionModelVariantID = $0 }
+                    )
+                )
             }
 
             Section("翻译引擎") {
@@ -35,7 +47,13 @@ struct SettingsView: View {
                         Text(engine.displayName).tag(engine.id)
                     }
                 }
-                modelVariantPicker(for: session.translationEngineID)
+                modelVariantPicker(
+                    for: session.translationEngineID,
+                    selection: Binding(
+                        get: { session.currentTranslationModelVariant?.id },
+                        set: { session.translationModelVariantID = $0 }
+                    )
+                )
             }
 
             Section("语言") {
@@ -51,21 +69,36 @@ struct SettingsView: View {
         // `isPreloadingModel` alongside `isSessionActive`: switching engines
         // mid-preload would race `preloadModel()`'s in-flight `loadModel()`
         // calls against `discardLoadedModelsIfStale()` unloading the very
-        // providers it's still awaiting.
+        // providers it's still awaiting. Also covers a variant's own
+        // download: that only ever runs from inside `preloadModel()`/
+        // `start()`, both already gated by these same two flags.
         .disabled(session.isSessionActive || session.isPreloadingModel)
     }
 
     @ViewBuilder
-    private func modelVariantPicker(for engineID: String) -> some View {
+    private func modelVariantPicker(for engineID: String, selection: Binding<String?>) -> some View {
         let variants = ProviderCatalog.modelVariants(forEngineID: engineID)
         if !variants.isEmpty {
-            Picker("模型", selection: .constant(variants.first?.id)) {
+            Picker("模型", selection: selection) {
                 ForEach(variants) { variant in
-                    Text("\(variant.displayName) · 约 \(variant.approximateSizeMB) MB")
+                    Text("\(variant.displayName) · \(variantCaption(for: variant))")
                         .tag(Optional(variant.id))
                 }
             }
-            .disabled(true) // TODO: enable once Model*Provider is implemented (see their doc comments).
         }
+    }
+
+    /// "约 N MB" for a not-yet-downloaded variant, "已下载 (N MB)" once
+    /// `ModelDownloadManager` has it cached, or a live "下载中… N%" while
+    /// `preloadModel()`/`start()` are actively fetching it — the same
+    /// `downloadProgress` a floating-panel progress view would observe.
+    private func variantCaption(for variant: ModelVariant) -> String {
+        if let fraction = downloadManager.downloadProgress[variant.id] {
+            return "下载中… \(Int(fraction * 100))%"
+        }
+        if downloadManager.isDownloaded(variant) {
+            return "已下载 · 约 \(variant.approximateSizeMB) MB"
+        }
+        return "约 \(variant.approximateSizeMB) MB"
     }
 }
