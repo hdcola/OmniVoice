@@ -295,7 +295,10 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    category, and download progress is now visible outside the Model
    Management window itself — the menu bar icon and the "模型管理…" menu row
    both show a live percentage while a download is in flight
-   (`ModelDownloadManager.hasActiveDownloads`).
+   (`ModelDownloadManager.hasActiveDownloads`). The floating panel also now
+   remembers its position/size across quit/relaunch (AppKit's own frame
+   autosave, `FloatingTranscriptPanel`) instead of always recentering at a
+   fixed 420×280.
 4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,

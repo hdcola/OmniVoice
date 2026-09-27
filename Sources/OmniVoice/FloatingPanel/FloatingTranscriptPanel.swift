@@ -19,6 +19,13 @@ final class DraggableHostingView<Content: View>: NSHostingView<Content> {
 /// the main history window so it can float over other apps without ever
 /// stealing focus or showing up in the Dock/Cmd-Tab switcher.
 final class FloatingTranscriptPanel: NSPanel {
+    private static let frameAutosaveName = "FloatingTranscriptPanel"
+
+    /// Whether `init` found (and applied) a previously-saved frame — the
+    /// caller (`AppDelegate`) only falls back to `center()` when this is
+    /// `false`, so a restored position/size is never immediately overridden.
+    private(set) var didRestoreFrame = false
+
     init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
@@ -47,6 +54,21 @@ final class FloatingTranscriptPanel: NSPanel {
         // effect, but themed to match the panel instead of a stray native
         // traffic light sitting on top of a titlebar-less panel.
         standardWindowButton(.closeButton)?.isHidden = true
+
+        // Remembers this panel's position/size (in `UserDefaults.standard`,
+        // under "NSWindow Frame FloatingTranscriptPanel") across quit/relaunch
+        // — dragging or resizing the panel (both already wired up above)
+        // triggers AppKit's own frame-change notifications, which
+        // `setFrameAutosaveName(_:)` alone is enough to hook into; no
+        // `windowDidMove`/`windowDidResize` delegate needed. That call only
+        // arranges *future* saves, though — it doesn't restore anything on
+        // its own, so `setFrameUsingName(_:)` must run first (standard AppKit
+        // idiom): it applies a previously-saved frame if one exists and
+        // returns whether it found one, false on a fresh install (nothing
+        // saved yet) or if the saved frame doesn't fit any connected screen
+        // (falls back to `contentRect`/`center()` either way).
+        didRestoreFrame = setFrameUsingName(Self.frameAutosaveName)
+        setFrameAutosaveName(Self.frameAutosaveName)
     }
 
     /// Never becomes key — clicking/dragging the panel must not steal focus
