@@ -282,6 +282,20 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    silently reverting to a different engine — `start()`/`preloadModel()`
    still handle it gracefully either way (the same friendly "尚未下载"
    message).
+- [x] **Model Management UX follow-up** (2026-09-27, `fixbug/model-management-ux`):
+   a `.model`-kind engine selection now self-heals back to its `.system`
+   counterpart the instant nothing is downloaded for it
+   (`RecordingSession.fallBackToSystemEngineIfModelUnavailable()` — called on
+   launch, right after a delete in `ModelManagementView`, and defensively at
+   the top of `preloadModel()`/`start()`), so the "尚未下载" `statusMessage`
+   from the previous entry above is now effectively unreachable in normal use
+   rather than something a user actually hits after deleting/never
+   downloading a model. `SettingsView` also gained a hint under each engine
+   picker pointing at "模型管理…" when nothing's downloaded for that
+   category, and download progress is now visible outside the Model
+   Management window itself — the menu bar icon and the "模型管理…" menu row
+   both show a live percentage while a download is in flight
+   (`ModelDownloadManager.hasActiveDownloads`).
 4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,
