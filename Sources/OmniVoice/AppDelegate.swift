@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published private(set) var session: RecordingSession
     private let sessionStore: SessionStore?
     private(set) var floatingPanel: FloatingTranscriptPanel?
+    private var isRunningCancellable: AnyCancellable?
 
     override init() {
         // A failed store (disk full, corrupted schema after a migration
@@ -49,6 +50,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         panel.contentView = NSHostingView(rootView: FloatingTranscriptView(session: session))
         panel.center()
         floatingPanel = panel
+
+        // The panel is otherwise only shown/hidden manually via
+        // `toggleFloatingPanel()` (menu item) — without this, starting a
+        // recording from the menu gives no visible feedback at all, since
+        // the panel is created hidden and nothing else ever orders it front.
+        // Only auto-*show* on start; leave hiding to the manual toggle so
+        // the user can still review the transcript after stopping.
+        isRunningCancellable = session.$isRunning
+            .filter { $0 }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak panel] _ in
+                panel?.orderFrontRegardless()
+            }
     }
 
     func toggleFloatingPanel() {
