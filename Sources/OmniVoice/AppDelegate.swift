@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import OmniVoiceCore
 import SwiftData
 import SwiftUI
@@ -26,7 +25,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published private(set) var session: RecordingSession
     private let sessionStore: SessionStore?
     private(set) var floatingPanel: FloatingTranscriptPanel?
-    private var isRunningCancellable: AnyCancellable?
 
     override init() {
         // A failed store (disk full, corrupted schema after a migration
@@ -46,23 +44,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     func applicationDidFinishLaunching(_ notification: Notification) {
         session.refreshDevices()
 
-        let panel = FloatingTranscriptPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 240))
+        let panel = FloatingTranscriptPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 280))
         panel.contentView = DraggableHostingView(rootView: FloatingTranscriptView(session: session))
         panel.center()
         floatingPanel = panel
 
-        // The panel is otherwise only shown/hidden manually via
-        // `toggleFloatingPanel()` (menu item) — without this, starting a
-        // recording from the menu gives no visible feedback at all, since
-        // the panel is created hidden and nothing else ever orders it front.
-        // Only auto-*show* on start; leave hiding to the manual toggle so
-        // the user can still review the transcript after stopping.
-        isRunningCancellable = session.$isRunning
-            .filter { $0 }
-            .receive(on: DispatchQueue.main)
-            .sink { [weak panel] _ in
-                panel?.orderFrontRegardless()
-            }
+        // The panel now hosts the controls used most often (start/stop,
+        // language pickers) alongside the live transcript, so it's shown
+        // from launch rather than only on demand — `toggleFloatingPanel()`
+        // (menu item) still lets the user hide it manually.
+        panel.orderFrontRegardless()
     }
 
     func toggleFloatingPanel() {

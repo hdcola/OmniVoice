@@ -28,20 +28,27 @@ struct MenuBarContentView: View {
 
     @ViewBuilder
     private var content: some View {
-        Button(session.isRunning ? "停止转录" : "开始转录") {
-            Task {
-                if session.isRunning {
-                    await session.stop()
-                } else {
-                    await session.start()
-                }
-            }
-        }
-        .disabled(session.isStopping)
-
         Button("显示/隐藏悬浮窗") {
             appDelegate.toggleFloatingPanel()
         }
+
+        Divider()
+
+        // Audio source — changed far less often than start/stop or the
+        // language pair (which live on the floating panel instead), but
+        // still frequent enough to want here rather than buried in
+        // Settings. Disabled while running: `RecordingSession.start()`
+        // reads these once to configure that recording's audio pipeline,
+        // so switching mid-recording wouldn't take effect anyway.
+        Picker("麦克风", selection: $session.selectedDeviceID) {
+            ForEach(session.inputDevices) { device in
+                Text(device.name).tag(Optional(device.id))
+            }
+        }
+        .disabled(session.isRunning)
+
+        Toggle("包含系统声音（需要屏幕录制权限）", isOn: $session.includeSystemAudio)
+            .disabled(session.isRunning)
 
         Divider()
 
