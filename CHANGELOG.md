@@ -10,6 +10,7 @@ The format is based on Keep a Changelog.
 
 - feat(panel): add a "预加载模型" button to the floating panel, next to start/stop, so a `.model`-kind (R2T2/T3PO) engine's weight load can happen before the user asks to record instead of during the first "开始" — `RecordingSession.preloadModel()`/`isModelLoaded`
 - feat(panel): show a live mic-level indicator on the floating panel's status bar while recording, driven by the existing `RecordingSession.inputLevel` meter — previously nothing on the panel distinguished "recording with a working mic" from "recording but the selected input is silent/muted"
+- feat(panel): auto-scroll the transcript to the latest line as new content arrives, but stop the moment the user scrolls up to read earlier lines — a "最新内容" button then appears to jump back to the bottom and resume auto-scroll. Previously new lines silently pushed the transcript further down with no way to keep reading older text without it fighting you
 
 ### Changed
 
@@ -37,6 +38,7 @@ The format is based on Keep a Changelog.
 
 - test(providers): add `ModelLanguageMappingTests` covering the BCP-47 → R2T2/T3PO language mapping helpers
 - test(session): cover `preloadModel()`'s state machine (including its no-op-once-loaded guard) and its discard-on-engine-switch guard, plus the new `usesOnDeviceModelEngine` flag
+- test(session): cover `TranscriptLine`'s new `Equatable` conformance
 
 ## [0.0.1] - 2026-09-27
 

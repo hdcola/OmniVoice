@@ -20,6 +20,15 @@ struct FloatingTranscriptView: View {
     /// to inject it through in the first place.
     let onClose: () -> Void
     @State private var translationConfiguration: TranslationSession.Configuration?
+    /// Whether `transcriptList` should keep pinning itself to the bottom as
+    /// new content arrives. Driven by `.onScrollGeometryChange` (true
+    /// whenever the scroll position is at/near the bottom, false the moment
+    /// the user scrolls up to read earlier lines) rather than a manual
+    /// gesture handler — that's the only reliable way to distinguish "the
+    /// user scrolled up on purpose" from "this view's own `scrollTo` call
+    /// just moved the position", since both look identical to a plain drag
+    /// handler.
+    @State private var isPinnedToBottom = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,6 +43,13 @@ struct FloatingTranscriptView: View {
         .onAppear { rebuildConfiguration() }
         .onChange(of: session.sourceLanguageCode) { rebuildConfiguration() }
         .onChange(of: session.targetLanguageCode) { rebuildConfiguration() }
+        // A fresh recording starts with `lines` reset back to one empty
+        // placeholder row (see `RecordingSession.start()`) — re-pin so it
+        // doesn't inherit "scrolled up" from whatever the user was doing
+        // while reading the *previous* recording's transcript.
+        .onChange(of: session.isRunning) { _, isRunning in
+            if isRunning { isPinnedToBottom = true }
+        }
         .translationTask(translationConfiguration) { translationSession in
             for await request in session.translationBridgeStream() {
                 let result = try? await translationSession.translate(request.text)
@@ -162,37 +178,100 @@ struct FloatingTranscriptView: View {
         }
     }
 
+    /// Id of the zero-height row appended after the real transcript lines —
+    /// `scrollTo(_:anchor:)` targets this instead of the last line's own id
+    /// so it always lands at the true bottom of the content, not just the
+    /// last line's top edge (which would leave a multi-line-wrapped last
+    /// entry's tail still off-screen).
+    private static let bottomAnchorID = "transcriptList.bottomAnchor"
+    /// How close to the bottom (in points) still counts as "at the bottom"
+    /// for `.onScrollGeometryChange` below — a plain `>=` against the exact
+    /// bottom offset would read as "scrolled away" from sub-pixel rounding
+    /// alone, immediately unpinning on every single append.
+    private static let bottomProximityTolerance: CGFloat = 24
+
     private var transcriptList: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
-                // Not `session.lines.isEmpty`: `start()` seeds `lines` with
-                // one placeholder row before any real content ever arrives
-                // (see `RecordingSession.start()`), so a session that failed
-                // to start, or one that was stopped before anyone said
-                // anything, still has a non-empty `lines` with nothing
-                // displayable in it — `session.lines.isEmpty` alone would
-                // leave the panel looking blank instead of showing this.
-                if session.lines.allSatisfy(\.displaySource.isEmpty) {
-                    Text("等待开始…")
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(session.lines) { line in
-                    if !line.displaySource.isEmpty {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(line.displaySource)
-                                .font(.system(size: 14, weight: .medium))
-                            if !line.displayTranslation.isEmpty {
-                                Text(line.displayTranslation)
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(.secondary)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Not `session.lines.isEmpty`: `start()` seeds `lines` with
+                    // one placeholder row before any real content ever arrives
+                    // (see `RecordingSession.start()`), so a session that failed
+                    // to start, or one that was stopped before anyone said
+                    // anything, still has a non-empty `lines` with nothing
+                    // displayable in it — `session.lines.isEmpty` alone would
+                    // leave the panel looking blank instead of showing this.
+                    if session.lines.allSatisfy(\.displaySource.isEmpty) {
+                        Text("等待开始…")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(session.lines) { line in
+                        if !line.displaySource.isEmpty {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(line.displaySource)
+                                    .font(.system(size: 14, weight: .medium))
+                                if !line.displayTranslation.isEmpty {
+                                    Text(line.displayTranslation)
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
+                    Color.clear
+                        .frame(height: 1)
+                        .id(Self.bottomAnchorID)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            // Tracks whether the user is (still) looking at the bottom of
+            // the transcript, independent of *why* the position changed —
+            // this fires the same way whether the user just dragged away
+            // from the bottom or `scrollTo` below just moved back to it, so
+            // it can't drift out of sync with reality the way a one-shot
+            // gesture flag could.
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y + geometry.containerSize.height
+                    >= geometry.contentSize.height - Self.bottomProximityTolerance
+            } action: { _, isAtBottom in
+                isPinnedToBottom = isAtBottom
+            }
+            // Re-pins on every content change (a new line, or the current
+            // line growing) — not animated: this fires on essentially every
+            // ASR delta while pinned, and an animation per delta would just
+            // queue up stutter instead of reading as a smooth follow.
+            .onChange(of: session.lines) { _, _ in
+                guard isPinnedToBottom else { return }
+                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+            }
+            .overlay(alignment: .bottom) {
+                if !isPinnedToBottom {
+                    jumpToLatestButton(proxy: proxy)
                 }
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    /// Shown only once the user has scrolled away from the bottom (see
+    /// `isPinnedToBottom`) — lets them jump back to the latest line and
+    /// resume auto-scrolling in one tap, rather than having to drag back
+    /// down manually (which, for a still-scrolling transcript, means
+    /// chasing a moving target).
+    private func jumpToLatestButton(proxy: ScrollViewProxy) -> some View {
+        Button {
+            isPinnedToBottom = true
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+            }
+        } label: {
+            Label("最新内容", systemImage: "arrow.down.circle.fill")
+                .font(.caption)
+                .labelStyle(.titleAndIcon)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.small)
+        .padding(.bottom, 8)
     }
 
     /// Surfaces `RecordingSession.statusMessage` (e.g. "识别引擎启动失败:

@@ -8,15 +8,14 @@ import Foundation
 public final class ModelTranscriptionProvider: TranscriptionProvider {
     public var onEvent: ((TranscriptionEvent) -> Void)?
 
-    // `nonisolated(unsafe)`: `ModelTranscriptionProvider` is inferred
-    // `@MainActor` (via `TranscriptionProvider`), but `push`/
-    // `notifyUtteranceBoundary` are `nonisolated` and must reach
-    // `transcriber` from whatever background audio/VAD queue calls them —
-    // safe here because `InProcessTranscriber` is itself internally
-    // thread-safe (one serial queue guards all its state, see its own doc),
-    // the same justification `SystemTranscriptionProvider`'s
-    // `nonisolated(unsafe)` fields document.
-    private nonisolated(unsafe) let transcriber = InProcessTranscriber()
+    // No `nonisolated(unsafe)` needed here (unlike `SystemTranscriptionProvider`'s
+    // fields): `push`/`notifyUtteranceBoundary` are `nonisolated` and must
+    // reach `transcriber` from whatever background audio/VAD queue calls
+    // them despite this class itself being inferred `@MainActor` (via
+    // `TranscriptionProvider`), but `InProcessTranscriber` is declared
+    // `@unchecked Sendable` (see its own doc — one serial queue guards all
+    // its state), so a plain `let` already satisfies that from any isolation.
+    private let transcriber = InProcessTranscriber()
     /// Resolved weights path, if the caller (`RecordingSession.makeTranscriptionProvider`)
     /// already knows one — e.g. a downloaded model cache location. `nil`
     /// falls back to `InProcessTranscriber.resolveModelPath`'s env-var/local-
