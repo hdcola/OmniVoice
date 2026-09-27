@@ -20,6 +20,11 @@ The format is based on Keep a Changelog.
 
 ### Fixed
 
+- fix(session): fold `transcriptionProvider`/`translationProvider` non-nil checks directly into `start()`'s `reusingLoaded` computation — previously an edge case where `isModelLoaded` was true but a provider ivar was `nil` fell into the "create fresh" branch while `reusingLoaded` itself stayed `true`, skipping `loadModel()` for a provider that was never actually loaded and failing at `startStream()` with `TranscriberError.notLoaded`
+- fix(session): reset `statusMessage` back to "未启动" in `discardLoadedModelsIfStale()` when it's still showing "模型已预加载" — switching engines right after a successful preload previously left the panel's status bar reporting a model as loaded that had just been unloaded
+- fix(menu): show "预加载中…" on the menu-bar dropdown's start/stop button while `isPreloadingModel`, not just a grayed-out "开始转录" — with the floating panel hidden, a disabled button with no label change gave no indication of *why* it wasn't responding
+- fix(panel): stop a `jumpToLatestButton` tap's own 0.2s scroll animation from getting undone mid-flight — `.onScrollGeometryChange` saw several intermediate frames where the offset had moved but not yet reached the bottom tolerance, indistinguishable by that check alone from a genuine user drag away, and flipped `isPinnedToBottom` back to `false` before the animation landed
+- fix(providers): add a defensive `deinit` to `InProcessTranscriber`/`InProcessTranslator` that releases the underlying C handles if some future caller ever drops an instance without going through the explicit `unload()` every current caller already uses — guards against silently leaking (or, for the Metal-backed resources, crashing ggml's exit-time assert on) a never-unloaded instance
 - fix(session): stop unconditionally discarding an already-loaded model on a same-value engine-ID re-assignment — `discardLoadedModelsIfStale()` fired on every `didSet`, including one that re-set the *same* id a Picker already had selected, and unloaded a perfectly good, still-matching load
 - fix(session): wire `preloadModel()`'s providers into `transcriptionProvider`/`translationProvider` before either `loadModel()` call resolves, not after both succeed — quitting mid-preload previously left those ivars `nil` the whole time, so `unloadModelsBeforeQuit()` had nothing to reach and skipped cleanup entirely, risking the exact ggml Metal exit-time assert it exists to prevent
 - fix(menu): disable the menu-bar dropdown's start/stop button while `isPreloadingModel` too, matching the floating panel's own button — `start()` itself already no-ops during a preload, but the menu-bar button didn't reflect that, so clicking it felt like nothing happened
@@ -41,6 +46,7 @@ The format is based on Keep a Changelog.
 - test(providers): add `ModelLanguageMappingTests` covering the BCP-47 → R2T2/T3PO language mapping helpers
 - test(session): cover `preloadModel()`'s state machine (including its no-op-once-loaded guard) and its discard-on-engine-switch guard, plus the new `usesOnDeviceModelEngine` flag
 - test(session): cover `TranscriptLine`'s new `Equatable` conformance
+- test(session): cover that a same-value engine-ID re-assignment keeps a loaded model, and that switching engines resets the stale "模型已预加载" `statusMessage`
 
 ## [0.0.1] - 2026-09-27
 

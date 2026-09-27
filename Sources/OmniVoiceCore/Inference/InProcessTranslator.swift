@@ -551,4 +551,23 @@ final class InProcessTranslator: @unchecked Sendable {
             llama_backend_free()
         }
     }
+
+    /// A safety net, not the normal teardown path — see
+    /// `InProcessTranscriber.deinit`'s doc, which applies here verbatim
+    /// (same risk: a leaked, Metal-backed `ctx`/`model` past process exit
+    /// trips ggml's exit-time assert). No `queue.sync`, for the same reason
+    /// given there.
+    ///
+    /// Unlike that one, this guards on `ctx`/`model` still being non-nil —
+    /// `llama_backend_free()` looks to be global/singleton teardown (unlike
+    /// audiocpp's per-handle frees, which are null-safe to call twice by
+    /// this class's own contract), so calling it again here after `unload()`
+    /// already ran (leaving both `nil`) would double-free global backend
+    /// state instead of safely no-op'ing.
+    deinit {
+        guard ctx != nil || model != nil else { return }
+        if let ctx { llama_free(ctx) }
+        if let model { llama_model_free(model) }
+        llama_backend_free()
+    }
 }

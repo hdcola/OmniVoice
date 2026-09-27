@@ -252,6 +252,17 @@ private struct TranscriptListView: View, Equatable {
     /// moved the position", since both look identical to a plain drag
     /// handler.
     @State private var isPinnedToBottom = true
+    /// True for the duration of `jumpToLatestButton`'s animated `scrollTo`.
+    /// Without this, `.onScrollGeometryChange` sees several intermediate
+    /// frames of that 0.2s animation where the geometry has moved (so
+    /// `contentSize` is unchanged) but hasn't reached the bottom tolerance
+    /// yet — indistinguishable, by that check alone, from a genuine user
+    /// drag away from the bottom — and would flip `isPinnedToBottom` back
+    /// to `false` mid-animation, missing any content that arrives in that
+    /// window. Cleared the moment the animation actually lands at the
+    /// bottom (`isAtBottom == true` below), not on a timer, so it can't
+    /// outlive the animation it's guarding.
+    @State private var isProgrammaticScrollInFlight = false
 
     /// Id of the zero-height row appended after the real transcript lines —
     /// `scrollTo(_:anchor:)` targets this instead of the last line's own id
@@ -319,10 +330,13 @@ private struct TranscriptListView: View, Equatable {
                     >= new.contentSize.height - Self.bottomProximityTolerance
                 if isAtBottom {
                     isPinnedToBottom = true
-                } else if new.contentSize.height <= old.contentSize.height + 0.5 {
+                    isProgrammaticScrollInFlight = false
+                } else if !isProgrammaticScrollInFlight && new.contentSize.height <= old.contentSize.height + 0.5 {
                     // Content didn't grow, yet we're no longer at the
                     // bottom — the only way that happens is a real scroll
-                    // away from it.
+                    // away from it. (Skipped while a programmatic scroll's
+                    // own animation is still landing — see
+                    // `isProgrammaticScrollInFlight`'s doc.)
                     isPinnedToBottom = false
                 }
                 // Else: content grew and the offset just hasn't been moved
@@ -361,6 +375,7 @@ private struct TranscriptListView: View, Equatable {
     private func jumpToLatestButton(proxy: ScrollViewProxy) -> some View {
         Button {
             isPinnedToBottom = true
+            isProgrammaticScrollInFlight = true
             withAnimation(.easeOut(duration: 0.2)) {
                 proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
             }

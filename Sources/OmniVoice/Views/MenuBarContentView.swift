@@ -32,7 +32,16 @@ struct MenuBarContentView: View {
         // (not removed in favor of it) — if the user has hidden the panel,
         // this is the only way to start/stop without first digging it back
         // out via "显示/隐藏悬浮窗" below.
-        Button(session.isRunning ? "停止转录" : (session.isStarting ? "启动中…" : "开始转录")) {
+        // The `isPreloadingModel` case matters specifically here (unlike the
+        // floating panel's own start/stop button, which sits right next to
+        // a "预加载模型"/"加载中…" button of its own): if the panel is
+        // hidden, this dropdown is the only place the user can see *why*
+        // the button below is grayed out — a plain "开始转录" that just
+        // doesn't respond reads as broken, not as "busy".
+        Button(
+            session.isRunning ? "停止转录"
+                : (session.isStarting ? "启动中…" : (session.isPreloadingModel ? "预加载中…" : "开始转录"))
+        ) {
             Task {
                 if session.isRunning {
                     await session.stop()

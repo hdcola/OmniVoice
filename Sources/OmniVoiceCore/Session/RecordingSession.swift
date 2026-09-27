@@ -363,6 +363,15 @@ public final class RecordingSession: ObservableObject {
         translationProvider = nil
         loadedEngineIDs = nil
         isModelLoaded = false
+        // Only when it's still showing what `preloadModel()` last set it to
+        // — never stomps a message from something else entirely unrelated
+        // to preloading (a recording in progress, a prior error, ...).
+        // Without this, switching engines right after a successful preload
+        // left the panel's status bar reading "模型已预加载" indefinitely,
+        // even though that model was just unloaded.
+        if statusMessage == "模型已预加载" {
+            statusMessage = "未启动"
+        }
     }
 
     /// Synchronously releases any loaded model backend before the app quits
@@ -421,10 +430,22 @@ public final class RecordingSession: ObservableObject {
         // `start()`, since `stop()` deliberately doesn't unload (see its
         // doc). The engine-ID comparison guards against a load left over
         // for a since-switched-away-from engine slipping through if
-        // `discardLoadedModelsIfStale()` hasn't run for some reason.
+        // `discardLoadedModelsIfStale()` hasn't run for some reason. The
+        // `transcriptionProvider`/`translationProvider` non-nil checks are
+        // folded into this same boolean, not left as a separate `if let`
+        // below — `reusingLoaded` is also read much further down (guarding
+        // whether `loadModel()` gets called at all), so if those checks
+        // lived only in the branch condition, an `isModelLoaded`-true-but-
+        // `transcriptionProvider`-nil edge case would fall into the `else`
+        // branch (creating fresh, unloaded providers) while `reusingLoaded`
+        // itself stayed `true` — skipping `loadModel()` for a provider that
+        // was never actually loaded, and failing at `startStream()` with
+        // `TranscriberError.notLoaded`.
         let reusingLoaded = isModelLoaded
             && loadedEngineIDs?.transcription == transcriptionEngineID
             && loadedEngineIDs?.translation == translationEngineID
+            && transcriptionProvider != nil
+            && translationProvider != nil
         let transcription: TranscriptionProvider
         let translation: TranslationProvider
         if reusingLoaded, let loadedTranscription = transcriptionProvider, let loadedTranslation = translationProvider {

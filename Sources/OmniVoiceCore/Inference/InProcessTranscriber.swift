@@ -333,6 +333,22 @@ final class InProcessTranscriber: @unchecked Sendable {
         }
     }
 
+    /// A safety net, not the normal teardown path — every caller in this
+    /// codebase already unloads explicitly (`RecordingSession.unloadModelsBeforeQuit()`/
+    /// `discardLoadedModelsIfStale()`), but if some future caller ever drops
+    /// or replaces an instance without going through that, this is what
+    /// stops the underlying registry/model/session C handles from leaking
+    /// silently — and, for the Metal-backed ones, risking the ggml
+    /// exit-time assert `unload()`'s doc describes. No `queue.sync` here:
+    /// by the time `deinit` runs, no other reference (and so no concurrent
+    /// caller) can exist, so the lock `unload()` needs elsewhere isn't
+    /// needed for this one guaranteed-exclusive access.
+    deinit {
+        audiocpp_session_free(session)
+        audiocpp_model_free(model)
+        audiocpp_registry_free(registry)
+    }
+
     private static func makeSessionOptions(_ tuning: StreamingTuning) -> OpaquePointer? {
         guard let options = audiocpp_options_create() else { return nil }
         audiocpp_options_set(options, "confucius4_r2t2.chunk_size_ms", String(tuning.chunkSizeMs))

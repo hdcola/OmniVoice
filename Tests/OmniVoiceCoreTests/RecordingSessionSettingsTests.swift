@@ -216,6 +216,20 @@ struct RecordingSessionSettingsTests {
         #expect(!session.isModelLoaded)
     }
 
+    /// Guards `discardLoadedModelsIfStale()`'s `statusMessage` cleanup —
+    /// without it, switching engines right after a successful preload left
+    /// the panel's status bar permanently reading "模型已预加载" even though
+    /// that model was just unloaded.
+    @Test func switchingEngineAfterPreloadResetsTheStaleStatusMessage() async {
+        defer { defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID) }
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.statusMessage == "模型已预加载")
+
+        session.transcriptionEngineID = "model.r2t2"
+        #expect(session.statusMessage == "未启动")
+    }
+
     /// Guards `discardLoadedModelsIfStale()`'s staleness check — a
     /// `didSet` fires on *any* assignment, including one that re-sets the
     /// same value a `Picker` already had selected, so without comparing
