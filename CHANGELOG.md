@@ -6,9 +6,13 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Fixed
+
+- fix(providers): fix the R2T2 crash on stop / VAD pause — a null-pointer dereference in `audio.cpp`'s own `R2T2ASRSession::build_stream_prefix(final_flush=true)`, which builds a one-element vector from an empty token list whenever the session's decoded text is empty at finish time. Ships as `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`, now a required step in `Docs/MODEL_ENGINE_SETUP.md`; reproduced deterministically from the C API (silence only, no mic) and verified against the patched dylib.
+
 ### Added
 
-- feat(providers): wire up the R2T2 (ASR) and T3PO (translation) in-process model engines via `audio.cpp`/`llama.cpp`'s C ABIs, ported from `mac-poc-hybrid`'s validated `InProcessTranscriber`/`InProcessTranslator` — `ModelTranscriptionProvider`/`ModelTranslationProvider` are no longer placeholders. See `Docs/MODEL_ENGINE_SETUP.md` for the required local `third_party`/`models` setup. T3PO translation is verified working end-to-end; R2T2 transcription has a known upstream crash bug — see below and `Docs/PROGRESS.md`.
+- feat(providers): wire up the R2T2 (ASR) and T3PO (translation) in-process model engines via `audio.cpp`/`llama.cpp`'s C ABIs, ported from `mac-poc-hybrid`'s validated `InProcessTranscriber`/`InProcessTranslator` — `ModelTranscriptionProvider`/`ModelTranslationProvider` are no longer placeholders. See `Docs/MODEL_ENGINE_SETUP.md` for the required local `third_party`/`models` setup. T3PO translation is verified working end-to-end; R2T2 transcription additionally needs the `Patches/audio.cpp/` patch applied to the `third_party` checkout — see Fixed above and `Docs/PROGRESS.md`.
 
 ### Documentation
 
@@ -16,6 +20,7 @@ The format is based on Keep a Changelog.
 - docs(repo): record DMG packaging + Homebrew distribution as done, and update the release-pipeline open item to reflect remaining notarization work in `Docs/PROGRESS.md`
 - docs(repo): add `Docs/MODEL_ENGINE_SETUP.md` (clone/build/weights recipe for the R2T2/T3PO model engines) and update `README.md`/`Docs/PROGRESS.md` to reflect the model providers landing
 - docs(repo): document a known R2T2 crash bug (SIGSEGV inside `audio.cpp`'s `R2T2ASRSession::finalize()` after a longer buffered utterance) in `README.md`/`Docs/PROGRESS.md` — confirmed reproducible in the unmodified upstream `mac-poc-hybrid` reference too, not a regression from this port; no mitigation found at the C API level
+- docs(repo): replace that writeup with the root cause and the fix across `README.md`/`Docs/PROGRESS.md`/`Docs/MODEL_ENGINE_SETUP.md`, and add `Patches/audio.cpp/README.md` describing how patches against the pinned `audio.cpp` checkout are carried and when to drop them
 
 ### Tests
 

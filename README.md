@@ -28,8 +28,9 @@ history and open items.
   frameworks (`SpeechAnalyzer`/`SpeechTranscriber` for ASR, `Translation` for
   translation — no cloud API calls) or fully local/offline models (R2T2 for
   ASR, T3PO for translation, run in-process via `audio.cpp`/`llama.cpp`),
-  picked independently per component. **R2T2 has a known crash bug — see
-  below; T3PO and both system frameworks are solid.**
+  picked independently per component. **R2T2 needs a one-line upstream patch
+  applied to `audio.cpp` before it's safe to use — see
+  `Docs/MODEL_ENGINE_SETUP.md`.**
 - **Floating transcript panel**: shown from launch, semi-transparent,
   draggable/resizable, stays on top without stealing focus. Its own control
   bar has start/stop, a source/target language picker, and a close button;
@@ -49,14 +50,16 @@ history and open items.
 
 ## Known issues
 
-- **R2T2 (识别引擎: "R2T2 模型") can crash the whole app** after a longer
-  buffered utterance (a few seconds of continuous speech) — a bug inside
-  `audio.cpp` itself (confirmed reproducible in the unmodified upstream
-  reference implementation too, not something this app's code introduced;
-  see `Docs/PROGRESS.md`'s Known gaps section for the full writeup). Avoid
-  selecting it for real use until this is understood/fixed upstream — T3PO
+- **R2T2 (识别引擎: "R2T2 模型") requires an upstream `audio.cpp` patch.**
+  Unpatched, it can SIGSEGV the whole app when a recording is stopped or a
+  VAD pause rotates the stream — a null-pointer dereference in `audio.cpp`'s
+  own `R2T2ASRSession::build_stream_prefix()`, not in this app's code. The
+  one-line fix ships here as
+  `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`
+  and is part of the build recipe in `Docs/MODEL_ENGINE_SETUP.md`; see
+  `Docs/PROGRESS.md`'s Known gaps section for the root-cause writeup. T3PO
   translation and both system frameworks (`SpeechAnalyzer`/`Translation`)
-  are unaffected.
+  were never affected.
 
 ## Not yet implemented
 

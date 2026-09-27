@@ -22,6 +22,11 @@ git clone https://github.com/0xShug0/audio.cpp.git
 cd audio.cpp
 git checkout 9bdd1d908bbd128e9eb405f5a8e38d0defb84c72   # v0.8.2, pinned
 
+# Required: fixes a null-pointer deref in R2T2's streaming final flush that
+# SIGSEGVs the whole host process from audiocpp_stream_finish(). See
+# Patches/audio.cpp/README.md.
+git apply ../../Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch
+
 cmake -S . -B build/macos-capi-metal-release \
   -DCMAKE_BUILD_TYPE=Release \
   -DENGINE_ENABLE_CUDA=OFF -DENGINE_ENABLE_VULKAN=OFF \
