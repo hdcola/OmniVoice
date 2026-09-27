@@ -57,7 +57,15 @@ public final class ModelTranscriptionProvider: TranscriptionProvider {
     }
 
     public func stop() async {
+        // Ends the stream but deliberately leaves the model loaded — an
+        // earlier version of this also called `transcriber.unload()` here,
+        // which meant every "停止" silently freed R2T2's weights, forcing
+        // the *next* "开始" to reload them from scratch (a multi-second
+        // stall) even though nothing asked for that. `RecordingSession` now
+        // owns the model's loaded lifetime independently of any one
+        // recording's start/stop — see its `isModelLoaded` doc — and calls
+        // `unload()` itself when that's actually warranted (an engine
+        // switch, or quitting).
         transcriber.finishStream()
-        transcriber.unload()
     }
 }

@@ -53,6 +53,10 @@ public final class ModelTranslationProvider: TranslationProvider {
     }
 
     public func stop() async {
-        translator.unload()
+        // Ends this recording's buffered/history state but leaves the model
+        // loaded — see `ModelTranscriptionProvider.stop()`'s doc for why
+        // unloading on every stop (an earlier version of this method did)
+        // was wrong.
+        translator.resetSession()
     }
 }

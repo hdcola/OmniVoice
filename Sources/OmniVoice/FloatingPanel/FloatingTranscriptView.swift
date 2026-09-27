@@ -110,10 +110,10 @@ struct FloatingTranscriptView: View {
     /// standalone entry point. Collapses to a static "已就绪" label once
     /// loaded (rather than staying a now-redundant, still-clickable button)
     /// since a second tap would just no-op against `preloadModel()`'s own
-    /// `isModelPreloaded` guard.
+    /// `isModelLoaded` guard.
     @ViewBuilder
     private var preloadButton: some View {
-        if session.isModelPreloaded {
+        if session.isModelLoaded {
             Label("模型已就绪", systemImage: "checkmark.circle.fill")
                 .font(.caption)
                 .foregroundStyle(.green)

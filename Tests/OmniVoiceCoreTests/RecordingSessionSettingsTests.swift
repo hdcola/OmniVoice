@@ -191,29 +191,43 @@ struct RecordingSessionSettingsTests {
     /// `SystemTranscriptionProvider`/`SystemTranslationProvider`) so this
     /// exercises `preloadModel()`'s own state machine without depending on
     /// real R2T2/T3PO weights being present on the test machine.
-    @Test func preloadModelSetsIsModelPreloadedForCurrentEngines() async {
+    @Test func preloadModelSetsIsModelLoadedForCurrentEngines() async {
         let session = RecordingSession()
-        #expect(!session.isModelPreloaded)
+        #expect(!session.isModelLoaded)
         #expect(!session.isPreloadingModel)
 
         await session.preloadModel()
 
-        #expect(session.isModelPreloaded)
+        #expect(session.isModelLoaded)
         #expect(!session.isPreloadingModel)
     }
 
-    /// Guards `discardPreloadedModelsIfStale()` — without it, switching
-    /// engines after a preload would leave `isModelPreloaded` true for an
-    /// engine pair `start()` was never actually asked to run, letting it
-    /// wrongly skip `loadModel()` for the newly-selected engine.
+    /// Guards `discardLoadedModelsIfStale()` — without it, switching engines
+    /// after a load would leave `isModelLoaded` true for an engine pair
+    /// `start()` was never actually asked to run, letting it wrongly skip
+    /// `loadModel()` for the newly-selected engine.
     @Test func switchingEngineAfterPreloadDiscardsIt() async {
         defer { defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID) }
         let session = RecordingSession()
         await session.preloadModel()
-        #expect(session.isModelPreloaded)
+        #expect(session.isModelLoaded)
 
         session.transcriptionEngineID = "model.r2t2"
-        #expect(!session.isModelPreloaded)
+        #expect(!session.isModelLoaded)
+    }
+
+    /// `preloadModel()` is a no-op once already loaded — without this guard
+    /// (see its own `!isModelLoaded` precondition), a second call would
+    /// pointlessly reload an already-resident model.
+    @Test func preloadModelIsANoOpOnceAlreadyLoaded() async {
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.isModelLoaded)
+
+        session.statusMessage = "未启动"
+        await session.preloadModel()
+        // Didn't re-run the "预加载…" messaging path a second time.
+        #expect(session.statusMessage == "未启动")
     }
 
     @Test func isSessionActiveReflectsAnyLifecyclePhase() {

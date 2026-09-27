@@ -84,12 +84,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // TODO once `ModelTranscriptionProvider`/`ModelTranslationProvider`
-        // are implemented: synchronously unload any loaded in-process model
-        // backend here — see `mac-poc-hybrid`'s `AppDelegate` doc for why
-        // this matters (ggml's Metal backend asserts if GPU resources
-        // outlive process exit). Not needed yet: the system engines this
-        // skeleton actually runs hold nothing that needs an explicit
-        // synchronous teardown.
+        // `RecordingSession` now keeps a `.model`-kind engine's weights
+        // loaded across stop/start cycles (see `isModelLoaded`'s doc), so
+        // unlike before, something *can* still be loaded here — synchronously
+        // release it before exit, since ggml's Metal backend asserts if its
+        // GPU resources outlive process exit (see
+        // `InProcessTranslator.unload()`'s doc).
+        session.unloadModelsBeforeQuit()
     }
 }

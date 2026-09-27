@@ -500,6 +500,20 @@ final class InProcessTranslator {
         return output
     }
 
+    /// Ends this recording's session — clears the buffered source text and
+    /// windowed history so a new recording's first `feed(sourceDelta:)`
+    /// doesn't leak the previous one's context into its prompt — without
+    /// releasing `model`/`ctx` (contrast `unload()` below, the actual
+    /// teardown). Cheap: no GPU/model resources are touched, just the two
+    /// in-memory arrays.
+    func resetSession() {
+        queue.sync {
+            pendingPreviewWorkItem?.cancel()
+            buffer.removeAll()
+            history.removeAll()
+        }
+    }
+
     /// Releases the context/model. Also frees the llama.cpp backend
     /// (`llama_backend_free`) — like `InProcessTranscriber.unload()`'s
     /// audiocpp teardown, this matters for ggml's Metal backend exit-time

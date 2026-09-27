@@ -8,7 +8,7 @@ The format is based on Keep a Changelog.
 
 ### Added
 
-- feat(panel): add a "预加载模型" button to the floating panel, next to start/stop, so a `.model`-kind (R2T2/T3PO) engine's weight load can happen before the user asks to record instead of during the first "开始" — `RecordingSession.preloadModel()`/`isModelPreloaded`
+- feat(panel): add a "预加载模型" button to the floating panel, next to start/stop, so a `.model`-kind (R2T2/T3PO) engine's weight load can happen before the user asks to record instead of during the first "开始" — `RecordingSession.preloadModel()`/`isModelLoaded`
 - feat(panel): show a live mic-level indicator on the floating panel's status bar while recording, driven by the existing `RecordingSession.inputLevel` meter — previously nothing on the panel distinguished "recording with a working mic" from "recording but the selected input is silent/muted"
 
 ### Changed
@@ -17,6 +17,7 @@ The format is based on Keep a Changelog.
 
 ### Fixed
 
+- fix(providers): stop unloading R2T2/T3PO's weights on every "停止" — `ModelTranscriptionProvider`/`ModelTranslationProvider.stop()` used to call `unload()` unconditionally, so every recording silently reloaded the model from scratch (a multi-second stall) even without the preload button, and the "预加载模型" button always reappeared after a stop. `stop()` now only ends the recording's stream/session (`InProcessTranscriber.finishStream()`, a new `InProcessTranslator.resetSession()`); `RecordingSession` owns the model's loaded lifetime independently of any one recording (`isModelLoaded` survives `stop()`), unloading only on an engine switch or app quit (`applicationWillTerminate` now actually calls `unloadModelsBeforeQuit()`, fulfilling a long-standing TODO)
 - fix(providers): fix the R2T2 crash on stop / VAD pause — a null-pointer dereference in `audio.cpp`'s own `R2T2ASRSession::build_stream_prefix(final_flush=true)`, which builds a one-element vector from an empty token list whenever the session's decoded text is empty at finish time. Ships as `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`, now a required step in `Docs/MODEL_ENGINE_SETUP.md`; reproduced deterministically from the C API (silence only, no mic) and verified against the patched dylib. Submitted upstream as [audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712).
 
 ### Added
@@ -34,7 +35,7 @@ The format is based on Keep a Changelog.
 ### Tests
 
 - test(providers): add `ModelLanguageMappingTests` covering the BCP-47 → R2T2/T3PO language mapping helpers
-- test(session): cover `preloadModel()`'s state machine and its discard-on-engine-switch guard, plus the new `usesOnDeviceModelEngine` flag
+- test(session): cover `preloadModel()`'s state machine (including its no-op-once-loaded guard) and its discard-on-engine-switch guard, plus the new `usesOnDeviceModelEngine` flag
 
 ## [0.0.1] - 2026-09-27
 
