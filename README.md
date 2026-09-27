@@ -28,7 +28,8 @@ history and open items.
   frameworks (`SpeechAnalyzer`/`SpeechTranscriber` for ASR, `Translation` for
   translation — no cloud API calls) or fully local/offline models (R2T2 for
   ASR, T3PO for translation, run in-process via `audio.cpp`/`llama.cpp`),
-  picked independently per component.
+  picked independently per component. **R2T2 has a known crash bug — see
+  below; T3PO and both system frameworks are solid.**
 - **Floating transcript panel**: shown from launch, semi-transparent,
   draggable/resizable, stays on top without stealing focus. Its own control
   bar has start/stop, a source/target language picker, and a close button;
@@ -45,6 +46,17 @@ history and open items.
   a searchable history window and Markdown export.
 - **Settings persistence**: engine choice, language pair, mic device, and
   system-audio inclusion survive quits/relaunches/restarts.
+
+## Known issues
+
+- **R2T2 (识别引擎: "R2T2 模型") can crash the whole app** after a longer
+  buffered utterance (a few seconds of continuous speech) — a bug inside
+  `audio.cpp` itself (confirmed reproducible in the unmodified upstream
+  reference implementation too, not something this app's code introduced;
+  see `Docs/PROGRESS.md`'s Known gaps section for the full writeup). Avoid
+  selecting it for real use until this is understood/fixed upstream — T3PO
+  translation and both system frameworks (`SpeechAnalyzer`/`Translation`)
+  are unaffected.
 
 ## Not yet implemented
 

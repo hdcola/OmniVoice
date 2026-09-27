@@ -271,6 +271,17 @@ final class InProcessTranscriber {
     /// Ends the stream and returns just the uncommitted tail (the suffix of
     /// the finish result's full transcript beyond what deltas already
     /// reported), or nil if there's nothing new.
+    ///
+    /// **Known crash risk (upstream, not this file)**: `audiocpp_stream_finish`
+    /// can SIGSEGV inside `R2T2ASRSession::finalize()`'s `decode_stream_chunk`
+    /// path when there's a longer buffered tail to flush — confirmed
+    /// reproducible with the *unmodified* upstream reference
+    /// (`mac-poc-hybrid`, same pinned commit, same dylib), not something this
+    /// port introduced or can work around from the C API surface (no lever
+    /// to influence audio.cpp's internal `buffer_`/graph-reuse state). Speak
+    /// briefly before stopping/pausing to reduce (not eliminate) the odds of
+    /// hitting it until this is understood/fixed upstream — see
+    /// `Docs/PROGRESS.md`'s Known gaps section.
     private func finishLocked() -> String? {
         guard let session else { return nil }
         var result: OpaquePointer?
