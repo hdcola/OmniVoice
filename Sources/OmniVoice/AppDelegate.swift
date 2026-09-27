@@ -84,6 +84,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Quitting mid-recording (Cmd+Q, system shutdown, ...) previously
+        // left that recording's history record with no `endedAt` — close
+        // it out first, before touching anything model-related below.
+        session.finalizeActiveSessionBeforeQuit()
+
         // `RecordingSession` now keeps a `.model`-kind engine's weights
         // loaded across stop/start cycles (see `isModelLoaded`'s doc), so
         // unlike before, something *can* still be loaded here — synchronously

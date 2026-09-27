@@ -20,6 +20,7 @@ The format is based on Keep a Changelog.
 
 ### Fixed
 
+- fix(session): finalize an in-progress recording's persisted history record before the app quits — `applicationWillTerminate` now calls the new `RecordingSession.finalizeActiveSessionBeforeQuit()` alongside `unloadModelsBeforeQuit()`; previously quitting mid-recording (Cmd+Q, system shutdown, ...) left that session's record with no `endedAt`, showing up in history as one that never properly ended (#10)
 - fix(session): call `transcription.unload()` too (not just `translation.unload()`) in `preloadModel()`'s and `start()`'s translation-failure catch blocks, for symmetry with the transcription-failure catch just below them — currently a no-op either way (that provider's own `loadModel()` was never reached), but keeps `unload()` calls paired to whatever got instantiated regardless of future engine implementations allocating anything eagerly at construction (#10)
 - fix(providers): pair every `InProcessTranslator` `llama_backend_init()` with a matching `llama_backend_free()` on that same load attempt's failure paths (previously missing — a failed `llama_model_load_from_file`/`llama_init_from_model` left backend state initialized with no `model`/`ctx` to ever pair it with a later free), and guard `unload()` itself against calling `llama_backend_free()` when `model`/`ctx` are both still `nil` — every caller already calls `unload()` unconditionally on any `loadModel()` failure, including one (`TranslatorError.modelMissing`) that throws *before* `llama_backend_init()` is ever reached, which previously freed global backend state that was never initialized (#10)
 - fix(session): guard `unloadModels()` against racing `preloadModel()`'s in-flight `loadModel()` calls too, not just `isSessionActive` — without also checking `isPreloadingModel`, calling it mid-preload nil'd the provider ivars right before `preloadModel()` resumed and unconditionally set `isModelLoaded = true`, leaving `isModelLoaded == true` (and the panel reading "模型已就绪") with both providers actually `nil` (#10)
@@ -57,6 +58,8 @@ The format is based on Keep a Changelog.
 - test(session): cover `TranscriptLine`'s new `Equatable` conformance (#10)
 - test(session): cover that a same-value engine-ID re-assignment keeps a loaded model, and that switching engines resets the stale "模型已预加载" `statusMessage` (#10)
 - test(session): cover `unloadModels()` releasing a preloaded model, and its no-op guards while a recording is active or a preload is in flight (#10)
+- test(session): cover `finalizeActiveSessionBeforeQuit()`'s no-op guard with no active session (#10)
+- test(providers): cover `ModelTranslationProvider.updateTargetLanguage(_:)` not requiring a loaded model — the actual retargeting-takes-effect path needs T3PO's real (gitignored) weights, not committed here (#10)
 
 ## [0.0.1] - 2026-09-27
 

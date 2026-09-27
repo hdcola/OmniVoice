@@ -411,6 +411,22 @@ public final class RecordingSession: ObservableObject {
         performModelUnload()
     }
 
+    /// Synchronously closes out an in-progress recording's persisted
+    /// history record before the app quits — call from
+    /// `applicationWillTerminate` alongside `unloadModelsBeforeQuit()`.
+    /// Without this, quitting mid-recording (Cmd+Q, system shutdown, ...)
+    /// left `activeSessionRecord` with no `endedAt`, showing up in history
+    /// as a session that never properly ended. Deliberately does **not**
+    /// call `stop()` — that does real async teardown of the mic/providers
+    /// the app has no time left to await; only the persisted record needs
+    /// closing out here, not the live capture.
+    public func finalizeActiveSessionBeforeQuit() {
+        guard let sessionStore, let activeSessionRecord else { return }
+        sessionStore.endSession(activeSessionRecord)
+        try? sessionStore.save()
+        self.activeSessionRecord = nil
+    }
+
     /// User-initiated release of a currently-loaded `.model`-kind engine —
     /// e.g. the floating panel's "模型已就绪" context menu offering "释放模型".
     /// `isModelLoaded` otherwise only goes away on an engine switch or quit

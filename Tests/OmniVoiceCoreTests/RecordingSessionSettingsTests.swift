@@ -300,6 +300,20 @@ struct RecordingSessionSettingsTests {
         session.isPreloadingModel = false
     }
 
+    /// `finalizeActiveSessionBeforeQuit()`'s no-op guard, for the common
+    /// case (no `sessionStore` — the default `RecordingSession()` used
+    /// throughout this suite — or nothing currently recording). The
+    /// "actually closes out an orphaned in-progress session" path isn't
+    /// covered here: reaching it requires `start()` to fully succeed
+    /// (`isRunning == true`), which needs real mic capture/ASR permissions
+    /// this sandboxed test environment can't reliably grant — any earlier
+    /// failure already deletes the just-created `activeSessionRecord` via
+    /// `start()`'s own cleanup `defer`.
+    @Test func finalizeActiveSessionBeforeQuitIsANoOpWithNoActiveSession() {
+        let session = RecordingSession()
+        session.finalizeActiveSessionBeforeQuit()
+    }
+
     @Test func isSessionActiveReflectsAnyLifecyclePhase() {
         let session = RecordingSession()
         #expect(!session.isSessionActive)
