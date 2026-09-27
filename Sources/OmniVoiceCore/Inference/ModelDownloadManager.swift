@@ -51,13 +51,21 @@ public enum ModelDownloadError: LocalizedError, Sendable {
 /// actor — same reasoning `SystemTranscriptionProvider`'s audio-path methods
 /// document for being `nonisolated` — so they're marked `nonisolated` and
 /// hop back to the main actor themselves for every mutation, rather than
-/// mutating this class's state directly.
+/// mutating this class's state directly. They're implemented on a private
+/// `DownloadDelegateProxy` that holds `self` *weakly*, not on this class
+/// directly — `URLSession` retains its delegate for as long as the session
+/// lives, and this class's own `session` property retains the session right
+/// back; conforming directly would make that a permanent retain cycle for
+/// any non-`shared` instance (every unit test's own instance included) the
+/// moment its first download touched `session`.
 @MainActor
 public final class ModelDownloadManager: NSObject, ObservableObject {
     public static let shared = ModelDownloadManager()
 
     private let cacheDirectory: URL
-    private lazy var session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
+    private lazy var session = URLSession(
+        configuration: .default, delegate: DownloadDelegateProxy(target: self), delegateQueue: nil
+    )
 
     /// The whole `ensureDownloaded` pipeline for a variant currently in
     /// flight — see the type's doc for why this covers more than just the
@@ -65,12 +73,16 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     private var jobs: [String: Task<URL, Error>] = [:]
     private var networkTasks: [String: URLSessionDownloadTask] = [:]
     private var networkContinuations: [String: CheckedContinuation<URL, Error>] = [:]
-    /// Values are only ever created and called on the main actor (this
-    /// class's default isolation) — not `@Sendable`, so the closure built in
-    /// `runJob` can mutate `downloadProgress` directly instead of needing its
-    /// own inner `Task { @MainActor in ... }` hop on every one of a
-    /// multi-gigabyte download's several-thousand progress callbacks.
-    private var progressHandlers: [String: (Double) -> Void] = [:]
+    /// Every caller currently waiting on a variant's progress — the
+    /// *initiating* `ensureDownloaded(_:progress:)` call's closure, plus any
+    /// later call that joined the same in-flight job (see `ensureDownloaded`'s
+    /// doc). Values are only ever created and invoked on the main actor (this
+    /// class's default isolation), so they're plain closures, not
+    /// `@Sendable` — letting them mutate `downloadProgress` directly instead
+    /// of needing their own inner `Task { @MainActor in ... }` hop on every
+    /// one of a multi-gigabyte download's several-thousand progress
+    /// callbacks.
+    private var progressHandlers: [String: [(Double) -> Void]] = [:]
 
     /// `0...1` per variant currently downloading — for a SwiftUI progress
     /// view to observe directly, instead of every caller needing to thread
@@ -131,11 +143,10 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     ///
     /// If a download for this variant is already running, this call joins
     /// it rather than starting a second, redundant one — the two calls'
-    /// results resolve together once the single underlying job finishes.
-    /// Only the joining call's own `progress` closure is not attached to
-    /// that job (the job already reports through `downloadProgress`, which
-    /// every caller can observe); the *initiating* call's `progress` closure
-    /// still fires for however many callers are waiting.
+    /// results resolve together once the single underlying job finishes, and
+    /// a non-nil `progress` from *either* call fires for the rest of that
+    /// job's lifetime (both closures are registered, not just the
+    /// initiating call's).
     public func ensureDownloaded(
         _ variant: ModelVariant,
         progress: (@Sendable (Double) -> Void)? = nil
@@ -144,6 +155,10 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         if isDownloaded(variant) { return destination }
         guard variant.downloadURL != nil else {
             throw ModelDownloadError.missingDownloadURL(variantID: variant.id)
+        }
+
+        if let progress {
+            progressHandlers[variant.id, default: []].append(progress)
         }
 
         if let existingJob = jobs[variant.id] {
@@ -165,16 +180,15 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
             defer {
                 self.jobs[variant.id] = nil
                 self.downloadProgress[variant.id] = nil
+                self.progressHandlers[variant.id] = nil
             }
-            return try await self.runJob(for: variant, progress: progress)
+            return try await self.runJob(for: variant)
         }
         jobs[variant.id] = job
         return try await job.value
     }
 
-    private func runJob(
-        for variant: ModelVariant, progress: (@Sendable (Double) -> Void)?
-    ) async throws -> URL {
+    private func runJob(for variant: ModelVariant) async throws -> URL {
         try Task.checkCancellation()
         let destination = localURL(for: variant)
         guard let downloadURL = variant.downloadURL else {
@@ -182,10 +196,7 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         }
         try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
 
-        let tempFileURL = try await runDownload(variantID: variant.id, from: downloadURL) { [weak self] fraction in
-            self?.downloadProgress[variant.id] = fraction
-            progress?(fraction)
-        }
+        let tempFileURL = try await runDownload(variantID: variant.id, from: downloadURL)
         do {
             try await verifyAndMove(
                 variantID: variant.id, expectedSHA256: variant.sha256,
@@ -198,9 +209,7 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         }
     }
 
-    private func runDownload(
-        variantID: String, from url: URL, progress: @escaping (Double) -> Void
-    ) async throws -> URL {
+    private func runDownload(variantID: String, from url: URL) async throws -> URL {
         try Task.checkCancellation()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
@@ -208,7 +217,6 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
                 task.taskDescription = variantID
                 networkTasks[variantID] = task
                 networkContinuations[variantID] = continuation
-                progressHandlers[variantID] = progress
                 task.resume()
             }
         } onCancel: {
@@ -254,8 +262,12 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     private func finish(variantID: String, result: Result<URL, Error>) {
         guard let continuation = networkContinuations.removeValue(forKey: variantID) else { return }
         networkTasks.removeValue(forKey: variantID)
-        progressHandlers.removeValue(forKey: variantID)
         continuation.resume(with: result)
+    }
+
+    fileprivate func handleProgress(variantID: String, fraction: Double) {
+        downloadProgress[variantID] = fraction
+        progressHandlers[variantID]?.forEach { $0(fraction) }
     }
 
     private nonisolated static func sha256Hex(ofFileAt url: URL) throws -> String {
@@ -270,25 +282,26 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     }
 }
 
-extension ModelDownloadManager: URLSessionDownloadDelegate {
-    nonisolated public func urlSession(
-        _ session: URLSession, downloadTask: URLSessionDownloadTask,
-        didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
-        totalBytesExpectedToWrite: Int64
+extension ModelDownloadManager {
+    fileprivate nonisolated func handleDidWriteData(
+        downloadTask: URLSessionDownloadTask, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64
     ) {
         guard totalBytesExpectedToWrite > 0, let variantID = downloadTask.taskDescription else { return }
         let fraction = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
         Task { @MainActor [weak self] in
-            self?.progressHandlers[variantID]?(fraction)
+            self?.handleProgress(variantID: variantID, fraction: fraction)
         }
     }
 
     /// `location` is deleted the instant this method returns, so it's moved
     /// to a stable temp path synchronously, on this delegate's own thread,
     /// before hopping back to the main actor to resolve the continuation.
-    nonisolated public func urlSession(
-        _ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL
-    ) {
+    /// That stable temp path lives inside `cacheDirectory` itself (not the
+    /// system temp directory) — `verifyAndMove`'s later
+    /// `FileManager.replaceItemAt` requires both URLs on the same volume,
+    /// which the system temp directory isn't guaranteed to share with a
+    /// caller-supplied `cacheDirectory` on a different disk/external volume.
+    fileprivate nonisolated func handleDidFinishDownloading(downloadTask: URLSessionDownloadTask, location: URL) {
         guard let variantID = downloadTask.taskDescription else { return }
         let httpResponse = downloadTask.response as? HTTPURLResponse
         if let statusCode = httpResponse?.statusCode, !(200..<300).contains(statusCode) {
@@ -297,7 +310,7 @@ extension ModelDownloadManager: URLSessionDownloadDelegate {
             }
             return
         }
-        let stableTempURL = FileManager.default.temporaryDirectory
+        let stableTempURL = cacheDirectory
             .appendingPathComponent("omnivoice-model-download-\(UUID().uuidString)")
         do {
             try FileManager.default.moveItem(at: location, to: stableTempURL)
@@ -311,16 +324,51 @@ extension ModelDownloadManager: URLSessionDownloadDelegate {
         }
     }
 
-    nonisolated public func urlSession(
-        _ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?
-    ) {
-        // Success is already handled by `didFinishDownloadingTo` above —
-        // this only fires meaningfully (non-nil `error`) on a failure that
-        // happens before/without a completed download (network error,
-        // cancellation).
+    /// Success is already handled by `handleDidFinishDownloading` above —
+    /// this only fires meaningfully (non-nil `error`) on a failure that
+    /// happens before/without a completed download (network error,
+    /// cancellation). `URLSessionTask.cancel()` surfaces as
+    /// `URLError(.cancelled)`, not `CancellationError` — mapped here so
+    /// every awaiter of `ensureDownloaded(_:)` sees the same
+    /// `CancellationError` regardless of which phase (network vs.
+    /// SHA-256 verify/move) the cancellation landed in.
+    fileprivate nonisolated func handleDidComplete(task: URLSessionTask, error: Error?) {
         guard let error, let variantID = task.taskDescription else { return }
+        let mappedError: Error = (error as? URLError)?.code == .cancelled ? CancellationError() : error
         Task { @MainActor [weak self] in
-            self?.finish(variantID: variantID, result: .failure(error))
+            self?.finish(variantID: variantID, result: .failure(mappedError))
         }
+    }
+}
+
+/// Holds `ModelDownloadManager` weakly as `URLSession`'s delegate — see
+/// `ModelDownloadManager`'s doc for why conforming directly would retain it
+/// permanently once a download touches `session`.
+private final class DownloadDelegateProxy: NSObject, URLSessionDownloadDelegate {
+    private weak var target: ModelDownloadManager?
+
+    init(target: ModelDownloadManager) {
+        self.target = target
+    }
+
+    func urlSession(
+        _ session: URLSession, downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        target?.handleDidWriteData(
+            downloadTask: downloadTask, totalBytesWritten: totalBytesWritten,
+            totalBytesExpectedToWrite: totalBytesExpectedToWrite
+        )
+    }
+
+    func urlSession(
+        _ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL
+    ) {
+        target?.handleDidFinishDownloading(downloadTask: downloadTask, location: location)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        target?.handleDidComplete(task: task, error: error)
     }
 }
