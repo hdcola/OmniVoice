@@ -333,6 +333,15 @@ public final class RecordingSession: ObservableObject {
         } catch {
             statusMessage = "翻译引擎预加载失败: \(error.localizedDescription)"
             translation.unload()
+            // `transcription.loadModel()` was never even called at this
+            // point, so it holds no C resources to release yet — but
+            // `transcriptionProvider` is about to be nil'd (dropping this
+            // app's only reference to it) regardless, so unloading it
+            // first keeps this symmetric with the `transcription.loadModel()`
+            // catch just below, and isn't relying on "nothing to release
+            // yet" staying true if `makeTranscriptionProvider`/a future
+            // engine ever allocates anything at construction time.
+            transcription.unload()
             transcriptionProvider = nil
             translationProvider = nil
             return
@@ -548,6 +557,11 @@ public final class RecordingSession: ObservableObject {
             // a perfectly good load.
             if !reusingLoaded {
                 translation.unload()
+                // Symmetric with the `transcription.loadModel()`/`start(config:)`
+                // catch below, even though `transcription` hasn't been
+                // touched yet at this point — see `preloadModel()`'s
+                // matching catch for the same reasoning.
+                transcription.unload()
                 transcriptionProvider = nil
                 translationProvider = nil
                 // Not reached via `reusingLoaded`, so neither was true
