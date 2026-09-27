@@ -77,9 +77,12 @@ struct MenuBarContentView: View {
         }
         .disabled(session.isSessionActive)
 
-        // Permission requirement is explained by the
-        // `screenRecordingPermissionNeeded` caption below instead of in this
-        // label — keeps the menu item itself from wrapping/getting cut off.
+        // A missing Screen Recording permission (needed for this toggle to
+        // actually capture anything) surfaces via `session.statusMessage`
+        // on the floating panel instead of a caption here — kept out of
+        // this label so it doesn't wrap/get cut off, and out of this menu
+        // entirely so the panel stays the one place status text lives (see
+        // `FloatingTranscriptView.statusBar`).
         Toggle("包含系统声音", isOn: $session.includeSystemAudio)
             .disabled(session.isSessionActive)
 
@@ -97,21 +100,6 @@ struct MenuBarContentView: View {
         Button("设置…") {
             NSApp.activate(ignoringOtherApps: true)
             openSettings()
-        }
-
-        Divider()
-
-        // `session.statusMessage` itself isn't repeated here — it's already
-        // shown live on the floating panel's own status bar
-        // (`FloatingTranscriptView.statusBar`), so duplicating it in this
-        // menu just showed the same (often stale-by-the-time-you-open-this-menu)
-        // line twice. The screen-recording hint below stays: it's the one
-        // actionable, not-purely-transient message, and worth surfacing even
-        // if the panel's been hidden.
-        if session.screenRecordingPermissionNeeded {
-            Text("需要在系统设置里授权屏幕录制权限，才能捕获系统声音")
-                .font(.caption)
-                .foregroundStyle(.orange)
         }
 
         Divider()

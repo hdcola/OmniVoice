@@ -15,7 +15,7 @@ The format is based on Keep a Changelog.
 
 ### Changed
 
-- refactor(menu): drop the duplicate `statusMessage` line from the menu-bar dropdown — it already shows live on the floating panel's own status bar, and duplicating it there just showed the same (often stale) line twice; the screen-recording permission hint stays (#10)
+- refactor(menu): drop the duplicate `statusMessage` line, and the separate screen-recording permission hint, from the menu-bar dropdown — both already show live on the floating panel's own status bar (`session.statusMessage` embeds the permission hint text on that failure), so the menu now only ever repeats an actionable item, never a status line (#10)
 - refactor(panel): pull the transcript list out into its own `TranscriptListView`, taking `lines`/`isRunning` as plain values (and `.equatable()` at the call site) instead of observing `RecordingSession` directly — without this, the high-frequency `inputLevel` meter update (~10-15×/sec while recording, unrelated to the transcript itself) forced a full re-diff of the whole transcript (potentially hundreds of rows) every tick (#10)
 
 ### Fixed
