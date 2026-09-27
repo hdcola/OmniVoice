@@ -65,12 +65,12 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     private var jobs: [String: Task<URL, Error>] = [:]
     private var networkTasks: [String: URLSessionDownloadTask] = [:]
     private var networkContinuations: [String: CheckedContinuation<URL, Error>] = [:]
-    private var progressHandlers: [String: @Sendable (Double) -> Void] = [:]
-    /// The SHA-256/move phase's own task, kept only so a `cancelDownload(for:)`
-    /// that lands during this phase (after the network transfer already
-    /// finished) can still cancel promptly instead of running the hash to
-    /// completion regardless.
-    private var verifyAndMoveTasks: [String: Task<Void, Error>] = [:]
+    /// Values are only ever created and called on the main actor (this
+    /// class's default isolation) — not `@Sendable`, so the closure built in
+    /// `runJob` can mutate `downloadProgress` directly instead of needing its
+    /// own inner `Task { @MainActor in ... }` hop on every one of a
+    /// multi-gigabyte download's several-thousand progress callbacks.
+    private var progressHandlers: [String: (Double) -> Void] = [:]
 
     /// `0...1` per variant currently downloading — for a SwiftUI progress
     /// view to observe directly, instead of every caller needing to thread
@@ -150,21 +150,32 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
             return try await existingJob.value
         }
 
+        // The cleanup `defer` lives inside the job's own `Task` body, not in
+        // this function's scope — this function returns (or throws, e.g. on
+        // cancellation) as soon as `job.value` does for *this* caller, which
+        // can happen well before the job itself finishes for any other
+        // caller that joined it. A `defer` here would clear `jobs[variant.id]`
+        // out from under a still-running job the moment the *first* caller's
+        // own await was cancelled, making a second `ensureDownloaded(_:)`
+        // call start a redundant second download while the first is still
+        // writing to (and, on delegate callback, resuming a continuation
+        // for) the very same temp file / `networkContinuations` entry.
         let job = Task { [weak self] () throws -> URL in
             guard let self else { throw CancellationError() }
+            defer {
+                self.jobs[variant.id] = nil
+                self.downloadProgress[variant.id] = nil
+            }
             return try await self.runJob(for: variant, progress: progress)
         }
         jobs[variant.id] = job
-        defer {
-            jobs[variant.id] = nil
-            downloadProgress[variant.id] = nil
-        }
         return try await job.value
     }
 
     private func runJob(
         for variant: ModelVariant, progress: (@Sendable (Double) -> Void)?
     ) async throws -> URL {
+        try Task.checkCancellation()
         let destination = localURL(for: variant)
         guard let downloadURL = variant.downloadURL else {
             throw ModelDownloadError.missingDownloadURL(variantID: variant.id)
@@ -172,10 +183,8 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
 
         let tempFileURL = try await runDownload(variantID: variant.id, from: downloadURL) { [weak self] fraction in
-            Task { @MainActor in
-                self?.downloadProgress[variant.id] = fraction
-                progress?(fraction)
-            }
+            self?.downloadProgress[variant.id] = fraction
+            progress?(fraction)
         }
         do {
             try await verifyAndMove(
@@ -190,9 +199,10 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     }
 
     private func runDownload(
-        variantID: String, from url: URL, progress: @escaping @Sendable (Double) -> Void
+        variantID: String, from url: URL, progress: @escaping (Double) -> Void
     ) async throws -> URL {
-        try await withTaskCancellationHandler {
+        try Task.checkCancellation()
+        return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
                 let task = session.downloadTask(with: url)
                 task.taskDescription = variantID
@@ -213,8 +223,10 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// providers' own load-off-main-actor fix documents (see CHANGELOG) —
     /// and checks `Task.checkCancellation()` between chunks so
     /// `cancelDownload(for:)` lands promptly instead of running the whole
-    /// hash to completion regardless.
-    private func verifyAndMove(
+    /// hash to completion regardless. Internal (not `private`) so tests can
+    /// exercise the verify/move logic directly against a fabricated temp
+    /// file, without a real network transfer to produce one.
+    func verifyAndMove(
         variantID: String, expectedSHA256: String?, tempFileURL: URL, destination: URL
     ) async throws {
         let task = Task.detached(priority: .utility) {
@@ -225,17 +237,13 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
                 }
             }
             try Task.checkCancellation()
-            // A stale file at `destination` (e.g. left over from a build
-            // that cached under a since-changed layout) would otherwise
-            // make `moveItem` throw `.fileWriteFileExists` and discard this
-            // freshly-verified download for nothing.
-            if FileManager.default.fileExists(atPath: destination.path) {
-                try FileManager.default.removeItem(at: destination)
-            }
-            try FileManager.default.moveItem(at: tempFileURL, to: destination)
+            // `replaceItemAt` (rather than a check-then-`moveItem`) handles
+            // a stale file already sitting at `destination` (e.g. left over
+            // from a build that cached under a since-changed layout)
+            // atomically, instead of a separate remove-then-move that could
+            // race a concurrent reader of `destination`.
+            _ = try FileManager.default.replaceItemAt(destination, withItemAt: tempFileURL)
         }
-        verifyAndMoveTasks[variantID] = task
-        defer { verifyAndMoveTasks[variantID] = nil }
         try await withTaskCancellationHandler {
             try await task.value
         } onCancel: {
