@@ -151,6 +151,22 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`
       and is a required step in `Docs/MODEL_ENGINE_SETUP.md`. Full writeup in
       "Known gaps" below.
+- [x] **Floating panel UX pass: model preload, mic-level feedback, transcript
+      auto-scroll** (2026-09-27, PR #10, merged to `main`): a "预加载模型"
+      button on the panel's status bar loads a `.model`-kind engine's weights
+      ahead of "开始转录" (`RecordingSession.preloadModel()`/`unloadModels()`/
+      `isModelLoaded`), with a "释放模型" action to reclaim memory without an
+      engine switch or quit; a live mic-level meter on the status bar while
+      recording; the transcript now auto-scrolls to new lines, pausing (with
+      a "最新内容" jump-back button) once the user scrolls up. Also fixed:
+      models no longer reload from scratch on every "停止" (`stop()` used to
+      unconditionally unload), an orphaned session record on app quit now
+      gets finalized, mid-recording target-language switching now reaches
+      `.model`-kind translation too (`TranslationProvider.updateTargetLanguage(_:)`),
+      and several `InProcessTranscriber`/`InProcessTranslator` load/unload
+      lifecycle bugs (partial-failure state, `llama_backend_init`/`free`
+      pairing, blocking the main actor during load). See CHANGELOG's
+      `[Unreleased]` section for the full per-commit list.
 
 ### Code review findings (fixed)
 
@@ -216,19 +232,36 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    every checkout has to apply it by hand. When it lands: bump the pin, drop
    the patch, and drop the `git apply` step from
    `Docs/MODEL_ENGINE_SETUP.md`.
-2. **Model download-on-first-use**: `ModelTranscriptionProvider`/
-   `ModelTranslationProvider` are wired up (see Done above), but still
-   resolve weights via an env var / repo-relative `models/` directory, not a
-   real per-user download cache. Needs a `ModelDownloadManager`
-   (fetch `ProviderCatalog.ModelVariant.downloadURL`, verify `sha256`, cache
-   under Application Support) and filling in the catalog's still-`nil`
-   `downloadURL`/`sha256` fields.
-3. **Settings UI wiring**: model-variant picker is currently `.disabled(true)`
-   (`SettingsView.modelVariantPicker`) — enable once #2 lands, to show
-   download state/trigger a download. (Device/language/system-audio controls
-   landed in PR #3 — mic picker + system-audio toggle in the menu bar,
-   language pickers shared between the floating panel and Settings via
-   `SourceLanguagePicker`/`TargetLanguagePicker`.)
+2. **Model download-on-first-use — half landed** (branch
+   `feature/model-download-manager`): `ModelDownloadManager`
+   (`Sources/OmniVoiceCore/Inference/ModelDownloadManager.swift`) downloads a
+   `ModelVariant`'s weights into an Application Support cache keyed by
+   `variant.id`, verifying SHA-256 before the file is considered usable, with
+   progress/cancellation support. `ProviderCatalog`'s `r2t2-q8_0`/
+   `t3po-q5_k_m` entries now carry real Hugging Face `downloadURL`/`sha256`
+   (fixed `approximateSizeMB` too — the old 1500/1100 MB placeholders were
+   roughly an order of magnitude off for T3PO: actual ~2.4GB/~9.8GB). Manually
+   verified end-to-end against a real HTTPS download (not part of the
+   committed test suite — a multi-GB download has no place in CI). **Still
+   not wired into `RecordingSession`/`SettingsView`** — `ModelTranscriptionProvider`/
+   `ModelTranslationProvider` still resolve weights via the env var /
+   repo-relative `models/` directory fallback
+   (`InProcessTranscriber`/`InProcessTranslator.resolveModelPath`). Deliberately
+   split off as its own step rather than bundled with #3 below: touching
+   `RecordingSession`'s `preloadModel()`/`start()`/
+   `discardLoadedModelsIfStale()` state machine (see "Architecture decisions"
+   above) is the riskier half of this work and deserves its own isolated
+   review.
+3. **Wire `ModelDownloadManager` into `RecordingSession`, enable Settings UI**:
+   needs a per-engine selected-variant setting (persisted, mirroring
+   `transcriptionEngineID`'s pattern), `preloadModel()`/`start()` calling
+   `ensureDownloaded(_:progress:)` before `loadModel()` and surfacing download
+   progress/failure through `statusMessage` (or a new published property), and
+   removing `SettingsView.modelVariantPicker`'s `.disabled(true)`. (Device/
+   language/system-audio controls landed in PR #3 — mic picker +
+   system-audio toggle in the menu bar, language pickers shared between the
+   floating panel and Settings via `SourceLanguagePicker`/
+   `TargetLanguagePicker`.)
 4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,

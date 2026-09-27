@@ -35,10 +35,16 @@ public struct ModelVariant: Identifiable, Hashable, Codable, Sendable {
     public let displayName: String
     public let quantization: String
     public let approximateSizeMB: Int
-    /// nil until a real weights host is chosen (see AGENTS discussion:
-    /// model distribution is "download on first use", host still TBD) —
-    /// a variant with no `downloadURL` is listed but not selectable yet.
+    /// Hosted on Hugging Face (`resolve/main/...`), same URLs
+    /// `Docs/MODEL_ENGINE_SETUP.md`'s manual `curl` recipe uses — fetched by
+    /// `ModelDownloadManager` on first use. Nil for a variant not yet
+    /// selectable (no known download source).
     public let downloadURL: URL?
+    /// SHA-256 of the weights file, verified by `ModelDownloadManager`
+    /// against Hugging Face's LFS metadata (`X-Linked-ETag`/the `blobs=true`
+    /// API) before a download is considered usable — never derived by
+    /// hashing our own download, which would just check the download against
+    /// itself.
     public let sha256: String?
 
     public init(
@@ -77,11 +83,23 @@ public enum ProviderCatalog {
     public static let modelVariants: [ModelVariant] = [
         ModelVariant(
             id: "r2t2-q8_0", engineID: "model.r2t2", displayName: "R2T2 (Q8_0)",
-            quantization: "Q8_0", approximateSizeMB: 1500
+            quantization: "Q8_0", approximateSizeMB: 2363,
+            downloadURL: URL(
+                string: "https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf/resolve/main/r2t2-q8_0.gguf"
+            )!,
+            // Verified against the file's HF LFS metadata
+            // (`GET /api/models/davidxifeng/Confucius4-R2T2-gguf?blobs=true`),
+            // which matches the `resolve/main` response's `X-Linked-ETag`.
+            sha256: "19f5ccd624484bcb5d44301437de41560b0ecc40c430e8850dfeefefbe82ccf5"
         ),
         ModelVariant(
             id: "t3po-q5_k_m", engineID: "model.t3po", displayName: "T3PO (Q5_K_M)",
-            quantization: "Q5_K_M", approximateSizeMB: 1100
+            quantization: "Q5_K_M", approximateSizeMB: 10021,
+            downloadURL: URL(
+                string:
+                    "https://huggingface.co/netease-youdao/Confucius4-T3PO-GGUF/resolve/main/Confucius4-T3PO-Q5_K_M.gguf"
+            )!,
+            sha256: "019b162a8fdff3edb1e2469445043fc2ebb0de0fbda9ca6454bc86b5898fac35"
         ),
     ]
 
