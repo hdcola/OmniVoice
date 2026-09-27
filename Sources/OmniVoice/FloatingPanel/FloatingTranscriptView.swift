@@ -226,16 +226,33 @@ struct FloatingTranscriptView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             // Tracks whether the user is (still) looking at the bottom of
-            // the transcript, independent of *why* the position changed —
-            // this fires the same way whether the user just dragged away
-            // from the bottom or `scrollTo` below just moved back to it, so
-            // it can't drift out of sync with reality the way a one-shot
-            // gesture flag could.
-            .onScrollGeometryChange(for: Bool.self) { geometry in
-                geometry.contentOffset.y + geometry.containerSize.height
-                    >= geometry.contentSize.height - Self.bottomProximityTolerance
-            } action: { _, isAtBottom in
-                isPinnedToBottom = isAtBottom
+            // the transcript. Compares the *whole* geometry (not just a
+            // derived `isAtBottom` bool) so it can tell apart two cases that
+            // both momentarily read as "not at the bottom": the user
+            // actually dragging away, vs. new content simply having grown
+            // `contentSize` out from under a `contentOffset` that hasn't
+            // caught up yet (true on every single append while pinned,
+            // since `scrollTo` below only fires *after* this same content
+            // change and needs its own layout pass to land) — the plain
+            // "isAtBottom ? true : false" version of this used to treat
+            // that second case as "the user scrolled away", permanently
+            // unpinning on the very next line/delta after any pinned
+            // append, without the user touching the scroll view at all.
+            .onScrollGeometryChange(for: ScrollGeometry.self) { $0 } action: { old, new in
+                let isAtBottom = new.contentOffset.y + new.containerSize.height
+                    >= new.contentSize.height - Self.bottomProximityTolerance
+                if isAtBottom {
+                    isPinnedToBottom = true
+                } else if new.contentSize.height <= old.contentSize.height + 0.5 {
+                    // Content didn't grow, yet we're no longer at the
+                    // bottom — the only way that happens is a real scroll
+                    // away from it.
+                    isPinnedToBottom = false
+                }
+                // Else: content grew and the offset just hasn't been moved
+                // to follow it yet — leave `isPinnedToBottom` as it was;
+                // `.onChange(of: session.lines)` below will `scrollTo` and
+                // this callback fires again reporting `isAtBottom == true`.
             }
             // Re-pins on every content change (a new line, or the current
             // line growing) — not animated: this fires on essentially every
