@@ -9,6 +9,7 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 - docs(repo): add Homebrew install instructions to `README.md` (`brew tap hdcola/tap && brew install --cask omnivoice`)
+- docs(repo): record DMG packaging + Homebrew distribution as done, and update the release-pipeline open item to reflect remaining notarization work in `Docs/PROGRESS.md`
 
 ## [0.0.1] - 2026-09-27
 
