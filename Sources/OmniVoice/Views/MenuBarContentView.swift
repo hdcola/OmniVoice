@@ -8,6 +8,7 @@ import SwiftUI
 /// settings.
 struct MenuBarContentView: View {
     @EnvironmentObject private var session: RecordingSession
+    @EnvironmentObject private var appDelegate: AppDelegate
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -38,7 +39,7 @@ struct MenuBarContentView: View {
         .disabled(session.isStopping)
 
         Button("显示/隐藏悬浮窗") {
-            (NSApp.delegate as? AppDelegate)?.toggleFloatingPanel()
+            appDelegate.toggleFloatingPanel()
         }
 
         Divider()
