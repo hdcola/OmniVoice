@@ -74,26 +74,50 @@ public final class RecordingSession: ObservableObject {
     /// abort the run: mic-only transcription still proceeds.
     @Published public var screenRecordingPermissionNeeded = false
 
-    /// The floating panel's window-level opacity (applied to `NSWindow.alphaValue`
-    /// by `AppDelegate`, not a SwiftUI `.opacity()` inside the panel's own
-    /// content) — a straight `1.0` default keeps today's look unchanged for
-    /// an existing install; lowering it lets the panel visually "see
-    /// through" to whatever's behind it (a slide, a video call window),
-    /// reducing how much it occludes without hiding the transcript outright.
-    /// Clamped to `0.3...1.0` — `SettingsView`'s `Slider` already constrains
-    /// its own range, but `didSet` clamps here too since this is a public,
-    /// externally-settable property. Editable at any time, including
-    /// mid-recording — unlike the audio/engine settings above, nothing about
-    /// the recording pipeline itself reads this, so there's no setup-time
-    /// race to guard against. Persisted (see `PersistedSettingsKey`).
-    @Published public var panelOpacity: Double = 1.0 {
+    /// The floating panel's *background* opacity — `FloatingTranscriptView`
+    /// applies this to just its `.ultraThinMaterial` background fill, not the
+    /// whole view, so lowering it lets the panel visually "see through" to
+    /// whatever's behind it (a slide, a video call window) without touching
+    /// the transcript text/controls at all. Split out from
+    /// `panelTextOpacity` below on purpose: a single window-level
+    /// `NSWindow.alphaValue` (an earlier version of this used exactly that)
+    /// fades everything uniformly, so turning the panel more see-through
+    /// always made the text harder to read right along with it — the two
+    /// needed independent controls, not one shared slider. Clamped to
+    /// `0.1...1.0` — `SettingsView`'s `Slider` already constrains its own
+    /// range, but `didSet` clamps here too since this is a public,
+    /// externally-settable property. Defaults to `1.0` (today's look,
+    /// unchanged) for an existing install. Editable at any time, including
+    /// mid-recording — nothing about the recording pipeline itself reads
+    /// this, so there's no setup-time race to guard against. Persisted (see
+    /// `PersistedSettingsKey`).
+    @Published public var panelBackgroundOpacity: Double = 1.0 {
         didSet {
-            let clamped = min(max(panelOpacity, 0.3), 1.0)
-            if clamped != panelOpacity {
-                panelOpacity = clamped
+            let clamped = min(max(panelBackgroundOpacity, 0.1), 1.0)
+            if clamped != panelBackgroundOpacity {
+                panelBackgroundOpacity = clamped
                 return
             }
-            Self.defaults.set(panelOpacity, forKey: PersistedSettingsKey.panelOpacity)
+            Self.defaults.set(panelBackgroundOpacity, forKey: PersistedSettingsKey.panelBackgroundOpacity)
+        }
+    }
+
+    /// The floating panel's *foreground* (transcript text + controls)
+    /// opacity — applied via a plain SwiftUI `.opacity()` around
+    /// `FloatingTranscriptView`'s whole content stack, independent of
+    /// `panelBackgroundOpacity` above (see that property's doc for why
+    /// they're split). Clamped to `0.4...1.0` — unlike the background, text
+    /// legibility degrades badly well before full transparency, so this
+    /// floor is meaningfully higher than the background's. Defaults to `1.0`.
+    /// Persisted (see `PersistedSettingsKey`).
+    @Published public var panelTextOpacity: Double = 1.0 {
+        didSet {
+            let clamped = min(max(panelTextOpacity, 0.4), 1.0)
+            if clamped != panelTextOpacity {
+                panelTextOpacity = clamped
+                return
+            }
+            Self.defaults.set(panelTextOpacity, forKey: PersistedSettingsKey.panelTextOpacity)
         }
     }
 
@@ -341,8 +365,11 @@ public final class RecordingSession: ObservableObject {
         selectedDeviceID = defaults.string(forKey: PersistedSettingsKey.selectedDeviceID)
         transcriptionModelVariantID = defaults.string(forKey: PersistedSettingsKey.transcriptionModelVariantID)
         translationModelVariantID = defaults.string(forKey: PersistedSettingsKey.translationModelVariantID)
-        if defaults.object(forKey: PersistedSettingsKey.panelOpacity) != nil {
-            panelOpacity = defaults.double(forKey: PersistedSettingsKey.panelOpacity)
+        if defaults.object(forKey: PersistedSettingsKey.panelBackgroundOpacity) != nil {
+            panelBackgroundOpacity = defaults.double(forKey: PersistedSettingsKey.panelBackgroundOpacity)
+        }
+        if defaults.object(forKey: PersistedSettingsKey.panelTextOpacity) != nil {
+            panelTextOpacity = defaults.double(forKey: PersistedSettingsKey.panelTextOpacity)
         }
 
         validateAndNormalizeSourceLanguage()
@@ -1100,5 +1127,6 @@ enum PersistedSettingsKey {
     static let selectedDeviceID = "org.omnivoice.selectedDeviceID"
     static let transcriptionModelVariantID = "org.omnivoice.transcriptionModelVariantID"
     static let translationModelVariantID = "org.omnivoice.translationModelVariantID"
-    static let panelOpacity = "org.omnivoice.panelOpacity"
+    static let panelBackgroundOpacity = "org.omnivoice.panelBackgroundOpacity"
+    static let panelTextOpacity = "org.omnivoice.panelTextOpacity"
 }

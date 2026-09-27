@@ -111,21 +111,24 @@ struct SettingsView: View {
             .disabled(isBusy)
 
             // Deliberately outside the `.disabled(isBusy)` sections above —
-            // this only ever touches `NSWindow.alphaValue` (see
-            // `AppDelegate`'s `panelOpacityCancellable`), never anything
-            // `start()` reads once at setup time, so there's no race to
-            // guard against; adjusting it while recording (to see through
-            // the panel at whatever's behind it) is exactly when it's most
-            // useful.
+            // these only ever touch `FloatingTranscriptView`'s own SwiftUI
+            // opacity (see `panelBackgroundOpacity`/`panelTextOpacity`'s
+            // docs), never anything `start()` reads once at setup time, so
+            // there's no race to guard against; adjusting either while
+            // recording (to see through the panel at whatever's behind it,
+            // without losing legibility) is exactly when they're most
+            // useful. Two separate sliders, not one — a single shared value
+            // (an earlier version of this had exactly that, driving
+            // `NSWindow.alphaValue`) faded the transcript text right along
+            // with the background, so a panel transparent enough to not
+            // block the view behind it also made the text hard to read.
             Section("悬浮窗") {
-                HStack {
-                    Text("透明度")
-                    Slider(value: $session.panelOpacity, in: 0.3...1.0)
-                    Text("\(Int(session.panelOpacity * 100))%")
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                        .frame(width: 40, alignment: .trailing)
-                }
+                opacitySlider(
+                    "背景透明度", value: $session.panelBackgroundOpacity, range: 0.1...1.0
+                )
+                opacitySlider(
+                    "文字透明度", value: $session.panelTextOpacity, range: 0.4...1.0
+                )
             }
         }
         .padding(20)
@@ -206,6 +209,17 @@ struct SettingsView: View {
                     Text(variantLabel(for: variant)).tag(Optional(variant.id))
                 }
             }
+        }
+    }
+
+    private func opacitySlider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        HStack {
+            Text(label)
+            Slider(value: value, in: range)
+            Text("\(Int(value.wrappedValue * 100))%")
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .frame(width: 40, alignment: .trailing)
         }
     }
 

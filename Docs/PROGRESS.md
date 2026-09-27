@@ -300,9 +300,12 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    autosave, `FloatingTranscriptPanel`) instead of always recentering at a
    fixed 420×280 — a brand-new panel (nothing saved yet) now opens at the
    screen's bottom-center instead, where live captions conventionally sit.
-   Settings also gained a "悬浮窗" transparency slider (`RecordingSession.panelOpacity`,
-   bound to the panel's `NSWindow.alphaValue`) so the panel can be made to
-   occlude less of whatever's behind it.
+   Settings also gained a "悬浮窗" section with two independent transparency
+   sliders — "背景透明度" (`RecordingSession.panelBackgroundOpacity`) and
+   "文字透明度" (`panelTextOpacity`) — so the panel's background can be made
+   to occlude less of whatever's behind it without also fading the
+   transcript text into illegibility (a first version used one shared
+   `NSWindow.alphaValue`, which faded both together).
 4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,
