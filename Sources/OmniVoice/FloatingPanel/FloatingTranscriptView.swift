@@ -87,15 +87,6 @@ struct FloatingTranscriptView: View {
             }
             .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
 
-            // Only worth surfacing for a `.model`-kind engine (a `.system`
-            // engine's `loadModel()` is a no-op) — see `usesOnDeviceModelEngine`'s
-            // doc. Placed next to start/stop rather than in Settings: this
-            // is the button meant to be pressed right before hitting "开始",
-            // not a one-time configuration choice.
-            if session.usesOnDeviceModelEngine {
-                preloadButton
-            }
-
             // Disabled for the whole start→stop lifecycle (isSessionActive,
             // not just isRunning): it's only read once, at the top of
             // `start()`, to configure the ASR engine for that recording
@@ -128,59 +119,6 @@ struct FloatingTranscriptView: View {
         .padding(10)
     }
 
-    /// A one-shot "预加载模型" affordance, separate from the start/stop
-    /// button — see `RecordingSession.preloadModel()`'s doc for why that's a
-    /// standalone entry point. Collapses to a static "已就绪" label once
-    /// loaded (rather than staying a now-redundant, still-clickable button)
-    /// since a second tap would just no-op against `preloadModel()`'s own
-    /// `isModelLoaded` guard.
-    @ViewBuilder
-    private var preloadButton: some View {
-        if session.isModelLoaded {
-            Label("模型已就绪", systemImage: "checkmark.circle.fill")
-                .font(.caption)
-                .foregroundStyle(.green)
-                // A `.model`-kind engine otherwise only ever unloads on an
-                // engine switch or app quit (see `isModelLoaded`'s doc) —
-                // this is the escape hatch for reclaiming that memory/VRAM
-                // sooner on a memory-constrained machine, without either.
-                // Disabled while running/starting/stopping (not just a
-                // no-op guard inside `unloadModels()` itself): a context
-                // menu item that silently does nothing when tapped reads as
-                // broken, not as "not applicable right now".
-                .contextMenu {
-                    Button("释放模型", systemImage: "xmark.circle") {
-                        session.unloadModels()
-                    }
-                    .disabled(session.isSessionActive)
-                }
-        } else {
-            Button {
-                Task { await session.preloadModel() }
-            } label: {
-                HStack(spacing: 5) {
-                    // A visible spinner while `loadModel()` is in flight —
-                    // without this, the button just sat on a static "加载
-                    // 中…" label for however many seconds R2T2/T3PO's
-                    // weights took to read, which (before
-                    // `InProcessTranscriber`/`InProcessTranslator.loadModel(modelPath:)`
-                    // stopped blocking the main actor synchronously — see
-                    // their doc) used to coincide with the entire window
-                    // being genuinely frozen, not just looking idle. Now
-                    // that the load runs off the main actor, this spinner
-                    // animates the whole time, which is itself confirmation
-                    // the window hasn't hung.
-                    if session.isPreloadingModel {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                    Text(session.isPreloadingModel ? "加载中…" : "预加载模型")
-                }
-            }
-            .disabled(session.isSessionActive || session.isPreloadingModel)
-        }
-    }
-
     /// Surfaces `RecordingSession.statusMessage` (e.g. "识别引擎启动失败:
     /// ...") on the panel itself — without this, a failed `start()` gave no
     /// visible indication of what went wrong: the button just went back to
@@ -205,10 +143,83 @@ struct FloatingTranscriptView: View {
                 // panel's default width — the tooltip is how the full text
                 // stays reachable without needing to widen the panel.
                 .help(session.statusMessage)
+
+            Spacer()
+
+            modelStatusControl
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
+    }
+
+    /// Model preload/loaded/release affordance — in the status bar's
+    /// bottom-right corner rather than a button up in `controlBar` (an
+    /// earlier version of this put it there) or behind a right-click
+    /// context menu on a label (an earlier version tried that too, for
+    /// "释放模型" specifically): a plain, always-visible button beats a
+    /// context menu for discoverability, and this corner keeps it out of
+    /// the way of the controls used on every single recording (start/stop,
+    /// language pickers) while still being visible without digging for it.
+    /// Only worth surfacing for a `.model`-kind engine at all — a `.system`
+    /// engine's `loadModel()` is a no-op, so there's nothing to preload or
+    /// release (see `usesOnDeviceModelEngine`'s doc).
+    @ViewBuilder
+    private var modelStatusControl: some View {
+        if session.usesOnDeviceModelEngine {
+            if session.isModelLoaded {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("模型已就绪")
+                    // A `.model`-kind engine otherwise only ever unloads on
+                    // an engine switch or app quit (see `isModelLoaded`'s
+                    // doc) — this is the escape hatch for reclaiming that
+                    // memory/VRAM sooner on a memory-constrained machine,
+                    // without either. Disabled while running/starting/
+                    // stopping (not just relying on `unloadModels()`'s own
+                    // no-op guard): a button that silently does nothing
+                    // when tapped reads as broken, not as "not applicable
+                    // right now".
+                    Button {
+                        session.unloadModels()
+                    } label: {
+                        Image(systemName: "xmark.circle")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .disabled(session.isSessionActive)
+                    .help("释放模型")
+                }
+                .font(.caption)
+            } else {
+                Button {
+                    Task { await session.preloadModel() }
+                } label: {
+                    HStack(spacing: 5) {
+                        // A visible spinner while `loadModel()` is in flight
+                        // — without this, the button just sat on a static
+                        // "加载中…" label for however many seconds R2T2/T3PO's
+                        // weights took to read, which (before
+                        // `InProcessTranscriber`/`InProcessTranslator.loadModel(modelPath:)`
+                        // stopped blocking the main actor synchronously —
+                        // see their doc) used to coincide with the entire
+                        // window being genuinely frozen, not just looking
+                        // idle. Now that the load runs off the main actor,
+                        // this spinner animates the whole time, which is
+                        // itself confirmation the window hasn't hung.
+                        if session.isPreloadingModel {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text(session.isPreloadingModel ? "加载中…" : "预加载模型")
+                    }
+                    .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .disabled(session.isSessionActive || session.isPreloadingModel)
+            }
+        }
     }
 
     /// Live feedback that audio is actually being picked up — without this,
