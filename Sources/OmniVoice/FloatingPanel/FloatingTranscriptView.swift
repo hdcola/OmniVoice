@@ -42,7 +42,7 @@ struct FloatingTranscriptView: View {
     /// menu-based `Picker` still works via a plain mouse click.
     private var controlBar: some View {
         HStack(spacing: 10) {
-            Button(session.isRunning ? "停止" : "开始") {
+            Button(session.isRunning ? "停止" : (session.isStarting ? "启动中…" : "开始")) {
                 Task {
                     if session.isRunning {
                         await session.stop()
@@ -51,7 +51,7 @@ struct FloatingTranscriptView: View {
                     }
                 }
             }
-            .disabled(session.isStopping)
+            .disabled(session.isStopping || session.isStarting)
 
             // Source is disabled while running: it's only read once, at
             // `start()`, to configure the ASR engine for that recording
@@ -59,8 +59,8 @@ struct FloatingTranscriptView: View {
             // it here wouldn't take effect until the next start.
             Picker("源语言", selection: $session.sourceLanguageCode) {
                 Text("自动").tag(String?.none)
-                ForEach(Self.languageOptions, id: \.code) { option in
-                    Text(option.label).tag(Optional(option.code))
+                ForEach(LanguageCatalog.common) { option in
+                    Text(option.displayName).tag(Optional(option.code))
                 }
             }
             .labelsHidden()
@@ -76,8 +76,8 @@ struct FloatingTranscriptView: View {
             // switching it mid-recording actually retargets the next
             // translated segment.
             Picker("目标语言", selection: $session.targetLanguageCode) {
-                ForEach(Self.languageOptions, id: \.code) { option in
-                    Text(option.label).tag(option.code)
+                ForEach(LanguageCatalog.common) { option in
+                    Text(option.displayName).tag(option.code)
                 }
             }
             .labelsHidden()
@@ -117,14 +117,4 @@ struct FloatingTranscriptView: View {
             target: session.currentTargetLanguage
         )
     }
-
-    private static let languageOptions: [(code: String, label: String)] = [
-        ("zh-CN", "中文"),
-        ("en-US", "英语"),
-        ("ja-JP", "日语"),
-        ("ko-KR", "韩语"),
-        ("fr-FR", "法语"),
-        ("de-DE", "德语"),
-        ("es-ES", "西班牙语"),
-    ]
 }

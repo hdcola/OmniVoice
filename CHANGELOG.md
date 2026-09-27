@@ -9,7 +9,7 @@ The format is based on Keep a Changelog.
 ### Added
 
 - feat(scaffold): initial project skeleton — `TranscriptionProvider`/`TranslationProvider` protocols, ported audio capture/mixing pipeline, SwiftData-backed session history with Markdown export, and a menu-bar app shell with a floating live-transcript panel (ee5f43d)
-- feat(app): move the most-frequently-adjusted controls onto the floating panel and menu bar, out of the Settings window — the panel now shows from launch and hosts a start/stop button plus source/target language pickers (target stays editable mid-recording, source doesn't — see its doc comment for why), and the menu bar gained a microphone picker and a "包含系统声音" toggle; Settings is now just engine selection
+- feat(app): move the most-frequently-adjusted controls onto the floating panel and menu bar, out of the Settings window — the panel now shows from launch and hosts a start/stop button plus source/target language pickers (target stays editable mid-recording, source doesn't — see its doc comment for why), and the menu bar gained a microphone picker and a "包含系统声音" toggle; Settings keeps just engine selection plus an advanced free-text BCP-47 entry for languages outside the new shared `LanguageCatalog`'s quick-pick list
 
 ### Changed
 
@@ -22,6 +22,9 @@ The format is based on Keep a Changelog.
 - fix(app): make the floating transcript panel draggable again — `NSHostingView` swallows `mouseDown` for its own SwiftUI gesture recognition, so `isMovableByWindowBackground` never actually fired; fall back to `performDrag(with:)` on any unhandled background click
 - fix(app): fix the menu's "显示/隐藏悬浮窗" toggle silently doing nothing — it reached `AppDelegate` via `NSApp.delegate as? AppDelegate`, which isn't reliable from a `MenuBarExtra`-only (no primary window) SwiftUI app; inject `AppDelegate` through the SwiftUI environment instead, the same way `RecordingSession` already is
 - fix(app): activate the app (`NSApp.activate(ignoringOtherApps:)`) before opening the history/settings windows — as an accessory app (`LSUIElement`), OmniVoice never becomes frontmost on its own, so those windows were opening behind whichever app already had focus
+- fix(app): restore a menu-bar start/stop button (code review on #3) — removing it in favor of the floating panel's own button left no way to start/stop while the panel is hidden
+- fix(session): guard `RecordingSession.start()` against reentrancy (code review on #3) — `isRunning` only flips `true` after `start()`'s (possibly slow) async setup finishes, so a fast double-click could pass the existing guard twice and create duplicate providers/capture; added an `isStarting` flag covering that whole window
+- fix(app): shorten the menu bar's "包含系统声音" toggle label — the permission caveat is already covered by the `screenRecordingPermissionNeeded` caption below it
 
 ### Dependencies
 

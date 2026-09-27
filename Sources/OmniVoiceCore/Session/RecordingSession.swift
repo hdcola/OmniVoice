@@ -17,6 +17,13 @@ public final class RecordingSession: ObservableObject {
     @Published public var selectedDeviceID: String?
     @Published public var isRunning = false
     @Published public var isStopping = false
+    /// True from the moment `start()` is called until its (possibly slow —
+    /// model loading, device init) setup finishes and `isRunning` flips to
+    /// `true`, or setup fails. Without this, `isRunning`/`isStopping` alone
+    /// don't guard the window *during* that setup: a second `start()` call
+    /// in that window would pass the same guard and create a second set of
+    /// providers/capture, leaking the first and double-starting capture.
+    @Published public var isStarting = false
     /// One row per ASR utterance/segment, source and translation aligned
     /// side by side.
     @Published public var lines: [TranscriptLine] = []
@@ -82,7 +89,9 @@ public final class RecordingSession: ObservableObject {
     // MARK: - Lifecycle
 
     public func start() async {
-        guard !isRunning, !isStopping else { return }
+        guard !isRunning, !isStopping, !isStarting else { return }
+        isStarting = true
+        defer { isStarting = false }
 
         let transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID)
         let translation = Self.makeTranslationProvider(engineID: translationEngineID)

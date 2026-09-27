@@ -28,6 +28,21 @@ struct MenuBarContentView: View {
 
     @ViewBuilder
     private var content: some View {
+        // Kept here alongside the floating panel's own start/stop button
+        // (not removed in favor of it) — if the user has hidden the panel,
+        // this is the only way to start/stop without first digging it back
+        // out via "显示/隐藏悬浮窗" below.
+        Button(session.isRunning ? "停止转录" : (session.isStarting ? "启动中…" : "开始转录")) {
+            Task {
+                if session.isRunning {
+                    await session.stop()
+                } else {
+                    await session.start()
+                }
+            }
+        }
+        .disabled(session.isStopping || session.isStarting)
+
         Button("显示/隐藏悬浮窗") {
             appDelegate.toggleFloatingPanel()
         }
@@ -47,7 +62,10 @@ struct MenuBarContentView: View {
         }
         .disabled(session.isRunning)
 
-        Toggle("包含系统声音（需要屏幕录制权限）", isOn: $session.includeSystemAudio)
+        // Permission requirement is explained by the
+        // `screenRecordingPermissionNeeded` caption below instead of in this
+        // label — keeps the menu item itself from wrapping/getting cut off.
+        Toggle("包含系统声音", isOn: $session.includeSystemAudio)
             .disabled(session.isRunning)
 
         Divider()
