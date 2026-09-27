@@ -6,6 +6,11 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.0.1] - 2026-09-27
+
+Internal test build — ad-hoc signed, not notarized (see `Docs/RELEASE_TESTING.md`
+for how testers install and run it).
+
 ### Added
 
 - feat(scaffold): initial project skeleton — `TranscriptionProvider`/`TranslationProvider` protocols, ported audio capture/mixing pipeline, SwiftData-backed session history with Markdown export, and a menu-bar app shell with a floating live-transcript panel (ee5f43d)
