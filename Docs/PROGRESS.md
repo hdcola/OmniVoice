@@ -121,6 +121,12 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       `[Unreleased]` cut into a dated `[0.0.1]` section, ad-hoc signed only
       (no Developer ID/notarization yet — see Open Items #3) — see
       `Docs/RELEASE_TESTING.md` for what testers need to do/know.
+- [x] **DMG packaging + Homebrew distribution** (2026-09-27, PRs #5/#6):
+      `Scripts/build_dmg.sh` wraps `build_app.sh`'s output into an installable
+      `.dmg` (app + `/Applications` symlink); README gained a download link
+      and `brew tap hdcola/tap && brew install --cask omnivoice` instructions.
+      Still ad-hoc signed — Developer ID signing/notarization/stapling remain
+      open (see Open Items #3).
 
 ### Code review findings (fixed)
 
@@ -189,9 +195,11 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    language/system-audio controls landed in PR #3 — mic picker + system-audio
    toggle in the menu bar, language pickers shared between the floating panel
    and Settings via `SourceLanguagePicker`/`TargetLanguagePicker`.)
-3. **Release pipeline**: Developer ID signing + notarization + stapling
-   (current `Scripts/build_app.sh` is ad-hoc-signed, dev-only), plus an
-   update mechanism (Sparkle-shaped) and a real weights-hosting location for
+3. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
+   above); still open — Developer ID signing + notarization + stapling
+   (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,
+   dev-only, needs `xattr -cr` per `Docs/RELEASE_TESTING.md`), plus an update
+   mechanism (Sparkle-shaped) and a real weights-hosting location for
    downloaded models.
 4. **Privacy copy, crash/error log export, localization scaffolding** — all
    explicitly deferred ("搭架子" / stub first) per the product discussion;
