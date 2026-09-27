@@ -10,6 +10,7 @@ struct MenuBarContentView: View {
     @EnvironmentObject private var session: RecordingSession
     @EnvironmentObject private var appDelegate: AppDelegate
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         // Device list can change between menu opens (a USB mic plugged in,
@@ -45,11 +46,17 @@ struct MenuBarContentView: View {
         Divider()
 
         Button("历史记录…") {
+            // OmniVoice runs as an accessory app (`LSUIElement`, no Dock
+            // icon) — opening a window without activating first creates it
+            // behind whatever app currently has focus, since this app never
+            // becomes frontmost on its own.
+            NSApp.activate(ignoringOtherApps: true)
             openWindow(id: "history")
         }
 
-        SettingsLink {
-            Text("设置…")
+        Button("设置…") {
+            NSApp.activate(ignoringOtherApps: true)
+            openSettings()
         }
 
         Divider()
