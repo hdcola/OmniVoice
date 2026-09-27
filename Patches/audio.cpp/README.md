@@ -17,7 +17,10 @@ Each patch should be reported upstream; drop it from here (and from
 
 ## 0001 — R2T2 null deref on an empty final flush
 
-**Status**: not yet reported upstream.
+**Status**: submitted upstream as
+[0xShug0/audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712) — open.
+Still present on upstream `main` (`90c56c2e`), verified there with the same
+reproducer, so this patch stays until a release carrying the fix is pinned.
 
 `R2T2ASRSession::build_stream_prefix(final_flush=true)`
 (`src/community_models/confucius4_r2t2/session.cpp`) clamps its rollback end

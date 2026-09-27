@@ -207,12 +207,14 @@ real UI bugs, all fixed:
 
 Roughly in the order they'll likely get tackled — not a hard commitment.
 
-1. **Report the R2T2 fix upstream**: the crash is root-caused and fixed
-   locally (see "Known gaps" below), but the fix currently lives only as
-   `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`,
-   which every checkout has to apply by hand. Needs an issue/PR against
-   [audio.cpp](https://github.com/0xShug0/audio.cpp); once a release carrying
-   it is pinned, drop the patch and the `git apply` step from
+1. **Land the R2T2 fix upstream**: the crash is root-caused and fixed locally
+   (see "Known gaps" below), and submitted as
+   [0xShug0/audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712)
+   (verified still broken on upstream `main`, `90c56c2e`). Until that merges
+   and a release carrying it is pinned, the fix lives only as
+   `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch` and
+   every checkout has to apply it by hand. When it lands: bump the pin, drop
+   the patch, and drop the `git apply` step from
    `Docs/MODEL_ENGINE_SETUP.md`.
 2. **Model download-on-first-use**: `ModelTranscriptionProvider`/
    `ModelTranslationProvider` are wired up (see Done above), but still
@@ -273,7 +275,9 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
   `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`
   (bail out early when `ids` is empty). **Every `third_party/audio.cpp`
   checkout must apply that patch** — it is a step in
-  `Docs/MODEL_ENGINE_SETUP.md`, and it is not yet upstream (Open Items #1).
+  `Docs/MODEL_ENGINE_SETUP.md`, and it is not upstream yet
+  ([audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712), Open
+  Items #1).
   This was never a regression from porting `mac-poc-hybrid`; that reference
   has the same bug, which is consistent with its CHANGELOG admitting this
   interactive flow had never been manually run. T3PO translation

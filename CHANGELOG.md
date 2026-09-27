@@ -8,7 +8,7 @@ The format is based on Keep a Changelog.
 
 ### Fixed
 
-- fix(providers): fix the R2T2 crash on stop / VAD pause — a null-pointer dereference in `audio.cpp`'s own `R2T2ASRSession::build_stream_prefix(final_flush=true)`, which builds a one-element vector from an empty token list whenever the session's decoded text is empty at finish time. Ships as `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`, now a required step in `Docs/MODEL_ENGINE_SETUP.md`; reproduced deterministically from the C API (silence only, no mic) and verified against the patched dylib.
+- fix(providers): fix the R2T2 crash on stop / VAD pause — a null-pointer dereference in `audio.cpp`'s own `R2T2ASRSession::build_stream_prefix(final_flush=true)`, which builds a one-element vector from an empty token list whenever the session's decoded text is empty at finish time. Ships as `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`, now a required step in `Docs/MODEL_ENGINE_SETUP.md`; reproduced deterministically from the C API (silence only, no mic) and verified against the patched dylib. Submitted upstream as [audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712).
 
 ### Added
 
