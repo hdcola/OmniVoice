@@ -38,7 +38,7 @@ public final class ModelTranscriptionProvider: TranscriptionProvider {
         throw ProviderError.notImplemented("R2T2 模型 ASR 引擎尚未接入")
     }
 
-    public func push(samples: [Float]) {}
+    public nonisolated func push(samples: [Float]) {}
 
     public func stop() async {}
 }

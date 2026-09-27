@@ -63,12 +63,17 @@ public enum ProviderError: LocalizedError {
 /// fresh per recording (`RecordingSession.start()`), same rule the POCs
 /// established — no engine here is expected to support a hot-swap mid-run.
 ///
-/// `@MainActor`-isolated: `RecordingSession` (also `@MainActor`) is the only
-/// caller, and every conforming type already does its actual engine work on
-/// its own internal serial queue/executor (mirroring the POCs' own
-/// thread-safety approach) — this just keeps the protocol's entry points on
-/// the same isolation domain as their one caller, rather than each
-/// implementation needing its own `Sendable`/`nonisolated` bookkeeping.
+/// `@MainActor`-isolated **except** `push(samples:)`/`notifyUtteranceBoundary()`:
+/// `RecordingSession` (also `@MainActor`) is the only caller of every other
+/// member, so those stay on the same isolation domain as their one caller.
+/// `push`/`notifyUtteranceBoundary` are different — they're the hot audio
+/// path, called directly from `AudioMixer`'s/`MicrophoneCapture`'s own
+/// background capture queues (never hopped to the main actor first, both for
+/// latency and because hopping per-buffer would mean the audio thread
+/// blocking on the main run loop), so they're `nonisolated` here. A
+/// conforming type is responsible for its own thread-safety on whatever
+/// mutable state those two touch — see `SystemTranscriptionProvider`'s
+/// `audioQueue` for how it does that.
 @MainActor
 public protocol TranscriptionProvider: AnyObject {
     /// Fires for every recognized event — see `TranscriptionEvent`'s doc.
@@ -87,14 +92,17 @@ public protocol TranscriptionProvider: AnyObject {
     func start(config: TranscriptionConfig) async throws
 
     /// Feeds one buffer of mono 16 kHz Float32 PCM in -1...1 range — the
-    /// format `AudioMixer` emits (see `Audio/AudioMixer.swift`).
-    func push(samples: [Float])
+    /// format `AudioMixer` emits (see `Audio/AudioMixer.swift`). Called from
+    /// a background audio queue, not the main actor — see this protocol's
+    /// doc.
+    nonisolated func push(samples: [Float])
 
     /// Hints that a voice-activity-detected pause just occurred. Providers
     /// that derive segment boundaries some other way (e.g. `SpeechTranscriber`'s
     /// own volatile/final distinction) can ignore this — the default
-    /// implementation below does exactly that.
-    func notifyUtteranceBoundary()
+    /// implementation below does exactly that. Called from a background
+    /// audio queue, not the main actor — see this protocol's doc.
+    nonisolated func notifyUtteranceBoundary()
 
     /// Ends the current session, flushing any trailing uncommitted segment
     /// through `onEvent` (`.segmentClosed`) first.
@@ -102,5 +110,5 @@ public protocol TranscriptionProvider: AnyObject {
 }
 
 extension TranscriptionProvider {
-    public func notifyUtteranceBoundary() {}
+    public nonisolated func notifyUtteranceBoundary() {}
 }

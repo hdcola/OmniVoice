@@ -17,16 +17,35 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
 
     private var transcriber: SpeechTranscriber?
     private var analyzer: SpeechAnalyzer?
-    private var inputContinuation: AsyncStream<AnalyzerInput>.Continuation?
-    private var analyzerFormat: AVAudioFormat?
     private var resultsTask: Task<Void, Never>?
 
+    /// Guards every field `push(samples:)` touches. `push` runs on
+    /// whatever background queue `AudioMixer` calls it from (never hopped to
+    /// the main actor — see `TranscriptionProvider`'s doc), while
+    /// `start(config:)`/`stop()` run on the main actor, so without this lock
+    /// `stop()` nil-ing these out and `push` reading/mutating them can run
+    /// concurrently on two different threads — exactly the race a review of
+    /// this file's first version caught (`stop()` and an in-flight `push`
+    /// touching `resampler`/`inputContinuation` with no synchronization at
+    /// all).
+    ///
+    /// `nonisolated(unsafe)` on the fields below is what it says: unsafe on
+    /// its own. It's only correct here because every read/write of them,
+    /// everywhere in this file, happens inside `audioQueue.sync { ... }` —
+    /// the class itself is inferred `@MainActor` (it conforms to
+    /// `TranscriptionProvider`, a `@MainActor` protocol), so without this
+    /// annotation these fields would be main-actor-isolated too, and
+    /// `nonisolated func push` (which must run on the calling audio thread,
+    /// not hop to the main actor per buffer) couldn't touch them at all.
+    private let audioQueue = DispatchQueue(label: "org.omnivoice.systemtranscription.audio")
+    private nonisolated(unsafe) var inputContinuation: AsyncStream<AnalyzerInput>.Continuation?
+    private nonisolated(unsafe) var analyzerFormat: AVAudioFormat?
     /// Resamples each incoming mixed-audio chunk (mono Float32 at
     /// `sourceSampleRate`, fixed at 16kHz — the format `AudioMixer` emits)
     /// into `analyzerFormat` right before wrapping it as an `AnalyzerInput`.
-    private var resampler: AVAudioConverter?
-    private var resamplerSourceFormat: AVAudioFormat?
-    private static let sourceSampleRate: Double = 16000
+    private nonisolated(unsafe) var resampler: AVAudioConverter?
+    private nonisolated(unsafe) var resamplerSourceFormat: AVAudioFormat?
+    private nonisolated static let sourceSampleRate: Double = 16000
 
     public init() {}
 
@@ -56,10 +75,16 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
         guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
             throw ProviderError.notImplemented("SpeechAnalyzer 无可用音频格式")
         }
-        analyzerFormat = format
 
         let (stream, continuation) = AsyncStream<AnalyzerInput>.makeStream()
-        inputContinuation = continuation
+        audioQueue.sync {
+            analyzerFormat = format
+            inputContinuation = continuation
+            // A previous run's resampler was built against that run's
+            // `analyzerFormat`; don't carry it into this one.
+            resampler = nil
+            resamplerSourceFormat = nil
+        }
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         try await analyzer.start(inputSequence: stream)
@@ -82,62 +107,66 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
         }
     }
 
-    public func push(samples: [Float]) {
-        guard let analyzerFormat, let continuation = inputContinuation else { return }
-        guard let sourceFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: Self.sourceSampleRate,
-            channels: 1,
-            interleaved: false
-        ) else { return }
+    public nonisolated func push(samples: [Float]) {
+        audioQueue.sync {
+            guard let analyzerFormat, let continuation = inputContinuation else { return }
+            guard let sourceFormat = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: Self.sourceSampleRate,
+                channels: 1,
+                interleaved: false
+            ) else { return }
 
-        if resampler == nil || resamplerSourceFormat != sourceFormat {
-            resampler = AVAudioConverter(from: sourceFormat, to: analyzerFormat)
-            resamplerSourceFormat = sourceFormat
-        }
-        guard let resampler else { return }
-
-        guard let sourceBuffer = AVAudioPCMBuffer(pcmFormat: sourceFormat, frameCapacity: AVAudioFrameCount(samples.count)) else {
-            return
-        }
-        sourceBuffer.frameLength = AVAudioFrameCount(samples.count)
-        guard let channelData = sourceBuffer.floatChannelData else { return }
-        samples.withUnsafeBufferPointer { pointer in
-            guard let baseAddress = pointer.baseAddress else { return }
-            channelData[0].update(from: baseAddress, count: samples.count)
-        }
-
-        let ratio = analyzerFormat.sampleRate / sourceFormat.sampleRate
-        let capacity = AVAudioFrameCount(Double(samples.count) * ratio) + 32
-        guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: analyzerFormat, frameCapacity: capacity) else { return }
-
-        var consumed = false
-        var conversionError: NSError?
-        let status = resampler.convert(to: outputBuffer, error: &conversionError) { _, outStatus in
-            if consumed {
-                outStatus.pointee = .noDataNow
-                return nil
+            if resampler == nil || resamplerSourceFormat != sourceFormat {
+                resampler = AVAudioConverter(from: sourceFormat, to: analyzerFormat)
+                resamplerSourceFormat = sourceFormat
             }
-            consumed = true
-            outStatus.pointee = .haveData
-            return sourceBuffer
-        }
-        guard status != .error, conversionError == nil, outputBuffer.frameLength > 0 else { return }
+            guard let resampler else { return }
 
-        continuation.yield(AnalyzerInput(buffer: outputBuffer))
+            guard let sourceBuffer = AVAudioPCMBuffer(pcmFormat: sourceFormat, frameCapacity: AVAudioFrameCount(samples.count)) else {
+                return
+            }
+            sourceBuffer.frameLength = AVAudioFrameCount(samples.count)
+            guard let channelData = sourceBuffer.floatChannelData else { return }
+            samples.withUnsafeBufferPointer { pointer in
+                guard let baseAddress = pointer.baseAddress else { return }
+                channelData[0].update(from: baseAddress, count: samples.count)
+            }
+
+            let ratio = analyzerFormat.sampleRate / sourceFormat.sampleRate
+            let capacity = AVAudioFrameCount(Double(samples.count) * ratio) + 32
+            guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: analyzerFormat, frameCapacity: capacity) else { return }
+
+            var consumed = false
+            var conversionError: NSError?
+            let status = resampler.convert(to: outputBuffer, error: &conversionError) { _, outStatus in
+                if consumed {
+                    outStatus.pointee = .noDataNow
+                    return nil
+                }
+                consumed = true
+                outStatus.pointee = .haveData
+                return sourceBuffer
+            }
+            guard status != .error, conversionError == nil, outputBuffer.frameLength > 0 else { return }
+
+            continuation.yield(AnalyzerInput(buffer: outputBuffer))
+        }
     }
 
     public func stop() async {
-        inputContinuation?.finish()
-        inputContinuation = nil
+        audioQueue.sync {
+            inputContinuation?.finish()
+            inputContinuation = nil
+            analyzerFormat = nil
+            resampler = nil
+            resamplerSourceFormat = nil
+        }
         try? await analyzer?.finalizeAndFinishThroughEndOfInput()
         resultsTask?.cancel()
         resultsTask = nil
         analyzer = nil
         transcriber = nil
-        analyzerFormat = nil
-        resampler = nil
-        resamplerSourceFormat = nil
     }
 
     private static func ensureModelInstalled(for transcriber: SpeechTranscriber, locale: Locale) async throws {
