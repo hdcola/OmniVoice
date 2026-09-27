@@ -426,25 +426,19 @@ public final class RecordingSession: ObservableObject {
         let transcriptionModelPath: URL?
         do {
             transcriptionModelPath = try resolveModelPath(
-                kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant, statusPrefix: "识别引擎模型"
+                kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant
             )
-        } catch let error as ModelNotDownloadedError {
-            statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
-            return
         } catch {
-            statusMessage = "识别引擎模型下载失败: \(error.localizedDescription)"
+            statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
             return
         }
         let translationModelPath: URL?
         do {
             translationModelPath = try resolveModelPath(
-                kind: translationEngineKind, variant: currentTranslationModelVariant, statusPrefix: "翻译引擎模型"
+                kind: translationEngineKind, variant: currentTranslationModelVariant
             )
-        } catch let error as ModelNotDownloadedError {
-            statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
-            return
         } catch {
-            statusMessage = "翻译引擎模型下载失败: \(error.localizedDescription)"
+            statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
             return
         }
 
@@ -670,25 +664,19 @@ public final class RecordingSession: ObservableObject {
             let transcriptionModelPath: URL?
             do {
                 transcriptionModelPath = try resolveModelPath(
-                    kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant, statusPrefix: "识别引擎模型"
+                    kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant
                 )
-            } catch let error as ModelNotDownloadedError {
-                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
-                return
             } catch {
-                statusMessage = "识别引擎模型下载失败: \(error.localizedDescription)"
+                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
                 return
             }
             let translationModelPath: URL?
             do {
                 translationModelPath = try resolveModelPath(
-                    kind: translationEngineKind, variant: currentTranslationModelVariant, statusPrefix: "翻译引擎模型"
+                    kind: translationEngineKind, variant: currentTranslationModelVariant
                 )
-            } catch let error as ModelNotDownloadedError {
-                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
-                return
             } catch {
-                statusMessage = "翻译引擎模型下载失败: \(error.localizedDescription)"
+                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
                 return
             }
             transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID, modelPath: transcriptionModelPath)
@@ -1016,10 +1004,14 @@ public final class RecordingSession: ObservableObject {
     /// env-var/local-`models/`-dir convention, same as passing `modelPath: nil`
     /// always did before this method existed). Throws `ModelNotDownloadedError`
     /// rather than downloading if `variant` isn't cached yet — see that
-    /// error's doc.
+    /// error's doc. Typed (`throws(ModelNotDownloadedError)`), not plain
+    /// `throws` — this can genuinely never throw anything else now that it
+    /// no longer downloads, so every call site's `catch` can bind `error` as
+    /// `ModelNotDownloadedError` directly instead of needing a second,
+    /// unreachable generic `catch` just to satisfy exhaustiveness.
     private func resolveModelPath(
-        kind: EngineKind?, variant: ModelVariant?, statusPrefix: String
-    ) throws -> URL? {
+        kind: EngineKind?, variant: ModelVariant?
+    ) throws(ModelNotDownloadedError) -> URL? {
         guard kind == .model, let variant else { return nil }
         guard modelDownloadManager.isDownloaded(variant) else {
             throw ModelNotDownloadedError(variant: variant)

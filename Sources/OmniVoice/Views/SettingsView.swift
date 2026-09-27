@@ -45,7 +45,7 @@ struct SettingsView: View {
                 HStack {
                     Picker("引擎", selection: $session.transcriptionEngineID) {
                         ForEach(ProviderCatalog.transcriptionEngines.filter(isEngineAvailable)) { engine in
-                            Text(engine.displayName).tag(engine.id)
+                            Text(engineLabel(for: engine)).tag(engine.id)
                         }
                     }
                     modelManagementButton
@@ -63,7 +63,7 @@ struct SettingsView: View {
                 HStack {
                     Picker("引擎", selection: $session.translationEngineID) {
                         ForEach(ProviderCatalog.translationEngines.filter(isEngineAvailable)) { engine in
-                            Text(engine.displayName).tag(engine.id)
+                            Text(engineLabel(for: engine)).tag(engine.id)
                         }
                     }
                     modelManagementButton
@@ -113,30 +113,57 @@ struct SettingsView: View {
     /// something for it has been downloaded — bootstrapping a brand-new
     /// engine always goes through the "模型管理" window instead (see
     /// `ModelManagementView`), which lists every catalog variant regardless
-    /// of download state.
+    /// of download state. The *currently selected* engine is always kept
+    /// visible even with nothing downloaded for it (e.g. its only variant
+    /// was just deleted via Model Management, or a synced `UserDefaults`
+    /// value names an engine this machine hasn't downloaded yet) — filtering
+    /// it out entirely left the `Picker`'s binding pointing at a tag no
+    /// longer in its options, which SwiftUI renders as a blank/no-selection
+    /// control instead of showing what's actually selected. `engineLabel(for:)`
+    /// marks that case "（未下载）" so it doesn't silently read as a normal,
+    /// ready-to-use option.
     private func isEngineAvailable(_ engine: EngineDescriptor) -> Bool {
+        if engine.id == session.transcriptionEngineID || engine.id == session.translationEngineID {
+            return true
+        }
+        return hasDownloadedVariant(engine)
+    }
+
+    private func hasDownloadedVariant(_ engine: EngineDescriptor) -> Bool {
         guard engine.kind == .model else { return true }
         return ProviderCatalog.modelVariants(forEngineID: engine.id)
             .contains { downloadManager.isDownloaded($0) }
     }
 
-    /// Only lists *downloaded* variants — a not-yet-downloaded one has
-    /// nothing useful to show here (nothing to select, nothing to act on;
-    /// downloading only ever happens from "模型管理" now), so it's simply
-    /// left out rather than shown disabled or with its own download button.
-    /// An engine is only ever listed above once at least one of its variants
-    /// is downloaded (see `isEngineAvailable(_:)`), so this `Picker` never
-    /// ends up empty.
+    private func engineLabel(for engine: EngineDescriptor) -> String {
+        hasDownloadedVariant(engine) ? engine.displayName : "\(engine.displayName)（未下载）"
+    }
+
+    /// Lists *downloaded* variants, same reasoning as `isEngineAvailable(_:)`
+    /// above — plus the currently-selected one even if it isn't downloaded
+    /// (deleted via Model Management, or a stale/synced selection), again to
+    /// avoid a blank `Picker` selection; marked "（未下载）" for the same
+    /// reason `engineLabel(for:)` marks its engine-level equivalent. An
+    /// engine is only ever listed above once at least one of its variants is
+    /// downloaded, so in the common case this `Picker` is never actually
+    /// empty.
     @ViewBuilder
     private func modelVariantPicker(for engineID: String, selection: Binding<String?>) -> some View {
-        let downloaded = ProviderCatalog.modelVariants(forEngineID: engineID).filter { downloadManager.isDownloaded($0) }
-        if !downloaded.isEmpty {
+        let variants = ProviderCatalog.modelVariants(forEngineID: engineID)
+        let selectedID = selection.wrappedValue
+        let shown = variants.filter { downloadManager.isDownloaded($0) || $0.id == selectedID }
+        if !shown.isEmpty {
             Picker("模型", selection: selection) {
-                ForEach(downloaded) { variant in
-                    Text("\(variant.displayName) · 约 \(variant.approximateSizeMB) MB")
-                        .tag(Optional(variant.id))
+                ForEach(shown) { variant in
+                    Text(variantLabel(for: variant)).tag(Optional(variant.id))
                 }
             }
         }
+    }
+
+    private func variantLabel(for variant: ModelVariant) -> String {
+        downloadManager.isDownloaded(variant)
+            ? "\(variant.displayName) · 约 \(variant.approximateSizeMB) MB"
+            : "\(variant.displayName)（未下载）"
     }
 }
