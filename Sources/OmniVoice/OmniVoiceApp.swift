@@ -20,7 +20,13 @@ struct OmniVoiceApp: App {
                 .modelContainerIfAvailable(appDelegate.modelContainer)
         }
 
-        WindowGroup("模型管理", id: "modelManagement") {
+        // `Window`, not `WindowGroup` — a `WindowGroup` opens a brand new
+        // window instance on every `openWindow(id:)` call (it's designed for
+        // multi-document windows), which repeated clicks on "模型管理…"/the
+        // Settings shortcut would otherwise keep stacking up. `Window` is
+        // macOS's singleton-window scene: `openWindow(id:)` reuses/refocuses
+        // the one instance instead.
+        Window("模型管理", id: "modelManagement") {
             ModelManagementView(modelDownloadManager: appDelegate.session.modelDownloadManager)
         }
 

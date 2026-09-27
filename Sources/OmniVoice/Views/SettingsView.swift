@@ -1,3 +1,4 @@
+import AppKit
 import OmniVoiceCore
 import SwiftUI
 
@@ -17,6 +18,7 @@ import SwiftUI
 /// so the two can't ever offer different language options.
 struct SettingsView: View {
     @EnvironmentObject private var session: RecordingSession
+    @Environment(\.openWindow) private var openWindow
     /// Observed directly (not just reached through `session`) so a variant
     /// row's "已下载"/"约 N MB" caption live-updates while
     /// `ModelDownloadManager.ensureDownloaded(_:progress:)` runs (from this
@@ -76,6 +78,18 @@ struct SettingsView: View {
                     transcriptionEngineKind: session.transcriptionEngineKind
                 )
                 TargetLanguagePicker(targetLanguageCode: $session.targetLanguageCode)
+            }
+
+            Section {
+                Button("模型管理…") {
+                    NSApp.activate(ignoringOtherApps: true)
+                    openWindow(id: "modelManagement")
+                }
+                // Overrides the form-wide `.disabled` below — this only
+                // opens a window, it doesn't touch engine/model selection,
+                // so there's no race with an in-flight preload/recording to
+                // guard against (unlike everything else in this form).
+                .disabled(false)
             }
         }
         .padding(20)
