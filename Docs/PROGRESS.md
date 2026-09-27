@@ -271,15 +271,25 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    folding variant IDs into that comparison and having the variant
    properties' `didSet` call `discardLoadedModelsIfStale()` too. Only one
    variant per engine exists in the catalog today, so this mostly plumbs the
-   mechanism through for whenever a second quantization/size is added — it
-   doesn't yet expose
-   `cancelDownload(for:)`/`deleteCachedModel(for:)` from the UI. Notably, a
-   user who triggers a `.model` engine's (multi-GB) download on a slow/flaky
-   connection currently has no way to back out short of quitting the app —
-   the panel/Settings just show "启动中…"/"加载中…" with everything else
-   disabled until it finishes or fails. Adding a "取消下载" affordance (panel
-   and/or Settings) that calls `cancelDownload(for:)` is a follow-up, not
-   blocking this step.
+   mechanism through for whenever a second quantization/size is added.
+- [x] **Dedicated "模型管理" window, `cancelDownload(for:)`/`deleteCachedModel(for:)`
+   exposed in the UI**: a new `ModelManagementView` (opened from the menu bar)
+   lists every `ProviderCatalog.modelVariants` entry with an explicit
+   下载/取消/删除 action per row — the follow-up flagged above. `RecordingSession`
+   no longer downloads anything implicitly: `resolveModelPath` (called from
+   `preloadModel()`/`start()`) now fails fast with a friendly "尚未下载,
+   请先在「模型管理」中下载" status message instead of kicking off a
+   multi-GB download with no way to back out. `SettingsView`'s engine
+   `Picker` only lists a `.model`-kind engine once something for it is
+   downloaded (bootstrapping a new engine always goes through Model
+   Management now); its variant picker only offers downloaded variants as
+   selectable, with a lightweight inline download/cancel row for anything
+   not yet downloaded. Known minor gap: if the currently-selected engine's
+   last downloaded variant is deleted via Model Management while Settings
+   isn't open, that engine silently drops out of the (now-filtered) engine
+   list next time Settings opens, but the persisted engine ID isn't reset —
+   `start()`/`preloadModel()` still handle it gracefully (the same friendly
+   "尚未下载" message), just not auto-corrected in the picker itself.
 4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,
