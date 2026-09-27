@@ -29,6 +29,12 @@ struct ModelDownloadManagerTests {
         quantization: "Q8_0", approximateSizeMB: 1
     )
 
+    private let hugeVariant = ModelVariant(
+        id: "huge-variant", engineID: "model.r2t2", displayName: "Huge Variant",
+        quantization: "Q8_0", approximateSizeMB: Int.max / 2,
+        downloadURL: URL(string: "https://example.invalid/model.gguf")
+    )
+
     @Test func localURLIsKeyedByVariantIDUnderTheCacheDirectory() {
         let cacheDirectory = makeTempCacheDirectory()
         let manager = ModelDownloadManager(cacheDirectory: cacheDirectory)
@@ -88,6 +94,42 @@ struct ModelDownloadManagerTests {
     @Test func deleteCachedModelIsANoOpWhenNothingIsCached() throws {
         let manager = ModelDownloadManager(cacheDirectory: makeTempCacheDirectory())
         try manager.deleteCachedModel(for: variant)
+    }
+
+    @Test func ensureDownloadedThrowsWhenDiskSpaceIsInsufficient() async throws {
+        // No real network involved — the disk-space preflight check runs
+        // (and this throws) before `runDownload` ever touches
+        // `example.invalid`.
+        let cacheDirectory = makeTempCacheDirectory()
+        let manager = ModelDownloadManager(cacheDirectory: cacheDirectory)
+
+        do {
+            _ = try await manager.ensureDownloaded(hugeVariant)
+            Issue.record("expected ensureDownloaded to throw")
+        } catch let error as ModelDownloadError {
+            guard case .insufficientDiskSpace = error else {
+                Issue.record("expected .insufficientDiskSpace, got \(error)")
+                return
+            }
+        }
+
+        try? FileManager.default.removeItem(at: cacheDirectory)
+    }
+
+    @Test func initRemovesOrphanedTempFilesButKeepsCachedModels() throws {
+        let cacheDirectory = makeTempCacheDirectory()
+        try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        let orphan = cacheDirectory.appendingPathComponent("omnivoice-model-download-orphan")
+        FileManager.default.createFile(atPath: orphan.path, contents: Data([0x01]))
+        let cached = cacheDirectory.appendingPathComponent("test-variant.gguf")
+        FileManager.default.createFile(atPath: cached.path, contents: Data([0x02]))
+
+        _ = ModelDownloadManager(cacheDirectory: cacheDirectory)
+
+        #expect(!FileManager.default.fileExists(atPath: orphan.path))
+        #expect(FileManager.default.fileExists(atPath: cached.path))
+
+        try FileManager.default.removeItem(at: cacheDirectory)
     }
 
     // MARK: - verifyAndMove (no network needed — exercises the checksum/move
@@ -156,4 +198,128 @@ struct ModelDownloadManagerTests {
 
         try FileManager.default.removeItem(at: cacheDirectory)
     }
+
+    // MARK: - Network phase, mocked via a custom URLProtocol (no real
+    // network — `sessionConfiguration` is injectable for exactly this)
+
+    private func makeMockedManager(cacheDirectory: URL) -> ModelDownloadManager {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        return ModelDownloadManager(cacheDirectory: cacheDirectory, sessionConfiguration: configuration)
+    }
+
+    @Test func ensureDownloadedSucceedsAgainstAMockedHTTPResponse() async throws {
+        let cacheDirectory = makeTempCacheDirectory()
+        let manager = makeMockedManager(cacheDirectory: cacheDirectory)
+        let mockedVariant = ModelVariant(
+            id: "mocked-ok", engineID: "model.r2t2", displayName: "Mocked", quantization: "Q8_0",
+            approximateSizeMB: 1, downloadURL: StubURLProtocol.url(status: 200, path: "ok.gguf")
+        )
+
+        let resolved = try await manager.ensureDownloaded(mockedVariant)
+        let content = try Data(contentsOf: resolved)
+        #expect(content == StubURLProtocol.body(forPath: "ok.gguf"))
+
+        try FileManager.default.removeItem(at: cacheDirectory)
+    }
+
+    @Test func ensureDownloadedVerifiesChecksumAgainstAMockedResponse() async throws {
+        let cacheDirectory = makeTempCacheDirectory()
+        let manager = makeMockedManager(cacheDirectory: cacheDirectory)
+        let path = "checksummed.gguf"
+        let expectedSHA256 = SHA256.hash(data: StubURLProtocol.body(forPath: path))
+            .map { String(format: "%02x", $0) }.joined()
+        let mockedVariant = ModelVariant(
+            id: "mocked-checksum-ok", engineID: "model.r2t2", displayName: "Mocked", quantization: "Q8_0",
+            approximateSizeMB: 1, downloadURL: StubURLProtocol.url(status: 200, path: path),
+            sha256: expectedSHA256
+        )
+
+        let resolved = try await manager.ensureDownloaded(mockedVariant)
+        #expect(FileManager.default.fileExists(atPath: resolved.path))
+
+        try FileManager.default.removeItem(at: cacheDirectory)
+    }
+
+    @Test func ensureDownloadedThrowsOnMockedChecksumMismatch() async throws {
+        let cacheDirectory = makeTempCacheDirectory()
+        let manager = makeMockedManager(cacheDirectory: cacheDirectory)
+        let mockedVariant = ModelVariant(
+            id: "mocked-checksum-bad", engineID: "model.r2t2", displayName: "Mocked", quantization: "Q8_0",
+            approximateSizeMB: 1, downloadURL: StubURLProtocol.url(status: 200, path: "bad-checksum.gguf"),
+            sha256: String(repeating: "0", count: 64)
+        )
+
+        await #expect(throws: ModelDownloadError.self) {
+            _ = try await manager.ensureDownloaded(mockedVariant)
+        }
+        #expect(!manager.isDownloaded(mockedVariant))
+
+        try FileManager.default.removeItem(at: cacheDirectory)
+    }
+
+    @Test func ensureDownloadedThrowsOnMockedHTTPError() async throws {
+        let cacheDirectory = makeTempCacheDirectory()
+        let manager = makeMockedManager(cacheDirectory: cacheDirectory)
+        let mockedVariant = ModelVariant(
+            id: "mocked-404", engineID: "model.r2t2", displayName: "Mocked", quantization: "Q8_0",
+            approximateSizeMB: 1, downloadURL: StubURLProtocol.url(status: 404, path: "missing.gguf")
+        )
+
+        do {
+            _ = try await manager.ensureDownloaded(mockedVariant)
+            Issue.record("expected ensureDownloaded to throw")
+        } catch let error as ModelDownloadError {
+            guard case .httpError(let statusCode) = error else {
+                Issue.record("expected .httpError, got \(error)")
+                return
+            }
+            #expect(statusCode == 404)
+        }
+
+        try FileManager.default.removeItem(at: cacheDirectory)
+    }
+}
+
+/// A minimal `URLProtocol` stub so the network phase (success, checksum
+/// verification, HTTP errors) can be exercised without a real network call.
+/// The desired status code and a path-derived body are both encoded in the
+/// request URL itself — not shared mutable state — so tests stay
+/// independent under parallel execution.
+private final class StubURLProtocol: URLProtocol {
+    static func url(status: Int, path: String) -> URL {
+        URL(string: "https://mock.invalid/\(status)/\(path)")!
+    }
+
+    static func body(forPath path: String) -> Data {
+        Data("stubbed content for \(path)".utf8)
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.url?.host == "mock.invalid"
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let url = request.url else {
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+        let components = url.pathComponents.filter { $0 != "/" }
+        let statusCode = components.first.flatMap { Int($0) } ?? 200
+        let path = components.dropFirst().joined(separator: "/")
+        let body = Self.body(forPath: path)
+        let response = HTTPURLResponse(
+            url: url, statusCode: statusCode, httpVersion: nil,
+            headerFields: ["Content-Length": "\(body.count)"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        if (200..<300).contains(statusCode) {
+            client?.urlProtocol(self, didLoad: body)
+        }
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }

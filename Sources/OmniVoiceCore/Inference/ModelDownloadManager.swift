@@ -9,6 +9,10 @@ public enum ModelDownloadError: LocalizedError, Sendable {
     /// The downloaded file's SHA-256 didn't match `ModelVariant.sha256` — the
     /// partial/corrupted download is discarded, never moved into the cache.
     case checksumMismatch(variantID: String)
+    /// The cache directory's volume doesn't have enough free space for
+    /// `ModelVariant.approximateSizeMB` — checked before starting the
+    /// transfer, not discovered partway through as an `ENOSPC` write failure.
+    case insufficientDiskSpace(requiredMB: Int, availableMB: Int)
 
     public var errorDescription: String? {
         switch self {
@@ -18,6 +22,8 @@ public enum ModelDownloadError: LocalizedError, Sendable {
             return "下载失败，服务器返回状态码 \(statusCode)"
         case .checksumMismatch(let variantID):
             return "模型 \(variantID) 校验和不匹配，下载文件可能已损坏，请重试"
+        case .insufficientDiskSpace(let requiredMB, let availableMB):
+            return "磁盘空间不足：需要约 \(requiredMB) MB，可用空间仅 \(availableMB) MB"
         }
     }
 }
@@ -62,9 +68,12 @@ public enum ModelDownloadError: LocalizedError, Sendable {
 public final class ModelDownloadManager: NSObject, ObservableObject {
     public static let shared = ModelDownloadManager()
 
+    private nonisolated static let tempFilePrefix = "omnivoice-model-download-"
+
     private let cacheDirectory: URL
+    private let sessionConfiguration: URLSessionConfiguration
     private lazy var session = URLSession(
-        configuration: .default, delegate: DownloadDelegateProxy(target: self), delegateQueue: nil
+        configuration: sessionConfiguration, delegate: DownloadDelegateProxy(target: self), delegateQueue: nil
     )
 
     /// The whole `ensureDownloaded` pipeline for a variant currently in
@@ -83,6 +92,8 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// one of a multi-gigabyte download's several-thousand progress
     /// callbacks.
     private var progressHandlers: [String: [(Double) -> Void]] = [:]
+    /// Throttle state for `handleProgress` — see its doc.
+    private var lastReportedProgress: [String: (fraction: Double, time: Date)] = [:]
 
     /// `0...1` per variant currently downloading — for a SwiftUI progress
     /// view to observe directly, instead of every caller needing to thread
@@ -90,9 +101,30 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// returns or throws.
     @Published public private(set) var downloadProgress: [String: Double] = [:]
 
-    public init(cacheDirectory: URL? = nil) {
+    /// - Parameter sessionConfiguration: injectable so tests can register a
+    ///   custom `URLProtocol` (via `.protocolClasses`) to exercise the
+    ///   network phase (redirects, HTTP errors, disconnects) without a real
+    ///   network round-trip. Defaults to `.default`.
+    public init(cacheDirectory: URL? = nil, sessionConfiguration: URLSessionConfiguration = .default) {
         self.cacheDirectory = cacheDirectory ?? Self.defaultCacheDirectory()
+        self.sessionConfiguration = sessionConfiguration
         super.init()
+        cleanUpOrphanedTempFiles()
+    }
+
+    /// A crash, force-quit, or system shutdown mid-download leaves its
+    /// stable temp file (see `handleDidFinishDownloading`'s doc) behind
+    /// forever otherwise — nothing else would ever revisit or remove it,
+    /// and it can be as large as the model itself (multi-GB).
+    private func cleanUpOrphanedTempFiles() {
+        guard
+            let entries = try? FileManager.default.contentsOfDirectory(
+                at: cacheDirectory, includingPropertiesForKeys: nil
+            )
+        else { return }
+        for url in entries where url.lastPathComponent.hasPrefix(Self.tempFilePrefix) {
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 
     private static func defaultCacheDirectory() -> URL {
@@ -158,6 +190,14 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         }
 
         if let progress {
+            // A call joining a download already partway through would
+            // otherwise not hear anything until the next network chunk (or,
+            // worse, not at all if that chunk lands during the SHA-256
+            // verify/move phase, which reports no progress of its own) —
+            // report whatever's already known immediately.
+            if let current = downloadProgress[variant.id] {
+                progress(current)
+            }
             progressHandlers[variant.id, default: []].append(progress)
         }
 
@@ -166,21 +206,23 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         }
 
         // The cleanup `defer` lives inside the job's own `Task` body, not in
-        // this function's scope — this function returns (or throws, e.g. on
-        // cancellation) as soon as `job.value` does for *this* caller, which
-        // can happen well before the job itself finishes for any other
-        // caller that joined it. A `defer` here would clear `jobs[variant.id]`
-        // out from under a still-running job the moment the *first* caller's
-        // own await was cancelled, making a second `ensureDownloaded(_:)`
-        // call start a redundant second download while the first is still
-        // writing to (and, on delegate callback, resuming a continuation
-        // for) the very same temp file / `networkContinuations` entry.
+        // this function's scope. This isn't guarding against caller
+        // cancellation racing job completion — cancelling *this* call's own
+        // awaiting context doesn't interrupt `try await job.value` early (an
+        // unstructured `Task`'s `.value` waits for the task to actually
+        // finish regardless); only an explicit `cancelDownload(for:)` call
+        // does, by cancelling `job` itself. Tying cleanup to the job's own
+        // body just ties its lifetime to the job's real completion by
+        // construction, rather than to however many/few callers happen to
+        // still be awaiting it — simpler to reason about than relying on the
+        // above being true.
         let job = Task { [weak self] () throws -> URL in
             guard let self else { throw CancellationError() }
             defer {
                 self.jobs[variant.id] = nil
                 self.downloadProgress[variant.id] = nil
                 self.progressHandlers[variant.id] = nil
+                self.lastReportedProgress[variant.id] = nil
             }
             return try await self.runJob(for: variant)
         }
@@ -195,6 +237,11 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
             throw ModelDownloadError.missingDownloadURL(variantID: variant.id)
         }
         try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        if let availableMB = Self.availableDiskSpaceMB(at: cacheDirectory), availableMB < variant.approximateSizeMB {
+            throw ModelDownloadError.insufficientDiskSpace(
+                requiredMB: variant.approximateSizeMB, availableMB: availableMB
+            )
+        }
 
         let tempFileURL = try await runDownload(variantID: variant.id, from: downloadURL)
         do {
@@ -265,9 +312,36 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         continuation.resume(with: result)
     }
 
+    /// A high-bandwidth multi-GB transfer can call this thousands of times
+    /// per second (`didWriteData` fires roughly once per TCP read, often
+    /// 64–512 KB) — writing `downloadProgress` (a `@Published` property)
+    /// unconditionally on every call would fire `objectWillChange` just as
+    /// often, which is much more expensive than the dictionary write itself
+    /// once any SwiftUI view is actually observing it. Throttled to at most
+    /// once per ~0.5% of progress or 100ms, whichever comes first — except
+    /// the terminal `1.0`, which always gets through so a progress view
+    /// never gets stuck just short of "done".
     fileprivate func handleProgress(variantID: String, fraction: Double) {
+        let now = Date()
+        if let last = lastReportedProgress[variantID], fraction < 1.0,
+            fraction - last.fraction < 0.005, now.timeIntervalSince(last.time) < 0.1
+        {
+            return
+        }
+        lastReportedProgress[variantID] = (fraction, now)
         downloadProgress[variantID] = fraction
         progressHandlers[variantID]?.forEach { $0(fraction) }
+    }
+
+    /// Best-effort — `nil` (never blocking a download) if the volume's
+    /// available capacity can't be determined, e.g. an unusual filesystem
+    /// that doesn't report `.volumeAvailableCapacityForImportantUsageKey`.
+    private nonisolated static func availableDiskSpaceMB(at url: URL) -> Int? {
+        guard
+            let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
+            let capacity = values.volumeAvailableCapacityForImportantUsage
+        else { return nil }
+        return Int(capacity / (1024 * 1024))
     }
 
     private nonisolated static func sha256Hex(ofFileAt url: URL) throws -> String {
@@ -311,7 +385,7 @@ extension ModelDownloadManager {
             return
         }
         let stableTempURL = cacheDirectory
-            .appendingPathComponent("omnivoice-model-download-\(UUID().uuidString)")
+            .appendingPathComponent("\(Self.tempFilePrefix)\(UUID().uuidString)")
         do {
             try FileManager.default.moveItem(at: location, to: stableTempURL)
             Task { @MainActor [weak self] in
