@@ -57,6 +57,7 @@ for how testers install and run it).
 ### Documentation
 
 - docs(repo): add `Docs/PROGRESS.md` tracking product/architecture decisions and open items
+- docs(repo): add `Docs/RELEASE_TESTING.md` for internal testers (install/permissions/scope/bug-report checklist), and rewrite `README.md` to describe 0.0.1's actual feature scope instead of the one-line placeholder it had (#4)
 
 ### Tests
 
