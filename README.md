@@ -8,6 +8,13 @@ with a floating live-transcript panel.
 
 ### [⬇ Download OmniVoice 0.0.1 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.0.1/OmniVoice-0.0.1.dmg)
 
+Or install via [Homebrew](https://brew.sh):
+
+```bash
+brew tap hdcola/tap
+brew install --cask omnivoice
+```
+
 This build is **ad-hoc signed only, not notarized** — macOS will refuse to
 open it straight out of the DMG until you clear its quarantine flag. See
 [`Docs/RELEASE_TESTING.md`](Docs/RELEASE_TESTING.md) for the one-line fix,

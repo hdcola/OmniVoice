@@ -6,6 +6,10 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Documentation
+
+- docs(repo): add Homebrew install instructions to `README.md` (`brew tap hdcola/tap && brew install --cask omnivoice`)
+
 ## [0.0.1] - 2026-09-27
 
 Internal test build — ad-hoc signed, not notarized (see `Docs/RELEASE_TESTING.md`
