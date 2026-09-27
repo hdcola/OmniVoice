@@ -174,9 +174,10 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    plan) and a first real download source for `ProviderCatalog`'s model
    variants (`downloadURL`/`sha256` are currently `nil` placeholders).
 2. **Settings UI wiring**: model-variant picker is currently `.disabled(true)`
-   (`SettingsView.modelVariantPicker`) — enable once #1 lands. Also currently
-   no device picker in Settings (`RecordingSession.inputDevices` exists but
-   nothing in the UI binds to it yet).
+   (`SettingsView.modelVariantPicker`) — enable once #1 lands. (Device/
+   language/system-audio controls landed in PR #3 — mic picker + system-audio
+   toggle in the menu bar, language pickers shared between the floating panel
+   and Settings via `SourceLanguagePicker`/`TargetLanguagePicker`.)
 3. **Release pipeline**: Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh` is ad-hoc-signed, dev-only), plus an
    update mechanism (Sparkle-shaped) and a real weights-hosting location for
@@ -185,10 +186,6 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    explicitly deferred ("搭架子" / stub first) per the product discussion;
    none of the actual placeholder work has been started yet.
 5. **Model license re-check** — before any commercial use, not before this.
-6. **Floating panel close button**: the red traffic-light close button is
-   still live despite the hidden titlebar — clicking it closes the panel
-   outside the toggle's tracked `isVisible` state. Flagged during the smoke
-   test, not fixed yet (low priority unless it turns out to bite).
 
 ### Known gaps / things to double check when touching nearby code
 
@@ -202,6 +199,21 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
   `localizedCaseInsensitiveContains` scan (`SessionStore.searchSessions`) —
   fine at small history sizes, will need a real index if/when session counts
   get large.
+- Live mid-recording target-language switching (see PR #3) only works
+  because `SystemTranslationProvider` bridges through a SwiftUI
+  `.translationTask` that rebuilds its `TranslationSession.Configuration` on
+  every change — `TranslationProvider`'s `start(config:)` is otherwise a
+  one-shot call. A future `ModelTranslationProvider` (R2T2/T3PO) that
+  initializes its target language once at `start()` won't get this for free;
+  either add an explicit `updateTargetLanguage(_:)` to the protocol before
+  that lands, or accept that model-engine translation can't retarget
+  mid-recording.
+- `RecordingSessionRecord.targetLanguageCode` is written once, at
+  `createSession` (session start) — if the user switches target language
+  mid-recording (see above), persisted history only ever shows the
+  *original* target for that whole session, not each utterance's actual
+  translated-into language. Fine for now (no UI exposes per-utterance target
+  language anyway); would need per-utterance tracking if that ever surfaces.
 - No handling yet for what happens if `SessionStore.init()` throws (disk
   full, schema mismatch after a future migration) beyond "history window has
   no data" — `RecordingSession` itself keeps working with `sessionStore ==
