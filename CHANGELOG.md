@@ -14,6 +14,10 @@ The format is based on Keep a Changelog.
 
 ### Fixed
 
+- fix(translation): correct a race where a translation row was persisted/aligned before its translation actually committed (b0e603f)
+- fix(app): construct `RecordingSession`/the floating panel at app launch instead of on first menu-open, so a future non-menu entry point can't silently skip that setup (ece1ea4)
+- fix(audio): synchronize `SystemTranscriptionProvider`'s audio-path state between the background audio queue and the main actor (408b082)
+
 ### Dependencies
 
 ### Documentation

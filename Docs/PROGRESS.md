@@ -108,6 +108,31 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       manually verified in the actual UI** — no mic-in-hand smoke test of a
       real recording session (see Open Items).
 
+### Code review findings (fixed)
+
+A review of the scaffold PR caught three real bugs, all fixed on
+`feature/project-scaffold` (see those commits for full reasoning):
+
+- **Translation row misalignment**: `SystemTranslationProvider.flush()` fired
+  its completion boundary synchronously, before the (async) translation
+  result it was supposed to be gating on ever arrived — every row after the
+  first translated one would silently shift by one. Fixed by moving the
+  boundary to fire from `receiveResult(_:)` instead.
+- **Floating panel/translation bridge wired up by coincidence**: setup lived
+  in `MenuBarContentView.onAppear`, which only runs the first time the menu
+  opens — harmless only because the menu is currently the sole entry point
+  to starting a recording. Fixed by moving ownership of `RecordingSession`/
+  the panel into `AppDelegate`, constructed at `applicationDidFinishLaunching`.
+- **Unsynchronized audio-path state**: `SystemTranscriptionProvider.push(samples:)`
+  runs on a background audio queue but mutated fields `stop()` (main actor)
+  also nils out, with no lock between them — a real, silent race that Swift's
+  minimal concurrency checking (Swift 5 language mode) didn't catch at
+  compile time. Fixed with a private serial queue guarding every field
+  `push` touches; `TranscriptionProvider.push(samples:)`/
+  `notifyUtteranceBoundary()` are now `nonisolated` in the protocol to
+  document that this is the hot audio-path exception to the rest of the
+  protocol's `@MainActor` default.
+
 ### Open items / next up
 
 Roughly in the order they'll likely get tackled — not a hard commitment.
