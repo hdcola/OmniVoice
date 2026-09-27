@@ -109,6 +109,46 @@ struct RecordingSessionSettingsTests {
         #expect(session.sourceLanguageCode == "en-US")
     }
 
+    @Test func includeSystemAudioIsRestoredFromPersistedValue() {
+        withPersisted([PersistedSettingsKey.includeSystemAudio: true]) {
+            let session = RecordingSession()
+            #expect(session.includeSystemAudio)
+        }
+    }
+
+    @Test func targetLanguageCodeIsRestoredFromPersistedValue() {
+        withPersisted([PersistedSettingsKey.targetLanguageCode: "ja-JP"]) {
+            let session = RecordingSession()
+            #expect(session.targetLanguageCode == "ja-JP")
+        }
+    }
+
+    @Test func emptyPersistedTargetLanguageCodeIsIgnored() {
+        // Guards against a stray/legacy empty string in UserDefaults —
+        // unlike sourceLanguageCode, "" was never targetLanguageCode's own
+        // sentinel for anything meaningful, so restoring it verbatim would
+        // leave targetLanguageCode == "", breaking TranslationSession.
+        withPersisted([PersistedSettingsKey.targetLanguageCode: ""]) {
+            let session = RecordingSession()
+            #expect(session.targetLanguageCode == "zh-CN")
+        }
+    }
+
+    /// Covers only the "don't lose the preference" half of a disconnected
+    /// mic — `refreshDevices()` reads real hardware via
+    /// `MicrophoneCapture.availableDevices()`, so this suite can't fabricate
+    /// a device becoming available again to also exercise "switches back
+    /// once reconnected" without turning that into a dependency-injection
+    /// point on `RecordingSession` itself (out of scope here).
+    @Test func refreshDevicesFallbackDoesNotClobberPersistedDevicePreference() {
+        withPersisted([PersistedSettingsKey.selectedDeviceID: "disconnected-device-id"]) {
+            let session = RecordingSession()
+            session.refreshDevices()
+            #expect(session.selectedDeviceID != "disconnected-device-id")
+            #expect(defaults.string(forKey: PersistedSettingsKey.selectedDeviceID) == "disconnected-device-id")
+        }
+    }
+
     @Test func isSessionActiveReflectsAnyLifecyclePhase() {
         let session = RecordingSession()
         #expect(!session.isSessionActive)

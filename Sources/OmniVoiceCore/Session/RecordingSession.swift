@@ -167,7 +167,7 @@ public final class RecordingSession: ObservableObject {
         if let value = defaults.string(forKey: PersistedSettingsKey.sourceLanguageCode) {
             sourceLanguageCode = value.isEmpty ? nil : value
         }
-        if let value = defaults.string(forKey: PersistedSettingsKey.targetLanguageCode) {
+        if let value = defaults.string(forKey: PersistedSettingsKey.targetLanguageCode), !value.isEmpty {
             targetLanguageCode = value
         }
         if defaults.object(forKey: PersistedSettingsKey.includeSystemAudio) != nil {
@@ -204,7 +204,22 @@ public final class RecordingSession: ObservableObject {
 
     public func refreshDevices() {
         inputDevices = [.systemDefault] + MicrophoneCapture.availableDevices()
-        if selectedDeviceID == nil || !inputDevices.contains(where: { $0.id == selectedDeviceID }) {
+
+        // Prefer the persisted device over whatever `selectedDeviceID`
+        // currently holds: once a disconnect falls back to `.systemDefault`
+        // (below), `.systemDefault` is *always* present in `inputDevices`,
+        // so the plain "is the current selection still valid" check below
+        // would never re-trigger once the preferred device reconnects —
+        // this in-session switch-back needs its own check against the
+        // persisted preference, not just against the current selection.
+        let preferredID = Self.defaults.string(forKey: PersistedSettingsKey.selectedDeviceID)
+        if let preferredID, inputDevices.contains(where: { $0.id == preferredID }) {
+            if selectedDeviceID != preferredID {
+                isReconcilingDevices = true
+                selectedDeviceID = preferredID
+                isReconcilingDevices = false
+            }
+        } else if selectedDeviceID == nil || !inputDevices.contains(where: { $0.id == selectedDeviceID }) {
             isReconcilingDevices = true
             selectedDeviceID = inputDevices.first?.id
             isReconcilingDevices = false
@@ -227,11 +242,21 @@ public final class RecordingSession: ObservableObject {
         // defer still finds `isRunning == false`" reliably means "we're
         // exiting via one of the early-failure returns" — clean up the
         // orphan there instead of duplicating cleanup in every `catch`.
+        // `lines` is reset the same way: `lines = [TranscriptLine(id: 0)]`
+        // below runs before any of those same failure points, so without
+        // this a failed `start()` left one empty row behind — `lines.isEmpty`
+        // then reads `false`, so `FloatingTranscriptView`'s "等待开始…"
+        // placeholder never shows and the panel just looks blank, with no
+        // indication anything went wrong (that's `statusMessage`'s job —
+        // see `FloatingTranscriptView.statusBar`).
         defer {
-            if !isRunning, let sessionStore, let orphan = activeSessionRecord {
-                sessionStore.delete(orphan)
-                try? sessionStore.save()
-                activeSessionRecord = nil
+            if !isRunning {
+                lines = []
+                if let sessionStore, let orphan = activeSessionRecord {
+                    sessionStore.delete(orphan)
+                    try? sessionStore.save()
+                    activeSessionRecord = nil
+                }
             }
         }
 

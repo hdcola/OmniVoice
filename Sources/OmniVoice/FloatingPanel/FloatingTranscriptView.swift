@@ -26,6 +26,8 @@ struct FloatingTranscriptView: View {
             controlBar
             Divider()
             transcriptList
+            Divider()
+            statusBar
         }
         .frame(minWidth: 380, maxWidth: .infinity, minHeight: 200, maxHeight: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
@@ -97,7 +99,14 @@ struct FloatingTranscriptView: View {
     private var transcriptList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
-                if session.lines.isEmpty {
+                // Not `session.lines.isEmpty`: `start()` seeds `lines` with
+                // one placeholder row before any real content ever arrives
+                // (see `RecordingSession.start()`), so a session that failed
+                // to start, or one that was stopped before anyone said
+                // anything, still has a non-empty `lines` with nothing
+                // displayable in it — `session.lines.isEmpty` alone would
+                // leave the panel looking blank instead of showing this.
+                if session.lines.allSatisfy(\.displaySource.isEmpty) {
                     Text("等待开始…")
                         .foregroundStyle(.secondary)
                 }
@@ -118,6 +127,22 @@ struct FloatingTranscriptView: View {
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    /// Surfaces `RecordingSession.statusMessage` (e.g. "识别引擎启动失败:
+    /// ...") on the panel itself — without this, a failed `start()` gave no
+    /// visible indication of what went wrong: the button just went back to
+    /// "开始" and the transcript area stayed empty, and this message
+    /// otherwise only ever appeared in the menu bar dropdown.
+    private var statusBar: some View {
+        Text(session.statusMessage)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
     }
 
     private func rebuildConfiguration() {
@@ -143,9 +168,16 @@ private struct PanelCloseButton: View {
                 .foregroundStyle(isHovering ? .primary : .secondary)
                 .frame(width: 18, height: 18)
                 .background(.primary.opacity(isHovering ? 0.16 : 0.08), in: Circle())
+                // Bigger than the visible glyph/background: this is the
+                // panel's only close affordance (no titlebar), so a hit
+                // target as small as the 18×18 circle itself makes it easy
+                // to miss and instead hit the draggable background next to it.
+                .frame(width: 24, height: 24)
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
         .help("隐藏悬浮窗")
+        .accessibilityLabel("隐藏悬浮窗")
     }
 }
