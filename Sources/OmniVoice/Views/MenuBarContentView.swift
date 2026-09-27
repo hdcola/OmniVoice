@@ -11,12 +11,16 @@ struct MenuBarContentView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        // Device list can change between menu opens (a USB mic plugged in,
+        // AirPods connected, ...) — cheap enough to just refresh every time
+        // the menu opens. Session/panel construction itself happens in
+        // `AppDelegate.applicationDidFinishLaunching`, not here — see that
+        // file's doc for why.
         Group {
             content
         }
         .onAppear {
             session.refreshDevices()
-            (NSApp.delegate as? AppDelegate)?.attach(session: session)
         }
     }
 
