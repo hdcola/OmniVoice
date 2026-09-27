@@ -232,8 +232,8 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    every checkout has to apply it by hand. When it lands: bump the pin, drop
    the patch, and drop the `git apply` step from
    `Docs/MODEL_ENGINE_SETUP.md`.
-2. **Model download-on-first-use — half landed** (branch
-   `feature/model-download-manager`): `ModelDownloadManager`
+2. **Model download-on-first-use** (branch `feature/model-download-manager`):
+   `ModelDownloadManager`
    (`Sources/OmniVoiceCore/Inference/ModelDownloadManager.swift`) downloads a
    `ModelVariant`'s weights into an Application Support cache keyed by
    `variant.id`, verifying SHA-256 before the file is considered usable, with
@@ -242,26 +242,27 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    (fixed `approximateSizeMB` too — the old 1500/1100 MB placeholders were
    roughly an order of magnitude off for T3PO: actual ~2.4GB/~9.8GB). Manually
    verified end-to-end against a real HTTPS download (not part of the
-   committed test suite — a multi-GB download has no place in CI). **Still
-   not wired into `RecordingSession`/`SettingsView`** — `ModelTranscriptionProvider`/
-   `ModelTranslationProvider` still resolve weights via the env var /
-   repo-relative `models/` directory fallback
-   (`InProcessTranscriber`/`InProcessTranslator.resolveModelPath`). Deliberately
-   split off as its own step rather than bundled with #3 below: touching
-   `RecordingSession`'s `preloadModel()`/`start()`/
-   `discardLoadedModelsIfStale()` state machine (see "Architecture decisions"
-   above) is the riskier half of this work and deserves its own isolated
-   review.
-3. **Wire `ModelDownloadManager` into `RecordingSession`, enable Settings UI**:
-   needs a per-engine selected-variant setting (persisted, mirroring
-   `transcriptionEngineID`'s pattern), `preloadModel()`/`start()` calling
-   `ensureDownloaded(_:progress:)` before `loadModel()` and surfacing download
-   progress/failure through `statusMessage` (or a new published property), and
-   removing `SettingsView.modelVariantPicker`'s `.disabled(true)`. (Device/
-   language/system-audio controls landed in PR #3 — mic picker +
-   system-audio toggle in the menu bar, language pickers shared between the
-   floating panel and Settings via `SourceLanguagePicker`/
-   `TargetLanguagePicker`.)
+   committed test suite — a multi-GB download has no place in CI). **Now
+   wired into `RecordingSession`/`SettingsView`** — see #3 below.
+3. **`ModelDownloadManager` wired into `RecordingSession`, Settings UI
+   enabled**: `RecordingSession` gained a persisted
+   `transcriptionModelVariantID`/`translationModelVariantID` selection per
+   `.model`-kind engine (mirroring `transcriptionEngineID`'s
+   restore/self-heal pattern — `currentTranscriptionModelVariant`/
+   `currentTranslationModelVariant` fall back to the catalog's first variant
+   for an unset/stale ID). `preloadModel()`/`start()` now call
+   `ModelDownloadManager.ensureDownloaded(_:progress:)` before constructing a
+   fresh `ModelTranscriptionProvider`/`ModelTranslationProvider` (skipped
+   entirely when reusing an already-loaded pair), surfacing live "下载识别引擎模型中…
+   N%"-style progress and download failures (checksum mismatch, insufficient
+   disk space, HTTP error) through `statusMessage`, same as the existing
+   load-failure messages. `SettingsView.modelVariantPicker` is a real,
+   enabled `Picker` now (dropped the `.disabled(true)` TODO), showing each
+   variant's size and live "已下载"/"下载中… N%" status via an
+   `@ObservedObject ModelDownloadManager.shared`. Only one variant per engine
+   exists in the catalog today, so this mostly plumbs the mechanism through
+   for whenever a second quantization/size is added — it doesn't yet expose
+   `cancelDownload(for:)`/`deleteCachedModel(for:)` from the UI.
 4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,
