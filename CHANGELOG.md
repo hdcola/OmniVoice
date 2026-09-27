@@ -6,6 +6,15 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+
+- feat(panel): add a "预加载模型" button to the floating panel, next to start/stop, so a `.model`-kind (R2T2/T3PO) engine's weight load can happen before the user asks to record instead of during the first "开始" — `RecordingSession.preloadModel()`/`isModelPreloaded`
+- feat(panel): show a live mic-level indicator on the floating panel's status bar while recording, driven by the existing `RecordingSession.inputLevel` meter — previously nothing on the panel distinguished "recording with a working mic" from "recording but the selected input is silent/muted"
+
+### Changed
+
+- refactor(menu): drop the duplicate `statusMessage` line from the menu-bar dropdown — it already shows live on the floating panel's own status bar, and duplicating it there just showed the same (often stale) line twice; the screen-recording permission hint stays
+
 ### Fixed
 
 - fix(providers): fix the R2T2 crash on stop / VAD pause — a null-pointer dereference in `audio.cpp`'s own `R2T2ASRSession::build_stream_prefix(final_flush=true)`, which builds a one-element vector from an empty token list whenever the session's decoded text is empty at finish time. Ships as `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`, now a required step in `Docs/MODEL_ENGINE_SETUP.md`; reproduced deterministically from the C API (silence only, no mic) and verified against the patched dylib. Submitted upstream as [audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712).
@@ -25,6 +34,7 @@ The format is based on Keep a Changelog.
 ### Tests
 
 - test(providers): add `ModelLanguageMappingTests` covering the BCP-47 → R2T2/T3PO language mapping helpers
+- test(session): cover `preloadModel()`'s state machine and its discard-on-engine-switch guard, plus the new `usesOnDeviceModelEngine` flag
 
 ## [0.0.1] - 2026-09-27
 

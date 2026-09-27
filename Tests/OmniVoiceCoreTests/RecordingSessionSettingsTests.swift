@@ -170,6 +170,52 @@ struct RecordingSessionSettingsTests {
         }
     }
 
+    @Test func usesOnDeviceModelEngineReflectsEitherEngineBeingModelKind() {
+        defer {
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)
+            defaults.removeObject(forKey: PersistedSettingsKey.translationEngineID)
+        }
+        let session = RecordingSession()
+        #expect(!session.usesOnDeviceModelEngine)
+
+        session.transcriptionEngineID = "model.r2t2"
+        #expect(session.usesOnDeviceModelEngine)
+        session.transcriptionEngineID = "system.speech"
+        #expect(!session.usesOnDeviceModelEngine)
+
+        session.translationEngineID = "model.t3po"
+        #expect(session.usesOnDeviceModelEngine)
+    }
+
+    /// Uses the default `.system` engines (no-op `loadModel()`, see
+    /// `SystemTranscriptionProvider`/`SystemTranslationProvider`) so this
+    /// exercises `preloadModel()`'s own state machine without depending on
+    /// real R2T2/T3PO weights being present on the test machine.
+    @Test func preloadModelSetsIsModelPreloadedForCurrentEngines() async {
+        let session = RecordingSession()
+        #expect(!session.isModelPreloaded)
+        #expect(!session.isPreloadingModel)
+
+        await session.preloadModel()
+
+        #expect(session.isModelPreloaded)
+        #expect(!session.isPreloadingModel)
+    }
+
+    /// Guards `discardPreloadedModelsIfStale()` — without it, switching
+    /// engines after a preload would leave `isModelPreloaded` true for an
+    /// engine pair `start()` was never actually asked to run, letting it
+    /// wrongly skip `loadModel()` for the newly-selected engine.
+    @Test func switchingEngineAfterPreloadDiscardsIt() async {
+        defer { defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID) }
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.isModelPreloaded)
+
+        session.transcriptionEngineID = "model.r2t2"
+        #expect(!session.isModelPreloaded)
+    }
+
     @Test func isSessionActiveReflectsAnyLifecyclePhase() {
         let session = RecordingSession()
         #expect(!session.isSessionActive)

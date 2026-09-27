@@ -62,7 +62,16 @@ struct FloatingTranscriptView: View {
                     }
                 }
             }
-            .disabled(session.isStopping || session.isStarting)
+            .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
+
+            // Only worth surfacing for a `.model`-kind engine (a `.system`
+            // engine's `loadModel()` is a no-op) — see `usesOnDeviceModelEngine`'s
+            // doc. Placed next to start/stop rather than in Settings: this
+            // is the button meant to be pressed right before hitting "开始",
+            // not a one-time configuration choice.
+            if session.usesOnDeviceModelEngine {
+                preloadButton
+            }
 
             // Disabled for the whole start→stop lifecycle (isSessionActive,
             // not just isRunning): it's only read once, at the top of
@@ -94,6 +103,26 @@ struct FloatingTranscriptView: View {
             PanelCloseButton(action: onClose)
         }
         .padding(10)
+    }
+
+    /// A one-shot "预加载模型" affordance, separate from the start/stop
+    /// button — see `RecordingSession.preloadModel()`'s doc for why that's a
+    /// standalone entry point. Collapses to a static "已就绪" label once
+    /// loaded (rather than staying a now-redundant, still-clickable button)
+    /// since a second tap would just no-op against `preloadModel()`'s own
+    /// `isModelPreloaded` guard.
+    @ViewBuilder
+    private var preloadButton: some View {
+        if session.isModelPreloaded {
+            Label("模型已就绪", systemImage: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(.green)
+        } else {
+            Button(session.isPreloadingModel ? "加载中…" : "预加载模型") {
+                Task { await session.preloadModel() }
+            }
+            .disabled(session.isSessionActive || session.isPreloadingModel)
+        }
     }
 
     private var transcriptList: some View {
@@ -135,19 +164,44 @@ struct FloatingTranscriptView: View {
     /// "开始" and the transcript area stayed empty, and this message
     /// otherwise only ever appeared in the menu bar dropdown.
     private var statusBar: some View {
-        Text(session.statusMessage)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            // Longer messages (a localized error description tacked onto a
-            // permission hint, say) get cut off by `.lineLimit(1)` at the
-            // panel's default width — the tooltip is how the full text
-            // stays reachable without needing to widen the panel.
-            .help(session.statusMessage)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+        HStack(spacing: 6) {
+            // Only shown while actually running: `session.inputLevel` is
+            // reset to 0 on `stop()`, but a static muted mic icon sitting
+            // here at rest would read as "not picking up sound" rather than
+            // "not recording" — gating on `isRunning` avoids that confusion.
+            if session.isRunning {
+                micLevelIndicator
+            }
+            Text(session.statusMessage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                // Longer messages (a localized error description tacked onto a
+                // permission hint, say) get cut off by `.lineLimit(1)` at the
+                // panel's default width — the tooltip is how the full text
+                // stays reachable without needing to widen the panel.
+                .help(session.statusMessage)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+    }
+
+    /// Live feedback that audio is actually being picked up — without this,
+    /// nothing on the panel changed between "转写中…" with the mic silent vs.
+    /// the mic capturing normally, so a misconfigured input device (wrong
+    /// mic selected, muted, unplugged) looked identical to a working one
+    /// until text failed to show up. Scales with `session.inputLevel`
+    /// (0...1, see `AudioMixer.onLevel`'s doc) rather than just toggling
+    /// on/off, so it reads as a level meter, not just a "recording" light.
+    private var micLevelIndicator: some View {
+        Image(systemName: "mic.fill")
+            .font(.system(size: 10))
+            .foregroundStyle(.red)
+            .scaleEffect(1 + CGFloat(session.inputLevel) * 0.5)
+            .animation(.easeOut(duration: 0.1), value: session.inputLevel)
+            .accessibilityLabel("正在收音")
     }
 
     private func rebuildConfiguration() {

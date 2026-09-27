@@ -88,9 +88,13 @@ struct MenuBarContentView: View {
 
         Divider()
 
-        Text(session.statusMessage)
-            .font(.caption)
-
+        // `session.statusMessage` itself isn't repeated here — it's already
+        // shown live on the floating panel's own status bar
+        // (`FloatingTranscriptView.statusBar`), so duplicating it in this
+        // menu just showed the same (often stale-by-the-time-you-open-this-menu)
+        // line twice. The screen-recording hint below stays: it's the one
+        // actionable, not-purely-transient message, and worth surfacing even
+        // if the panel's been hidden.
         if session.screenRecordingPermissionNeeded {
             Text("需要在系统设置里授权屏幕录制权限，才能捕获系统声音")
                 .font(.caption)
