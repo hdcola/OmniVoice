@@ -127,6 +127,23 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       and `brew tap hdcola/tap && brew install --cask omnivoice` instructions.
       Still ad-hoc signed — Developer ID signing/notarization/stapling remain
       open (see Open Items #3).
+- [x] **Model providers wired up** (2026-09-27): `ModelTranscriptionProvider`/
+      `ModelTranslationProvider` now run R2T2 (audio.cpp) / T3PO (llama.cpp)
+      in-process, ported from `mac-poc-hybrid`'s validated
+      `InProcessTranscriber`/`InProcessTranslator` — see
+      `Sources/OmniVoiceCore/Inference/`. `Package.swift` gained `CAudioCpp`/
+      `CLlamaCpp` C shim targets linking gitignored `third_party/`
+      checkouts (setup recipe: `Docs/MODEL_ENGINE_SETUP.md`); building this
+      package now requires those checkouts to exist, same trade-off
+      `mac-poc-hybrid/Package.swift` accepted. Model weights are resolved via
+      an `R2T2_MODEL_PATH`/`R2T2_T3PO_MODEL_PATH` env var or a repo-relative
+      `models/` directory — a real per-user "download on first use" cache
+      (`ProviderCatalog.ModelVariant.downloadURL`/`sha256`, still nil
+      placeholders) is a separate follow-up, see Open Items #1.
+      **T3PO translation verified working end-to-end (mic → live translation
+      → stop, no crash). R2T2 transcription has a known upstream crash bug —
+      see "Known gaps" below; not recommended for real use until that's
+      understood/fixed.**
 
 ### Code review findings (fixed)
 
@@ -183,31 +200,61 @@ real UI bugs, all fixed:
 
 Roughly in the order they'll likely get tackled — not a hard commitment.
 
-1. **Model providers**: port `InProcessTranscriber`/`InProcessTranslator` from
-   `mac-poc-hybrid` behind `ModelTranscriptionProvider`/
-   `ModelTranslationProvider` — needs adding `CAudioCpp`/`CLlamaCpp` C target
-   shims + `third_party/audio.cpp`+`third_party/llama.cpp` linker flags to
-   `Package.swift` (see those two provider files' doc comments for the exact
-   plan) and a first real download source for `ProviderCatalog`'s model
-   variants (`downloadURL`/`sha256` are currently `nil` placeholders).
-2. **Settings UI wiring**: model-variant picker is currently `.disabled(true)`
-   (`SettingsView.modelVariantPicker`) — enable once #1 lands. (Device/
-   language/system-audio controls landed in PR #3 — mic picker + system-audio
-   toggle in the menu bar, language pickers shared between the floating panel
-   and Settings via `SourceLanguagePicker`/`TargetLanguagePicker`.)
-3. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
+1. **R2T2 crash bug (upstream, blocking real use)**: see "Known gaps" below
+   for the full writeup — `audiocpp_stream_finish` can SIGSEGV the whole
+   process after a longer buffered utterance, reproduced identically in the
+   unmodified `mac-poc-hybrid` reference. Needs either an upstream
+   audio.cpp fix/patch release, or a mitigation found on our side (none
+   identified yet — the C API gives no lever into the internal state that
+   appears to trigger it).
+2. **Model download-on-first-use**: `ModelTranscriptionProvider`/
+   `ModelTranslationProvider` are wired up (see Done above), but still
+   resolve weights via an env var / repo-relative `models/` directory, not a
+   real per-user download cache. Needs a `ModelDownloadManager`
+   (fetch `ProviderCatalog.ModelVariant.downloadURL`, verify `sha256`, cache
+   under Application Support) and filling in the catalog's still-`nil`
+   `downloadURL`/`sha256` fields.
+3. **Settings UI wiring**: model-variant picker is currently `.disabled(true)`
+   (`SettingsView.modelVariantPicker`) — enable once #2 lands, to show
+   download state/trigger a download. (Device/language/system-audio controls
+   landed in PR #3 — mic picker + system-audio toggle in the menu bar,
+   language pickers shared between the floating panel and Settings via
+   `SourceLanguagePicker`/`TargetLanguagePicker`.)
+4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,
    dev-only, needs `xattr -cr` per `Docs/RELEASE_TESTING.md`), plus an update
    mechanism (Sparkle-shaped) and a real weights-hosting location for
    downloaded models.
-4. **Privacy copy, crash/error log export, localization scaffolding** — all
+5. **Privacy copy, crash/error log export, localization scaffolding** — all
    explicitly deferred ("搭架子" / stub first) per the product discussion;
    none of the actual placeholder work has been started yet.
-5. **Model license re-check** — before any commercial use, not before this.
+6. **Model license re-check** — before any commercial use, not before this.
 
 ### Known gaps / things to double check when touching nearby code
 
+- **R2T2 (`model.r2t2`) can SIGSEGV the whole process — upstream audio.cpp
+  bug, not this repo's code.** After a longer buffered utterance (a few
+  seconds of continuous speech with no VAD-detected pause), the *next* call
+  into `audiocpp_stream_finish` — whether from `InProcessTranscriber.rotateStream()`
+  (a VAD boundary mid-recording) or `finishStream()` (Stop) — crashes 3
+  frames deep inside `libaudiocpp` (null-pointer deref in
+  `R2T2ASRSession::finalize()`'s `decode_stream_chunk` path, likely its
+  `reuse_graph=true` decode graph reacting badly to a longer/differently-shaped
+  final chunk than the fixed-size ones `push()` streams). Confirmed via:
+  hashing/swapping in the *exact* prebuilt `libaudiocpp.dylib` the untouched
+  `mac-poc-hybrid` reference uses (same crash); reproducing the identical
+  crash signature (same `libaudiocpp` offsets) by running `mac-poc-hybrid`
+  itself, unmodified, after a longer utterance; ruling out Metal-vs-CPU
+  backend and our calling thread/`Task.detached` wrapping (neither changed
+  the outcome). `mac-poc-hybrid`'s own CHANGELOG is honest that this exact
+  interactive flow was "not yet manually run" before — this is a real gap in
+  the upstream library that nobody had hit yet, not a regression from
+  porting it. No mitigation identified from the C API surface (no lever into
+  audio.cpp's internal buffering/graph-reuse state); a real fix needs
+  upstream audio.cpp changes. **Do not select "R2T2 模型" for real use until
+  this is understood/fixed** (see Open Items #1) — T3PO translation
+  (llama.cpp) is unaffected and verified working.
 - `RecordingSession.translationBridgeStream()` assumes the SwiftUI view that
   drains it never remounts independent of the app's lifetime. If
   `FloatingTranscriptView` ever gets recreated (e.g. panel is destroyed and

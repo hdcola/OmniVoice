@@ -24,9 +24,12 @@ history and open items.
 
 ## What it does today
 
-- **Live transcription + translation**, running on macOS's built-in
-  frameworks (`SpeechAnalyzer`/`SpeechTranscriber` for ASR, `Translation`
-  for translation) — no cloud API calls, no model download required yet.
+- **Live transcription + translation**, either on macOS's built-in
+  frameworks (`SpeechAnalyzer`/`SpeechTranscriber` for ASR, `Translation` for
+  translation — no cloud API calls) or fully local/offline models (R2T2 for
+  ASR, T3PO for translation, run in-process via `audio.cpp`/`llama.cpp`),
+  picked independently per component. **R2T2 has a known crash bug — see
+  below; T3PO and both system frameworks are solid.**
 - **Floating transcript panel**: shown from launch, semi-transparent,
   draggable/resizable, stays on top without stealing focus. Its own control
   bar has start/stop, a source/target language picker, and a close button;
@@ -44,12 +47,23 @@ history and open items.
 - **Settings persistence**: engine choice, language pair, mic device, and
   system-audio inclusion survive quits/relaunches/restarts.
 
+## Known issues
+
+- **R2T2 (识别引擎: "R2T2 模型") can crash the whole app** after a longer
+  buffered utterance (a few seconds of continuous speech) — a bug inside
+  `audio.cpp` itself (confirmed reproducible in the unmodified upstream
+  reference implementation too, not something this app's code introduced;
+  see `Docs/PROGRESS.md`'s Known gaps section for the full writeup). Avoid
+  selecting it for real use until this is understood/fixed upstream — T3PO
+  translation and both system frameworks (`SpeechAnalyzer`/`Translation`)
+  are unaffected.
+
 ## Not yet implemented
 
-- **Local/offline model engines** (R2T2 for ASR, T3PO for translation, via
-  `audio.cpp`/`llama.cpp`) — the provider abstraction and catalog are in
-  place, but the engines themselves aren't wired up yet. Only the system
-  frameworks work right now.
+- **Model weight download-on-first-use** — R2T2/T3PO are wired up and work,
+  but building/running them today requires manually fetching their upstream
+  engines + GGUF weights (see `Docs/MODEL_ENGINE_SETUP.md`); a real in-app
+  download/cache flow is still open.
 - **Localization** — UI strings are Chinese-only.
 - **Release pipeline** — this build is ad-hoc signed only, not notarized;
   see `Docs/RELEASE_TESTING.md` for what that means for installing it.

@@ -6,10 +6,20 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+
+- feat(providers): wire up the R2T2 (ASR) and T3PO (translation) in-process model engines via `audio.cpp`/`llama.cpp`'s C ABIs, ported from `mac-poc-hybrid`'s validated `InProcessTranscriber`/`InProcessTranslator` — `ModelTranscriptionProvider`/`ModelTranslationProvider` are no longer placeholders. See `Docs/MODEL_ENGINE_SETUP.md` for the required local `third_party`/`models` setup. T3PO translation is verified working end-to-end; R2T2 transcription has a known upstream crash bug — see below and `Docs/PROGRESS.md`.
+
 ### Documentation
 
 - docs(repo): add Homebrew install instructions to `README.md` (`brew tap hdcola/tap && brew install --cask omnivoice`)
 - docs(repo): record DMG packaging + Homebrew distribution as done, and update the release-pipeline open item to reflect remaining notarization work in `Docs/PROGRESS.md`
+- docs(repo): add `Docs/MODEL_ENGINE_SETUP.md` (clone/build/weights recipe for the R2T2/T3PO model engines) and update `README.md`/`Docs/PROGRESS.md` to reflect the model providers landing
+- docs(repo): document a known R2T2 crash bug (SIGSEGV inside `audio.cpp`'s `R2T2ASRSession::finalize()` after a longer buffered utterance) in `README.md`/`Docs/PROGRESS.md` — confirmed reproducible in the unmodified upstream `mac-poc-hybrid` reference too, not a regression from this port; no mitigation found at the C API level
+
+### Tests
+
+- test(providers): add `ModelLanguageMappingTests` covering the BCP-47 → R2T2/T3PO language mapping helpers
 
 ## [0.0.1] - 2026-09-27
 

@@ -1,39 +1,58 @@
 import Foundation
 
-/// Placeholder for the T3PO in-process model translation engine.
-///
-/// The real implementation is already validated in `../mac-poc-hybrid`'s
-/// `Inference/InProcessTranslator.swift` (streaming WAIT/TRANS policy via
-/// llama.cpp's C ABI) — its `feed(sourceDelta:)`/`flush()` shape already
-/// matches `TranslationProvider` almost exactly (this protocol was modeled
-/// on it), so porting it is mostly:
-/// 1. Adding the `third_party/llama.cpp` C target shim + linker flags to
-///    `Package.swift`, same recipe as `mac-poc-hybrid/Package.swift`.
-/// 2. Renaming `onPartialTranslation`/`onPreviewTranslation`/`onFlushBoundary`
-///    to this protocol's `onCommit`/`onPreview`/`onFlushBoundary`.
-/// 3. Threading `ProviderCatalog.modelVariants(forEngineID:)`'s resolved
-///    weights path through `TranslationConfig.modelPath`.
-///
-/// Deferred until the system-engine path and app shell are in place — see
-/// this repo's `Package.swift` doc comment.
+/// T3PO in-process model translation engine — wraps `InProcessTranslator`
+/// (llama.cpp's C ABI) to conform to `TranslationProvider`. Ported from
+/// `../mac-poc-hybrid`'s validated `AppModel` wiring; see
+/// `InProcessTranslator`'s own doc for the streaming WAIT/TRANS design this
+/// delegates to unchanged.
 public final class ModelTranslationProvider: TranslationProvider {
     public var onCommit: ((String) -> Void)?
     public var onPreview: ((String) -> Void)?
     public var onFlushBoundary: (() -> Void)?
 
-    public init() {}
+    private let translator = InProcessTranslator()
+    /// See `ModelTranscriptionProvider.modelPath`'s doc for why this is a
+    /// constructor parameter rather than threaded through `start(config:)`.
+    private let modelPath: URL?
+
+    public init(modelPath: URL? = nil) {
+        self.modelPath = modelPath
+        translator.onPartialTranslation = { [weak self] text in
+            self?.onCommit?(text)
+        }
+        translator.onPreviewTranslation = { [weak self] text in
+            self?.onPreview?(text)
+        }
+        translator.onFlushBoundary = { [weak self] in
+            self?.onFlushBoundary?()
+        }
+    }
 
     public func loadModel() async throws {
-        throw ProviderError.notImplemented("T3PO 模型翻译引擎尚未接入，见 ModelTranslationProvider 的类型注释")
+        try translator.loadModel(modelPath: modelPath)
     }
 
-    public func unload() {}
+    public func unload() {
+        translator.unload()
+    }
 
     public func start(config: TranslationConfig) async throws {
-        throw ProviderError.notImplemented("T3PO 模型翻译引擎尚未接入")
+        // `config.sourceLanguageCode` is deliberately unused — T3PO's prompt
+        // asks for "live speech" and relies on the model to recognize the
+        // source language itself (see `InProcessTranslator.systemPrompt`'s
+        // doc), same as its reference engine.
+        translator.setTargetLanguage(ModelLanguageMapping.t3poTargetLanguage(forCode: config.targetLanguageCode))
     }
 
-    public func feed(_ text: String) {}
-    public func flush() {}
-    public func stop() async {}
+    public func feed(_ text: String) {
+        translator.feed(sourceDelta: text)
+    }
+
+    public func flush() {
+        translator.flush()
+    }
+
+    public func stop() async {
+        translator.unload()
+    }
 }
