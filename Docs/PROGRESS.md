@@ -151,6 +151,22 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`
       and is a required step in `Docs/MODEL_ENGINE_SETUP.md`. Full writeup in
       "Known gaps" below.
+- [x] **Floating panel UX pass: model preload, mic-level feedback, transcript
+      auto-scroll** (2026-09-27, PR #10, merged to `main`): a "预加载模型"
+      button on the panel's status bar loads a `.model`-kind engine's weights
+      ahead of "开始转录" (`RecordingSession.preloadModel()`/`unloadModels()`/
+      `isModelLoaded`), with a "释放模型" action to reclaim memory without an
+      engine switch or quit; a live mic-level meter on the status bar while
+      recording; the transcript now auto-scrolls to new lines, pausing (with
+      a "最新内容" jump-back button) once the user scrolls up. Also fixed:
+      models no longer reload from scratch on every "停止" (`stop()` used to
+      unconditionally unload), an orphaned session record on app quit now
+      gets finalized, mid-recording target-language switching now reaches
+      `.model`-kind translation too (`TranslationProvider.updateTargetLanguage(_:)`),
+      and several `InProcessTranscriber`/`InProcessTranslator` load/unload
+      lifecycle bugs (partial-failure state, `llama_backend_init`/`free`
+      pairing, blocking the main actor during load). See CHANGELOG's
+      `[Unreleased]` section for the full per-commit list.
 
 ### Code review findings (fixed)
 
@@ -207,6 +223,8 @@ real UI bugs, all fixed:
 
 Roughly in the order they'll likely get tackled — not a hard commitment.
 
+0. **Model download-on-first-use** is now in progress (branch
+   `feature/model-download-manager`) — see the entry directly below.
 1. **Land the R2T2 fix upstream**: the crash is root-caused and fixed locally
    (see "Known gaps" below), and submitted as
    [0xShug0/audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712)
