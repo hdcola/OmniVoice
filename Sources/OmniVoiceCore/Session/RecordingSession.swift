@@ -86,12 +86,14 @@ public final class RecordingSession: ObservableObject {
     /// needed independent controls, not one shared slider. Clamped to
     /// `0.1...1.0` — `SettingsView`'s `Slider` already constrains its own
     /// range, but `didSet` clamps here too since this is a public,
-    /// externally-settable property. Defaults to `1.0` (today's look,
-    /// unchanged) for an existing install. Editable at any time, including
-    /// mid-recording — nothing about the recording pipeline itself reads
-    /// this, so there's no setup-time race to guard against. Persisted (see
-    /// `PersistedSettingsKey`).
-    @Published public var panelBackgroundOpacity: Double = 1.0 {
+    /// externally-settable property. Defaults to `0.5` — occluding
+    /// noticeably less than the fully-opaque `.ultraThinMaterial` this
+    /// replaces, which is the whole point of this setting existing, while
+    /// still reading as a panel rather than bare text floating in space.
+    /// Editable at any time, including mid-recording — nothing about the
+    /// recording pipeline itself reads this, so there's no setup-time race
+    /// to guard against. Persisted (see `PersistedSettingsKey`).
+    @Published public var panelBackgroundOpacity: Double = 0.5 {
         didSet {
             let clamped = min(max(panelBackgroundOpacity, 0.1), 1.0)
             if clamped != panelBackgroundOpacity {
