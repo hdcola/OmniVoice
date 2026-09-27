@@ -258,6 +258,31 @@ struct RecordingSessionSettingsTests {
         #expect(session.statusMessage == "未启动")
     }
 
+    @Test func unloadModelsReleasesAPreloadedModel() async {
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.isModelLoaded)
+
+        session.unloadModels()
+        #expect(!session.isModelLoaded)
+        #expect(session.statusMessage == "未启动")
+    }
+
+    /// Guards the one thing that makes `unloadModels()` (a user-initiated
+    /// action, unlike `unloadModelsBeforeQuit()`) different from that
+    /// quit-time counterpart: it must never pull a model out from under an
+    /// active recording.
+    @Test func unloadModelsIsANoOpWhileSessionIsActive() async {
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.isModelLoaded)
+
+        session.isRunning = true
+        session.unloadModels()
+        #expect(session.isModelLoaded)
+        session.isRunning = false
+    }
+
     @Test func isSessionActiveReflectsAnyLifecyclePhase() {
         let session = RecordingSession()
         #expect(!session.isSessionActive)

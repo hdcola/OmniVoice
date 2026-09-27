@@ -11,6 +11,7 @@ The format is based on Keep a Changelog.
 - feat(panel): add a "预加载模型" button to the floating panel, next to start/stop, so a `.model`-kind (R2T2/T3PO) engine's weight load can happen before the user asks to record instead of during the first "开始" — `RecordingSession.preloadModel()`/`isModelLoaded` (#10)
 - feat(panel): show a live mic-level indicator on the floating panel's status bar while recording, driven by the existing `RecordingSession.inputLevel` meter — previously nothing on the panel distinguished "recording with a working mic" from "recording but the selected input is silent/muted" (#10)
 - feat(panel): auto-scroll the transcript to the latest line as new content arrives, but stop the moment the user scrolls up to read earlier lines — a "最新内容" button then appears to jump back to the bottom and resume auto-scroll. Previously new lines silently pushed the transcript further down with no way to keep reading older text without it fighting you (#10)
+- feat(panel): add a "释放模型" action to the "模型已就绪" label's context menu, for reclaiming a `.model`-kind engine's memory/VRAM sooner on a memory-constrained machine — `RecordingSession.unloadModels()`, otherwise unchanged from `unloadModelsBeforeQuit()`'s teardown except for guarding against unloading out from under an active recording (#10)
 - feat(providers): wire up the R2T2 (ASR) and T3PO (translation) in-process model engines via `audio.cpp`/`llama.cpp`'s C ABIs, ported from `mac-poc-hybrid`'s validated `InProcessTranscriber`/`InProcessTranslator` — `ModelTranscriptionProvider`/`ModelTranslationProvider` are no longer placeholders. See `Docs/MODEL_ENGINE_SETUP.md` for the required local `third_party`/`models` setup. T3PO translation is verified working end-to-end; R2T2 transcription additionally needs the `Patches/audio.cpp/` patch applied to the `third_party` checkout — see Fixed below and `Docs/PROGRESS.md`.
 
 ### Changed
@@ -49,6 +50,7 @@ The format is based on Keep a Changelog.
 - test(session): cover `preloadModel()`'s state machine (including its no-op-once-loaded guard) and its discard-on-engine-switch guard, plus the new `usesOnDeviceModelEngine` flag (#10)
 - test(session): cover `TranscriptLine`'s new `Equatable` conformance (#10)
 - test(session): cover that a same-value engine-ID re-assignment keeps a loaded model, and that switching engines resets the stale "模型已预加载" `statusMessage` (#10)
+- test(session): cover `unloadModels()` releasing a preloaded model, and its no-op guard while a recording is active (#10)
 
 ## [0.0.1] - 2026-09-27
 

@@ -399,12 +399,32 @@ public final class RecordingSession: ObservableObject {
     /// `applicationWillTerminate` gives no opportunity to await one that
     /// wasn't.
     public func unloadModelsBeforeQuit() {
+        performModelUnload()
+    }
+
+    /// User-initiated release of a currently-loaded `.model`-kind engine —
+    /// e.g. the floating panel's "模型已就绪" context menu offering "释放模型".
+    /// `isModelLoaded` otherwise only goes away on an engine switch or quit
+    /// (see its own doc); this is for reclaiming the memory/VRAM sooner on
+    /// a memory-constrained machine, without either of those. Guarded by
+    /// `!isSessionActive` — unlike `unloadModelsBeforeQuit()` (called at
+    /// quit, when nothing else matters), unloading out from under an active
+    /// recording would break it outright.
+    public func unloadModels() {
+        guard !isSessionActive else { return }
+        performModelUnload()
+    }
+
+    private func performModelUnload() {
         transcriptionProvider?.unload()
         translationProvider?.unload()
         transcriptionProvider = nil
         translationProvider = nil
         loadedEngineIDs = nil
         isModelLoaded = false
+        if statusMessage == "模型已预加载" {
+            statusMessage = "未启动"
+        }
     }
 
     public func start() async {

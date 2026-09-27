@@ -140,6 +140,20 @@ struct FloatingTranscriptView: View {
             Label("模型已就绪", systemImage: "checkmark.circle.fill")
                 .font(.caption)
                 .foregroundStyle(.green)
+                // A `.model`-kind engine otherwise only ever unloads on an
+                // engine switch or app quit (see `isModelLoaded`'s doc) —
+                // this is the escape hatch for reclaiming that memory/VRAM
+                // sooner on a memory-constrained machine, without either.
+                // Disabled while running/starting/stopping (not just a
+                // no-op guard inside `unloadModels()` itself): a context
+                // menu item that silently does nothing when tapped reads as
+                // broken, not as "not applicable right now".
+                .contextMenu {
+                    Button("释放模型", systemImage: "xmark.circle") {
+                        session.unloadModels()
+                    }
+                    .disabled(session.isSessionActive)
+                }
         } else {
             Button {
                 Task { await session.preloadModel() }
