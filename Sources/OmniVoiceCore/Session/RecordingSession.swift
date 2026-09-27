@@ -302,12 +302,24 @@ public final class RecordingSession: ObservableObject {
 
         let transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID)
         let translation = Self.makeTranslationProvider(engineID: translationEngineID)
+        // Wired into the ivars immediately — *before* either `loadModel()`
+        // call below resolves, not after both succeed. `unloadModelsBeforeQuit()`
+        // reads these same ivars, and it needs something to reach even if
+        // the app quits mid-load: leaving them `nil` until success meant
+        // quitting during a multi-second preload skipped `unload()`
+        // entirely, risking exactly the ggml Metal exit-time assert
+        // `unloadModelsBeforeQuit()` exists to prevent (see its doc).
+        transcriptionProvider = transcription
+        translationProvider = translation
 
         statusMessage = "预加载翻译引擎中…"
         do {
             try await translation.loadModel()
         } catch {
             statusMessage = "翻译引擎预加载失败: \(error.localizedDescription)"
+            translation.unload()
+            transcriptionProvider = nil
+            translationProvider = nil
             return
         }
 
@@ -317,11 +329,12 @@ public final class RecordingSession: ObservableObject {
         } catch {
             statusMessage = "识别引擎预加载失败: \(error.localizedDescription)"
             translation.unload()
+            transcription.unload()
+            transcriptionProvider = nil
+            translationProvider = nil
             return
         }
 
-        transcriptionProvider = transcription
-        translationProvider = translation
         loadedEngineIDs = (transcriptionEngineID, translationEngineID)
         isModelLoaded = true
         statusMessage = "模型已预加载"
@@ -336,7 +349,14 @@ public final class RecordingSession: ObservableObject {
     /// would otherwise just leak a loaded model that's no longer reachable
     /// through `preloadModel()`'s `isModelLoaded` guard.
     private func discardLoadedModelsIfStale() {
-        guard loadedEngineIDs != nil else { return }
+        guard let loaded = loadedEngineIDs else { return }
+        // Re-assigning the *same* engine ID a Picker already has selected
+        // still fires this `didSet` — without this check, that (a no-op as
+        // far as the actual selection goes) would unconditionally discard a
+        // perfectly good, still-matching load.
+        guard loaded.transcription != transcriptionEngineID || loaded.translation != translationEngineID else {
+            return
+        }
         transcriptionProvider?.unload()
         translationProvider?.unload()
         transcriptionProvider = nil

@@ -41,7 +41,11 @@ struct MenuBarContentView: View {
                 }
             }
         }
-        .disabled(session.isStopping || session.isStarting)
+        // `isPreloadingModel` too — `start()` itself already no-ops while a
+        // preload is in flight (see its own guard), but without disabling
+        // this button too, clicking it here felt like nothing happened
+        // rather than the button visibly reflecting why.
+        .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
 
         Button("显示/隐藏悬浮窗") {
             appDelegate.toggleFloatingPanel()

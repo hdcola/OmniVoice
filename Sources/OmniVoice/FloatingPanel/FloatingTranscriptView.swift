@@ -20,21 +20,17 @@ struct FloatingTranscriptView: View {
     /// to inject it through in the first place.
     let onClose: () -> Void
     @State private var translationConfiguration: TranslationSession.Configuration?
-    /// Whether `transcriptList` should keep pinning itself to the bottom as
-    /// new content arrives. Driven by `.onScrollGeometryChange` (true
-    /// whenever the scroll position is at/near the bottom, false the moment
-    /// the user scrolls up to read earlier lines) rather than a manual
-    /// gesture handler — that's the only reliable way to distinguish "the
-    /// user scrolled up on purpose" from "this view's own `scrollTo` call
-    /// just moved the position", since both look identical to a plain drag
-    /// handler.
-    @State private var isPinnedToBottom = true
 
     var body: some View {
         VStack(spacing: 0) {
             controlBar
             Divider()
-            transcriptList
+            // `.equatable()`: `TranscriptListView` takes `lines`/`isRunning`
+            // as plain values rather than observing `session` itself — see
+            // its own doc for why, and why that's the point of pulling it
+            // out of this view in the first place.
+            TranscriptListView(lines: session.lines, isRunning: session.isRunning)
+                .equatable()
             Divider()
             statusBar
         }
@@ -43,13 +39,6 @@ struct FloatingTranscriptView: View {
         .onAppear { rebuildConfiguration() }
         .onChange(of: session.sourceLanguageCode) { rebuildConfiguration() }
         .onChange(of: session.targetLanguageCode) { rebuildConfiguration() }
-        // A fresh recording starts with `lines` reset back to one empty
-        // placeholder row (see `RecordingSession.start()`) — re-pin so it
-        // doesn't inherit "scrolled up" from whatever the user was doing
-        // while reading the *previous* recording's transcript.
-        .onChange(of: session.isRunning) { _, isRunning in
-            if isRunning { isPinnedToBottom = true }
-        }
         .translationTask(translationConfiguration) { translationSession in
             for await request in session.translationBridgeStream() {
                 let result = try? await translationSession.translate(request.text)
@@ -178,119 +167,6 @@ struct FloatingTranscriptView: View {
         }
     }
 
-    /// Id of the zero-height row appended after the real transcript lines —
-    /// `scrollTo(_:anchor:)` targets this instead of the last line's own id
-    /// so it always lands at the true bottom of the content, not just the
-    /// last line's top edge (which would leave a multi-line-wrapped last
-    /// entry's tail still off-screen).
-    private static let bottomAnchorID = "transcriptList.bottomAnchor"
-    /// How close to the bottom (in points) still counts as "at the bottom"
-    /// for `.onScrollGeometryChange` below — a plain `>=` against the exact
-    /// bottom offset would read as "scrolled away" from sub-pixel rounding
-    /// alone, immediately unpinning on every single append.
-    private static let bottomProximityTolerance: CGFloat = 24
-
-    private var transcriptList: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    // Not `session.lines.isEmpty`: `start()` seeds `lines` with
-                    // one placeholder row before any real content ever arrives
-                    // (see `RecordingSession.start()`), so a session that failed
-                    // to start, or one that was stopped before anyone said
-                    // anything, still has a non-empty `lines` with nothing
-                    // displayable in it — `session.lines.isEmpty` alone would
-                    // leave the panel looking blank instead of showing this.
-                    if session.lines.allSatisfy(\.displaySource.isEmpty) {
-                        Text("等待开始…")
-                            .foregroundStyle(.secondary)
-                    }
-                    ForEach(session.lines) { line in
-                        if !line.displaySource.isEmpty {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(line.displaySource)
-                                    .font(.system(size: 14, weight: .medium))
-                                if !line.displayTranslation.isEmpty {
-                                    Text(line.displayTranslation)
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-                    Color.clear
-                        .frame(height: 1)
-                        .id(Self.bottomAnchorID)
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            // Tracks whether the user is (still) looking at the bottom of
-            // the transcript. Compares the *whole* geometry (not just a
-            // derived `isAtBottom` bool) so it can tell apart two cases that
-            // both momentarily read as "not at the bottom": the user
-            // actually dragging away, vs. new content simply having grown
-            // `contentSize` out from under a `contentOffset` that hasn't
-            // caught up yet (true on every single append while pinned,
-            // since `scrollTo` below only fires *after* this same content
-            // change and needs its own layout pass to land) — the plain
-            // "isAtBottom ? true : false" version of this used to treat
-            // that second case as "the user scrolled away", permanently
-            // unpinning on the very next line/delta after any pinned
-            // append, without the user touching the scroll view at all.
-            .onScrollGeometryChange(for: ScrollGeometry.self) { $0 } action: { old, new in
-                let isAtBottom = new.contentOffset.y + new.containerSize.height
-                    >= new.contentSize.height - Self.bottomProximityTolerance
-                if isAtBottom {
-                    isPinnedToBottom = true
-                } else if new.contentSize.height <= old.contentSize.height + 0.5 {
-                    // Content didn't grow, yet we're no longer at the
-                    // bottom — the only way that happens is a real scroll
-                    // away from it.
-                    isPinnedToBottom = false
-                }
-                // Else: content grew and the offset just hasn't been moved
-                // to follow it yet — leave `isPinnedToBottom` as it was;
-                // `.onChange(of: session.lines)` below will `scrollTo` and
-                // this callback fires again reporting `isAtBottom == true`.
-            }
-            // Re-pins on every content change (a new line, or the current
-            // line growing) — not animated: this fires on essentially every
-            // ASR delta while pinned, and an animation per delta would just
-            // queue up stutter instead of reading as a smooth follow.
-            .onChange(of: session.lines) { _, _ in
-                guard isPinnedToBottom else { return }
-                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
-            }
-            .overlay(alignment: .bottom) {
-                if !isPinnedToBottom {
-                    jumpToLatestButton(proxy: proxy)
-                }
-            }
-        }
-    }
-
-    /// Shown only once the user has scrolled away from the bottom (see
-    /// `isPinnedToBottom`) — lets them jump back to the latest line and
-    /// resume auto-scrolling in one tap, rather than having to drag back
-    /// down manually (which, for a still-scrolling transcript, means
-    /// chasing a moving target).
-    private func jumpToLatestButton(proxy: ScrollViewProxy) -> some View {
-        Button {
-            isPinnedToBottom = true
-            withAnimation(.easeOut(duration: 0.2)) {
-                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
-            }
-        } label: {
-            Label("最新内容", systemImage: "arrow.down.circle.fill")
-                .font(.caption)
-                .labelStyle(.titleAndIcon)
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.small)
-        .padding(.bottom, 8)
-    }
-
     /// Surfaces `RecordingSession.statusMessage` (e.g. "识别引擎启动失败:
     /// ...") on the panel itself — without this, a failed `start()` gave no
     /// visible indication of what went wrong: the button just went back to
@@ -342,6 +218,160 @@ struct FloatingTranscriptView: View {
             source: session.currentSourceLanguage,
             target: session.currentTargetLanguage
         )
+    }
+}
+
+/// The scrollable transcript itself, pulled out of `FloatingTranscriptView`
+/// so that view's very-high-frequency, unrelated `@Published` changes (chiefly
+/// `session.inputLevel`, ticking ~10-15×/sec while recording — see
+/// `micLevelIndicator`'s doc) don't force a full re-diff of what can be
+/// hundreds of transcript rows on every single tick. Takes `lines`/`isRunning`
+/// as plain values instead of observing `session` directly, and the call site
+/// applies `.equatable()` — together, that lets SwiftUI skip this view's
+/// `body` entirely on a re-render that didn't actually change either value.
+///
+/// `Equatable` is hand-written, not synthesized: `isPinnedToBottom` is
+/// `@State`, and `State<Bool>` itself isn't `Equatable`, so automatic
+/// synthesis can't see past it anyway — which is the right outcome here,
+/// since whether the view is pinned isn't part of "did the *content*
+/// change", the question `.equatable()` is actually asking.
+private struct TranscriptListView: View, Equatable {
+    let lines: [TranscriptLine]
+    let isRunning: Bool
+
+    static func == (lhs: TranscriptListView, rhs: TranscriptListView) -> Bool {
+        lhs.lines == rhs.lines && lhs.isRunning == rhs.isRunning
+    }
+
+    /// Whether this view should keep pinning itself to the bottom as new
+    /// content arrives. Driven by `.onScrollGeometryChange` (true whenever
+    /// the scroll position is at/near the bottom, false the moment the user
+    /// scrolls up to read earlier lines) rather than a manual gesture
+    /// handler — that's the only reliable way to distinguish "the user
+    /// scrolled up on purpose" from "this view's own `scrollTo` call just
+    /// moved the position", since both look identical to a plain drag
+    /// handler.
+    @State private var isPinnedToBottom = true
+
+    /// Id of the zero-height row appended after the real transcript lines —
+    /// `scrollTo(_:anchor:)` targets this instead of the last line's own id
+    /// so it always lands at the true bottom of the content, not just the
+    /// last line's top edge (which would leave a multi-line-wrapped last
+    /// entry's tail still off-screen).
+    private static let bottomAnchorID = "transcriptList.bottomAnchor"
+    /// How close to the bottom (in points) still counts as "at the bottom"
+    /// for `.onScrollGeometryChange` below — a plain `>=` against the exact
+    /// bottom offset would read as "scrolled away" from sub-pixel rounding
+    /// alone, immediately unpinning on every single append.
+    private static let bottomProximityTolerance: CGFloat = 24
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Not `lines.isEmpty`: `start()` seeds `lines` with one
+                    // placeholder row before any real content ever arrives
+                    // (see `RecordingSession.start()`), so a session that
+                    // failed to start, or one that was stopped before anyone
+                    // said anything, still has a non-empty `lines` with
+                    // nothing displayable in it — `lines.isEmpty` alone
+                    // would leave the panel looking blank instead of showing
+                    // this.
+                    if lines.allSatisfy(\.displaySource.isEmpty) {
+                        Text("等待开始…")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(lines) { line in
+                        if !line.displaySource.isEmpty {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(line.displaySource)
+                                    .font(.system(size: 14, weight: .medium))
+                                if !line.displayTranslation.isEmpty {
+                                    Text(line.displayTranslation)
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    Color.clear
+                        .frame(height: 1)
+                        .id(Self.bottomAnchorID)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            // Tracks whether the user is (still) looking at the bottom of
+            // the transcript. Compares the *whole* geometry (not just a
+            // derived `isAtBottom` bool) so it can tell apart two cases that
+            // both momentarily read as "not at the bottom": the user
+            // actually dragging away, vs. new content simply having grown
+            // `contentSize` out from under a `contentOffset` that hasn't
+            // caught up yet (true on every single append while pinned,
+            // since `scrollTo` below only fires *after* this same content
+            // change and needs its own layout pass to land) — the plain
+            // "isAtBottom ? true : false" version of this used to treat
+            // that second case as "the user scrolled away", permanently
+            // unpinning on the very next line/delta after any pinned
+            // append, without the user touching the scroll view at all.
+            .onScrollGeometryChange(for: ScrollGeometry.self) { $0 } action: { old, new in
+                let isAtBottom = new.contentOffset.y + new.containerSize.height
+                    >= new.contentSize.height - Self.bottomProximityTolerance
+                if isAtBottom {
+                    isPinnedToBottom = true
+                } else if new.contentSize.height <= old.contentSize.height + 0.5 {
+                    // Content didn't grow, yet we're no longer at the
+                    // bottom — the only way that happens is a real scroll
+                    // away from it.
+                    isPinnedToBottom = false
+                }
+                // Else: content grew and the offset just hasn't been moved
+                // to follow it yet — leave `isPinnedToBottom` as it was;
+                // `.onChange(of: lines)` below will `scrollTo` and this
+                // callback fires again reporting `isAtBottom == true`.
+            }
+            // Re-pins on every content change (a new line, or the current
+            // line growing) — not animated: this fires on essentially every
+            // ASR delta while pinned, and an animation per delta would just
+            // queue up stutter instead of reading as a smooth follow.
+            .onChange(of: lines) { _, _ in
+                guard isPinnedToBottom else { return }
+                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+            }
+            // A fresh recording starts with `lines` reset back to one empty
+            // placeholder row (see `RecordingSession.start()`) — re-pin so
+            // it doesn't inherit "scrolled up" from whatever the user was
+            // doing while reading the *previous* recording's transcript.
+            .onChange(of: isRunning) { _, running in
+                if running { isPinnedToBottom = true }
+            }
+            .overlay(alignment: .bottom) {
+                if !isPinnedToBottom {
+                    jumpToLatestButton(proxy: proxy)
+                }
+            }
+        }
+    }
+
+    /// Shown only once the user has scrolled away from the bottom (see
+    /// `isPinnedToBottom`) — lets them jump back to the latest line and
+    /// resume auto-scrolling in one tap, rather than having to drag back
+    /// down manually (which, for a still-scrolling transcript, means
+    /// chasing a moving target).
+    private func jumpToLatestButton(proxy: ScrollViewProxy) -> some View {
+        Button {
+            isPinnedToBottom = true
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+            }
+        } label: {
+            Label("最新内容", systemImage: "arrow.down.circle.fill")
+                .font(.caption)
+                .labelStyle(.titleAndIcon)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.small)
+        .padding(.bottom, 8)
     }
 }
 

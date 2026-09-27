@@ -216,6 +216,20 @@ struct RecordingSessionSettingsTests {
         #expect(!session.isModelLoaded)
     }
 
+    /// Guards `discardLoadedModelsIfStale()`'s staleness check — a
+    /// `didSet` fires on *any* assignment, including one that re-sets the
+    /// same value a `Picker` already had selected, so without comparing
+    /// against the previously-loaded id this used to discard a perfectly
+    /// good, still-matching load.
+    @Test func reassigningTheSameEngineIDDoesNotDiscardALoadedModel() async {
+        let session = RecordingSession()
+        await session.preloadModel()
+        #expect(session.isModelLoaded)
+
+        session.transcriptionEngineID = session.transcriptionEngineID
+        #expect(session.isModelLoaded)
+    }
+
     /// `preloadModel()` is a no-op once already loaded — without this guard
     /// (see its own `!isModelLoaded` precondition), a second call would
     /// pointlessly reload an already-resident model.
