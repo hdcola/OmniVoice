@@ -69,6 +69,7 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     public static let shared = ModelDownloadManager()
 
     private nonisolated static let tempFilePrefix = "omnivoice-model-download-"
+    private nonisolated static let diskSpaceSafetyMarginMB = 512
 
     private let cacheDirectory: URL
     private let sessionConfiguration: URLSessionConfiguration
@@ -109,7 +110,21 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         self.cacheDirectory = cacheDirectory ?? Self.defaultCacheDirectory()
         self.sessionConfiguration = sessionConfiguration
         super.init()
+        prepareCacheDirectory()
         cleanUpOrphanedTempFiles()
+    }
+
+    /// Creates the cache directory up front (idempotent — `runJob` no longer
+    /// needs to) and excludes it from Time Machine/iCloud backup. Application
+    /// Support is backed up by default, and these are multi-GB, perfectly
+    /// re-downloadable files — backing them up just burns the user's backup
+    /// disk/APFS snapshot space for no benefit.
+    private func prepareCacheDirectory() {
+        try? FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        var mutableCacheDirectory = cacheDirectory
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? mutableCacheDirectory.setResourceValues(values)
     }
 
     /// A crash, force-quit, or system shutdown mid-download leaves its
@@ -159,8 +174,12 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// Removes `variant`'s cached weights, if any — e.g. to let a user
     /// recover from a corrupted/stale local file without waiting for an
     /// engine switch (which doesn't touch the cache) or reinstalling the
-    /// app. A no-op if nothing is cached.
+    /// app. A no-op if nothing is cached. Also cancels an in-flight download
+    /// for this variant, if any — without that, a download already
+    /// partway through would just silently re-populate the cache a few
+    /// minutes later, defeating the point of "delete this model".
     public func deleteCachedModel(for variant: ModelVariant) throws {
+        cancelDownload(for: variant)
         let url = localURL(for: variant)
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         try FileManager.default.removeItem(at: url)
@@ -237,10 +256,13 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
             throw ModelDownloadError.missingDownloadURL(variantID: variant.id)
         }
         try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
-        if let availableMB = Self.availableDiskSpaceMB(at: cacheDirectory), availableMB < variant.approximateSizeMB {
-            throw ModelDownloadError.insufficientDiskSpace(
-                requiredMB: variant.approximateSizeMB, availableMB: availableMB
-            )
+        // A safety margin beyond the model's own size, not just "does it
+        // technically fit" — landing at only a few MB of free space after a
+        // multi-GB download risks starving APFS/other processes right after
+        // the download that was supposed to succeed.
+        let requiredMB = variant.approximateSizeMB + Self.diskSpaceSafetyMarginMB
+        if let availableMB = Self.availableDiskSpaceMB(at: cacheDirectory), availableMB < requiredMB {
+            throw ModelDownloadError.insufficientDiskSpace(requiredMB: requiredMB, availableMB: availableMB)
         }
 
         let tempFileURL = try await runDownload(variantID: variant.id, from: downloadURL)
@@ -361,7 +383,10 @@ extension ModelDownloadManager {
         downloadTask: URLSessionDownloadTask, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64
     ) {
         guard totalBytesExpectedToWrite > 0, let variantID = downloadTask.taskDescription else { return }
-        let fraction = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+        // Clamped defensively — a server-reported `Content-Length` that
+        // doesn't quite match the actual byte count would otherwise hand a
+        // SwiftUI `ProgressView(value:)` a fraction slightly over 1.0.
+        let fraction = min(1.0, max(0.0, Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)))
         Task { @MainActor [weak self] in
             self?.handleProgress(variantID: variantID, fraction: fraction)
         }

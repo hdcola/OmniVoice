@@ -279,6 +279,44 @@ struct ModelDownloadManagerTests {
 
         try FileManager.default.removeItem(at: cacheDirectory)
     }
+
+    @Test func deleteCachedModelCancelsAnInFlightDownload() async throws {
+        let cacheDirectory = makeTempCacheDirectory()
+        let manager = makeMockedManager(cacheDirectory: cacheDirectory)
+        let mockedVariant = ModelVariant(
+            id: "mocked-delete-inflight", engineID: "model.r2t2", displayName: "Mocked", quantization: "Q8_0",
+            approximateSizeMB: 1,
+            downloadURL: StubURLProtocol.slowURL(status: 200, delayMS: 300, path: "slow.gguf")
+        )
+
+        let task = Task { try await manager.ensureDownloaded(mockedVariant) }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(manager.isDownloading(mockedVariant))
+
+        try manager.deleteCachedModel(for: mockedVariant)
+
+        do {
+            _ = try await task.value
+            Issue.record("expected the in-flight download to be cancelled")
+        } catch is CancellationError {
+            // expected
+        } catch {
+            Issue.record("expected CancellationError, got \(error)")
+        }
+        #expect(!manager.isDownloaded(mockedVariant))
+
+        try FileManager.default.removeItem(at: cacheDirectory)
+    }
+
+    @Test func cacheDirectoryIsExcludedFromBackup() throws {
+        let cacheDirectory = makeTempCacheDirectory()
+        _ = ModelDownloadManager(cacheDirectory: cacheDirectory)
+
+        let values = try cacheDirectory.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        #expect(values.isExcludedFromBackup == true)
+
+        try FileManager.default.removeItem(at: cacheDirectory)
+    }
 }
 
 /// A minimal `URLProtocol` stub so the network phase (success, checksum
@@ -289,6 +327,12 @@ struct ModelDownloadManagerTests {
 private final class StubURLProtocol: URLProtocol {
     static func url(status: Int, path: String) -> URL {
         URL(string: "https://mock.invalid/\(status)/\(path)")!
+    }
+
+    /// A response delayed by `delayMS` — for tests that need a window
+    /// during which the "download" is still in flight (e.g. cancellation).
+    static func slowURL(status: Int, delayMS: Int, path: String) -> URL {
+        URL(string: "https://mock.invalid/\(status)/slow-\(delayMS)/\(path)")!
     }
 
     static func body(forPath path: String) -> Data {
@@ -306,19 +350,34 @@ private final class StubURLProtocol: URLProtocol {
             client?.urlProtocolDidFinishLoading(self)
             return
         }
-        let components = url.pathComponents.filter { $0 != "/" }
+        var components = url.pathComponents.filter { $0 != "/" }
         let statusCode = components.first.flatMap { Int($0) } ?? 200
-        let path = components.dropFirst().joined(separator: "/")
-        let body = Self.body(forPath: path)
-        let response = HTTPURLResponse(
-            url: url, statusCode: statusCode, httpVersion: nil,
-            headerFields: ["Content-Length": "\(body.count)"]
-        )!
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        if (200..<300).contains(statusCode) {
-            client?.urlProtocol(self, didLoad: body)
+        components = Array(components.dropFirst())
+        var delayMS = 0
+        if let first = components.first, first.hasPrefix("slow-"), let ms = Int(first.dropFirst(5)) {
+            delayMS = ms
+            components = Array(components.dropFirst())
         }
-        client?.urlProtocolDidFinishLoading(self)
+        let path = components.joined(separator: "/")
+        let body = Self.body(forPath: path)
+
+        let respond = { [weak self] in
+            guard let self else { return }
+            let response = HTTPURLResponse(
+                url: url, statusCode: statusCode, httpVersion: nil,
+                headerFields: ["Content-Length": "\(body.count)"]
+            )!
+            self.client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            if (200..<300).contains(statusCode) {
+                self.client?.urlProtocol(self, didLoad: body)
+            }
+            self.client?.urlProtocolDidFinishLoading(self)
+        }
+        if delayMS > 0 {
+            DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(delayMS), execute: respond)
+        } else {
+            respond()
+        }
     }
 
     override func stopLoading() {}
