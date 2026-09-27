@@ -18,6 +18,8 @@ The format is based on Keep a Changelog.
 
 ### Documentation
 
+- docs(repo): add `Docs/PROGRESS.md` tracking product/architecture decisions and open items
+
 ### Tests
 
 - test(scaffold): unit tests for `SentenceBoundary` and `ProviderCatalog` (ee5f43d)
