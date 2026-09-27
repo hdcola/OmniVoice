@@ -87,12 +87,12 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// *initiating* `ensureDownloaded(_:progress:)` call's closure, plus any
     /// later call that joined the same in-flight job (see `ensureDownloaded`'s
     /// doc). Values are only ever created and invoked on the main actor (this
-    /// class's default isolation), so they're plain closures, not
-    /// `@Sendable` — letting them mutate `downloadProgress` directly instead
-    /// of needing their own inner `Task { @MainActor in ... }` hop on every
-    /// one of a multi-gigabyte download's several-thousand progress
-    /// callbacks.
-    private var progressHandlers: [String: [(Double) -> Void]] = [:]
+    /// class's default isolation) — `ensureDownloaded`'s `progress` parameter
+    /// is declared `@MainActor @Sendable` precisely so a caller can mutate
+    /// its own main-actor state directly from inside the closure, without
+    /// needing its own inner `Task { @MainActor in ... }` hop on every one of
+    /// a multi-gigabyte download's several-thousand progress callbacks.
+    private var progressHandlers: [String: [@MainActor (Double) -> Void]] = [:]
     /// Throttle state for `handleProgress` — see its doc.
     private var lastReportedProgress: [String: (fraction: Double, time: Date)] = [:]
 
@@ -182,6 +182,12 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         cancelDownload(for: variant)
         let url = localURL(for: variant)
         guard FileManager.default.fileExists(atPath: url.path) else { return }
+        // `isDownloaded(_:)` is a plain file-existence check, not a
+        // `@Published` property — nothing here would otherwise tell a
+        // SwiftUI observer (`ModelManagementView`/`SettingsView`) that it
+        // just changed, leaving a stale "已下载" row on screen until some
+        // unrelated `@Published` mutation happened to trigger a re-render.
+        objectWillChange.send()
         try FileManager.default.removeItem(at: url)
     }
 
@@ -200,7 +206,7 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// initiating call's).
     public func ensureDownloaded(
         _ variant: ModelVariant,
-        progress: (@Sendable (Double) -> Void)? = nil
+        progress: (@MainActor @Sendable (Double) -> Void)? = nil
     ) async throws -> URL {
         let destination = localURL(for: variant)
         if isDownloaded(variant) { return destination }
@@ -245,6 +251,13 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
             }
             return try await self.runJob(for: variant)
         }
+        // `jobs` isn't `@Published` either — without this, `isDownloading(_:)`
+        // flipping to `true` right here (well before the first
+        // `downloadProgress` tick, which is what actually publishes) has
+        // nothing to prompt a SwiftUI observer to re-check it, leaving a
+        // "下载" button showing during the DNS/TLS/redirect gap instead of
+        // the "准备下载…" state it's meant to cover.
+        objectWillChange.send()
         jobs[variant.id] = job
         return try await job.value
     }

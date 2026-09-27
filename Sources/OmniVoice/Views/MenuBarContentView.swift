@@ -97,6 +97,11 @@ struct MenuBarContentView: View {
             openWindow(id: "history")
         }
 
+        Button("模型管理…") {
+            NSApp.activate(ignoringOtherApps: true)
+            openWindow(id: "modelManagement")
+        }
+
         Button("设置…") {
             NSApp.activate(ignoringOtherApps: true)
             openSettings()

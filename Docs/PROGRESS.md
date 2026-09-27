@@ -232,8 +232,8 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    every checkout has to apply it by hand. When it lands: bump the pin, drop
    the patch, and drop the `git apply` step from
    `Docs/MODEL_ENGINE_SETUP.md`.
-2. **Model download-on-first-use — half landed** (branch
-   `feature/model-download-manager`): `ModelDownloadManager`
+2. **Model download-on-first-use** (branch `feature/model-download-manager`):
+   `ModelDownloadManager`
    (`Sources/OmniVoiceCore/Inference/ModelDownloadManager.swift`) downloads a
    `ModelVariant`'s weights into an Application Support cache keyed by
    `variant.id`, verifying SHA-256 before the file is considered usable, with
@@ -242,26 +242,46 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    (fixed `approximateSizeMB` too — the old 1500/1100 MB placeholders were
    roughly an order of magnitude off for T3PO: actual ~2.4GB/~9.8GB). Manually
    verified end-to-end against a real HTTPS download (not part of the
-   committed test suite — a multi-GB download has no place in CI). **Still
-   not wired into `RecordingSession`/`SettingsView`** — `ModelTranscriptionProvider`/
-   `ModelTranslationProvider` still resolve weights via the env var /
-   repo-relative `models/` directory fallback
-   (`InProcessTranscriber`/`InProcessTranslator.resolveModelPath`). Deliberately
-   split off as its own step rather than bundled with #3 below: touching
-   `RecordingSession`'s `preloadModel()`/`start()`/
-   `discardLoadedModelsIfStale()` state machine (see "Architecture decisions"
-   above) is the riskier half of this work and deserves its own isolated
-   review.
-3. **Wire `ModelDownloadManager` into `RecordingSession`, enable Settings UI**:
-   needs a per-engine selected-variant setting (persisted, mirroring
-   `transcriptionEngineID`'s pattern), `preloadModel()`/`start()` calling
-   `ensureDownloaded(_:progress:)` before `loadModel()` and surfacing download
-   progress/failure through `statusMessage` (or a new published property), and
-   removing `SettingsView.modelVariantPicker`'s `.disabled(true)`. (Device/
-   language/system-audio controls landed in PR #3 — mic picker +
-   system-audio toggle in the menu bar, language pickers shared between the
-   floating panel and Settings via `SourceLanguagePicker`/
-   `TargetLanguagePicker`.)
+   committed test suite — a multi-GB download has no place in CI). **Now
+   wired into `RecordingSession`/`SettingsView`** — see #3 below.
+3. **`ModelDownloadManager` wired into `RecordingSession`; dedicated "模型管理"
+   window for download/cancel/delete**: `RecordingSession` gained a
+   persisted `transcriptionModelVariantID`/`translationModelVariantID`
+   selection per `.model`-kind engine (mirroring `transcriptionEngineID`'s
+   restore/self-heal pattern — `currentTranscriptionModelVariant`/
+   `currentTranslationModelVariant` fall back to the catalog's first variant
+   for an unset/stale ID). Downloading a variant's weights is never
+   implicit: `resolveModelPath` (called from `preloadModel()`/`start()`)
+   resolves an already-cached variant's local path, or fails fast with a
+   friendly "「...」尚未下载，请先在「模型管理」中下载" `statusMessage`
+   instead of silently kicking off a multi-GB transfer with no way to back
+   out — the only place that ever calls
+   `ModelDownloadManager.ensureDownloaded(_:progress:)`/`cancelDownload(for:)`/
+   `deleteCachedModel(for:)` is the new `ModelManagementView` (opened from
+   the menu bar, or a "模型管理…" button next to each engine `Picker` in
+   Settings), which lists every `ProviderCatalog.modelVariants` entry with
+   an explicit 下载/取消/删除 action per row (disabling "删除" while a
+   recording/preload is active). `SettingsView`'s engine `Picker` only lists
+   a `.model`-kind engine once something for it is downloaded, and its
+   variant picker only lists downloaded variants — both keep the
+   *currently-selected* engine/variant visible regardless (marked
+   "（未下载）") so the `Picker`'s binding never points at a tag missing
+   from its own options, which SwiftUI would otherwise render as a
+   blank/no-selection control. Review also caught `loadedEngineIDs`/
+   `start()`'s `reusingLoaded` only ever comparing engine IDs, not the
+   selected variant — switching a `.model` engine's variant while the
+   *previous* one was already loaded left `isModelLoaded` reading "still
+   matches", silently running the stale variant forever; fixed by folding
+   variant IDs into that comparison and having the variant properties'
+   `didSet` call `discardLoadedModelsIfStale()` too. Only one variant per
+   engine exists in the catalog today, so this mostly plumbs the mechanism
+   through for whenever a second quantization/size is added. Known minor
+   gap: if the currently-selected engine's last downloaded variant is
+   deleted via Model Management while Settings isn't open, that engine's
+   `Picker` row just reads "（未下载）" next time Settings opens rather than
+   silently reverting to a different engine — `start()`/`preloadModel()`
+   still handle it gracefully either way (the same friendly "尚未下载"
+   message).
 4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,
