@@ -110,6 +110,17 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       settings window — full flow confirmed working end to end. Surfaced 4
       real UI bugs, all fixed on `fixbug/show-floating-panel-on-start`
       (PR #2) — see "Smoke test findings (fixed)" below.
+- [x] Floating panel redesign (PR #3): control bar (start/stop, language
+      pickers, close button) + status bar moved onto the panel itself, menu
+      bar gained mic/system-audio controls, Settings trimmed to just engine
+      selection, settings persistence via `UserDefaults`. Several rounds of
+      review caught real bugs along the way — see PR #3's description/commits
+      rather than re-summarizing every one here.
+- [x] **0.0.1 internal test build cut** (2026-09-27): version bumped in
+      `Scripts/Info.plist` (`CFBundleShortVersionString` 0.0.1), CHANGELOG's
+      `[Unreleased]` cut into a dated `[0.0.1]` section, ad-hoc signed only
+      (no Developer ID/notarization yet — see Open Items #3) — see
+      `Docs/RELEASE_TESTING.md` for what testers need to do/know.
 
 ### Code review findings (fixed)
 
