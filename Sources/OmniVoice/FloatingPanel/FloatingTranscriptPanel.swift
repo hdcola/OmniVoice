@@ -76,4 +76,30 @@ final class FloatingTranscriptPanel: NSPanel {
     /// actually working in.
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    /// Where a brand-new panel (see `didRestoreFrame`) opens — bottom-center
+    /// of the main screen, not dead center (`center()`), since that's where
+    /// live captions/subtitles conventionally sit (meeting apps, system
+    /// dictation, ...) and stays out of the way of whatever's in the middle
+    /// of the screen the user is actually looking at. `visibleFrame` (not
+    /// `frame`) already excludes the Dock/menu bar, so this doesn't need its
+    /// own check for either.
+    func positionAtBottomCenterOfScreen() {
+        guard let screen = NSScreen.main else {
+            center()
+            return
+        }
+        let visibleFrame = screen.visibleFrame
+        let panelFrame = frame
+        let origin = NSPoint(
+            x: visibleFrame.midX - panelFrame.width / 2,
+            y: visibleFrame.minY + Self.bottomMargin
+        )
+        setFrameOrigin(origin)
+    }
+
+    /// Gap left below the panel and the bottom of `visibleFrame` — enough to
+    /// clear the Dock (when it's set to auto-hide, `visibleFrame` doesn't
+    /// account for it) and to not look glued to the very edge of the screen.
+    private static let bottomMargin: CGFloat = 72
 }

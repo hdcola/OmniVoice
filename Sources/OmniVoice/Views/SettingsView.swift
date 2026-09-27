@@ -109,6 +109,24 @@ struct SettingsView: View {
                 TargetLanguagePicker(targetLanguageCode: $session.targetLanguageCode)
             }
             .disabled(isBusy)
+
+            // Deliberately outside the `.disabled(isBusy)` sections above —
+            // this only ever touches `NSWindow.alphaValue` (see
+            // `AppDelegate`'s `panelOpacityCancellable`), never anything
+            // `start()` reads once at setup time, so there's no race to
+            // guard against; adjusting it while recording (to see through
+            // the panel at whatever's behind it) is exactly when it's most
+            // useful.
+            Section("悬浮窗") {
+                HStack {
+                    Text("透明度")
+                    Slider(value: $session.panelOpacity, in: 0.3...1.0)
+                    Text("\(Int(session.panelOpacity * 100))%")
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .frame(width: 40, alignment: .trailing)
+                }
+            }
         }
         .padding(20)
         .frame(width: 440)

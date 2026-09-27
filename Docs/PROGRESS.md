@@ -298,7 +298,11 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    (`ModelDownloadManager.hasActiveDownloads`). The floating panel also now
    remembers its position/size across quit/relaunch (AppKit's own frame
    autosave, `FloatingTranscriptPanel`) instead of always recentering at a
-   fixed 420×280.
+   fixed 420×280 — a brand-new panel (nothing saved yet) now opens at the
+   screen's bottom-center instead, where live captions conventionally sit.
+   Settings also gained a "悬浮窗" transparency slider (`RecordingSession.panelOpacity`,
+   bound to the panel's `NSWindow.alphaValue`) so the panel can be made to
+   occlude less of whatever's behind it.
 4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,

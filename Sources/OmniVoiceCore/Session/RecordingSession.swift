@@ -74,6 +74,29 @@ public final class RecordingSession: ObservableObject {
     /// abort the run: mic-only transcription still proceeds.
     @Published public var screenRecordingPermissionNeeded = false
 
+    /// The floating panel's window-level opacity (applied to `NSWindow.alphaValue`
+    /// by `AppDelegate`, not a SwiftUI `.opacity()` inside the panel's own
+    /// content) — a straight `1.0` default keeps today's look unchanged for
+    /// an existing install; lowering it lets the panel visually "see
+    /// through" to whatever's behind it (a slide, a video call window),
+    /// reducing how much it occludes without hiding the transcript outright.
+    /// Clamped to `0.3...1.0` — `SettingsView`'s `Slider` already constrains
+    /// its own range, but `didSet` clamps here too since this is a public,
+    /// externally-settable property. Editable at any time, including
+    /// mid-recording — unlike the audio/engine settings above, nothing about
+    /// the recording pipeline itself reads this, so there's no setup-time
+    /// race to guard against. Persisted (see `PersistedSettingsKey`).
+    @Published public var panelOpacity: Double = 1.0 {
+        didSet {
+            let clamped = min(max(panelOpacity, 0.3), 1.0)
+            if clamped != panelOpacity {
+                panelOpacity = clamped
+                return
+            }
+            Self.defaults.set(panelOpacity, forKey: PersistedSettingsKey.panelOpacity)
+        }
+    }
+
     /// Engine selection — only takes effect on the next `start()`, so a
     /// picker bound to these should be disabled while `isSessionActive`.
     /// Persisted (see `PersistedSettingsKey`).
@@ -318,6 +341,9 @@ public final class RecordingSession: ObservableObject {
         selectedDeviceID = defaults.string(forKey: PersistedSettingsKey.selectedDeviceID)
         transcriptionModelVariantID = defaults.string(forKey: PersistedSettingsKey.transcriptionModelVariantID)
         translationModelVariantID = defaults.string(forKey: PersistedSettingsKey.translationModelVariantID)
+        if defaults.object(forKey: PersistedSettingsKey.panelOpacity) != nil {
+            panelOpacity = defaults.double(forKey: PersistedSettingsKey.panelOpacity)
+        }
 
         validateAndNormalizeSourceLanguage()
         validateAndNormalizeModelVariantSelections()
@@ -1074,4 +1100,5 @@ enum PersistedSettingsKey {
     static let selectedDeviceID = "org.omnivoice.selectedDeviceID"
     static let transcriptionModelVariantID = "org.omnivoice.transcriptionModelVariantID"
     static let translationModelVariantID = "org.omnivoice.translationModelVariantID"
+    static let panelOpacity = "org.omnivoice.panelOpacity"
 }

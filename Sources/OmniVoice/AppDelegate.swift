@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private let sessionStore: SessionStore?
     private(set) var floatingPanel: FloatingTranscriptPanel?
     private var isRunningCancellable: AnyCancellable?
+    private var panelOpacityCancellable: AnyCancellable?
 
     override init() {
         // A failed store (disk full, corrupted schema after a migration
@@ -52,14 +53,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 panel?.orderOut(nil)
             })
         )
-        // Only center a brand-new panel — one whose position/size was just
+        // Only place a brand-new panel — one whose position/size was just
         // restored from a previous run (`didRestoreFrame`, see
         // `FloatingTranscriptPanel.init`) should open exactly where the user
-        // left it, not get recentered out from under that.
+        // left it, not get repositioned out from under that.
         if !panel.didRestoreFrame {
-            panel.center()
+            panel.positionAtBottomCenterOfScreen()
         }
         floatingPanel = panel
+
+        panel.alphaValue = session.panelOpacity
+        // `alphaValue` isn't itself bindable/observable from SwiftUI (the
+        // panel's content view is a separate object from the `NSWindow` that
+        // owns it) — `SettingsView`'s Slider writes straight to
+        // `session.panelOpacity` (the persisted value), and this just
+        // mirrors that onto the actual window.
+        panelOpacityCancellable = session.$panelOpacity
+            .receive(on: DispatchQueue.main)
+            .sink { [weak panel] opacity in
+                panel?.alphaValue = opacity
+            }
 
         // Shown from launch (not just on demand) since the panel hosts the
         // controls used most often (start/stop, language pickers) alongside
