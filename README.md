@@ -24,9 +24,11 @@ history and open items.
 
 ## What it does today
 
-- **Live transcription + translation**, running on macOS's built-in
-  frameworks (`SpeechAnalyzer`/`SpeechTranscriber` for ASR, `Translation`
-  for translation) — no cloud API calls, no model download required yet.
+- **Live transcription + translation**, either on macOS's built-in
+  frameworks (`SpeechAnalyzer`/`SpeechTranscriber` for ASR, `Translation` for
+  translation — no cloud API calls) or fully local/offline models (R2T2 for
+  ASR, T3PO for translation, run in-process via `audio.cpp`/`llama.cpp`),
+  picked independently per component.
 - **Floating transcript panel**: shown from launch, semi-transparent,
   draggable/resizable, stays on top without stealing focus. Its own control
   bar has start/stop, a source/target language picker, and a close button;
@@ -46,10 +48,10 @@ history and open items.
 
 ## Not yet implemented
 
-- **Local/offline model engines** (R2T2 for ASR, T3PO for translation, via
-  `audio.cpp`/`llama.cpp`) — the provider abstraction and catalog are in
-  place, but the engines themselves aren't wired up yet. Only the system
-  frameworks work right now.
+- **Model weight download-on-first-use** — R2T2/T3PO are wired up and work,
+  but building/running them today requires manually fetching their upstream
+  engines + GGUF weights (see `Docs/MODEL_ENGINE_SETUP.md`); a real in-app
+  download/cache flow is still open.
 - **Localization** — UI strings are Chinese-only.
 - **Release pipeline** — this build is ad-hoc signed only, not notarized;
   see `Docs/RELEASE_TESTING.md` for what that means for installing it.

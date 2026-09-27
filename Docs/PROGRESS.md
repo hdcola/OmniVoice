@@ -127,6 +127,19 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       and `brew tap hdcola/tap && brew install --cask omnivoice` instructions.
       Still ad-hoc signed — Developer ID signing/notarization/stapling remain
       open (see Open Items #3).
+- [x] **Model providers wired up** (2026-09-27): `ModelTranscriptionProvider`/
+      `ModelTranslationProvider` now run R2T2 (audio.cpp) / T3PO (llama.cpp)
+      in-process, ported from `mac-poc-hybrid`'s validated
+      `InProcessTranscriber`/`InProcessTranslator` — see
+      `Sources/OmniVoiceCore/Inference/`. `Package.swift` gained `CAudioCpp`/
+      `CLlamaCpp` C shim targets linking gitignored `third_party/`
+      checkouts (setup recipe: `Docs/MODEL_ENGINE_SETUP.md`); building this
+      package now requires those checkouts to exist, same trade-off
+      `mac-poc-hybrid/Package.swift` accepted. Model weights are resolved via
+      an `R2T2_MODEL_PATH`/`R2T2_T3PO_MODEL_PATH` env var or a repo-relative
+      `models/` directory — a real per-user "download on first use" cache
+      (`ProviderCatalog.ModelVariant.downloadURL`/`sha256`, still nil
+      placeholders) is a separate follow-up, see Open Items #1.
 
 ### Code review findings (fixed)
 
@@ -183,18 +196,19 @@ real UI bugs, all fixed:
 
 Roughly in the order they'll likely get tackled — not a hard commitment.
 
-1. **Model providers**: port `InProcessTranscriber`/`InProcessTranslator` from
-   `mac-poc-hybrid` behind `ModelTranscriptionProvider`/
-   `ModelTranslationProvider` — needs adding `CAudioCpp`/`CLlamaCpp` C target
-   shims + `third_party/audio.cpp`+`third_party/llama.cpp` linker flags to
-   `Package.swift` (see those two provider files' doc comments for the exact
-   plan) and a first real download source for `ProviderCatalog`'s model
-   variants (`downloadURL`/`sha256` are currently `nil` placeholders).
+1. **Model download-on-first-use**: `ModelTranscriptionProvider`/
+   `ModelTranslationProvider` are wired up and working (see Done above), but
+   still resolve weights via an env var / repo-relative `models/` directory,
+   not a real per-user download cache. Needs a `ModelDownloadManager`
+   (fetch `ProviderCatalog.ModelVariant.downloadURL`, verify `sha256`, cache
+   under Application Support) and filling in the catalog's still-`nil`
+   `downloadURL`/`sha256` fields.
 2. **Settings UI wiring**: model-variant picker is currently `.disabled(true)`
-   (`SettingsView.modelVariantPicker`) — enable once #1 lands. (Device/
-   language/system-audio controls landed in PR #3 — mic picker + system-audio
-   toggle in the menu bar, language pickers shared between the floating panel
-   and Settings via `SourceLanguagePicker`/`TargetLanguagePicker`.)
+   (`SettingsView.modelVariantPicker`) — enable once #1 lands, to show
+   download state/trigger a download. (Device/language/system-audio controls
+   landed in PR #3 — mic picker + system-audio toggle in the menu bar,
+   language pickers shared between the floating panel and Settings via
+   `SourceLanguagePicker`/`TargetLanguagePicker`.)
 3. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,

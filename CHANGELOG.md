@@ -6,10 +6,19 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+
+- feat(providers): wire up the R2T2 (ASR) and T3PO (translation) in-process model engines via `audio.cpp`/`llama.cpp`'s C ABIs, ported from `mac-poc-hybrid`'s validated `InProcessTranscriber`/`InProcessTranslator` — `ModelTranscriptionProvider`/`ModelTranslationProvider` are no longer placeholders. See `Docs/MODEL_ENGINE_SETUP.md` for the required local `third_party`/`models` setup.
+
 ### Documentation
 
 - docs(repo): add Homebrew install instructions to `README.md` (`brew tap hdcola/tap && brew install --cask omnivoice`)
 - docs(repo): record DMG packaging + Homebrew distribution as done, and update the release-pipeline open item to reflect remaining notarization work in `Docs/PROGRESS.md`
+- docs(repo): add `Docs/MODEL_ENGINE_SETUP.md` (clone/build/weights recipe for the R2T2/T3PO model engines) and update `README.md`/`Docs/PROGRESS.md` to reflect the model providers landing
+
+### Tests
+
+- test(providers): add `ModelLanguageMappingTests` covering the BCP-47 → R2T2/T3PO language mapping helpers
 
 ## [0.0.1] - 2026-09-27
 

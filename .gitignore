@@ -2,3 +2,9 @@
 build/
 .swiftpm/
 .DS_Store
+
+# External native dependencies for the R2T2/T3PO model providers — full
+# upstream clones + multi-GB GGUF weights, never vendored into this repo's
+# history. See Docs/MODEL_ENGINE_SETUP.md for how to fetch/build these.
+/third_party/
+/models/
