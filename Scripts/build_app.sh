@@ -26,7 +26,8 @@ cp "$SCRIPT_DIR/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 # app dies at launch on any other machine with "Library not loaded".
 FRAMEWORKS_DIR="$APP_BUNDLE/Contents/Frameworks"
 mkdir -p "$FRAMEWORKS_DIR"
-MAIN_BIN="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+MACOS_DIR="$APP_BUNDLE/Contents/MacOS"
+MAIN_BIN="$MACOS_DIR/$APP_NAME"
 
 rpaths_of() {
   otool -l "$1" | awk '
@@ -35,23 +36,61 @@ rpaths_of() {
 }
 
 rpath_deps_of() {
-  # Skip line 1: the binary's own path (executable) or install name (dylib).
-  otool -L "$1" | tail -n +2 | awk '{print $1}' | grep '^@rpath/'
+  # otool -L's line 1 is always the file's own path (executable) or install
+  # name (dylib) — skip it. A dylib (unlike an executable) also re-lists
+  # itself as its very first dependency (its LC_ID_DYLIB); exclude that via
+  # `otool -D` too, since a dylib's on-disk filename can differ from its
+  # install name's basename (e.g. built as libfoo.dylib but installed as
+  # @rpath/libfoo.0.dylib) — left in, that self-reference would otherwise
+  # get chased as an unresolved dependency.
+  local self_id
+  self_id="$(otool -D "$1" 2>/dev/null | tail -n 1 || true)"
+  otool -L "$1" | awk -v self="$self_id" 'NR > 1 && $1 ~ /^@rpath\// && $1 != self { print $1 }'
+}
+
+# @executable_path always means the main executable's directory, regardless
+# of which binary declared the rpath; @loader_path means the directory of
+# the binary that declared it (for anything already copied into
+# Contents/Frameworks, that's Frameworks itself).
+resolve_rpath_token() {
+  local rp="$1" owner_dir="$2"
+  case "$rp" in
+    @executable_path*) printf '%s\n' "${rp/@executable_path/$MACOS_DIR}" ;;
+    @loader_path*) printf '%s\n' "${rp/@loader_path/$owner_dir}" ;;
+    *) printf '%s\n' "$rp" ;;
+  esac
 }
 
 echo "==> embedding @rpath dylib dependencies into $FRAMEWORKS_DIR"
-# Plain indexed arrays + a newline-joined "seen" list only — this runs under
+# Plain indexed arrays + a newline-joined "seen" list only, and every bare
+# "${arr[@]}"/"${arr[*]}" below uses a `:0` offset — this runs under
 # whatever `bash` is first on PATH, which on a stock macOS install is the
-# system bash 3.2 (no `mapfile`, no associative arrays).
+# system bash 3.2: no `mapfile`, no associative arrays, and (unlike modern
+# bash) `set -u` treats a bare expansion of an *empty* array as an
+# unbound-variable error and aborts the script, not as an empty list.
+#
+# A dylib built without its own LC_RPATH (common — CMake typically only
+# rpath's the final executable, relying on it to resolve every transitively
+# linked dylib) can't resolve its own @rpath deps from its own rpaths alone.
+# So `search_paths` accumulates every directory we've ever resolved a dylib
+# from, seeded with the main executable's rpaths, and every binary's lookup
+# falls back to it.
+search_paths=()
+while IFS= read -r rp; do
+  [ -n "$rp" ] && search_paths+=("$(resolve_rpath_token "$rp" "$MACOS_DIR")")
+done < <(rpaths_of "$MAIN_BIN")
+search_paths+=("$FRAMEWORKS_DIR")
+
 queue=("$MAIN_BIN")
 copied_names=$'\n'
 while [ "${#queue[@]}" -gt 0 ]; do
   bin="${queue[0]}"
   queue=("${queue[@]:1}")
+  owner_dir="$(dirname "$bin")"
 
   bin_rpaths=()
   while IFS= read -r rp; do
-    [ -n "$rp" ] && bin_rpaths+=("$rp")
+    [ -n "$rp" ] && bin_rpaths+=("$(resolve_rpath_token "$rp" "$owner_dir")")
   done < <(rpaths_of "$bin")
 
   for dep in $(rpath_deps_of "$bin"); do
@@ -61,19 +100,20 @@ while [ "${#queue[@]}" -gt 0 ]; do
     esac
 
     resolved=""
-    for rp in "${bin_rpaths[@]}"; do
+    for rp in "${bin_rpaths[@]:0}" "${search_paths[@]:0}"; do
       if [ -f "$rp/$dep_name" ]; then
         resolved="$rp/$dep_name"
         break
       fi
     done
     if [ -z "$resolved" ]; then
-      echo "error: could not resolve $dep referenced by $bin (looked in: ${bin_rpaths[*]})" >&2
+      echo "error: could not resolve $dep referenced by $bin (looked in: ${bin_rpaths[*]:0} ${search_paths[*]:0})" >&2
       exit 1
     fi
 
     cp "$resolved" "$FRAMEWORKS_DIR/$dep_name"
     copied_names="$copied_names$dep_name"$'\n'
+    search_paths+=("$(dirname "$resolved")")
     queue+=("$FRAMEWORKS_DIR/$dep_name")
   done
 done
