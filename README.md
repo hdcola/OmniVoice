@@ -4,9 +4,9 @@ All-in-one real-time speech transcription &amp; translation assistant for
 lectures, meetings, and multilingual conversations — a macOS menu-bar app
 with a floating live-transcript panel.
 
-**Current version: 0.0.1 — internal test build.**
+**Current version: 0.1.0 — internal test build.**
 
-### [⬇ Download OmniVoice 0.0.1 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.0.1/OmniVoice-0.0.1.dmg)
+### [⬇ Download OmniVoice 0.1.0 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.1.0/OmniVoice-0.1.0.dmg)
 
 Or install via [Homebrew](https://brew.sh):
 

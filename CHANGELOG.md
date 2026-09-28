@@ -8,6 +8,20 @@ The format is based on Keep a Changelog.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.1.0] - 2026-09-28
+
+### Added
+
 - feat(settings): add a "悬浮窗" section to Settings with two independent sliders — "背景透明度" (`RecordingSession.panelBackgroundOpacity`, `0.1...1.0`) and "内容透明度" (`panelContentOpacity`, `0.4...1.0`), both persisted, both editable at any time including mid-recording. Applied purely in SwiftUI (`FloatingTranscriptView`'s background material vs. its whole content stack), not `NSWindow.alphaValue` — an earlier version of this used one shared window-level opacity, which faded the transcript text right along with the background, making a panel transparent enough to not block the view behind it also make the text hard to read. Named "内容" ("content"), not "文字" ("text"), since it fades every control in the panel (buttons/pickers/dividers/status bar), not just the transcript text. Defaults to `0.5`/`1.0` respectively — a noticeably-more-see-through background out of the box, while the content stays at full opacity by default (#13)
 - feat(panel): open a brand-new floating panel at the screen's bottom-center instead of dead center — where live captions/subtitles conventionally sit (meeting apps, system dictation, ...) and out of the way of whatever's in the middle of the screen (`FloatingTranscriptPanel.positionAtBottomCenterOfScreen()`). Only applies the first time (or after a saved frame no longer fits any connected screen) — see the frame-persistence entry below (#13)
 - feat(panel): remember the floating transcript panel's position/size across quit/relaunch (`FloatingTranscriptPanel`'s `setFrameAutosaveName`, which both restores a previously-saved frame and arranges future saves in one call) — previously every launch recentered it at a fixed 420×280, discarding wherever the user had dragged/resized it last. `AppDelegate` only calls `positionAtBottomCenterOfScreen()` when nothing was restored (`didRestoreFrame == false` — a fresh install, or a saved frame that no longer fits any connected screen) (#13)

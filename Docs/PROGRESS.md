@@ -166,7 +166,17 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       and several `InProcessTranscriber`/`InProcessTranslator` load/unload
       lifecycle bugs (partial-failure state, `llama_backend_init`/`free`
       pairing, blocking the main actor during load). See CHANGELOG's
-      `[Unreleased]` section for the full per-commit list.
+      `[0.1.0]` section for the full per-commit list.
+- [x] **0.1.0 release cut** (2026-09-28, `chore/release-0.1.0`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.1.0,
+      `CFBundleVersion` 2), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.1.0]` section (a fresh empty `[Unreleased]` template above it),
+      `README.md`'s version/download-link references bumped to match. Still
+      ad-hoc signed only (no Developer ID/notarization yet — see Open Items
+      #4) — see `Docs/RELEASE_TESTING.md` for what testers need to do/know.
+      Bundles everything merged since `0.0.1`: the model download/cache
+      manager + dedicated "模型管理" window (PRs #11/#12), and the Model
+      Management UX + floating-panel-position/opacity follow-up (PR #13).
 
 ### Code review findings (fixed)
 
