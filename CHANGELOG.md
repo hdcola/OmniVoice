@@ -12,6 +12,8 @@ The format is based on Keep a Changelog.
 
 ### Fixed
 
+- fix(packaging): embed `libaudiocpp`/`libllama`/`libggml-*` dylibs into `OmniVoice.app/Contents/Frameworks` and rewrite their rpaths to `@executable_path`/`@loader_path` in `Scripts/build_app.sh` — the app previously linked those dylibs via absolute `-rpath` entries pointing at the build machine's `third_party/{audio.cpp,llama.cpp}` checkout, so any packaged build crashed on launch elsewhere with `dyld: Library not loaded: @rpath/libaudiocpp.0.dylib` (#18)
+
 ### Dependencies
 
 ### Documentation
