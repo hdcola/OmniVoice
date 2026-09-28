@@ -567,24 +567,37 @@ struct RecordingSessionSettingsTests {
     /// meaningfully higher. Both clamp on assignment, not just at the
     /// `Slider` UI layer, since these are public, externally-settable
     /// properties.
+    /// Also asserts the persisted value, not just the in-memory one — a
+    /// prior version's `didSet` `return`ed right after reassigning `self`
+    /// with the clamped value, silently skipping the `Self.defaults.set(...)`
+    /// call below it for every out-of-range assignment (reassigning `self`
+    /// from inside its own `didSet` does *not* re-trigger `didSet`, so
+    /// nothing else ran that line for it either). A plain in-memory
+    /// assertion alone wouldn't have caught that.
     @Test func panelBackgroundOpacityClampsToItsRange() {
         defer { defaults.removeObject(forKey: PersistedSettingsKey.panelBackgroundOpacity) }
         let session = RecordingSession()
         session.panelBackgroundOpacity = -1
         #expect(session.panelBackgroundOpacity == 0.1)
+        #expect(defaults.double(forKey: PersistedSettingsKey.panelBackgroundOpacity) == 0.1)
 
         session.panelBackgroundOpacity = 5
         #expect(session.panelBackgroundOpacity == 1.0)
+        #expect(defaults.double(forKey: PersistedSettingsKey.panelBackgroundOpacity) == 1.0)
     }
 
+    /// See `panelBackgroundOpacityClampsToItsRange`'s doc for why this
+    /// asserts the persisted value too.
     @Test func panelContentOpacityClampsToItsRange() {
         defer { defaults.removeObject(forKey: PersistedSettingsKey.panelContentOpacity) }
         let session = RecordingSession()
         session.panelContentOpacity = -1
         #expect(session.panelContentOpacity == 0.4)
+        #expect(defaults.double(forKey: PersistedSettingsKey.panelContentOpacity) == 0.4)
 
         session.panelContentOpacity = 5
         #expect(session.panelContentOpacity == 1.0)
+        #expect(defaults.double(forKey: PersistedSettingsKey.panelContentOpacity) == 1.0)
     }
 
     @Test func isSessionActiveReflectsAnyLifecyclePhase() {

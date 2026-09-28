@@ -96,11 +96,18 @@ public final class RecordingSession: ObservableObject {
     @Published public var panelBackgroundOpacity: Double = 0.5 {
         didSet {
             let clamped = min(max(panelBackgroundOpacity, 0.1), 1.0)
+            // Reassigning `self` from inside its own `didSet` does *not*
+            // re-trigger `didSet` for that reassignment (verified
+            // empirically, since it's easy to assume the opposite) — so the
+            // `Self.defaults.set(...)` below must read `clamped`, not
+            // `panelBackgroundOpacity` again, and must run unconditionally,
+            // not only in an `else` branch. An earlier version `return`ed
+            // right after the reassignment instead, silently skipping
+            // persistence for every out-of-range value ever assigned.
             if clamped != panelBackgroundOpacity {
                 panelBackgroundOpacity = clamped
-                return
             }
-            Self.defaults.set(panelBackgroundOpacity, forKey: PersistedSettingsKey.panelBackgroundOpacity)
+            Self.defaults.set(clamped, forKey: PersistedSettingsKey.panelBackgroundOpacity)
         }
     }
 
@@ -119,11 +126,12 @@ public final class RecordingSession: ObservableObject {
     @Published public var panelContentOpacity: Double = 1.0 {
         didSet {
             let clamped = min(max(panelContentOpacity, 0.4), 1.0)
+            // See `panelBackgroundOpacity`'s `didSet` for why this reads
+            // `clamped` (not `panelContentOpacity` again) and always runs.
             if clamped != panelContentOpacity {
                 panelContentOpacity = clamped
-                return
             }
-            Self.defaults.set(panelContentOpacity, forKey: PersistedSettingsKey.panelContentOpacity)
+            Self.defaults.set(clamped, forKey: PersistedSettingsKey.panelContentOpacity)
         }
     }
 
