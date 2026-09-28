@@ -119,17 +119,24 @@ while [ "${#queue[@]}" -gt 0 ]; do
 done
 
 echo "==> rewriting rpaths for relocatability"
-for rp in $(rpaths_of "$MAIN_BIN"); do
-  install_name_tool -delete_rpath "$rp" "$MAIN_BIN" 2>/dev/null || true
-done
-install_name_tool -add_rpath "@executable_path/../Frameworks" "$MAIN_BIN"
+# `for rp in $(rpaths_of ...)` word-splits on whitespace — a build/checkout
+# path with a space in it (e.g. "~/My Projects/OmniVoice") would silently
+# truncate the rpath argument and fail to delete it. Use the same
+# `while IFS= read -r` form as the embedding loop above instead.
+while IFS= read -r rp; do
+  [ -n "$rp" ] && install_name_tool -delete_rpath "$rp" "$MAIN_BIN" 2>/dev/null || true
+done < <(rpaths_of "$MAIN_BIN")
+# `2>/dev/null || true`: a fresh copy of the swift build product never
+# already has this rpath, but stay idempotent (install_name_tool errors
+# with "would duplicate path" otherwise) in case that ever changes.
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$MAIN_BIN" 2>/dev/null || true
 
 for dylib in "$FRAMEWORKS_DIR"/*.dylib; do
   [ -e "$dylib" ] || continue
   install_name_tool -id "@rpath/$(basename "$dylib")" "$dylib"
-  for rp in $(rpaths_of "$dylib"); do
-    install_name_tool -delete_rpath "$rp" "$dylib" 2>/dev/null || true
-  done
+  while IFS= read -r rp; do
+    [ -n "$rp" ] && install_name_tool -delete_rpath "$rp" "$dylib" 2>/dev/null || true
+  done < <(rpaths_of "$dylib")
   install_name_tool -add_rpath "@loader_path" "$dylib" 2>/dev/null || true
 done
 
