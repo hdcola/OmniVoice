@@ -235,7 +235,14 @@ struct SettingsView: View {
     /// showing only `.system` engines — without this, a `.model`-kind engine
     /// simply not appearing in the list (see `isEngineAvailable(_:)`) reads
     /// as a missing feature/bug rather than "go download one first", since
-    /// nothing else on this screen ever mentions "模型管理".
+    /// nothing else on this screen ever mentions "模型管理". Assumes `engines`
+    /// contains at least one `.model`-kind entry, true for both categories
+    /// today (`model.r2t2`/`model.t3po`) — if a future category is ever
+    /// `.system`-only (no `.model` engine in the catalog at all for it),
+    /// this would show the hint permanently for that category with nothing
+    /// to ever download; guard with
+    /// `engines.contains(where: { $0.kind == .model })` first if that
+    /// happens.
     @ViewBuilder
     private func noLocalModelHint(for engines: [EngineDescriptor]) -> some View {
         if !engines.contains(where: { $0.kind == .model && hasDownloadedVariant($0) }) {
