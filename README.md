@@ -15,6 +15,11 @@ brew tap hdcola/tap
 brew install --cask omnivoice
 ```
 
+Homebrew 7+ refuses to load a cask from a third-party tap it hasn't been
+told to trust yet — if `brew install` stops with "Refusing to load cask
+... from untrusted tap", run `brew trust hdcola/tap` (or `brew trust --cask
+hdcola/tap/omnivoice`) once, then retry.
+
 This build is **ad-hoc signed only, not notarized** — macOS will refuse to
 open it straight out of the DMG until you clear its quarantine flag. See
 [`Docs/RELEASE_TESTING.md`](Docs/RELEASE_TESTING.md) for the one-line fix,
