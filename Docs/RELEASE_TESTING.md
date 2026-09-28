@@ -65,10 +65,10 @@ App 打包**，需要手动下载：
 - 本地模型引擎目前每个只有一个量化版本可选（R2T2 Q8_0、T3PO Q5_K_M），没有
   多档位可切换。
 - 崩溃/错误日志导出、隐私说明文案还没做（仍是占位状态）。
-- 用 Homebrew 装（`brew tap hdcola/tap && brew install --cask omnivoice`）
-  的话，新版 Homebrew（7+）第一次会报"Refusing to load cask ... from
-  untrusted tap"——执行一次 `brew trust hdcola/tap` 再重试装即可，只需做
-  一次。
+- 用 Homebrew 装的话，`brew tap hdcola/tap` 之后先执行一次
+  `brew trust hdcola/tap` 再 `brew install --cask omnivoice`（新版
+  Homebrew 7+ 要求先信任第三方 tap，否则会报"Refusing to load cask ...
+  from untrusted tap"；只需做一次）。
 
 ## 反馈问题时请提供
 
