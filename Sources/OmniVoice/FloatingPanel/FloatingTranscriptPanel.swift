@@ -22,8 +22,9 @@ final class FloatingTranscriptPanel: NSPanel {
     private static let frameAutosaveName = "FloatingTranscriptPanel"
 
     /// Whether `init` found (and applied) a previously-saved frame — the
-    /// caller (`AppDelegate`) only falls back to `center()` when this is
-    /// `false`, so a restored position/size is never immediately overridden.
+    /// caller (`AppDelegate`) only falls back to `positionAtBottomCenterOfScreen()`
+    /// when this is `false`, so a restored position/size is never
+    /// immediately overridden.
     private(set) var didRestoreFrame = false
 
     init(contentRect: NSRect) {
