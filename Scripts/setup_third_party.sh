@@ -17,7 +17,7 @@ set -euo pipefail
 #                   NOT re-clone or discard an existing checkout's local
 #                   changes — only re-runs cmake --build)
 
-AUDIOCPP_COMMIT="9bdd1d908bbd128e9eb405f5a8e38d0defb84c72"   # v0.8.2, pinned
+AUDIOCPP_COMMIT="4d88768fbcae4e6eb3352c6ab1422dabb7d90b58"   # v0.8.2, pinned
 LLAMACPP_COMMIT="a02c7f58c1c335f5375bf81f174b9a58cce939af"   # pinned
 
 SKIP_AUDIO=0
