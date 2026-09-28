@@ -90,7 +90,11 @@ struct ModelManagementView: View {
                     // moment); waiting on `downloadProgress` left the button
                     // reading "下载" during that gap, inviting a second tap.
                     if let fraction = downloadManager.downloadProgress[variant.id] {
-                        Text("下载中… \(Int(fraction * 100))%")
+                        // `.rounded()`, not a bare `Int(...)` truncation — see
+                        // `SettingsView`'s `opacitySlider` doc for why (binary
+                        // floating-point rounding can land a hair under a
+                        // "clean" percentage).
+                        Text("下载中… \(Int((fraction * 100).rounded()))%")
                             .foregroundStyle(.secondary)
                             .font(.caption)
                         ProgressView(value: fraction)
@@ -171,6 +175,15 @@ struct ModelManagementView: View {
             {
                 session.unloadModels()
             }
+            // Without this, deleting the last downloaded variant for the
+            // currently-selected engine left Settings pointing at a
+            // `.model` engine with nothing behind it — the next "开始
+            //转录"/"预加载模型" would then fail with a "尚未下载" message
+            // the user has no reason to expect right after deleting
+            // something on purpose. Falls back to the corresponding
+            // `.system` engine instead, same as a fresh install where
+            // nothing was ever downloaded.
+            session.fallBackToSystemEngineIfModelUnavailable()
         } catch {
             errorTitle = "删除失败"
             errorMessage = error.localizedDescription

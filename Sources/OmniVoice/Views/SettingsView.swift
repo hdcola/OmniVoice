@@ -73,6 +73,7 @@ struct SettingsView: View {
                     )
                 )
                 .disabled(isBusy)
+                noLocalModelHint(for: ProviderCatalog.transcriptionEngines)
             }
 
             Section("翻译引擎") {
@@ -97,6 +98,7 @@ struct SettingsView: View {
                     )
                 )
                 .disabled(isBusy)
+                noLocalModelHint(for: ProviderCatalog.translationEngines)
             }
 
             Section("语言") {
@@ -107,6 +109,30 @@ struct SettingsView: View {
                 TargetLanguagePicker(targetLanguageCode: $session.targetLanguageCode)
             }
             .disabled(isBusy)
+
+            // Deliberately outside the `.disabled(isBusy)` sections above —
+            // these only ever touch `FloatingTranscriptView`'s own SwiftUI
+            // opacity (see `panelBackgroundOpacity`/`panelContentOpacity`'s
+            // docs), never anything `start()` reads once at setup time, so
+            // there's no race to guard against; adjusting either while
+            // recording (to see through the panel at whatever's behind it,
+            // without losing legibility) is exactly when they're most
+            // useful. Two separate sliders, not one — a single shared value
+            // (an earlier version of this had exactly that, driving
+            // `NSWindow.alphaValue`) faded the transcript text right along
+            // with the background, so a panel transparent enough to not
+            // block the view behind it also made the text hard to read.
+            Section("悬浮窗") {
+                opacitySlider(
+                    "背景透明度", value: $session.panelBackgroundOpacity, range: 0.1...1.0
+                )
+                // "内容透明度", not "文字透明度" — `panelContentOpacity`
+                // fades the whole panel content stack (buttons/pickers/
+                // dividers/status bar too), not just the transcript text.
+                opacitySlider(
+                    "内容透明度", value: $session.panelContentOpacity, range: 0.4...1.0
+                )
+            }
         }
         .padding(20)
         .frame(width: 440)
@@ -186,6 +212,43 @@ struct SettingsView: View {
                     Text(variantLabel(for: variant)).tag(Optional(variant.id))
                 }
             }
+        }
+    }
+
+    private func opacitySlider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        HStack {
+            Text(label)
+            Slider(value: value, in: range)
+            // `.rounded()`, not a bare `Int(...)` truncation — a `Slider`'s
+            // underlying `Double` can land a hair under a "clean" percentage
+            // from binary floating-point rounding (e.g. 0.29999999999999994
+            // for what's visually 0.3), which truncation reads as 29% —
+            // jittery/off-by-one against where the thumb actually looks.
+            Text("\(Int((value.wrappedValue * 100).rounded()))%")
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .frame(width: 40, alignment: .trailing)
+        }
+    }
+
+    /// Shown under a category's engine `Picker` whenever it's currently
+    /// showing only `.system` engines — without this, a `.model`-kind engine
+    /// simply not appearing in the list (see `isEngineAvailable(_:)`) reads
+    /// as a missing feature/bug rather than "go download one first", since
+    /// nothing else on this screen ever mentions "模型管理". Assumes `engines`
+    /// contains at least one `.model`-kind entry, true for both categories
+    /// today (`model.r2t2`/`model.t3po`) — if a future category is ever
+    /// `.system`-only (no `.model` engine in the catalog at all for it),
+    /// this would show the hint permanently for that category with nothing
+    /// to ever download; guard with
+    /// `engines.contains(where: { $0.kind == .model })` first if that
+    /// happens.
+    @ViewBuilder
+    private func noLocalModelHint(for engines: [EngineDescriptor]) -> some View {
+        if !engines.contains(where: { $0.kind == .model && hasDownloadedVariant($0) }) {
+            Text("还没有可用的本地模型，点击上方「模型管理…」下载后即可选用")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 

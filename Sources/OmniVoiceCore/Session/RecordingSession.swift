@@ -74,6 +74,67 @@ public final class RecordingSession: ObservableObject {
     /// abort the run: mic-only transcription still proceeds.
     @Published public var screenRecordingPermissionNeeded = false
 
+    /// The floating panel's *background* opacity — `FloatingTranscriptView`
+    /// applies this to just its `.ultraThinMaterial` background fill, not the
+    /// whole view, so lowering it lets the panel visually "see through" to
+    /// whatever's behind it (a slide, a video call window) without touching
+    /// the transcript text/controls at all. Split out from
+    /// `panelContentOpacity` below on purpose: a single window-level
+    /// `NSWindow.alphaValue` (an earlier version of this used exactly that)
+    /// fades everything uniformly, so turning the panel more see-through
+    /// always made the text harder to read right along with it — the two
+    /// needed independent controls, not one shared slider. Clamped to
+    /// `0.1...1.0` — `SettingsView`'s `Slider` already constrains its own
+    /// range, but `didSet` clamps here too since this is a public,
+    /// externally-settable property. Defaults to `0.5` — occluding
+    /// noticeably less than the fully-opaque `.ultraThinMaterial` this
+    /// replaces, which is the whole point of this setting existing, while
+    /// still reading as a panel rather than bare text floating in space.
+    /// Editable at any time, including mid-recording — nothing about the
+    /// recording pipeline itself reads this, so there's no setup-time race
+    /// to guard against. Persisted (see `PersistedSettingsKey`).
+    @Published public var panelBackgroundOpacity: Double = 0.5 {
+        didSet {
+            let clamped = min(max(panelBackgroundOpacity, 0.1), 1.0)
+            // Reassigning `self` from inside its own `didSet` does *not*
+            // re-trigger `didSet` for that reassignment (verified
+            // empirically, since it's easy to assume the opposite) — so the
+            // `Self.defaults.set(...)` below must read `clamped`, not
+            // `panelBackgroundOpacity` again, and must run unconditionally,
+            // not only in an `else` branch. An earlier version `return`ed
+            // right after the reassignment instead, silently skipping
+            // persistence for every out-of-range value ever assigned.
+            if clamped != panelBackgroundOpacity {
+                panelBackgroundOpacity = clamped
+            }
+            Self.defaults.set(clamped, forKey: PersistedSettingsKey.panelBackgroundOpacity)
+        }
+    }
+
+    /// The floating panel's *content* opacity — transcript text, the
+    /// start/stop button, language pickers, the close button, dividers, the
+    /// status bar, all of it — applied via a plain SwiftUI `.opacity()`
+    /// around `FloatingTranscriptView`'s whole content stack, independent of
+    /// `panelBackgroundOpacity` above (see that property's doc for why
+    /// they're split). Named "内容透明度" ("content opacity"), not "文字
+    /// 透明度" ("text opacity"), in `SettingsView` for exactly that reason —
+    /// it fades every control in the panel, not just the transcript text.
+    /// Clamped to `0.4...1.0` — unlike the background, legibility degrades
+    /// badly well before full transparency, so this floor is meaningfully
+    /// higher than the background's. Defaults to `1.0`. Persisted (see
+    /// `PersistedSettingsKey`).
+    @Published public var panelContentOpacity: Double = 1.0 {
+        didSet {
+            let clamped = min(max(panelContentOpacity, 0.4), 1.0)
+            // See `panelBackgroundOpacity`'s `didSet` for why this reads
+            // `clamped` (not `panelContentOpacity` again) and always runs.
+            if clamped != panelContentOpacity {
+                panelContentOpacity = clamped
+            }
+            Self.defaults.set(clamped, forKey: PersistedSettingsKey.panelContentOpacity)
+        }
+    }
+
     /// Engine selection — only takes effect on the next `start()`, so a
     /// picker bound to these should be disabled while `isSessionActive`.
     /// Persisted (see `PersistedSettingsKey`).
@@ -318,9 +379,55 @@ public final class RecordingSession: ObservableObject {
         selectedDeviceID = defaults.string(forKey: PersistedSettingsKey.selectedDeviceID)
         transcriptionModelVariantID = defaults.string(forKey: PersistedSettingsKey.transcriptionModelVariantID)
         translationModelVariantID = defaults.string(forKey: PersistedSettingsKey.translationModelVariantID)
+        if defaults.object(forKey: PersistedSettingsKey.panelBackgroundOpacity) != nil {
+            panelBackgroundOpacity = defaults.double(forKey: PersistedSettingsKey.panelBackgroundOpacity)
+        }
+        if defaults.object(forKey: PersistedSettingsKey.panelContentOpacity) != nil {
+            panelContentOpacity = defaults.double(forKey: PersistedSettingsKey.panelContentOpacity)
+        }
 
         validateAndNormalizeSourceLanguage()
         validateAndNormalizeModelVariantSelections()
+        fallBackToSystemEngineIfModelUnavailable()
+    }
+
+    /// Switches `transcriptionEngineID`/`translationEngineID` back to their
+    /// `.system` counterpart whenever the currently-selected `.model`-kind
+    /// engine has nothing downloaded for it — a fresh install (nothing ever
+    /// downloaded), or a variant deleted via "模型管理" out from under the
+    /// engine currently selected in Settings. Called at launch
+    /// (`restorePersistedSettings()`), from `ModelManagementView` right after
+    /// a delete, and defensively at the top of `preloadModel()`/`start()` —
+    /// the point is that neither of those should ever need to surface a
+    /// "尚未下载" `statusMessage` in the first place: the selection itself
+    /// should never be left pointing at an undownloaded model to begin with.
+    /// A no-op for a `.system`-kind selection (nothing to fall back from) or
+    /// a `.model`-kind selection that still has something downloaded.
+    public func fallBackToSystemEngineIfModelUnavailable() {
+        if transcriptionEngineKind == .model, !hasDownloadedModelVariant(engineID: transcriptionEngineID),
+            let systemEngine = ProviderCatalog.transcriptionEngines.first(where: { $0.kind == .system }) {
+            transcriptionEngineID = systemEngine.id
+        }
+        if translationEngineKind == .model, !hasDownloadedModelVariant(engineID: translationEngineID),
+            let systemEngine = ProviderCatalog.translationEngines.first(where: { $0.kind == .system }) {
+            translationEngineID = systemEngine.id
+        }
+    }
+
+    /// Whether *any* variant of `engineID` is downloaded — deliberately not
+    /// "is the currently-*selected* variant downloaded", since today every
+    /// `.model` engine has exactly one catalog variant, so the two questions
+    /// have the same answer. Once a second quantization/size is added to some
+    /// engine, they won't: deleting the *selected* variant while a different
+    /// one for the same engine stays downloaded would leave this reading
+    /// `true` (no fallback to `.system`) while `currentTranscriptionModelVariant`/
+    /// `currentTranslationModelVariant` still point at the deleted one.
+    /// `validateAndNormalizeModelVariantSelections()` would need its own
+    /// "selected variant not downloaded ⇒ fall back to another downloaded
+    /// variant of the same engine" case added alongside this one at that
+    /// point — not needed while single-variant-per-engine holds.
+    private func hasDownloadedModelVariant(engineID: String) -> Bool {
+        ProviderCatalog.modelVariants(forEngineID: engineID).contains { modelDownloadManager.isDownloaded($0) }
     }
 
     /// Drops a persisted variant selection that no longer names one of its
@@ -422,6 +529,13 @@ public final class RecordingSession: ObservableObject {
         guard !isSessionActive, !isPreloadingModel, !isModelLoaded else { return }
         isPreloadingModel = true
         defer { isPreloadingModel = false }
+
+        // Belt-and-suspenders — the selection should already never point at
+        // an undownloaded model by the time this runs (see this method's own
+        // doc), but re-checking here means a race (a deletion landing between
+        // this call being queued and actually running) still resolves to
+        // "use the system engine" instead of the "尚未下载" failure below.
+        fallBackToSystemEngineIfModelUnavailable()
 
         let transcriptionModelPath: URL?
         do {
@@ -598,6 +712,9 @@ public final class RecordingSession: ObservableObject {
         guard !isRunning, !isStopping, !isStarting, !isPreloadingModel else { return }
         isStarting = true
         defer { isStarting = false }
+
+        // Same defensive re-check `preloadModel()` does — see its doc.
+        fallBackToSystemEngineIfModelUnavailable()
         // `activeSessionRecord` is created below, before translation/
         // transcription/mic are actually up — any of those failing (several
         // `catch` blocks below `return` early) left that record as a
@@ -1036,4 +1153,6 @@ enum PersistedSettingsKey {
     static let selectedDeviceID = "org.omnivoice.selectedDeviceID"
     static let transcriptionModelVariantID = "org.omnivoice.transcriptionModelVariantID"
     static let translationModelVariantID = "org.omnivoice.translationModelVariantID"
+    static let panelBackgroundOpacity = "org.omnivoice.panelBackgroundOpacity"
+    static let panelContentOpacity = "org.omnivoice.panelContentOpacity"
 }

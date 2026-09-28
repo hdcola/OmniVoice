@@ -52,7 +52,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 panel?.orderOut(nil)
             })
         )
-        panel.center()
+        // Only place a brand-new panel — one whose position/size was just
+        // restored from a previous run (`didRestoreFrame`, see
+        // `FloatingTranscriptPanel.init`) should open exactly where the user
+        // left it, not get repositioned out from under that.
+        if !panel.didRestoreFrame {
+            panel.positionAtBottomCenterOfScreen()
+        }
         floatingPanel = panel
 
         // Shown from launch (not just on demand) since the panel hosts the

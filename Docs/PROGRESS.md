@@ -282,6 +282,48 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    silently reverting to a different engine — `start()`/`preloadModel()`
    still handle it gracefully either way (the same friendly "尚未下载"
    message).
+- [x] **Model Management UX follow-up** (2026-09-27, `fixbug/model-management-ux`):
+   a `.model`-kind engine selection now self-heals back to its `.system`
+   counterpart the instant nothing is downloaded for it
+   (`RecordingSession.fallBackToSystemEngineIfModelUnavailable()` — called on
+   launch, right after a delete in `ModelManagementView`, and defensively at
+   the top of `preloadModel()`/`start()`), so the "尚未下载" `statusMessage`
+   from the previous entry above is now effectively unreachable in normal use
+   rather than something a user actually hits after deleting/never
+   downloading a model. `SettingsView` also gained a hint under each engine
+   picker pointing at "模型管理…" when nothing's downloaded for that
+   category, and download progress is now visible outside the Model
+   Management window itself — the menu bar icon and the "模型管理…" menu row
+   both show a live percentage while a download is in flight
+   (`ModelDownloadManager.hasActiveDownloads`). The floating panel also now
+   remembers its position/size across quit/relaunch (AppKit's own frame
+   autosave, `FloatingTranscriptPanel`) instead of always recentering at a
+   fixed 420×280 — a brand-new panel (nothing saved yet) now opens at the
+   screen's bottom-center instead, where live captions conventionally sit.
+   Settings also gained a "悬浮窗" section with two independent transparency
+   sliders — "背景透明度" (`RecordingSession.panelBackgroundOpacity`) and
+   "内容透明度" (`panelContentOpacity`) — so the panel's background can be
+   made to occlude less of whatever's behind it without also fading the
+   transcript text/controls into illegibility (a first version used one
+   shared `NSWindow.alphaValue`, which faded both together; a second used
+   "文字透明度" for the latter, renamed to "内容透明度" since it fades every
+   control, not just the transcript text). A code review pass on this whole
+   follow-up also added test coverage for the new opacity properties (and
+   the translation-side undownloaded-model fallback, and
+   `ModelDownloadManager.hasActiveDownloads`), fixed `Int(x * 100)`
+   percentage-jitter from binary floating-point rounding (now `.rounded()`,
+   `SettingsView`/`MenuBarContentView`/`ModelManagementView` — a second
+   review pass caught the last of the three), and simplified
+   `FloatingTranscriptPanel.init`'s frame restore to a single
+   `setFrameAutosaveName` call (it already restores + reports success on
+   its own — a separate `setFrameUsingName` call first was redundant). That
+   second pass also made `positionAtBottomCenterOfScreen()` fall back to
+   `NSScreen.screens.first` before `center()` (`NSScreen.main` — the screen
+   holding the key window — can read `nil` for the brief window right at
+   launch before this never-key/never-main accessory app has any window the
+   system considers key/main yet), and made `ModelDownloadManager`'s
+   job-cleanup `defer` call `objectWillChange.send()` explicitly rather than
+   relying on a `@Published` dictionary mutation to imply it.
 4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,

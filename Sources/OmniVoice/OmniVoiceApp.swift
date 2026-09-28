@@ -7,10 +7,12 @@ struct OmniVoiceApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra("OmniVoice", systemImage: "waveform") {
-            MenuBarContentView()
+        MenuBarExtra {
+            MenuBarContentView(modelDownloadManager: appDelegate.session.modelDownloadManager)
                 .environmentObject(appDelegate.session)
                 .environmentObject(appDelegate)
+        } label: {
+            MenuBarLabel(modelDownloadManager: appDelegate.session.modelDownloadManager)
         }
         .menuBarExtraStyle(.menu)
 

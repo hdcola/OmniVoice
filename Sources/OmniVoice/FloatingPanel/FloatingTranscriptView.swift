@@ -34,8 +34,19 @@ struct FloatingTranscriptView: View {
             Divider()
             statusBar
         }
+        // Applied to the whole content stack, not the background below —
+        // `session.panelContentOpacity`/`panelBackgroundOpacity` are
+        // deliberately independent (see the former's doc): fading the
+        // transcript/controls must never also fade the background material
+        // (or vice versa), which is exactly what a single window-level
+        // `NSWindow.alphaValue` couldn't do.
+        .opacity(session.panelContentOpacity)
         .frame(minWidth: 380, maxWidth: .infinity, minHeight: 200, maxHeight: .infinity)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(.ultraThinMaterial)
+                .opacity(session.panelBackgroundOpacity)
+        )
         .onAppear { rebuildConfiguration() }
         .onChange(of: session.sourceLanguageCode) { rebuildConfiguration() }
         .onChange(of: session.targetLanguageCode) { rebuildConfiguration() }

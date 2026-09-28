@@ -308,6 +308,32 @@ struct ModelDownloadManagerTests {
         try FileManager.default.removeItem(at: cacheDirectory)
     }
 
+    /// `hasActiveDownloads` is meant for a global "something is downloading"
+    /// indicator (the menu bar icon/menu row) that doesn't care *which*
+    /// variant — this guards both halves: `false` with nothing in flight,
+    /// `true` for the duration of an in-flight job, `false` again once it
+    /// finishes.
+    @Test func hasActiveDownloadsReflectsAnyInFlightJob() async throws {
+        let cacheDirectory = makeTempCacheDirectory()
+        let manager = makeMockedManager(cacheDirectory: cacheDirectory)
+        #expect(!manager.hasActiveDownloads)
+
+        let mockedVariant = ModelVariant(
+            id: "mocked-has-active-downloads", engineID: "model.r2t2", displayName: "Mocked", quantization: "Q8_0",
+            approximateSizeMB: 1,
+            downloadURL: StubURLProtocol.slowURL(status: 200, delayMS: 200, path: "has-active.gguf")
+        )
+
+        let task = Task { try await manager.ensureDownloaded(mockedVariant) }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(manager.hasActiveDownloads)
+
+        _ = try await task.value
+        #expect(!manager.hasActiveDownloads)
+
+        try FileManager.default.removeItem(at: cacheDirectory)
+    }
+
     @Test func cacheDirectoryIsExcludedFromBackup() throws {
         let cacheDirectory = makeTempCacheDirectory()
         _ = ModelDownloadManager(cacheDirectory: cacheDirectory)

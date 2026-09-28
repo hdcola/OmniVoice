@@ -162,6 +162,15 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         jobs[variant.id] != nil
     }
 
+    /// Whether *any* variant currently has an `ensureDownloaded` job in
+    /// flight — for a global "downloading" indicator (menu bar icon/menu
+    /// item) that only needs to know "something is downloading", not which
+    /// variant. Not itself `@Published`, but `objectWillChange.send()` fires
+    /// at both job start (`ensureDownloaded`) and job end (the `defer` in its
+    /// `Task`), so an `@ObservedObject` view still redraws whenever this
+    /// changes.
+    public var hasActiveDownloads: Bool { !jobs.isEmpty }
+
     /// Cancels `variant`'s in-flight `ensureDownloaded` pipeline, whichever
     /// phase it's currently in (network transfer or SHA-256 verify/move) —
     /// every awaiter of that same job (see `ensureDownloaded`'s doc on
@@ -244,6 +253,19 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         let job = Task { [weak self] () throws -> URL in
             guard let self else { throw CancellationError() }
             defer {
+                // Explicit here, matching the explicit `objectWillChange.send()`
+                // at job *start* below, rather than leaning on
+                // `downloadProgress[variant.id] = nil` (a `@Published`
+                // mutation) to imply it — that assignment does still notify
+                // even when the key was never populated (a job that throws
+                // before ever reporting progress, the disk-space preflight
+                // check say, leaves `downloadProgress[variant.id]` at "already
+                // nil"), but `jobs`/`hasActiveDownloads` need their own
+                // notification regardless, since neither is itself
+                // `@Published` — spelling it out here keeps this `defer`
+                // legible on its own, without needing to know that detail
+                // about `Dictionary`-backed `@Published` properties.
+                self.objectWillChange.send()
                 self.jobs[variant.id] = nil
                 self.downloadProgress[variant.id] = nil
                 self.progressHandlers[variant.id] = nil
