@@ -86,7 +86,14 @@ final class FloatingTranscriptPanel: NSPanel {
     /// `frame`) already excludes the Dock/menu bar, so this doesn't need its
     /// own check for either.
     func positionAtBottomCenterOfScreen() {
-        guard let screen = NSScreen.main else {
+        // `NSScreen.main` (the screen holding the key window) can come back
+        // `nil` in the short window right at launch, before this
+        // never-key/never-main accessory app has any window the system
+        // considers key/main yet — `NSScreen.screens.first` still gives a
+        // real screen to place the panel on in that case, falling back to
+        // `center()`'s own no-op-safe behavior only if there's truly no
+        // screen at all (e.g. a headless CI runner).
+        guard let screen = NSScreen.main ?? NSScreen.screens.first else {
             center()
             return
         }

@@ -311,11 +311,19 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    follow-up also added test coverage for the new opacity properties (and
    the translation-side undownloaded-model fallback, and
    `ModelDownloadManager.hasActiveDownloads`), fixed `Int(x * 100)`
-   percentage-jitter from binary floating-point rounding (now
-   `.rounded()`), and simplified `FloatingTranscriptPanel.init`'s frame
-   restore to a single `setFrameAutosaveName` call (it already restores +
-   reports success on its own — a separate `setFrameUsingName` call first
-   was redundant).
+   percentage-jitter from binary floating-point rounding (now `.rounded()`,
+   `SettingsView`/`MenuBarContentView`/`ModelManagementView` — a second
+   review pass caught the last of the three), and simplified
+   `FloatingTranscriptPanel.init`'s frame restore to a single
+   `setFrameAutosaveName` call (it already restores + reports success on
+   its own — a separate `setFrameUsingName` call first was redundant). That
+   second pass also made `positionAtBottomCenterOfScreen()` fall back to
+   `NSScreen.screens.first` before `center()` (`NSScreen.main` — the screen
+   holding the key window — can read `nil` for the brief window right at
+   launch before this never-key/never-main accessory app has any window the
+   system considers key/main yet), and made `ModelDownloadManager`'s
+   job-cleanup `defer` call `objectWillChange.send()` explicitly rather than
+   relying on a `@Published` dictionary mutation to imply it.
 4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,

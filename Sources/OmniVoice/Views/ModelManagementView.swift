@@ -90,7 +90,11 @@ struct ModelManagementView: View {
                     // moment); waiting on `downloadProgress` left the button
                     // reading "下载" during that gap, inviting a second tap.
                     if let fraction = downloadManager.downloadProgress[variant.id] {
-                        Text("下载中… \(Int(fraction * 100))%")
+                        // `.rounded()`, not a bare `Int(...)` truncation — see
+                        // `SettingsView`'s `opacitySlider` doc for why (binary
+                        // floating-point rounding can land a hair under a
+                        // "clean" percentage).
+                        Text("下载中… \(Int((fraction * 100).rounded()))%")
                             .foregroundStyle(.secondary)
                             .font(.caption)
                         ProgressView(value: fraction)
