@@ -177,6 +177,20 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       Bundles everything merged since `0.0.1`: the model download/cache
       manager + dedicated "模型管理" window (PRs #11/#12), and the Model
       Management UX + floating-panel-position/opacity follow-up (PR #13).
+- [x] **0.1.1 release cut** (2026-09-28, `chore/release-0.1.1`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.1.1,
+      `CFBundleVersion` 3), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.1.1]` section, `README.md`'s version/download-link references
+      bumped to match. Fixes a real, user-reported crash: the 0.1.0 Homebrew
+      cask's `OmniVoice.app` linked `libaudiocpp`/`libllama`/`libggml-*` via
+      absolute `-rpath` entries pointing at the build machine's
+      `third_party/` checkout, so every packaged build died on launch on any
+      other machine with `dyld: Library not loaded: @rpath/libaudiocpp.0.dylib`
+      — `Scripts/build_app.sh` now embeds those dylibs into
+      `Contents/Frameworks` and rewrites rpaths to be relocatable (PRs
+      #18/#20; verified end-to-end on a machine with `third_party` actually
+      built — see those PRs' review comments). Still ad-hoc signed only
+      (no Developer ID/notarization yet — see Open Items #4).
 
 ### Code review findings (fixed)
 
