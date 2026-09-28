@@ -12,14 +12,23 @@ The format is based on Keep a Changelog.
 
 ### Fixed
 
-- fix(packaging): embed `libaudiocpp`/`libllama`/`libggml-*` dylibs into `OmniVoice.app/Contents/Frameworks` and rewrite their rpaths to `@executable_path`/`@loader_path` in `Scripts/build_app.sh` — the app previously linked those dylibs via absolute `-rpath` entries pointing at the build machine's `third_party/{audio.cpp,llama.cpp}` checkout, so any packaged build crashed on launch elsewhere with `dyld: Library not loaded: @rpath/libaudiocpp.0.dylib` (#18)
-- fix(packaging): harden `Scripts/build_app.sh`'s rpath rewrite against a build path containing a space (previously word-split by `for rp in $(...)`, silently truncating `install_name_tool -delete_rpath`'s argument) and make `-add_rpath` on the main executable idempotent (it errors with "would duplicate path" on a second call)
-
 ### Dependencies
 
 ### Documentation
 
 ### Tests
+
+## [0.1.1] - 2026-09-28
+
+### Fixed
+
+- fix(packaging): embed `libaudiocpp`/`libllama`/`libggml-*` dylibs into `OmniVoice.app/Contents/Frameworks` and rewrite their rpaths to `@executable_path`/`@loader_path` in `Scripts/build_app.sh` — the app previously linked those dylibs via absolute `-rpath` entries pointing at the build machine's `third_party/{audio.cpp,llama.cpp}` checkout, so any packaged build crashed on launch elsewhere with `dyld: Library not loaded: @rpath/libaudiocpp.0.dylib` (#18)
+- fix(packaging): harden `Scripts/build_app.sh`'s rpath rewrite against a build path containing a space (previously word-split by `for rp in $(...)`, silently truncating `install_name_tool -delete_rpath`'s argument) and make `-add_rpath` on the main executable idempotent (it errors with "would duplicate path" on a second call) (#20)
+
+### Documentation
+
+- docs(repo): note Homebrew 7+'s untrusted-tap prompt (`brew trust hdcola/tap`) needed before `brew install --cask omnivoice` (#15)
+- docs(repo): make `brew trust hdcola/tap` a proactive install step in `README.md`'s Homebrew snippet, instead of an "if you hit this error" footnote (#16)
 
 ## [0.1.0] - 2026-09-28
 
