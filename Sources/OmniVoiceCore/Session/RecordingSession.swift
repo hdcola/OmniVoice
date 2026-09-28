@@ -79,7 +79,7 @@ public final class RecordingSession: ObservableObject {
     /// whole view, so lowering it lets the panel visually "see through" to
     /// whatever's behind it (a slide, a video call window) without touching
     /// the transcript text/controls at all. Split out from
-    /// `panelTextOpacity` below on purpose: a single window-level
+    /// `panelContentOpacity` below on purpose: a single window-level
     /// `NSWindow.alphaValue` (an earlier version of this used exactly that)
     /// fades everything uniformly, so turning the panel more see-through
     /// always made the text harder to read right along with it — the two
@@ -104,22 +104,26 @@ public final class RecordingSession: ObservableObject {
         }
     }
 
-    /// The floating panel's *foreground* (transcript text + controls)
-    /// opacity — applied via a plain SwiftUI `.opacity()` around
-    /// `FloatingTranscriptView`'s whole content stack, independent of
+    /// The floating panel's *content* opacity — transcript text, the
+    /// start/stop button, language pickers, the close button, dividers, the
+    /// status bar, all of it — applied via a plain SwiftUI `.opacity()`
+    /// around `FloatingTranscriptView`'s whole content stack, independent of
     /// `panelBackgroundOpacity` above (see that property's doc for why
-    /// they're split). Clamped to `0.4...1.0` — unlike the background, text
-    /// legibility degrades badly well before full transparency, so this
-    /// floor is meaningfully higher than the background's. Defaults to `1.0`.
-    /// Persisted (see `PersistedSettingsKey`).
-    @Published public var panelTextOpacity: Double = 1.0 {
+    /// they're split). Named "内容透明度" ("content opacity"), not "文字
+    /// 透明度" ("text opacity"), in `SettingsView` for exactly that reason —
+    /// it fades every control in the panel, not just the transcript text.
+    /// Clamped to `0.4...1.0` — unlike the background, legibility degrades
+    /// badly well before full transparency, so this floor is meaningfully
+    /// higher than the background's. Defaults to `1.0`. Persisted (see
+    /// `PersistedSettingsKey`).
+    @Published public var panelContentOpacity: Double = 1.0 {
         didSet {
-            let clamped = min(max(panelTextOpacity, 0.4), 1.0)
-            if clamped != panelTextOpacity {
-                panelTextOpacity = clamped
+            let clamped = min(max(panelContentOpacity, 0.4), 1.0)
+            if clamped != panelContentOpacity {
+                panelContentOpacity = clamped
                 return
             }
-            Self.defaults.set(panelTextOpacity, forKey: PersistedSettingsKey.panelTextOpacity)
+            Self.defaults.set(panelContentOpacity, forKey: PersistedSettingsKey.panelContentOpacity)
         }
     }
 
@@ -370,8 +374,8 @@ public final class RecordingSession: ObservableObject {
         if defaults.object(forKey: PersistedSettingsKey.panelBackgroundOpacity) != nil {
             panelBackgroundOpacity = defaults.double(forKey: PersistedSettingsKey.panelBackgroundOpacity)
         }
-        if defaults.object(forKey: PersistedSettingsKey.panelTextOpacity) != nil {
-            panelTextOpacity = defaults.double(forKey: PersistedSettingsKey.panelTextOpacity)
+        if defaults.object(forKey: PersistedSettingsKey.panelContentOpacity) != nil {
+            panelContentOpacity = defaults.double(forKey: PersistedSettingsKey.panelContentOpacity)
         }
 
         validateAndNormalizeSourceLanguage()
@@ -402,6 +406,18 @@ public final class RecordingSession: ObservableObject {
         }
     }
 
+    /// Whether *any* variant of `engineID` is downloaded — deliberately not
+    /// "is the currently-*selected* variant downloaded", since today every
+    /// `.model` engine has exactly one catalog variant, so the two questions
+    /// have the same answer. Once a second quantization/size is added to some
+    /// engine, they won't: deleting the *selected* variant while a different
+    /// one for the same engine stays downloaded would leave this reading
+    /// `true` (no fallback to `.system`) while `currentTranscriptionModelVariant`/
+    /// `currentTranslationModelVariant` still point at the deleted one.
+    /// `validateAndNormalizeModelVariantSelections()` would need its own
+    /// "selected variant not downloaded ⇒ fall back to another downloaded
+    /// variant of the same engine" case added alongside this one at that
+    /// point — not needed while single-variant-per-engine holds.
     private func hasDownloadedModelVariant(engineID: String) -> Bool {
         ProviderCatalog.modelVariants(forEngineID: engineID).contains { modelDownloadManager.isDownloaded($0) }
     }
@@ -1130,5 +1146,5 @@ enum PersistedSettingsKey {
     static let transcriptionModelVariantID = "org.omnivoice.transcriptionModelVariantID"
     static let translationModelVariantID = "org.omnivoice.translationModelVariantID"
     static let panelBackgroundOpacity = "org.omnivoice.panelBackgroundOpacity"
-    static let panelTextOpacity = "org.omnivoice.panelTextOpacity"
+    static let panelContentOpacity = "org.omnivoice.panelContentOpacity"
 }

@@ -59,16 +59,17 @@ final class FloatingTranscriptPanel: NSPanel {
         // under "NSWindow Frame FloatingTranscriptPanel") across quit/relaunch
         // — dragging or resizing the panel (both already wired up above)
         // triggers AppKit's own frame-change notifications, which
-        // `setFrameAutosaveName(_:)` alone is enough to hook into; no
-        // `windowDidMove`/`windowDidResize` delegate needed. That call only
-        // arranges *future* saves, though — it doesn't restore anything on
-        // its own, so `setFrameUsingName(_:)` must run first (standard AppKit
-        // idiom): it applies a previously-saved frame if one exists and
-        // returns whether it found one, false on a fresh install (nothing
-        // saved yet) or if the saved frame doesn't fit any connected screen
-        // (falls back to `contentRect`/`center()` either way).
-        didRestoreFrame = setFrameUsingName(Self.frameAutosaveName)
-        setFrameAutosaveName(Self.frameAutosaveName)
+        // `setFrameAutosaveName(_:)` is enough to hook into on its own; no
+        // `windowDidMove`/`windowDidResize` delegate needed. Its `Bool`
+        // return already covers the *restore* side too (it both applies a
+        // previously-saved frame, if one exists, and arranges future saves
+        // under the same name in one call — an explicit separate
+        // `setFrameUsingName(_:)` call first would just be redundant): `true`
+        // if a saved frame existed and was applied, `false` on a fresh
+        // install (nothing saved yet) or if the saved frame doesn't fit any
+        // connected screen (falls back to `contentRect`/`center()` either
+        // way).
+        didRestoreFrame = setFrameAutosaveName(Self.frameAutosaveName)
     }
 
     /// Never becomes key — clicking/dragging the panel must not steal focus

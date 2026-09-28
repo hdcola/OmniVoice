@@ -135,7 +135,7 @@ struct MenuBarContentView: View {
         guard let fraction = downloadManager.downloadProgress.values.max() else {
             return downloadManager.hasActiveDownloads ? "模型管理…（准备下载…）" : "模型管理…"
         }
-        return "模型管理…（下载中 \(Int(fraction * 100))%）"
+        return "模型管理…（下载中 \(Int((fraction * 100).rounded()))%）"
     }
 }
 
@@ -155,7 +155,7 @@ struct MenuBarLabel: View {
 
     var body: some View {
         if let fraction = downloadManager.downloadProgress.values.max() {
-            Label("\(Int(fraction * 100))%", systemImage: "arrow.down.circle")
+            Label("\(Int((fraction * 100).rounded()))%", systemImage: "arrow.down.circle")
         } else if downloadManager.hasActiveDownloads {
             Label("下载中", systemImage: "arrow.down.circle")
         } else {

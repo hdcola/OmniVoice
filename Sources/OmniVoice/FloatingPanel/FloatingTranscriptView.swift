@@ -35,12 +35,12 @@ struct FloatingTranscriptView: View {
             statusBar
         }
         // Applied to the whole content stack, not the background below —
-        // `session.panelTextOpacity`/`panelBackgroundOpacity` are
+        // `session.panelContentOpacity`/`panelBackgroundOpacity` are
         // deliberately independent (see the former's doc): fading the
         // transcript/controls must never also fade the background material
         // (or vice versa), which is exactly what a single window-level
         // `NSWindow.alphaValue` couldn't do.
-        .opacity(session.panelTextOpacity)
+        .opacity(session.panelContentOpacity)
         .frame(minWidth: 380, maxWidth: .infinity, minHeight: 200, maxHeight: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 14)

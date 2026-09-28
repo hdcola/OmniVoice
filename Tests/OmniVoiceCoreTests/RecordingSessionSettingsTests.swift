@@ -515,6 +515,78 @@ struct RecordingSessionSettingsTests {
         #expect(!session.statusMessage.contains("尚未下载"))
     }
 
+    /// Complements `recognizedPersistedTranscriptionEngineIDWithNothingDownloadedFallsBackToSystem`
+    /// — the same self-heal applies to `translationEngineID` independently.
+    @Test func recognizedPersistedTranslationEngineIDWithNothingDownloadedFallsBackToSystem() {
+        withPersisted([PersistedSettingsKey.translationEngineID: "model.t3po"]) {
+            let session = RecordingSession(modelDownloadManager: ModelDownloadManager(cacheDirectory: makeEmptyTempCacheDirectory()))
+            #expect(session.translationEngineID == "system.translation")
+        }
+    }
+
+    /// Complements `preloadModelFallsBackToSystemEngineWhenTheSelectedVariantIsntDownloaded`
+    /// — the same fallback applies on the translation side independently of
+    /// the transcription side.
+    @Test func preloadModelFallsBackToSystemEngineForTranslationWhenTheSelectedVariantIsntDownloaded() async throws {
+        defer { defaults.removeObject(forKey: PersistedSettingsKey.translationEngineID) }
+        let session = RecordingSession(modelDownloadManager: ModelDownloadManager(cacheDirectory: makeEmptyTempCacheDirectory()))
+        session.translationEngineID = "model.t3po"
+
+        await session.preloadModel()
+
+        #expect(session.isModelLoaded)
+        #expect(session.translationEngineID == "system.translation")
+        #expect(!session.statusMessage.contains("尚未下载"))
+    }
+
+    // MARK: - Floating panel opacity
+
+    @Test func panelOpacityDefaultsMatchTheirDocumentedValues() {
+        let session = RecordingSession()
+        #expect(session.panelBackgroundOpacity == 0.5)
+        #expect(session.panelContentOpacity == 1.0)
+    }
+
+    @Test func panelBackgroundOpacityIsRestoredFromPersistedValue() {
+        withPersisted([PersistedSettingsKey.panelBackgroundOpacity: 0.75]) {
+            let session = RecordingSession()
+            #expect(session.panelBackgroundOpacity == 0.75)
+        }
+    }
+
+    @Test func panelContentOpacityIsRestoredFromPersistedValue() {
+        withPersisted([PersistedSettingsKey.panelContentOpacity: 0.6]) {
+            let session = RecordingSession()
+            #expect(session.panelContentOpacity == 0.6)
+        }
+    }
+
+    /// `panelBackgroundOpacity`'s range (`0.1...1.0`) is wider than
+    /// `panelContentOpacity`'s (`0.4...1.0`) — text/control legibility
+    /// degrades badly well before full transparency, so its floor is
+    /// meaningfully higher. Both clamp on assignment, not just at the
+    /// `Slider` UI layer, since these are public, externally-settable
+    /// properties.
+    @Test func panelBackgroundOpacityClampsToItsRange() {
+        defer { defaults.removeObject(forKey: PersistedSettingsKey.panelBackgroundOpacity) }
+        let session = RecordingSession()
+        session.panelBackgroundOpacity = -1
+        #expect(session.panelBackgroundOpacity == 0.1)
+
+        session.panelBackgroundOpacity = 5
+        #expect(session.panelBackgroundOpacity == 1.0)
+    }
+
+    @Test func panelContentOpacityClampsToItsRange() {
+        defer { defaults.removeObject(forKey: PersistedSettingsKey.panelContentOpacity) }
+        let session = RecordingSession()
+        session.panelContentOpacity = -1
+        #expect(session.panelContentOpacity == 0.4)
+
+        session.panelContentOpacity = 5
+        #expect(session.panelContentOpacity == 1.0)
+    }
+
     @Test func isSessionActiveReflectsAnyLifecyclePhase() {
         let session = RecordingSession()
         #expect(!session.isSessionActive)

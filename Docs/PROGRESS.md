@@ -302,10 +302,20 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    screen's bottom-center instead, where live captions conventionally sit.
    Settings also gained a "悬浮窗" section with two independent transparency
    sliders — "背景透明度" (`RecordingSession.panelBackgroundOpacity`) and
-   "文字透明度" (`panelTextOpacity`) — so the panel's background can be made
-   to occlude less of whatever's behind it without also fading the
-   transcript text into illegibility (a first version used one shared
-   `NSWindow.alphaValue`, which faded both together).
+   "内容透明度" (`panelContentOpacity`) — so the panel's background can be
+   made to occlude less of whatever's behind it without also fading the
+   transcript text/controls into illegibility (a first version used one
+   shared `NSWindow.alphaValue`, which faded both together; a second used
+   "文字透明度" for the latter, renamed to "内容透明度" since it fades every
+   control, not just the transcript text). A code review pass on this whole
+   follow-up also added test coverage for the new opacity properties (and
+   the translation-side undownloaded-model fallback, and
+   `ModelDownloadManager.hasActiveDownloads`), fixed `Int(x * 100)`
+   percentage-jitter from binary floating-point rounding (now
+   `.rounded()`), and simplified `FloatingTranscriptPanel.init`'s frame
+   restore to a single `setFrameAutosaveName` call (it already restores +
+   reports success on its own — a separate `setFrameUsingName` call first
+   was redundant).
 4. **Release pipeline**: DMG packaging + Homebrew tap are done (see Done
    above); still open — Developer ID signing + notarization + stapling
    (current `Scripts/build_app.sh`/`build_dmg.sh` output is ad-hoc-signed,

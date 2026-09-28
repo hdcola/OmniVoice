@@ -112,7 +112,7 @@ struct SettingsView: View {
 
             // Deliberately outside the `.disabled(isBusy)` sections above —
             // these only ever touch `FloatingTranscriptView`'s own SwiftUI
-            // opacity (see `panelBackgroundOpacity`/`panelTextOpacity`'s
+            // opacity (see `panelBackgroundOpacity`/`panelContentOpacity`'s
             // docs), never anything `start()` reads once at setup time, so
             // there's no race to guard against; adjusting either while
             // recording (to see through the panel at whatever's behind it,
@@ -126,8 +126,11 @@ struct SettingsView: View {
                 opacitySlider(
                     "背景透明度", value: $session.panelBackgroundOpacity, range: 0.1...1.0
                 )
+                // "内容透明度", not "文字透明度" — `panelContentOpacity`
+                // fades the whole panel content stack (buttons/pickers/
+                // dividers/status bar too), not just the transcript text.
                 opacitySlider(
-                    "文字透明度", value: $session.panelTextOpacity, range: 0.4...1.0
+                    "内容透明度", value: $session.panelContentOpacity, range: 0.4...1.0
                 )
             }
         }
@@ -216,7 +219,12 @@ struct SettingsView: View {
         HStack {
             Text(label)
             Slider(value: value, in: range)
-            Text("\(Int(value.wrappedValue * 100))%")
+            // `.rounded()`, not a bare `Int(...)` truncation — a `Slider`'s
+            // underlying `Double` can land a hair under a "clean" percentage
+            // from binary floating-point rounding (e.g. 0.29999999999999994
+            // for what's visually 0.3), which truncation reads as 29% —
+            // jittery/off-by-one against where the thumb actually looks.
+            Text("\(Int((value.wrappedValue * 100).rounded()))%")
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
                 .frame(width: 40, alignment: .trailing)
