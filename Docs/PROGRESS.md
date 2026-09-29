@@ -259,11 +259,12 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    prints `SURVIVED`/exit 0 against the real `r2t2-q8_0.gguf` weights (same
    deterministic repro that used to SIGSEGV), and `swift build --configuration
    release` + `swift test` (70 tests) + a packaged `build_app.sh` app
-   launching and quitting cleanly all pass. Not separately re-verified
-   through the mic-driven UI stop/rotate flow (only the library-level repro
-   and app launch/quit) — low risk, since the repro matches the original
-   crash frame-for-frame, but worth a mic smoke test before fully forgetting
-   about this.
+   launching and quitting cleanly all pass. **Mic-driven UI smoke test done**
+   (2026-09-28): downloaded the real R2T2 weights
+   (`models/Confucius4-R2T2-GGUF/r2t2-q8_0.gguf`), rebuilt/repackaged the app
+   against the pinned post-fix `third_party/audio.cpp` checkout, selected
+   `model.r2t2` in Settings, recorded live mic audio, and stopped — no
+   crash. This item is now fully closed.
 2. **Model download-on-first-use** (branch `feature/model-download-manager`):
    `ModelDownloadManager`
    (`Sources/OmniVoiceCore/Inference/ModelDownloadManager.swift`) downloads a
