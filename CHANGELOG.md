@@ -28,6 +28,7 @@ The format is based on Keep a Changelog.
 
 ### Tests
 - test(models): add `ModelBundleStatusTests`, pinning the round-4 recommended-bundle report's exact scenario (R2T2 Q8_0 downloaded, T3PO Q5_K_M not) plus sibling-quantization and full-completion cases against `ModelBundle.status(isDownloaded:)`
+- test(uitests): stand up `UITests/` — an xcodegen-generated, unhosted XCUITest target that drives the real `build/OmniVoice.app` via `XCUIApplication(url:)`, with a passing smoke test confirming it launches the app and reads its onboarding window; `swift build`/`swift test` for the SPM package are untouched (see `UITests/README.md`)
 
 ## [0.3.0] - 2026-09-29
 
