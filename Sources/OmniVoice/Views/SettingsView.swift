@@ -104,14 +104,9 @@ struct SettingsView: View {
                 .disabled(isBusy)
                 inlineDownloadSection(forEngineID: session.translationEngineID)
                 // T3PO is the only engine with a WAIT/TRANS decision to bias
-                // (see `TranslationCommitEagerness`'s doc), so it gets its
-                // own picker; every other (one-shot) engine instead exposes
-                // the actual character threshold it reads
-                // (`TranslationConfig.earlyTranslateThreshold`'s doc) as a
-                // plain, directly user-configurable number — showing both
-                // controls at once, or the wrong one for the selected
-                // engine, would just be confusing. Deliberately *not*
-                // `.disabled(isBusy)` in either branch — safe to change
+                // (see `TranslationCommitEagerness`'s doc), so its picker
+                // stays right here next to the engine choice it biases.
+                // Deliberately *not* `.disabled(isBusy)` — safe to change
                 // mid-recording, same as `targetLanguageCode`'s picker.
                 if session.translationEngineID == "model.t3po" {
                     Picker("翻译提交策略", selection: $session.translationCommitEagerness) {
@@ -119,23 +114,46 @@ struct SettingsView: View {
                             Text(eagerness.displayName).tag(eagerness)
                         }
                     }
-                } else if session.transcriptionEngineKind != .system {
+                }
+            }
+
+            // Problem 2 (round-4 user report) — every other one-shot
+            // translation engine (HY-MT1.5/system translation, i.e. every
+            // `.model`-kind ASR pairing except T3PO) instead exposes the
+            // actual character threshold it reads
+            // (`TranslationConfig.earlyTranslateThreshold`'s doc) as a
+            // plain, directly user-configurable number. Sitting as a bare
+            // `Stepper` wedged between the engine `Picker`s and the memory
+            // console read as an unexplained, out-of-place control; it now
+            // gets its own titled/explained section instead. Same
+            // visibility rule as before — hidden outright (not just
+            // disabled) under T3PO (has its own picker above) or the system
+            // ASR engine (see the doc below for why it's a genuine no-op
+            // there), rather than shown greyed-out with nothing to act on.
+            if session.translationEngineID != "model.t3po", session.transcriptionEngineKind != .system {
+                Section("翻译输出") {
+                    Text(
+                        "缓存的原文达到该字数的一半、且遇到句号/问号/换行等断句点时，会提前把已缓存内容翻译一次；"
+                            + "达到完整阈值后，即使还没遇到断句点也会强制翻译，避免长句迟迟不出字。"
+                            + "数值越低出字越快，但长句越容易被拆成更多段；数值越高单段更完整，但可能等得更久。"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                     // Task 1.4 (清理无效参数干扰) — See
                     // `TranslationConfig.earlyTranslateThreshold`'s doc for
-                    // why this Stepper is a genuine no-op under the system
-                    // ASR engine: `SystemTranscriptionProvider` never
-                    // reports committed text via `.appended` mid-utterance —
-                    // a finalized result *is* its segment boundary — so
+                    // why this is a genuine no-op under the system ASR
+                    // engine: `SystemTranscriptionProvider` never reports
+                    // committed text via `.appended` mid-utterance — a
+                    // finalized result *is* its segment boundary — so
                     // `translationProvider.feed(_:)` only ever runs once per
                     // segment, with the whole utterance already, immediately
                     // followed by `flush()` in the same call. There's
-                    // nothing "early" left to translate by then. Rather
-                    // than show it disabled with an explanatory caption
-                    // (the old behavior), it's hidden outright.
+                    // nothing "early" left to translate by then.
                     Stepper(
                         "长句提前翻译阈值：\(session.translationEarlyTranslateThreshold) 字",
                         value: $session.translationEarlyTranslateThreshold, in: 20...1000, step: 10
                     )
+                    .help("达到这个字数就提前翻译一次，不必等整句说完；数值越低出字越快，长句可能被拆得更碎。")
                 }
             }
 

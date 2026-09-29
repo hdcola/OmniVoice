@@ -20,6 +20,13 @@ struct OnboardingView: View {
 
     private enum Mode {
         case lightweight
+        /// Problem 1 (round-4 user report) — the middle tier between the
+        /// zero-download system engine and the full R2T2+T3PO pairing:
+        /// downloads `bundle.lightweight` (R2T2 识别 + HY-MT1.5 翻译，约
+        /// 3.4GB) instead. Reuses the same catalog bundle "模型库管理"'s own
+        /// "方案 B：轻量低内存方案" card offers, rather than a second,
+        /// parallel definition of the same pairing.
+        case balanced
         case offlineModel
     }
 
@@ -60,15 +67,33 @@ struct OnboardingView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Step 2：选择适合您的运行模式").font(.headline)
-                HStack(spacing: 12) {
-                    modeCard(
-                        mode: .lightweight, title: "极速轻量模式",
-                        bullets: ["基于 macOS 自带引擎", "零磁盘占用，即开即用", "适合轻度记录与快速尝鲜"]
-                    )
-                    modeCard(
-                        mode: .offlineModel, title: "高精离线大模型模式（推荐）",
-                        bullets: ["基于 R2T2 + T3PO 离线大模型", "混合语种自动判别，打字机流式", "需下载约 12.4 GB 模型"]
-                    )
+                // Problem 1 (round-4 user report) — a third, middle-tier
+                // card sits between the two originals. Wrapped in a
+                // horizontal `ScrollView` rather than widening the window
+                // (this sheet's host `NSWindow` is a fixed, non-resizable
+                // 560pt — see `AppDelegate.presentOnboardingIfNeeded()`):
+                // three cards' natural width comfortably exceeds the
+                // content area at that fixed size, so this keeps every card
+                // fully reachable (scroll to see the rest) instead of
+                // clipping or force-squeezing them illegibly thin.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        modeCard(
+                            mode: .lightweight, title: "极速轻量模式",
+                            bullets: ["基于 macOS 自带引擎", "零磁盘占用，即开即用", "适合轻度记录与快速尝鲜"]
+                        )
+                        modeCard(
+                            mode: .balanced, title: "均衡低内存模式",
+                            bullets: [
+                                "R2T2 识别 + HY-MT1.5 翻译", "混合语种自动识别，整句翻译",
+                                "内存占用低，适合 8GB 设备", "约 3.4 GB，翻译无逐字预览",
+                            ]
+                        )
+                        modeCard(
+                            mode: .offlineModel, title: "高精离线大模型模式（推荐）",
+                            bullets: ["基于 R2T2 + T3PO 离线大模型", "混合语种自动判别，打字机流式", "需下载约 12.4 GB 模型"]
+                        )
+                    }
                 }
             }
 
@@ -77,7 +102,7 @@ struct OnboardingView: View {
             HStack {
                 Button("跳过向导") { finish(startDownload: false) }
                 Spacer()
-                Button("一键开启并下载") { finish(startDownload: selectedMode == .offlineModel) }
+                Button("一键开启并下载") { finish(startDownload: selectedMode != .lightweight) }
                     .buttonStyle(.borderedProminent)
             }
         }
@@ -112,6 +137,11 @@ struct OnboardingView: View {
         }
     }
 
+    /// Fixed `width` (not `.frame(maxWidth: .infinity)`, the original
+    /// two-card layout's approach) — now that these sit inside a horizontal
+    /// `ScrollView` (Problem 1), a greedy width would have each card try to
+    /// claim all the scroll content's unconstrained width instead of laying
+    /// out side by side.
     private func modeCard(mode: Mode, title: String, bullets: [String]) -> some View {
         Button {
             selectedMode = mode
@@ -128,7 +158,7 @@ struct OnboardingView: View {
                 }
             }
             .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(width: 220, alignment: .leading)
             .background(
                 (selectedMode == mode ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06)),
                 in: RoundedRectangle(cornerRadius: 8)
@@ -187,17 +217,28 @@ struct OnboardingView: View {
         onFinished()
     }
 
+    /// Which recommended bundle `.balanced`/`.offlineModel` each kick off —
+    /// `nil` for `.lightweight`, which has nothing to download (Problem 1).
+    private var selectedBundleID: String? {
+        switch selectedMode {
+        case .lightweight: return nil
+        case .balanced: return "bundle.lightweight"
+        case .offlineModel: return "bundle.standard-realtime"
+        }
+    }
+
     /// `true` if there was nothing to download, or a download was
     /// successfully queued; `false` only when the disk-space preflight
     /// failed and `diskSpaceWarningMessage` was set instead — see
     /// `finish(startDownload:)`'s doc for why that distinction is what
     /// keeps this window (and its alert) open on failure.
     private func startBundleDownload() -> Bool {
-        guard let bundle = ProviderCatalog.bundles.first(where: { $0.id == "bundle.standard-realtime" }) else {
+        guard let bundleID = selectedBundleID,
+            let bundle = ProviderCatalog.bundles.first(where: { $0.id == bundleID })
+        else {
             return true
         }
-        let variants = bundle.variantIDs.compactMap(ProviderCatalog.variant(forID:))
-            .filter { !downloadManager.isDownloaded($0) }
+        let variants = bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants
         guard !variants.isEmpty else { return true }
 
         // Task 4.2 — one preflight check against the *combined* remaining

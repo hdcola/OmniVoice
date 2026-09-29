@@ -95,8 +95,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private func presentOnboardingIfNeeded() {
         guard !UserDefaults.standard.bool(forKey: PersistedOnboardingKey.hasCompletedOnboarding) else { return }
         NSApp.activate(ignoringOtherApps: true)
+        // Height bumped from 420 to 440 (Problem 1, round-4 user report) —
+        // the third "均衡低内存模式" mode card has one extra bullet line
+        // versus the original two cards, growing Step 2's natural height
+        // slightly; this window has no `.resizable` style mask, so without
+        // the extra headroom the bottom action row could clip.
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 440),
             styleMask: [.titled, .closable],
             backing: .buffered, defer: false
         )
