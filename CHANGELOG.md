@@ -8,6 +8,20 @@ The format is based on Keep a Changelog.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.2.0] - 2026-09-29
+
+### Added
+
 - feat(translation): add Tencent's HY-MT1.5 1.8B as a second, one-shot in-process local translation engine (`model.hymt15`) alongside T3PO — a genuinely low-memory option (~1.06GB/~1.82GB vs. T3PO's ~9.8GB) (#27)
 - feat(audio): add a "无" microphone option for system-audio-only recording (a meeting/lecture played through the Mac's own output, no one talking into a mic) (#27)
 - feat(translation): make translation commit timing user-configurable — a "翻译提交策略" picker for T3PO's WAIT/TRANS bias, and a directly adjustable "长句提前翻译阈值" character count for one-shot engines (HY-MT1.5/system translation), so a single long, pause-free utterance no longer waits for the whole thing before any translation shows up (#27)
