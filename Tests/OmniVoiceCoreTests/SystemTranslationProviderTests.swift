@@ -4,9 +4,27 @@ import Testing
 /// Covers `TranslationConfig.earlyTranslateThreshold`'s length-threshold
 /// behavior for a one-shot engine — see `SystemTranslationProvider.feed(_:)`'s
 /// doc for why a long, pause-free utterance needs an early, non-final bridge
-/// request rather than waiting for `flush()`.
+/// request rather than waiting for `flush()` — and the FIFO-ordering fix in
+/// `sendBridgeRequest(isFinal:)`'s doc that keeps that safe across multiple
+/// utterances.
 @MainActor
 struct SystemTranslationProviderTests {
+    /// Drains `requests` in FIFO order via `receiveResult`, exactly the way
+    /// `FloatingTranscriptView`'s `.translationTask` loop consumes
+    /// `translationBridgeStream()` — one request's result fully applied
+    /// before the next is even considered. Real `translate(_:)` calls are
+    /// stubbed by `resolvedText` (`nil` for the empty-text sentinel case,
+    /// where the real loop skips the call entirely — see
+    /// `TranslationBridgeRequest.text`'s doc).
+    private func resolveInOrder(
+        _ requests: [TranslationBridgeRequest], on provider: SystemTranslationProvider,
+        resolvedText: (TranslationBridgeRequest) -> String
+    ) {
+        for request in requests {
+            provider.receiveResult(request.text.isEmpty ? "" : resolvedText(request), isFinal: request.isFinal)
+        }
+    }
+
     @Test func feedBelowThresholdSendsNoBridgeRequest() async throws {
         let provider = SystemTranslationProvider()
         var requests: [TranslationBridgeRequest] = []
@@ -18,7 +36,7 @@ struct SystemTranslationProviderTests {
         #expect(requests.isEmpty)
     }
 
-    @Test func feedCrossingThresholdSendsANonFinalBridgeRequestAndClearsTheBuffer() async throws {
+    @Test func feedCrossingThresholdSendsANonFinalBridgeRequest() async throws {
         let provider = SystemTranslationProvider()
         var requests: [TranslationBridgeRequest] = []
         provider.onBridgeRequest = { requests.append($0) }
@@ -30,11 +48,27 @@ struct SystemTranslationProviderTests {
         #expect(requests.count == 1)
         #expect(requests.first?.text == longText)
         #expect(requests.first?.isFinal == false)
+    }
 
-        // The buffer was cleared by the early request — a subsequent flush
-        // with nothing new fed should have nothing left to send.
-        provider.flush()
-        #expect(requests.count == 1)
+    /// `flush()` finding the buffer already drained by an earlier early
+    /// request must not just silently do nothing — it still needs to send
+    /// an (empty-text) sentinel so the boundary reaches
+    /// `receiveResult(_:isFinal:)` in the correct FIFO position, not before
+    /// the earlier request resolves. See
+    /// `feedCrossingThresholdThenFlushingPreservesOrderAcrossTwoUtterances`
+    /// for the full end-to-end scenario this enables.
+    @Test func flushAfterAnEarlyRequestDrainedTheBufferSendsAnEmptySentinel() async throws {
+        let provider = SystemTranslationProvider()
+        var requests: [TranslationBridgeRequest] = []
+        provider.onBridgeRequest = { requests.append($0) }
+        try await provider.start(config: TranslationConfig(targetLanguageCode: "zh-CN", earlyTranslateThreshold: 60))
+
+        provider.feed(String(repeating: "x", count: 60)) // sends the early request
+        provider.flush() // buffer is now empty — must still send a sentinel, not no-op
+
+        #expect(requests.count == 2)
+        #expect(requests[1].text.isEmpty)
+        #expect(requests[1].isFinal == true)
     }
 
     @Test func flushSendsAFinalBridgeRequest() async throws {
@@ -63,6 +97,21 @@ struct SystemTranslationProviderTests {
 
         provider.receiveResult("最终片段", isFinal: true)
         #expect(commits == ["早期片段", "最终片段"])
+        #expect(flushBoundaryCount == 1)
+    }
+
+    /// A sentinel's result (empty text) must never reach `onCommit` — it's a
+    /// boundary marker, not a (if unhelpful) real translation.
+    @Test func receiveResultWithEmptyTextDoesNotCommit() {
+        let provider = SystemTranslationProvider()
+        var commits: [String] = []
+        var flushBoundaryCount = 0
+        provider.onCommit = { commits.append($0) }
+        provider.onFlushBoundary = { flushBoundaryCount += 1 }
+
+        provider.receiveResult("", isFinal: true)
+
+        #expect(commits.isEmpty)
         #expect(flushBoundaryCount == 1)
     }
 
@@ -108,34 +157,54 @@ struct SystemTranslationProviderTests {
         #expect(flushBoundaryCount == 1)
     }
 
-    /// Regression test for a real race: an early (non-final) request drains
-    /// the buffer, then a `flush()` (an ASR segment boundary arriving before
-    /// that request's async result comes back) must *not* fire
-    /// `onFlushBoundary` right away — doing so would advance
-    /// `translationRowIndex` before the pending request's `onCommit` lands,
-    /// misrouting that commit into the next segment's row once it finally
-    /// resolves. See `SystemTranslationProvider.sendBridgeRequest(isFinal:)`'s
-    /// doc.
-    @Test func flushDefersItsBoundaryUntilAnEarlierPendingRequestResolves() async throws {
+    /// End-to-end regression test for the real bug this whole mechanism
+    /// exists to prevent: utterance 1 is long enough to send an early
+    /// request, then ends (its `flush()` finds an empty buffer); before
+    /// that early request resolves, utterance 2 begins and *also* ends. All
+    /// three now-pending requests (early-1, sentinel-1, final-2) must
+    /// resolve — in the order they were sent — into exactly two flush
+    /// boundaries and two separate commits, never merging utterance 1 and
+    /// utterance 2's text into the same row or losing a boundary.
+    ///
+    /// An earlier fix used a single `pendingFlushBoundary` flag instead of
+    /// this FIFO-sentinel design and failed exactly this scenario: it could
+    /// only remember "one boundary is owed", not "how many", so utterance
+    /// 2's own final request resolving first (in that flag-based version)
+    /// swallowed utterance 1's still-deferred boundary — one fewer
+    /// `onFlushBoundary` fire than actual utterances, permanently
+    /// misaligning every row after it.
+    @Test func twoUtterancesInFlightAtOnceEachGetTheirOwnBoundaryAndCommit() async throws {
         let provider = SystemTranslationProvider()
+        var requests: [TranslationBridgeRequest] = []
         var commits: [String] = []
         var flushBoundaryCount = 0
-        provider.onBridgeRequest = { _ in }
+        provider.onBridgeRequest = { requests.append($0) }
         provider.onCommit = { commits.append($0) }
         provider.onFlushBoundary = { flushBoundaryCount += 1 }
         try await provider.start(config: TranslationConfig(targetLanguageCode: "zh-CN", earlyTranslateThreshold: 60))
 
-        provider.feed(String(repeating: "x", count: 60)) // sends an early, non-final request
-        provider.flush() // buffer is now empty — must defer, not fire immediately
+        // Utterance 1: long enough to send an early request, then ends.
+        provider.feed(String(repeating: "x", count: 60))
+        provider.flush()
 
-        #expect(flushBoundaryCount == 0)
+        // Utterance 2 begins and ends before utterance 1's early request
+        // has resolved (a real, async on-device translate call would still
+        // be in flight at this point).
+        provider.feed("Next sentence.")
+        provider.flush()
+
+        #expect(requests.count == 3) // early-1, sentinel-1, final-2
         #expect(commits.isEmpty)
+        #expect(flushBoundaryCount == 0)
 
-        // The early request's result finally arrives.
-        provider.receiveResult("早期翻译", isFinal: false)
+        // The bridging view resolves them strictly in the order they were
+        // sent (see `resolveInOrder`'s doc).
+        resolveInOrder(requests, on: provider) { request in
+            request.text == String(repeating: "x", count: 60) ? "早期翻译" : "第二句翻译"
+        }
 
-        #expect(commits == ["早期翻译"])
-        #expect(flushBoundaryCount == 1) // the deferred boundary fires now, not before
+        #expect(commits == ["早期翻译", "第二句翻译"])
+        #expect(flushBoundaryCount == 2) // one boundary per utterance, not one total
     }
 
     @Test func updateEarlyTranslateThresholdTakesEffectMidSession() async throws {

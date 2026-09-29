@@ -690,4 +690,34 @@ struct RecordingSessionSettingsTests {
         #expect(!session.isRunning)
         #expect(session.statusMessage.contains("包含系统声音"))
     }
+
+    @Test func appendTranslationInsertsASpaceBetweenFragmentsForASpaceSeparatedTargetLanguage() {
+        let session = RecordingSession()
+        session.targetLanguageCode = "en-US"
+
+        session.appendTranslation("I went to the store.")
+        session.appendTranslation("And bought some fruit.")
+
+        #expect(session.lines[0].translation == "I went to the store. And bought some fruit.")
+    }
+
+    @Test func appendTranslationDoesNotInsertASpaceForACJKTargetLanguage() {
+        let session = RecordingSession()
+        session.targetLanguageCode = "zh-CN"
+
+        session.appendTranslation("我去了商店。")
+        session.appendTranslation("买了些水果。")
+
+        #expect(session.lines[0].translation == "我去了商店。买了些水果。")
+    }
+
+    @Test func appendTranslationDoesNotDoubleUpAnAlreadyPresentSpace() {
+        let session = RecordingSession()
+        session.targetLanguageCode = "en-US"
+
+        session.appendTranslation("Hello ")
+        session.appendTranslation("world.")
+
+        #expect(session.lines[0].translation == "Hello world.")
+    }
 }

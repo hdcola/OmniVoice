@@ -1124,10 +1124,38 @@ public final class RecordingSession: ObservableObject {
         }
     }
 
-    private func appendTranslation(_ text: String) {
+    /// Appends `text` to the current translation row — possibly more than
+    /// once per row (T3PO's mid-segment forced probes, or a one-shot
+    /// engine's `earlyTranslateThreshold`-driven early commit, both append
+    /// without closing the row; see `TranslationCommitEagerness`'s doc).
+    /// Inserts a single space between fragments for a target language that
+    /// separates words with spaces — English or Korean, per this app's own
+    /// `LanguageCatalog`, not Chinese/Japanese — so two fragments joined
+    /// mid-sentence (e.g. "I went to the store." + "And bought some fruit.")
+    /// don't run together into "store.And bought" with no separation.
+    /// Skipped if either side of the join already has whitespace there, so
+    /// this never produces a double space.
+    /// `internal`, not `private` — exercised directly (bypassing the
+    /// `TranslationProvider.onCommit` wiring, which needs a full `start()`)
+    /// by `RecordingSessionSettingsTests`.
+    func appendTranslation(_ text: String) {
         ensureLine(translationRowIndex)
-        lines[translationRowIndex].translation += text
+        let existing = lines[translationRowIndex].translation
+        let needsSpace = !existing.isEmpty
+            && !(existing.last?.isWhitespace ?? true)
+            && !(text.first?.isWhitespace ?? true)
+            && !Self.targetLanguageJoinsWithoutSpaces(targetLanguageCode)
+        lines[translationRowIndex].translation += (needsSpace ? " " : "") + text
         lines[translationRowIndex].translationPreview = ""
+    }
+
+    /// Whether `code`'s primary language subtag doesn't separate words with
+    /// spaces — Chinese and Japanese, the only two of this app's target
+    /// languages (see `LanguageCatalog`) where that's true; everything else
+    /// (notably English and Korean) does.
+    private static func targetLanguageJoinsWithoutSpaces(_ code: String) -> Bool {
+        let primary = code.split(separator: "-").first.map(String.init)?.lowercased() ?? code.lowercased()
+        return primary == "zh" || primary == "ja" || primary == "yue"
     }
 
     private func updateTranslationPreview(_ text: String) {

@@ -41,18 +41,23 @@ enum LlamaGeneration {
                         var n = messages.withUnsafeBufferPointer { msgs in
                             llama_chat_apply_template(tmpl, msgs.baseAddress, msgs.count, true, &buf, bufSize)
                         }
-                        if n > bufSize {
-                            // `n` is the formatted prompt's exact byte
-                            // length — `llama_chat_apply_template`'s C++
-                            // implementation copies it via `strncpy(buf,
-                            // formatted_chat.c_str(), length)`, which only
-                            // null-terminates when `length` is *larger*
-                            // than the source: allocating exactly `n` bytes
-                            // here would fill the whole buffer with real
-                            // content and leave no `\0` anywhere in it, so
-                            // `String(cString:)` below would then read past
-                            // the end of `buf` hunting for one. `n + 1`
-                            // guarantees room for that terminator.
+                        // `>=`, not `>`: `llama_chat_apply_template`'s C++
+                        // implementation copies via `strncpy(buf,
+                        // formatted_chat.c_str(), length)`, which only
+                        // null-terminates when `length` is *strictly
+                        // larger* than the source — `n == bufSize` (the
+                        // formatted prompt exactly filling the first,
+                        // 8192-byte buffer) is just as unterminated as
+                        // `n > bufSize`, so checking `>` alone would silently
+                        // skip the retry for that one exact-fit size and
+                        // fall through to `String(cString:)` reading past
+                        // the end of `buf` hunting for a `\0` that was never
+                        // written.
+                        if n >= bufSize {
+                            // Retry with `n + 1`: guarantees `length` is
+                            // strictly larger than the source this time, so
+                            // `strncpy` pads the last byte with the `\0`
+                            // `String(cString:)` needs.
                             bufSize = n + 1
                             buf = [CChar](repeating: 0, count: Int(bufSize))
                             n = messages.withUnsafeBufferPointer { msgs in

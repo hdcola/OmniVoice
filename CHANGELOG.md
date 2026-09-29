@@ -16,8 +16,9 @@ The format is based on Keep a Changelog.
 
 ### Fixed
 
-- fix(translation): defer `SystemTranslationProvider`'s flush boundary until an earlier, still-in-flight early translation request actually resolves, instead of advancing the translation row immediately and misrouting that request's result into the next segment (#27)
-- fix(inference): avoid a potential out-of-bounds read in `LlamaGenerationSupport.applyChatTemplate`'s buffer-resize retry (missing room for the C string's null terminator) and accumulate generated tokens as raw bytes before decoding to UTF-8 once, instead of per token (which could otherwise split a multi-byte CJK character across two tokens and corrupt it) (#27)
+- fix(translation): fix `SystemTranslationProvider` misrouting/losing a translation across back-to-back utterances — an early, still-in-flight translation request could have its result committed into the wrong (following) segment's row, or a segment's row-close signal could be dropped entirely if another utterance started before that request resolved (#27)
+- fix(translation): insert a space between multiple translation commits appended to the same row for a space-separated target language (English/Korean), so an early-translated fragment and the rest of the sentence don't run together with no separation (#27)
+- fix(inference): avoid a potential out-of-bounds read in `LlamaGenerationSupport.applyChatTemplate`'s buffer-resize retry (missing room for the C string's null terminator, including when the formatted prompt's length exactly matched the initial buffer size) and accumulate generated tokens as raw bytes before decoding to UTF-8 once, instead of per token (which could otherwise split a multi-byte CJK character across two tokens and corrupt it) (#27)
 
 ### Dependencies
 

@@ -311,9 +311,11 @@ A review of the scaffold PR caught three real bugs, all fixed on
 
 ### Code review findings, PR #27 (fixed)
 
-A review of PR #27 (HY-MT1.5 + no-mic recording + configurable translation
-timing) caught two real bugs and one repo-process gap, all fixed on
-`feature/hymt15-translation-engine` before merge:
+Two review rounds on PR #27 (HY-MT1.5 + no-mic recording + configurable
+translation timing), both fixed on `feature/hymt15-translation-engine`
+before merge:
+
+**Round 1** caught two real bugs and one repo-process gap:
 
 - **`SystemTranslationProvider` row misalignment, take two**: the
   `earlyTranslateThreshold` feature reintroduced a version of the original
@@ -322,38 +324,103 @@ timing) caught two real bugs and one repo-process gap, all fixed on
   back sees an *empty* buffer and, previously, fired `onFlushBoundary`
   immediately anyway, advancing `translationRowIndex` before the pending
   request's `onCommit` ever landed — misrouting that commit into the next
-  segment's row once it finally resolved. Fixed with
-  `pendingBridgeRequestCount`/`pendingFlushBoundary`: `flush()` now defers
-  the boundary until every already-sent request has actually resolved. A
-  narrow residual gap remains — see `pendingFlushBoundary`'s doc in
-  `SystemTranslationProvider.swift` — for back-to-back speech with
-  essentially no pause across a segment boundary; not worth a full
-  per-request segment-tagging redesign for how rare that window is.
+  segment's row once it finally resolved. First fix attempt used a
+  `pendingBridgeRequestCount`/`pendingFlushBoundary` pair to defer the
+  boundary — **round 2** found that attempt itself still broke on a second
+  utterance starting before the first one's early request resolved (see
+  below), so the final fix is different — see that entry.
 - **`LlamaGenerationSupport.applyChatTemplate` buffer-resize retry could
   read out of bounds**: `llama_chat_apply_template`'s C++ implementation
   copies the formatted prompt via `strncpy(buf, formatted_chat.c_str(),
   length)`, which only null-terminates when `length` is *larger* than the
   source — resizing the retry buffer to exactly `n` (the reported byte
   count) left no room for a `\0` anywhere in it, so the following
-  `String(cString:)` could read past the buffer hunting for one. Fixed by
-  allocating `n + 1`. Also hardened `LlamaGeneration.generate` alongside it:
-  the token buffer is now sized from an exact `tokenCount(of:vocab:)` dry
-  run instead of a `prompt.utf8.count + 16` guess (not reliably >= the real
-  token count for every tokenizer/language), and generated token pieces are
-  now accumulated as raw bytes and decoded to UTF-8 once at the end instead
-  of per token — a byte-level BPE vocab can split one multi-byte CJK
-  character across more than one token, and decoding each piece
-  independently could hit an incomplete byte sequence mid-character and
-  silently corrupt it into U+FFFD.
+  `String(cString:)` could read past the buffer hunting for one. First fix
+  attempt allocated `n + 1` but left the *trigger condition* (`if n >
+  bufSize`) unfixed — **round 2** caught that too (see below). Also
+  hardened `LlamaGeneration.generate` alongside it: the token buffer is now
+  sized from an exact `tokenCount(of:vocab:)` dry run instead of a
+  `prompt.utf8.count + 16` guess (not reliably >= the real token count for
+  every tokenizer/language), and generated token pieces are now accumulated
+  as raw bytes and decoded to UTF-8 once at the end instead of per token —
+  a byte-level BPE vocab can split one multi-byte CJK character across more
+  than one token, and decoding each piece independently could hit an
+  incomplete byte sequence mid-character and silently corrupt it into
+  U+FFFD.
 - **Missing `CHANGELOG.md` entries**: `AGENTS.md`'s "All user-facing changes
   must be recorded in `CHANGELOG.md`" wasn't followed for this PR's three
   features. Added under `[Unreleased]`.
 
-Also added, defensively, not in response to a real bug: `AudioMixer.submitMic`
-now guards `micEnabled` itself too (mirroring `submitSystemAudio`'s existing
-guard) — nothing calls it in `micEnabled: false` mode today, since
-`RecordingSession.start()` never constructs a `MicrophoneCapture` in that
-mode, but the class's own invariant should hold regardless of a future
+Also added in round 1, defensively, not in response to a real bug:
+`AudioMixer.submitMic` now guards `micEnabled` itself too (mirroring
+`submitSystemAudio`'s existing guard) — nothing calls it in
+`micEnabled: false` mode today, since `RecordingSession.start()` never
+constructs a `MicrophoneCapture` in that mode, but the class's own
+invariant should hold regardless of a future caller's wiring.
+
+**Round 2** re-reviewed round 1's own fixes and caught two of them were
+still wrong, plus one real UX gap and one false-positive report (kept here
+for the record — it's useful to know a report was checked and rejected, not
+just which ones were accepted):
+
+- **`SystemTranslationProvider`'s round-1 fix could still permanently
+  swallow a boundary**: `pendingFlushBoundary` was a single flag — it could
+  only remember "one boundary is owed", not "how many". Trace: utterance 1
+  sends an early request then ends (`flush()` defers, `pendingFlushBoundary
+  = true`); before that request resolves, utterance 2 begins *and ends too*
+  (its own `flush()` finds a non-empty buffer, sends a normal final
+  request, `pendingBridgeRequestCount` now counts both). Utterance 1's
+  early request finally resolves — `pendingBridgeRequestCount` drops to 1,
+  not 0, so the deferred boundary still doesn't fire. Utterance 2's final
+  request then resolves, firing `onFlushBoundary` *once* for what were
+  really two utterances — permanently losing one boundary, merging both
+  utterances' text into one row, and misaligning every row after it.
+  Rewritten to a design with no separate flag/counter-threshold logic at
+  all: `sendBridgeRequest(isFinal:)` now sends an empty-text, `isFinal:
+  true` **sentinel** request through the same bridge instead of deferring
+  internally, relying on `FloatingTranscriptView`'s `.translationTask` loop
+  already consuming `translationBridgeStream()` strictly in FIFO order (one
+  request fully resolved before the next is even dequeued) to guarantee the
+  sentinel resolves in the correct position automatically. `receiveResult(_:isFinal:)`
+  simply skips `onCommit` for an empty result and fires `onFlushBoundary`
+  for every final result, sentinel or not — no bookkeeping beyond a plain
+  `pendingBridgeRequestCount` (kept only so a *true* "nothing pending"
+  `flush()` can still fire immediately without a round trip). Regression
+  test (`twoUtterancesInFlightAtOnceEachGetTheirOwnBoundaryAndCommit`)
+  reproduces the exact two-utterance trace above.
+- **`LlamaGenerationSupport.applyChatTemplate`'s retry condition missed the
+  exact-fit case**: `if n > bufSize` skips the resize-and-retry whenever the
+  formatted prompt's length lands *exactly* on the initial 8192-byte
+  buffer — `strncpy` still doesn't null-terminate in that case (per the
+  round-1 finding above), so `n == bufSize` was just as unterminated as
+  `n > bufSize`, silently falling through to the same out-of-bounds
+  `String(cString:)` read. Fixed to `if n >= bufSize`.
+- **UX gap, not a bug**: `RecordingSession.appendTranslation` concatenated
+  multiple commits into one row (T3PO's mid-segment forced probes, or a
+  one-shot engine's `earlyTranslateThreshold`-driven early commit) with no
+  separator — fine for Chinese/Japanese (no inter-word spacing), but for a
+  space-separated target language (English, Korean) two fragments joined
+  mid-sentence read as "store.And bought" with no space. Fixed by inserting
+  a single space between fragments for those languages, skipped if either
+  side already has whitespace there.
+- **False positive, checked and rejected**: the review flagged
+  `RecordingSession.init()`'s restore of a persisted
+  `translationEarlyTranslateThreshold` as bypassing the property's own
+  `didSet` clamp (`min...max(20...1000)`), since Swift documents that
+  property observers don't fire during a class's own initializer. Verified
+  empirically with a throwaway test (persist `99999`, construct a fresh
+  `RecordingSession`, assert the restored value): `didSet` *does* fire for
+  a plain assignment written later in `init()`'s body (as opposed to a
+  property's own default-value literal) — the "observers don't fire in
+  init" exemption is only for that literal default, not for a subsequent
+  ordinary assignment statement in the same initializer. No code change
+  needed; noted here so this exact (plausible-sounding, but wrong) claim
+  doesn't get "fixed" again without re-checking it.
+
+Also added in round 2, as suggested test coverage rather than a bug fix:
+`AudioMixerTests` (mic-enabled/disabled dispatch, mixing/clipping, level
+calculation — this class had no dedicated tests before this PR added its
+`micEnabled` mode).
 caller's wiring.
 
 ### Smoke test findings (fixed)

@@ -7,6 +7,11 @@ import Foundation
 /// can never call `TranslationSession.translate(_:)` directly.
 public struct TranslationBridgeRequest: Identifiable, Sendable {
     public let id: UUID
+    /// Empty for a boundary-only "sentinel" request — see
+    /// `SystemTranslationProvider.sendBridgeRequest(isFinal:)`'s doc for why
+    /// those exist. The bridging view should skip the actual
+    /// `TranslationSession.translate(_:)` call for one (nothing to
+    /// translate) and resolve it with an empty result immediately.
     public let text: String
     /// Whether this request corresponds to a real `flush()` (an ASR segment
     /// boundary) — `false` for an `earlyTranslateThreshold`-driven early
@@ -58,29 +63,8 @@ public final class SystemTranslationProvider: TranslationProvider {
     private var config: TranslationConfig?
     /// How many bridge requests have been sent (via `onBridgeRequest`) but
     /// not yet resolved (via `receiveResult(_:isFinal:)`) — see
-    /// `sendBridgeRequest(isFinal:)`'s doc for why this matters: without it,
-    /// a `flush()` that finds an empty buffer (because an earlier
-    /// `earlyTranslateThreshold`-driven request already drained it) would
-    /// fire `onFlushBoundary` — advancing `translationRowIndex` — *before*
-    /// that earlier request's result ever arrives, misrouting it into the
-    /// next segment's row instead.
+    /// `sendBridgeRequest(isFinal:)`'s doc for why this matters.
     private var pendingBridgeRequestCount = 0
-    /// Set instead of firing `onFlushBoundary` immediately when `flush()`
-    /// finds an empty buffer while `pendingBridgeRequestCount > 0` — cleared
-    /// and actually fired from `receiveResult(_:isFinal:)` once every
-    /// already-sent request has resolved.
-    ///
-    /// Known remaining gap: if the *next* segment starts (`feed(_:)` is
-    /// called again) and itself crosses `earlyTranslateThreshold` before the
-    /// deferred boundary above actually fires, that new segment's early
-    /// request resolves into the still-current (old) row — its `onCommit`
-    /// runs before `pendingFlushBoundary` is checked — rather than the new
-    /// one, since `translationRowIndex` hasn't advanced yet. This needs
-    /// back-to-back speech with essentially no pause across the segment
-    /// boundary to hit; tagging each request with which segment it belongs
-    /// to would close it fully, but that's a bigger change than this fix
-    /// warrants for how narrow the window is.
-    private var pendingFlushBoundary = false
 
     public init() {}
 
@@ -135,7 +119,7 @@ public final class SystemTranslationProvider: TranslationProvider {
     /// is only empty because an earlier `earlyTranslateThreshold`-driven
     /// request already drained it, the same reasoning applies to *that*
     /// request too — see `sendBridgeRequest(isFinal:)`'s doc for how that
-    /// case is deferred instead of misrouting the pending result.
+    /// case is handled without a race.
     public func flush() {
         sendBridgeRequest(isFinal: true)
     }
@@ -149,19 +133,25 @@ public final class SystemTranslationProvider: TranslationProvider {
     /// can be empty either because nothing was ever fed (the common case —
     /// safe to fire `onFlushBoundary` immediately), or because an earlier
     /// `earlyTranslateThreshold`-driven request already drained it and
-    /// hasn't resolved yet (`pendingBridgeRequestCount > 0`) — firing the
-    /// boundary in that second case would advance `translationRowIndex`
-    /// before that request's result arrives, misrouting it into the next
-    /// segment's row once it finally does. `pendingFlushBoundary` defers to
-    /// `receiveResult(_:isFinal:)` in exactly that case.
+    /// hasn't resolved yet (`pendingBridgeRequestCount > 0`). Firing the
+    /// boundary immediately in that second case would advance
+    /// `translationRowIndex` before that earlier request's result arrives,
+    /// misrouting it into the next segment's row once it finally does — so
+    /// instead of a separate "deferred boundary" flag (a **prior** version
+    /// of this fix used exactly that, and got it wrong: a *second* segment
+    /// starting and itself flushing before the first request resolved could
+    /// permanently swallow the first segment's boundary, since the flag
+    /// only remembered "one is owed", not "how many"), this sends an empty,
+    /// `isFinal: true` **sentinel** request through the same bridge. The
+    /// bridging view's `.translationTask` loop (`FloatingTranscriptView`)
+    /// consumes `translationBridgeStream()` strictly in order — one request
+    /// fully resolved before the next is even dequeued — so a sentinel
+    /// queued right after the pending request is *guaranteed* to resolve
+    /// right after it too, in the same order they were sent, with no
+    /// separate counting/flag bookkeeping needed to get that ordering right.
     private func sendBridgeRequest(isFinal: Bool) {
-        guard !buffer.isEmpty else {
-            guard isFinal else { return } // nothing buffered, nothing to send early
-            if pendingBridgeRequestCount > 0 {
-                pendingFlushBoundary = true
-            } else {
-                onFlushBoundary?()
-            }
+        guard !buffer.isEmpty || (isFinal && pendingBridgeRequestCount > 0) else {
+            if isFinal { onFlushBoundary?() } // nothing buffered, nothing in flight
             return
         }
         let text = buffer
@@ -186,25 +176,17 @@ public final class SystemTranslationProvider: TranslationProvider {
     public func stop() async {}
 
     /// Called by the bridging view once a request's `translate(_:)`
-    /// resolves — this, not `flush()`, is what actually marks a row's
+    /// resolves (or, for an empty-text sentinel request — see
+    /// `sendBridgeRequest(isFinal:)`'s doc — immediately, with nothing to
+    /// translate) — this, not `flush()`, is what actually marks a row's
     /// translation as done, and only for a **final** result (see `flush()`'s
-    /// doc and `TranslationBridgeRequest.isFinal`'s doc) — a non-final
-    /// (early, `earlyTranslateThreshold`-driven) result still commits its
-    /// text into the segment's still-open row, it just doesn't close it,
-    /// *unless* an earlier `flush()` already deferred its boundary to this
-    /// point (`pendingFlushBoundary`, see `sendBridgeRequest(isFinal:)`'s
-    /// doc) — once every outstanding request has resolved
-    /// (`pendingBridgeRequestCount` back at zero), the deferred boundary
-    /// fires here instead.
+    /// doc and `TranslationBridgeRequest.isFinal`'s doc). `text` empty is
+    /// only ever a sentinel's result, never a real (if unhelpful) commit, so
+    /// it's not passed to `onCommit`.
     public func receiveResult(_ text: String, isFinal: Bool) {
         pendingBridgeRequestCount = max(0, pendingBridgeRequestCount - 1)
-        onCommit?(text)
-        if isFinal {
-            onFlushBoundary?()
-        } else if pendingFlushBoundary && pendingBridgeRequestCount == 0 {
-            pendingFlushBoundary = false
-            onFlushBoundary?()
-        }
+        if !text.isEmpty { onCommit?(text) }
+        if isFinal { onFlushBoundary?() }
     }
 
     public var currentSourceLanguageCode: String? { config?.sourceLanguageCode }
