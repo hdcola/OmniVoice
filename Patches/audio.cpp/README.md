@@ -1,26 +1,17 @@
 # audio.cpp patches
 
-Patches applied on top of the pinned [audio.cpp](https://github.com/0xShug0/audio.cpp)
-checkout (`9bdd1d908bbd128e9eb405f5a8e38d0defb84c72`, v0.8.2) before building
-`libaudiocpp.dylib`. `third_party/` is gitignored and never vendored into this
-repo's history (see `Docs/MODEL_ENGINE_SETUP.md`), so fixes we need there live
-here as patch files instead.
+No patches currently needed — the pinned
+[audio.cpp](https://github.com/0xShug0/audio.cpp) checkout
+(`77491a33c589c53ff18add050095cf35647c8213`, see `Docs/MODEL_ENGINE_SETUP.md`)
+already carries every fix we've needed there. `repro_r2t2_finish.c` below is
+kept as a standalone regression check for the one bug we did hit.
 
-Apply them from the `third_party/audio.cpp` checkout root:
+## 0001 — R2T2 null deref on an empty final flush (fixed upstream, no longer patched locally)
 
-```bash
-git apply ../../Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch
-```
-
-Each patch should be reported upstream; drop it from here (and from
-`Docs/MODEL_ENGINE_SETUP.md`) once a release that carries the fix is pinned.
-
-## 0001 — R2T2 null deref on an empty final flush
-
-**Status**: submitted upstream as
-[0xShug0/audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712) — open.
-Still present on upstream `main` (`90c56c2e`), verified there with the same
-reproducer, so this patch stays until a release carrying the fix is pinned.
+**Status**: fixed upstream as
+[0xShug0/audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712) — merged
+2026-09-27 (`77491a33`). Our pin was bumped past the merge, so the local patch
+that used to carry this fix was removed.
 
 `R2T2ASRSession::build_stream_prefix(final_flush=true)`
 (`src/community_models/confucius4_r2t2/session.cpp`) clamps its rollback end
