@@ -1096,9 +1096,16 @@ public final class RecordingSession: ObservableObject {
         }
     }
 
+    /// Dispatches on `engineID` itself, not just `EngineDescriptor.kind` —
+    /// unlike transcription (one `.model`-kind engine today), translation
+    /// now has two different `.model`-kind engines backed by two different
+    /// provider classes (T3PO's streaming WAIT/TRANS design vs HY-MT1.5's
+    /// one-shot design — see `HYMT15Translator`'s class doc), so `kind`
+    /// alone can no longer pick the provider type.
     private static func makeTranslationProvider(engineID: String, modelPath: URL?) -> TranslationProvider {
-        switch ProviderCatalog.translationEngines.first(where: { $0.id == engineID })?.kind {
-        case .model: return ModelTranslationProvider(modelPath: modelPath)
+        switch engineID {
+        case "model.hymt15": return HYMT15TranslationProvider(modelPath: modelPath)
+        case "model.t3po": return ModelTranslationProvider(modelPath: modelPath)
         default: return SystemTranslationProvider()
         }
     }

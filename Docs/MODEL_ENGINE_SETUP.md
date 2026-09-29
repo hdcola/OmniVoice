@@ -65,6 +65,13 @@ curl -L -o models/Confucius4-R2T2-GGUF/r2t2-q8_0.gguf \
 
 curl -L -o models/Confucius4-T3PO-GGUF/Confucius4-T3PO-Q5_K_M.gguf \
   https://huggingface.co/netease-youdao/Confucius4-T3PO-GGUF/resolve/main/Confucius4-T3PO-Q5_K_M.gguf
+
+# Optional: Tencent's HY-MT1.5 — a much smaller, one-shot (no live preview)
+# translation model, see `HYMT15Translator`'s doc for why it's a separate
+# engine (`model.hymt15`) rather than another T3PO variant.
+mkdir -p models/HY-MT1.5-GGUF
+curl -L -o models/HY-MT1.5-GGUF/HY-MT1.5-1.8B-Q4_K_M.gguf \
+  https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/main/HY-MT1.5-1.8B-Q4_K_M.gguf
 ```
 
 ~2.5GB (R2T2) + ~9GB (T3PO). `InProcessTranscriber`/`InProcessTranslator`

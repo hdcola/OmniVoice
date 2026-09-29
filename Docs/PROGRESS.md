@@ -192,6 +192,34 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       built — see those PRs' review comments). Still ad-hoc signed only
       (no Developer ID/notarization yet — see Open Items #4).
 
+- [x] **HY-MT1.5 wired up as a second, one-shot local translation engine**
+      (2026-09-28): added `model.hymt15` alongside `model.t3po` in
+      `ProviderCatalog` (two variants: HY-MT1.5-1.8B Q4_K_M ~1.06GB/Q8_0
+      ~1.82GB — a genuinely low-memory option, since neither R2T2's nor
+      T3PO's own HF repos carry anything smaller than what's already
+      pinned). Unlike T3PO, HY-MT1.5 has no trained WAIT/TRANS control
+      signal (see "Known gaps" below) — `HYMT15Translator`
+      (`Sources/OmniVoiceCore/Inference/HYMT15Translator.swift`) never
+      probes mid-utterance or emits a preview: `feed()` only buffers,
+      `flush()` translates the whole buffer once, same cadence
+      `SystemTranslationProvider` uses. Wrapped by
+      `HYMT15TranslationProvider` (`TranslationProvider` conformance,
+      mirrors `ModelTranslationProvider`'s shape) and dispatched from
+      `RecordingSession.makeTranslationProvider(engineID:modelPath:)`,
+      which now switches on `engineID` itself (not just
+      `EngineDescriptor.kind`) since translation has two different
+      `.model`-kind provider classes. The mechanical llama.cpp plumbing
+      shared by both models (tokenize, chat-template application, the
+      clear-KV-cache-and-decode loop) was extracted into
+      `LlamaGenerationSupport.swift` as a pure refactor of
+      `InProcessTranslator` first (verified: all 70 existing tests still
+      pass, T3PO's behavior unchanged) before `HYMT15Translator` was added
+      on top of it. **Not yet smoke-tested against real downloaded
+      weights** (see Open Items) — HY-MT1.5's license is also unclear (no
+      LICENSE file found in its HF repos), same "re-check before commercial
+      use" bucket as R2T2/T3PO, arguably needing more attention since it
+      doesn't even have a clear license file today.
+
 ### Code review findings (fixed)
 
 A review of the scaffold PR caught three real bugs, all fixed on
@@ -367,6 +395,11 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    explicitly deferred ("搭架子" / stub first) per the product discussion;
    none of the actual placeholder work has been started yet.
 6. **Model license re-check** — before any commercial use, not before this.
+7. **HY-MT1.5 mic smoke test**: download the real
+   `models/HY-MT1.5-GGUF/HY-MT1.5-1.8B-Q4_K_M.gguf` weights, select
+   `model.hymt15` in Settings, record live mic audio, stop — confirm a
+   one-shot translation actually lands per segment (no crash, no hang),
+   the same way R2T2's Open Item #1 was verified. Not done yet.
 
 ### Known gaps / things to double check when touching nearby code
 
@@ -435,6 +468,29 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
   *original* target for that whole session, not each utterance's actual
   translated-into language. Fine for now (no UI exposes per-utterance target
   language anyway); would need per-utterance tracking if that ever surfaces.
+- **HY-MT1.5 has no WAIT/TRANS control signal** — unlike T3PO (see
+  `InProcessTranslator`'s class doc for that trick), Tencent's model card
+  documents only a single "translate the following complete segment"
+  instruction turn, with no trained behavior for "not enough context yet,
+  say nothing." `HYMT15Translator` is built around that: no incremental
+  probing, no preview, translation only happens once per `flush()`. If a
+  future model in this same "one-shot" family *does* need mid-utterance
+  probing, this class isn't the place to add it — a third
+  `LocalTranslationStrategy`-shaped abstraction would be worth revisiting at
+  that point instead of bolting more special cases onto either existing
+  class.
+- **`model.hymt15` is the first `.model`-kind engine with more than one
+  catalog variant** — activates a previously-hypothetical edge case
+  `RecordingSession.hasDownloadedModelVariant(engineID:)`'s doc already
+  flagged: deleting the *currently-selected* variant via Model Management
+  while a *different* variant of the same engine stays downloaded leaves
+  the stale selection pointing at the deleted one (still handled gracefully
+  via the existing "尚未下载" `statusMessage`/Settings "（未下载）" label,
+  just not auto-switched to the still-downloaded sibling variant). Fine to
+  leave as-is per that doc's own reasoning; would need
+  `validateAndNormalizeModelVariantSelections()` to gain a "fall back to
+  another downloaded variant of the same engine" case if this friction ever
+  actually bothers a user.
 - No handling yet for what happens if `SessionStore.init()` throws (disk
   full, schema mismatch after a future migration) beyond "history window has
   no data" — `RecordingSession` itself keeps working with `sessionStore ==

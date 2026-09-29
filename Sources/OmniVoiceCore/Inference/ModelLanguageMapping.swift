@@ -29,6 +29,19 @@ enum ModelLanguageMapping {
         }
     }
 
+    /// Same fallback reasoning as `t3poTargetLanguage(forCode:)` — this
+    /// catalog only ever offers `zh`/`en`/`ja`/`ko` as translation targets,
+    /// a subset of HY-MT1.5's own much larger supported language list.
+    static func hyMT15TargetLanguage(forCode code: String) -> HYMT15TargetLanguage {
+        switch match(code) {
+        case .chinese: return .chinese
+        case .english: return .english
+        case .japanese: return .japanese
+        case .korean: return .korean
+        case .auto, .none: return .chinese
+        }
+    }
+
     private static func match(_ code: String) -> RecognitionLanguage? {
         let primary = code.split(separator: "-").first.map(String.init)?.lowercased() ?? code.lowercased()
         switch primary {
