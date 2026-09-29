@@ -304,6 +304,17 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       and permission deep links (PR #30, including its code-review fix
       round), plus `Scripts/setup_third_party.sh` to automate the
       `third_party` clone/build setup (PR #31).
+- [x] **0.3.1 release cut** (2026-09-29, `chore/release-0.3.1`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.3.1,
+      `CFBundleVersion` 6), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.3.1]` section, `README.md`'s version/download-link references
+      bumped to match. Bundles everything merged since `0.3.0`: the
+      settings/model-management UX redesign — engine list with undownloaded
+      models, rich model cards + recommended bundles with per-variant
+      download speed/ETA, a unified tabbed Settings window, a first-run
+      onboarding wizard with three mode choices, disk-space pre-flight and
+      inline download retry, plus the model-download/bundle-status review
+      fixes (PR #33, including its code-review fix rounds).
 
 ### Code review findings (fixed)
 
