@@ -28,6 +28,20 @@ public enum ModelDownloadError: LocalizedError, Sendable {
     }
 }
 
+/// Instantaneous download telemetry for one in-flight variant (Task 2.4 of
+/// Docs/UX-SETTINGS-MODEL-MANAGEMENT.md) — `bytesPerSecond`/`etaSeconds` are
+/// computed from the delta against the previous progress callback, so both
+/// read `0`/`nil` on the very first callback of a download (nothing to
+/// diff against yet) and settle within a couple of ticks after.
+public struct DownloadStats: Sendable, Equatable {
+    public let bytesWritten: Int64
+    public let totalBytes: Int64
+    public let bytesPerSecond: Double
+    /// `nil` while `bytesPerSecond` is still `0` (nothing to divide by) —
+    /// e.g. the first callback, or a transfer that's momentarily stalled.
+    public let etaSeconds: Double?
+}
+
 /// Downloads and caches a `.model`-kind engine's weights on first use (see
 /// `Docs/PROGRESS.md` Open Items — "Model download-on-first-use"), instead of
 /// requiring an `R2T2_MODEL_PATH`/`R2T2_T3PO_MODEL_PATH` env var or a
@@ -101,6 +115,13 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// its own `progress` closure through. Cleared once `ensureDownloaded`
     /// returns or throws.
     @Published public private(set) var downloadProgress: [String: Double] = [:]
+    /// Instantaneous speed/ETA per variant currently downloading (Task 2.4)
+    /// — see `DownloadStats`'s doc. Cleared alongside `downloadProgress`.
+    @Published public private(set) var downloadStats: [String: DownloadStats] = [:]
+    /// `handleProgress`'s previous `(bytesWritten, time)` sample per variant
+    /// — the delta between this and the next call is what turns raw byte
+    /// counts into a speed. Not itself published; only `downloadStats` is.
+    private var lastByteSample: [String: (bytes: Int64, time: Date)] = [:]
 
     /// - Parameter sessionConfiguration: injectable so tests can register a
     ///   custom `URLProtocol` (via `.protocolClasses`) to exercise the
@@ -268,6 +289,8 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
                 self.objectWillChange.send()
                 self.jobs[variant.id] = nil
                 self.downloadProgress[variant.id] = nil
+                self.downloadStats[variant.id] = nil
+                self.lastByteSample[variant.id] = nil
                 self.progressHandlers[variant.id] = nil
                 self.lastReportedProgress[variant.id] = nil
             }
@@ -378,8 +401,31 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// once per ~0.5% of progress or 100ms, whichever comes first — except
     /// the terminal `1.0`, which always gets through so a progress view
     /// never gets stuck just short of "done".
-    fileprivate func handleProgress(variantID: String, fraction: Double) {
+    fileprivate func handleProgress(variantID: String, fraction: Double, bytesWritten: Int64, totalBytes: Int64) {
         let now = Date()
+        // `downloadStats` is computed *before* the throttle `return` below —
+        // otherwise a byte-delta sample skipped by the throttle would make
+        // the next surviving sample's `dt`/`db` span more than one actual
+        // callback, which is fine for the speed math (still a real delta),
+        // but skipping the sample update itself would leave `lastByteSample`
+        // stale and understate speed on the next call. Simplest to just
+        // always update the sample/stats, and only throttle the
+        // `@Published downloadProgress`/`progressHandlers` fan-out below.
+        let bytesPerSecond: Double
+        if let sample = lastByteSample[variantID] {
+            let elapsed = now.timeIntervalSince(sample.time)
+            bytesPerSecond = elapsed > 0 ? Double(bytesWritten - sample.bytes) / elapsed : 0
+        } else {
+            bytesPerSecond = 0
+        }
+        lastByteSample[variantID] = (bytesWritten, now)
+        let remainingBytes = max(0, totalBytes - bytesWritten)
+        let etaSeconds = bytesPerSecond > 0 ? Double(remainingBytes) / bytesPerSecond : nil
+        downloadStats[variantID] = DownloadStats(
+            bytesWritten: bytesWritten, totalBytes: totalBytes,
+            bytesPerSecond: bytesPerSecond, etaSeconds: etaSeconds
+        )
+
         if let last = lastReportedProgress[variantID], fraction < 1.0,
             fraction - last.fraction < 0.005, now.timeIntervalSince(last.time) < 0.1
         {
@@ -423,7 +469,10 @@ extension ModelDownloadManager {
         // SwiftUI `ProgressView(value:)` a fraction slightly over 1.0.
         let fraction = min(1.0, max(0.0, Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)))
         Task { @MainActor [weak self] in
-            self?.handleProgress(variantID: variantID, fraction: fraction)
+            self?.handleProgress(
+                variantID: variantID, fraction: fraction,
+                bytesWritten: totalBytesWritten, totalBytes: totalBytesExpectedToWrite
+            )
         }
     }
 

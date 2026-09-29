@@ -3,24 +3,33 @@ import SwiftUI
 
 /// Dedicated window for downloading/cancelling/deleting a `.model`-kind
 /// engine's weights — the single place that actually drives
-/// `ModelDownloadManager`. `SettingsView`'s engine picker only offers an
-/// engine once something here has been downloaded for it (see that view's
-/// `isEngineAvailable(_:)`); this view itself always lists every catalog
-/// entry regardless of what's currently selected there, since a variant not
-/// yet downloaded needs to be reachable from *somewhere* to bootstrap it.
+/// `ModelDownloadManager`. `SettingsView`'s engine picker links back here
+/// (Task 1.3) whenever a not-yet-downloaded engine is selected; this view
+/// itself always lists every catalog entry regardless of what's currently
+/// selected there, since a variant not yet downloaded needs to be reachable
+/// from *somewhere* to bootstrap it.
 struct ModelManagementView: View {
     /// Same instance `RecordingSession`/`SettingsView` observe — see
     /// `SettingsView`'s own `downloadManager` doc for why this is passed in
     /// explicitly rather than defaulted to `.shared`.
     @ObservedObject private var downloadManager: ModelDownloadManager
-    /// Injected via `.environmentObject` in `OmniVoiceApp.swift`'s
-    /// `modelManagement` scene, same as every other window this app opens —
-    /// only used here to disable "删除" during an active recording/preload
-    /// (see `actionButton(for:)`).
+    /// Injected via `.environmentObject` — used both to disable "删除"
+    /// during an active recording/preload (see `actionButton(for:)`) and,
+    /// per Task 2.1, to auto-activate a freshly-downloaded engine.
     @EnvironmentObject private var session: RecordingSession
     @State private var errorTitle = "操作失败"
     @State private var errorMessage: String?
     @State private var pendingDeletion: ModelVariant?
+    /// Task 2.1 (下载后自动激活与反馈) — set right after a download this view
+    /// itself auto-activated, cleared on "撤销切换" or once the user
+    /// dismisses it. `nil` the rest of the time (nothing to show).
+    @State private var activationBanner: ActivationBanner?
+    /// Which variant IDs a bundle download most recently kicked off — purely
+    /// so `bundleCard(for:)` can show "下载中" immediately for every member,
+    /// same reasoning `ModelDownloadManager.isDownloading(_:)`'s doc gives
+    /// for reading a job's existence rather than waiting on its first
+    /// progress tick.
+    @State private var pendingBundleDownloads: Set<String> = []
 
     init(modelDownloadManager: ModelDownloadManager) {
         self.downloadManager = modelDownloadManager
@@ -28,6 +37,10 @@ struct ModelManagementView: View {
 
     var body: some View {
         Form {
+            if let activationBanner {
+                activationBannerView(activationBanner)
+            }
+            bundleSection
             Section("识别引擎模型") {
                 ForEach(ProviderCatalog.transcriptionEngines.filter { $0.kind == .model }) { engine in
                     variantRows(forEngineID: engine.id)
@@ -40,7 +53,7 @@ struct ModelManagementView: View {
             }
         }
         .padding(20)
-        .frame(width: 460)
+        .frame(width: 520)
         .alert(
             errorTitle,
             isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
@@ -69,61 +82,263 @@ struct ModelManagementView: View {
         return "确定要删除「\(pendingDeletion.displayName)」吗？"
     }
 
+    // MARK: - Task 2.1 — Auto-activation banner
+
+    private struct ActivationBanner {
+        let message: String
+        let companionSuggestion: (message: String, variant: ModelVariant)?
+        let undo: () -> Void
+    }
+
+    private func activationBannerView(_ banner: ActivationBanner) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top) {
+                Text("🎉 \(banner.message)")
+                    .font(.callout)
+                Spacer()
+                Button("撤销切换") {
+                    banner.undo()
+                    activationBanner = nil
+                }
+                .font(.caption)
+            }
+            if let companion = banner.companionSuggestion {
+                HStack {
+                    Text("💡 \(companion.message)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("立即下载 \(companion.variant.displayName)（约 \(companion.variant.approximateSizeMB) MB）") {
+                        download(companion.variant)
+                    }
+                    .font(.caption)
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    /// Checks whether `variant`'s owning engine's *category* (ASR vs.
+    /// translation) is still on its `.system` engine, and if so switches it
+    /// over to `variant`'s engine and shows the undo-able banner above. A
+    /// no-op if the category is already on a `.model` engine — auto-activating
+    /// over a *different* model the user deliberately picked would be a much
+    /// more surprising override than switching away from the always-available
+    /// system default.
+    private func autoActivateIfSystemEngineStillSelected(_ variant: ModelVariant) {
+        if ProviderCatalog.transcriptionEngines.contains(where: { $0.id == variant.engineID }) {
+            guard session.transcriptionEngineKind == .system else { return }
+            let previousEngineID = session.transcriptionEngineID
+            session.transcriptionEngineID = variant.engineID
+            session.transcriptionModelVariantID = variant.id
+            activationBanner = ActivationBanner(
+                message: "「\(variant.displayName)」已下载完成！已自动将识别引擎切换为\(variant.displayName)。",
+                companionSuggestion: companionSuggestion(forDownloadedTranscription: variant),
+                undo: { session.transcriptionEngineID = previousEngineID }
+            )
+        } else if ProviderCatalog.translationEngines.contains(where: { $0.id == variant.engineID }) {
+            guard session.translationEngineKind == .system else { return }
+            let previousEngineID = session.translationEngineID
+            session.translationEngineID = variant.engineID
+            session.translationModelVariantID = variant.id
+            activationBanner = ActivationBanner(
+                message: "「\(variant.displayName)」已下载完成！已自动将翻译引擎切换为\(variant.displayName)。",
+                companionSuggestion: companionSuggestion(forDownloadedTranslation: variant),
+                undo: { session.translationEngineID = previousEngineID }
+            )
+        }
+    }
+
+    /// Just downloaded a translation model (T3PO/HY-MT1.5) but R2T2 isn't
+    /// downloaded yet — surfaces the §4.3.3 "搭配 R2T2 识别引擎可获得最佳实时
+    /// 打字机体验" nudge. `nil` once R2T2 is already downloaded, or for a
+    /// transcription-side download (nothing to suggest downward from).
+    private func companionSuggestion(forDownloadedTranscription variant: ModelVariant) -> (String, ModelVariant)? {
+        nil
+    }
+
+    private func companionSuggestion(forDownloadedTranslation variant: ModelVariant) -> (String, ModelVariant)? {
+        guard let r2t2 = ProviderCatalog.variant(forID: "r2t2-q8_0"), !downloadManager.isDownloaded(r2t2) else {
+            return nil
+        }
+        return ("搭配 R2T2 识别引擎可获得最佳实时打字机体验", r2t2)
+    }
+
+    // MARK: - Task 2.3 — Recommended bundles
+
+    private var bundleSection: some View {
+        Section("💡 推荐方案快速配置") {
+            ForEach(ProviderCatalog.bundles) { bundle in
+                bundleCard(for: bundle)
+            }
+        }
+    }
+
+    private func bundleVariants(_ bundle: ModelBundle) -> [ModelVariant] {
+        bundle.variantIDs.compactMap(ProviderCatalog.variant(forID:))
+    }
+
+    private func bundleCard(for bundle: ModelBundle) -> some View {
+        let variants = bundleVariants(bundle)
+        let downloadedCount = variants.filter { downloadManager.isDownloaded($0) }.count
+        let remaining = variants.filter { !downloadManager.isDownloaded($0) }
+        let isBundleDownloading = variants.contains { downloadManager.isDownloading($0) || pendingBundleDownloads.contains($0.id) }
+        let remainingSizeMB = remaining.reduce(0) { $0 + $1.approximateSizeMB }
+
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(bundle.displayName).font(.headline)
+            Text(bundle.summary)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                Text(
+                    downloadedCount == variants.count
+                        ? "状态：已全部下载"
+                        : "状态：已下载 \(downloadedCount)/\(variants.count)"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                Spacer()
+                if downloadedCount < variants.count {
+                    Button {
+                        downloadBundle(bundle)
+                    } label: {
+                        if isBundleDownloading {
+                            HStack(spacing: 4) {
+                                ProgressView().controlSize(.small)
+                                Text("下载中…")
+                            }
+                        } else {
+                            Text(
+                                downloadedCount == 0
+                                    ? "⬇️ 一键配置此方案（约 \(remainingSizeMB) MB）"
+                                    : "⬇️ 一键下载剩余组件（约 \(remainingSizeMB) MB）"
+                            )
+                        }
+                    }
+                    .disabled(isBundleDownloading)
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func downloadBundle(_ bundle: ModelBundle) {
+        let variants = bundleVariants(bundle).filter { !downloadManager.isDownloaded($0) }
+        for variant in variants {
+            pendingBundleDownloads.insert(variant.id)
+            download(variant) {
+                pendingBundleDownloads.remove(variant.id)
+            }
+        }
+    }
+
+    // MARK: - Rich model cards (Task 2.2)
+
     @ViewBuilder
     private func variantRows(forEngineID engineID: String) -> some View {
         ForEach(ProviderCatalog.modelVariants(forEngineID: engineID)) { variant in
-            variantRow(for: variant)
+            variantCard(for: variant)
         }
     }
 
     @ViewBuilder
-    private func variantRow(for variant: ModelVariant) -> some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(variant.displayName)
-                if downloadManager.isDownloading(variant) {
-                    // `isDownloading(_:)` (a job exists) rather than
-                    // `downloadProgress[variant.id] != nil` — the job starts
-                    // (and this row should already read "下载中…") the
-                    // instant "下载" is tapped, well before the first network
-                    // progress callback arrives (DNS/TLS/redirect can take a
-                    // moment); waiting on `downloadProgress` left the button
-                    // reading "下载" during that gap, inviting a second tap.
-                    if let fraction = downloadManager.downloadProgress[variant.id] {
-                        // `.rounded()`, not a bare `Int(...)` truncation — see
-                        // `SettingsView`'s `opacitySlider` doc for why (binary
-                        // floating-point rounding can land a hair under a
-                        // "clean" percentage).
-                        Text("下载中… \(Int((fraction * 100).rounded()))%")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                        ProgressView(value: fraction)
-                    } else {
-                        Text("准备下载…")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                        // `.linear`, not the default circular spinner — this
-                        // state flips to the determinate `ProgressView(value:)`
-                        // above the moment the first byte count arrives, and
-                        // a spinner-to-bar shape change read as a jarring
-                        // hiccup rather than the same download simply
-                        // gaining a known size.
-                        ProgressView()
-                            .progressViewStyle(.linear)
-                    }
-                } else if downloadManager.isDownloaded(variant) {
-                    Text("已下载 · 约 \(variant.approximateSizeMB) MB")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                } else {
-                    Text("约 \(variant.approximateSizeMB) MB")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
+    private func variantCard(for variant: ModelVariant) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(variant.displayName).font(.headline)
+                Spacer()
+                actionButton(for: variant)
             }
-            Spacer()
-            actionButton(for: variant)
+            Text("版本：\(variant.quantization) · 文件大小：约 \(variant.approximateSizeMB) MB · 预计显存/内存占用：约 \(variant.recommendedMemoryGB) GB")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if !variant.summary.isEmpty {
+                Text("优势：\(variant.summary)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            statusLine(for: variant)
         }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func statusLine(for variant: ModelVariant) -> some View {
+        if downloadManager.isDownloading(variant) {
+            downloadingStatus(for: variant)
+        } else if downloadManager.isDownloaded(variant) {
+            Text("🟢 校验通过，就绪")
+                .font(.caption)
+                .foregroundStyle(.green)
+        } else {
+            Text("约 \(variant.approximateSizeMB) MB · 尚未下载")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Task 2.4's speed/ETA readout, rendered next to the determinate
+    /// progress bar — falls back to the old "准备下载…" spinner state before
+    /// the first byte-count callback arrives (see `ModelManagementView`'s
+    /// previous revision for why that gap needs its own state at all).
+    @ViewBuilder
+    private func downloadingStatus(for variant: ModelVariant) -> some View {
+        if let fraction = downloadManager.downloadProgress[variant.id] {
+            // `.rounded()`, not a bare `Int(...)` truncation — see
+            // `SettingsView`'s `opacitySlider` doc for why (binary
+            // floating-point rounding can land a hair under a "clean"
+            // percentage).
+            Text("下载中 \(Int((fraction * 100).rounded()))%")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+            ProgressView(value: fraction)
+            if let stats = downloadManager.downloadStats[variant.id] {
+                Text(downloadStatsLine(stats))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            Text("准备下载…")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+            // `.linear`, not the default circular spinner — this state
+            // flips to the determinate `ProgressView(value:)` above the
+            // moment the first byte count arrives, and a spinner-to-bar
+            // shape change read as a jarring hiccup rather than the same
+            // download simply gaining a known size.
+            ProgressView()
+                .progressViewStyle(.linear)
+        }
+    }
+
+    private func downloadStatsLine(_ stats: DownloadStats) -> String {
+        let speed = Self.formatBytes(stats.bytesPerSecond) + "/s"
+        let downloaded = Self.formatBytes(Double(stats.bytesWritten))
+        let total = Self.formatBytes(Double(stats.totalBytes))
+        let etaText = stats.etaSeconds.map(Self.formatDuration) ?? "计算中…"
+        return "速度：\(speed) | 已下载：\(downloaded) / \(total) | 剩余时间：约 \(etaText)"
+    }
+
+    private static func formatBytes(_ bytes: Double) -> String {
+        if bytes >= 1024 * 1024 * 1024 {
+            return String(format: "%.2f GB", bytes / (1024 * 1024 * 1024))
+        }
+        return String(format: "%.1f MB", bytes / (1024 * 1024))
+    }
+
+    private static func formatDuration(_ seconds: Double) -> String {
+        let totalSeconds = max(0, Int(seconds.rounded()))
+        if totalSeconds >= 3600 {
+            return "\(totalSeconds / 3600) 小时 \((totalSeconds % 3600) / 60) 分钟"
+        } else if totalSeconds >= 60 {
+            return "\(totalSeconds / 60) 分 \(totalSeconds % 60) 秒"
+        }
+        return "\(totalSeconds) 秒"
     }
 
     @ViewBuilder
@@ -131,23 +346,28 @@ struct ModelManagementView: View {
         if downloadManager.isDownloading(variant) {
             Button("取消") { downloadManager.cancelDownload(for: variant) }
         } else if downloadManager.isDownloaded(variant) {
-            // Guards against deleting the weights out from under an active
-            // recording/preload — an in-flight `loadModel()`/an already
-            // *loaded* model doesn't re-read the file after load, but the
-            // very next preload/start attempt for this variant would find
-            // nothing there and fail confusingly rather than with the clear
-            // "尚未下载" message a deliberate re-download produces.
-            Button("删除") { pendingDeletion = variant }
-                .disabled(session.isSessionActive || session.isPreloadingModel)
+            HStack(spacing: 8) {
+                // Guards against deleting the weights out from under an
+                // active recording/preload — an in-flight `loadModel()`/an
+                // already *loaded* model doesn't re-read the file after
+                // load, but the very next preload/start attempt for this
+                // variant would find nothing there and fail confusingly
+                // rather than with the clear "尚未下载" message a deliberate
+                // re-download produces.
+                Button("删除") { pendingDeletion = variant }
+                    .disabled(session.isSessionActive || session.isPreloadingModel)
+            }
         } else {
             Button("下载") { download(variant) }
         }
     }
 
-    private func download(_ variant: ModelVariant) {
+    private func download(_ variant: ModelVariant, completion: (() -> Void)? = nil) {
         Task {
+            defer { completion?() }
             do {
                 _ = try await downloadManager.ensureDownloaded(variant)
+                autoActivateIfSystemEngineStillSelected(variant)
             } catch is CancellationError {
                 // The user's own "取消" tap — not a failure worth an alert.
             } catch {
