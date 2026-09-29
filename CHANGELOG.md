@@ -8,6 +8,13 @@ The format is based on Keep a Changelog.
 
 ### Added
 
+- feat(history): support deleting (swipe, context menu, or ⌫) and renaming past recordings, and show relative-time, duration, language-pair, and utterance-count tags on each row (Docs/UI_UX_DESIGN_PROPOSAL.md §3.3)
+- feat(history): add "复制全文"/"仅复制译文" clipboard actions to the session detail toolbar, and enable text selection on its transcript
+- feat(panel): enable text selection on the floating panel's transcript, with a per-line hover "复制本句" button and a panel-wide "复制全文" button (§3.1.D)
+- feat(panel): add a one-tap deeplink to the relevant System Settings privacy pane when microphone or screen-recording permission is missing (§3.4.C)
+- feat(menubar): show a pulsing red recording indicator in the menu bar icon while a session is running, so recording state stays visible even with the floating panel hidden (§3.2)
+- feat(panel): add auto-hiding controls (mouse-leave fades the control/status bars after 2s), a display-mode switch (双语对照/仅译文/仅原文), font-size presets (标准/大/特大), and a live elapsed-time readout (§3.1.A–C, E)
+
 ### Changed
 
 ### Fixed
