@@ -283,6 +283,16 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       and `RecordingSession.resolveTranslationBridgeResult(_:)`/
       `FloatingTranscriptView`'s `.translationTask` loop now thread that flag
       through so only a final result advances `translationRowIndex`.
+- [x] **0.2.0 release cut** (2026-09-29, `chore/release-0.2.0`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.2.0,
+      `CFBundleVersion` 4), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.2.0]` section, `README.md`'s version/download-link references
+      bumped to match. Bundles everything merged since `0.1.1`: Tencent's
+      HY-MT1.5 1.8B as a second local translation engine, a "无" mic option
+      for system-audio-only recording, user-configurable translation commit
+      timing, several `SystemTranslationProvider`/HY-MT1.5/`llama.cpp`
+      correctness fixes (PR #27), and the macOS application icon +
+      packaging work (PR #28).
 
 ### Code review findings (fixed)
 
