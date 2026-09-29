@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit tests (swift test)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # Package.swift links against third_party/{audio.cpp,llama.cpp}'s
+      # built dylibs unconditionally (see Docs/MODEL_ENGINE_SETUP.md) — even
+      # a plain `swift build` cannot succeed without them, model weights
+      # aside. Cache the checkout+build so this only pays the (slow) cmake
+      # build cost when the pinned commits in setup_third_party.sh change.
+      - name: Cache third_party native dependencies
+        id: cache-third-party
+        uses: actions/cache@v4
+        with:
+          path: third_party
+          key: third-party-${{ runner.os }}-${{ hashFiles('Scripts/setup_third_party.sh') }}
+
+      - name: Ensure cmake is available
+        run: command -v cmake || brew install cmake
+
+      - name: Set up third_party (audio.cpp / llama.cpp)
+        if: steps.cache-third-party.outputs.cache-hit != 'true'
+        run: Scripts/setup_third_party.sh
+
+      - name: swift build
+        run: swift build
+
+      - name: swift test
+        run: swift test
+
+  # UITests/ (XCUITest against the real app) is intentionally NOT run here.
+  # It needs a one-time, interactive Accessibility-permission grant for the
+  # process driving xcodebuild (System Settings > Privacy & Security >
+  # Accessibility), which a fresh, unattended GitHub-hosted macOS runner has
+  # no way to provide, plus that suite has known host-specific flakiness
+  # documented in UITests/README.md. Run it locally, or wire up a
+  # self-hosted runner with that permission pre-granted and add a
+  # workflow_dispatch-triggered job here once one exists.

@@ -9,6 +9,7 @@ The format is based on Keep a Changelog.
 ### Added
 
 ### Changed
+- chore(ci): add a GitHub Actions workflow that builds `third_party/{audio.cpp,llama.cpp}` (cached by their pinned commits) and runs `swift build`/`swift test` on every push to `main` and every pull request; XCUITest coverage under `UITests/` is intentionally left out of CI for now since it needs a one-time interactive Accessibility-permission grant that an unattended GitHub-hosted macOS runner cannot provide
 
 ### Fixed
 
