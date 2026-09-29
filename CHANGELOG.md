@@ -19,7 +19,7 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 - docs(repo): remove `CLAUDE.md` symlink to `AGENTS.md`
-- docs(design): add UI/UX design and optimization proposal in `Docs/UI_UX_DESIGN_PROPOSAL.md` covering floating panel immersion, menu bar state cues, session management, and phased roadmap
+- docs(design): add UI/UX design and optimization proposal in `Docs/UI_UX_DESIGN_PROPOSAL.md` covering floating panel immersion, menu bar state cues, session management, and phased roadmap (#26)
 
 ### Tests
 
