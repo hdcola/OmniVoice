@@ -28,6 +28,49 @@ public enum ModelDownloadError: LocalizedError, Sendable {
     }
 }
 
+/// Instantaneous download telemetry for one in-flight variant (Task 2.4 of
+/// Docs/UX-SETTINGS-MODEL-MANAGEMENT.md) — `bytesPerSecond`/`etaSeconds` are
+/// computed from the delta against the previous progress callback, so both
+/// read `0`/`nil` on the very first callback of a download (nothing to
+/// diff against yet) and settle within a couple of ticks after.
+public struct DownloadStats: Sendable, Equatable {
+    public let bytesWritten: Int64
+    public let totalBytes: Int64
+    public let bytesPerSecond: Double
+    /// `nil` while `bytesPerSecond` is still `0` (nothing to divide by) —
+    /// e.g. the first callback, or a transfer that's momentarily stalled.
+    public let etaSeconds: Double?
+
+    /// One formatted line ("速度：18.5 MB/s | 已下载：1.6 GB / 2.31 GB | 剩余时间：
+    /// 约 42 秒") — shared by every download-progress card so the wording
+    /// stays identical wherever this is shown (Docs/UX-SETTINGS-MODEL-MANAGEMENT.md
+    /// §4.3.2/§4.5's status-text column).
+    public var summaryLine: String {
+        let speed = Self.formatBytes(bytesPerSecond) + "/s"
+        let downloaded = Self.formatBytes(Double(bytesWritten))
+        let total = Self.formatBytes(Double(totalBytes))
+        let etaText = etaSeconds.map(Self.formatDuration) ?? "计算中…"
+        return "速度：\(speed) | 已下载：\(downloaded) / \(total) | 剩余时间：约 \(etaText)"
+    }
+
+    private static func formatBytes(_ bytes: Double) -> String {
+        if bytes >= 1024 * 1024 * 1024 {
+            return String(format: "%.2f GB", bytes / (1024 * 1024 * 1024))
+        }
+        return String(format: "%.1f MB", bytes / (1024 * 1024))
+    }
+
+    private static func formatDuration(_ seconds: Double) -> String {
+        let totalSeconds = max(0, Int(seconds.rounded()))
+        if totalSeconds >= 3600 {
+            return "\(totalSeconds / 3600) 小时 \((totalSeconds % 3600) / 60) 分钟"
+        } else if totalSeconds >= 60 {
+            return "\(totalSeconds / 60) 分 \(totalSeconds % 60) 秒"
+        }
+        return "\(totalSeconds) 秒"
+    }
+}
+
 /// Downloads and caches a `.model`-kind engine's weights on first use (see
 /// `Docs/PROGRESS.md` Open Items — "Model download-on-first-use"), instead of
 /// requiring an `R2T2_MODEL_PATH`/`R2T2_T3PO_MODEL_PATH` env var or a
@@ -101,6 +144,13 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// its own `progress` closure through. Cleared once `ensureDownloaded`
     /// returns or throws.
     @Published public private(set) var downloadProgress: [String: Double] = [:]
+    /// Instantaneous speed/ETA per variant currently downloading (Task 2.4)
+    /// — see `DownloadStats`'s doc. Cleared alongside `downloadProgress`.
+    @Published public private(set) var downloadStats: [String: DownloadStats] = [:]
+    /// `handleProgress`'s previous `(bytesWritten, time)` sample per variant
+    /// — the delta between this and the next call is what turns raw byte
+    /// counts into a speed. Not itself published; only `downloadStats` is.
+    private var lastByteSample: [String: (bytes: Int64, time: Date)] = [:]
 
     /// - Parameter sessionConfiguration: injectable so tests can register a
     ///   custom `URLProtocol` (via `.protocolClasses`) to exercise the
@@ -200,6 +250,33 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         try FileManager.default.removeItem(at: url)
     }
 
+    /// Task 4.2 (下载前磁盘空间可视化预检) — the same disk-space check
+    /// `runJob(for:)` below performs as its own safety net, exposed here so
+    /// a download-initiating UI can show the "磁盘空间不足" warning *before*
+    /// starting a multi-GB transfer instead of only discovering it after
+    /// `ensureDownloaded(_:)` throws. `nil` (nothing to warn about) both
+    /// when there's enough space and when availability couldn't be
+    /// determined — same "never block a download on an unknowable" stance
+    /// `availableDiskSpaceMB(at:)` itself documents.
+    public func insufficientDiskSpaceWarning(for variant: ModelVariant) -> ModelDownloadError? {
+        insufficientDiskSpaceWarning(forTotalMB: variant.approximateSizeMB)
+    }
+
+    /// Same check as `insufficientDiskSpaceWarning(for:)`, against a
+    /// pre-summed size instead of a single variant's — for a caller
+    /// downloading several variants back to back (a bundle, or Onboarding's
+    /// "高精离线大模型模式") that needs one up-front check against the whole
+    /// batch's combined size, not just each variant's own (which would let
+    /// an early, individually-small variant pass a check that the batch as
+    /// a whole can't actually satisfy).
+    public func insufficientDiskSpaceWarning(forTotalMB totalMB: Int) -> ModelDownloadError? {
+        let requiredMB = totalMB + Self.diskSpaceSafetyMarginMB
+        guard let availableMB = Self.availableDiskSpaceMB(at: cacheDirectory), availableMB < requiredMB else {
+            return nil
+        }
+        return .insufficientDiskSpace(requiredMB: requiredMB, availableMB: availableMB)
+    }
+
     /// Downloads `variant`'s weights if not already cached, verifying their
     /// SHA-256 before the file is considered usable, and returns the local
     /// path either way. `progress` is called on the main actor with a
@@ -268,6 +345,8 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
                 self.objectWillChange.send()
                 self.jobs[variant.id] = nil
                 self.downloadProgress[variant.id] = nil
+                self.downloadStats[variant.id] = nil
+                self.lastByteSample[variant.id] = nil
                 self.progressHandlers[variant.id] = nil
                 self.lastReportedProgress[variant.id] = nil
             }
@@ -378,8 +457,18 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// once per ~0.5% of progress or 100ms, whichever comes first — except
     /// the terminal `1.0`, which always gets through so a progress view
     /// never gets stuck just short of "done".
-    fileprivate func handleProgress(variantID: String, fraction: Double) {
+    fileprivate func handleProgress(variantID: String, fraction: Double, bytesWritten: Int64, totalBytes: Int64) {
         let now = Date()
+        // Review Round 1 Must-Fix 5 — this early `return` must come *before*
+        // any `@Published` write, `downloadStats` included: a `Dictionary`-
+        // backed `@Published` property's setter fires `objectWillChange`
+        // unconditionally on every assignment regardless of whether the
+        // value actually changed, so computing/publishing `downloadStats`
+        // ahead of this check (an earlier revision did exactly that) defeats
+        // the whole point of throttling `downloadProgress` below it — a
+        // high-bandwidth transfer would still drive hundreds of SwiftUI
+        // redraws per second on the main actor, exactly what this guard
+        // exists to prevent.
         if let last = lastReportedProgress[variantID], fraction < 1.0,
             fraction - last.fraction < 0.005, now.timeIntervalSince(last.time) < 0.1
         {
@@ -387,6 +476,27 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         }
         lastReportedProgress[variantID] = (fraction, now)
         downloadProgress[variantID] = fraction
+
+        // Computed only on a throttle-surviving update — the byte-delta
+        // window this spans is therefore itself throttled to ~100ms/~0.5%
+        // apart, which also makes the resulting speed *more* stable than
+        // computing it per raw callback would (each raw callback can be as
+        // little as one ~64KB TCP read apart).
+        let bytesPerSecond: Double
+        if let sample = lastByteSample[variantID] {
+            let elapsed = now.timeIntervalSince(sample.time)
+            bytesPerSecond = elapsed > 0 ? Double(bytesWritten - sample.bytes) / elapsed : 0
+        } else {
+            bytesPerSecond = 0
+        }
+        lastByteSample[variantID] = (bytesWritten, now)
+        let remainingBytes = max(0, totalBytes - bytesWritten)
+        let etaSeconds = bytesPerSecond > 0 ? Double(remainingBytes) / bytesPerSecond : nil
+        downloadStats[variantID] = DownloadStats(
+            bytesWritten: bytesWritten, totalBytes: totalBytes,
+            bytesPerSecond: bytesPerSecond, etaSeconds: etaSeconds
+        )
+
         progressHandlers[variantID]?.forEach { $0(fraction) }
     }
 
@@ -423,7 +533,10 @@ extension ModelDownloadManager {
         // SwiftUI `ProgressView(value:)` a fraction slightly over 1.0.
         let fraction = min(1.0, max(0.0, Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)))
         Task { @MainActor [weak self] in
-            self?.handleProgress(variantID: variantID, fraction: fraction)
+            self?.handleProgress(
+                variantID: variantID, fraction: fraction,
+                bytesWritten: totalBytesWritten, totalBytes: totalBytesExpectedToWrite
+            )
         }
     }
 

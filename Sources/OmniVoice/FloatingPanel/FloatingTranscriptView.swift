@@ -188,8 +188,17 @@ struct FloatingTranscriptView: View {
             // above rebuilds `translationConfiguration` on every change, so
             // switching it mid-recording actually retargets the next
             // translated segment.
-            TargetLanguagePicker(targetLanguageCode: $session.targetLanguageCode)
-                .labelsHidden()
+            TargetLanguagePicker(
+                targetLanguageCode: $session.targetLanguageCode,
+                translationEngineID: session.translationEngineID,
+                onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
+                isSessionActive: session.isSessionActive,
+                // Review Round 1 Must-Fix 2 — the compact control bar is a
+                // single 30pt-tall row; the full multi-line warning card
+                // would blow that out and shove the transcript list down.
+                isCompact: true
+            )
+            .labelsHidden()
 
             // 录制计时器（提案 3.1.E）— 只在录制中显示，停止后复位，避免一个
             // 静止的 "00:00:00" 常驻在控制栏里，看起来像是坏掉了。

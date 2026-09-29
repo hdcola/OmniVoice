@@ -9,6 +9,7 @@ import SwiftUI
 struct MenuBarContentView: View {
     @EnvironmentObject private var session: RecordingSession
     @EnvironmentObject private var appDelegate: AppDelegate
+    @EnvironmentObject private var settingsNavigation: SettingsNavigationState
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     /// Same instance `SettingsView`/`ModelManagementView` observe — see
@@ -118,8 +119,12 @@ struct MenuBarContentView: View {
         }
 
         Button(modelManagementLabel) {
+            // Task 3.4 — "模型管理…" jumps directly to Settings' "模型库管理"
+            // tab instead of opening a separate window (see
+            // `SettingsNavigationState`'s doc).
             NSApp.activate(ignoringOtherApps: true)
-            openWindow(id: "modelManagement")
+            settingsNavigation.openModelLibrary()
+            openSettings()
         }
 
         Button("设置…") {

@@ -27,6 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private let sessionStore: SessionStore?
     private(set) var floatingPanel: FloatingTranscriptPanel?
     private var isRunningCancellable: AnyCancellable?
+    /// Task 4.1 (首次启动向导) — kept alive only for as long as the window
+    /// itself is open; released once the user finishes/skips it.
+    private var onboardingWindow: NSWindow?
 
     override init() {
         // A failed store (disk full, corrupted schema after a migration
@@ -78,6 +81,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             .sink { [weak panel] _ in
                 panel?.orderFrontRegardless()
             }
+
+        presentOnboardingIfNeeded()
+    }
+
+    /// Task 4.1 — shown exactly once, on the very first launch (see
+    /// `PersistedOnboardingKey.hasCompletedOnboarding`'s doc), as its own
+    /// titled/resizable window rather than a `.sheet` on the floating
+    /// panel — that panel is a non-activating `NSPanel` that never becomes
+    /// key (see `FloatingTranscriptPanel.canBecomeKey`), which a SwiftUI
+    /// sheet needs its presenting window to be able to become in order to
+    /// receive keyboard focus/dismiss correctly.
+    private func presentOnboardingIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: PersistedOnboardingKey.hasCompletedOnboarding) else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        // Height bumped from 420 to 440 (Problem 1, round-4 user report) —
+        // the third "均衡低内存模式" mode card has one extra bullet line
+        // versus the original two cards, growing Step 2's natural height
+        // slightly; this window has no `.resizable` style mask, so without
+        // the extra headroom the bottom action row could clip.
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 440),
+            styleMask: [.titled, .closable],
+            backing: .buffered, defer: false
+        )
+        window.title = "欢迎使用 OmniVoice"
+        window.isReleasedWhenClosed = false
+        window.center()
+        window.contentView = NSHostingView(
+            rootView: OnboardingView(
+                session: session, downloadManager: session.modelDownloadManager,
+                onFinished: { [weak self, weak window] in
+                    window?.close()
+                    self?.onboardingWindow = nil
+                }
+            )
+        )
+        onboardingWindow = window
+        window.makeKeyAndOrderFront(nil)
     }
 
     func toggleFloatingPanel() {

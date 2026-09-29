@@ -2,69 +2,76 @@ import AppKit
 import OmniVoiceCore
 import SwiftUI
 
-/// Engine settings — data-driven from `ProviderCatalog` rather than one
+/// Settings window — a `TabView` (Task 3.1) over four tabs: "语音与引擎"
+/// (engine choice, inline model download, the memory/preload console),
+/// "模型库管理" (the full model catalog — the same content that used to be
+/// the standalone "模型管理" window), "语言与悬浮窗" (language pickers + panel
+/// opacity), and "关于". Data-driven from `ProviderCatalog` rather than one
 /// hand-written `case` per engine, so adding a new community model
-/// audio.cpp supports later is a catalog change, not a UI change. Disabled
-/// for the whole start→stop lifecycle (`isSessionActive`, not just
-/// `isRunning`) — each provider's session is set up fresh from these values
-/// at the top of `start()`, so changing them during that setup would either
-/// race the read or silently not apply to the run in progress.
-///
-/// The mic/system-audio toggle lives on the menu bar instead of here — it's
-/// adjusted often enough to want quicker access, while this window is
-/// reserved for the ones that aren't (which engine, eventually which model
-/// variant). Language uses the same `SourceLanguagePicker`/
-/// `TargetLanguagePicker` the floating panel does — not a free-text field —
-/// so the two can't ever offer different language options.
+/// audio.cpp supports later is a catalog change, not a UI change.
 struct SettingsView: View {
     @EnvironmentObject private var session: RecordingSession
-    @Environment(\.openWindow) private var openWindow
-    /// Observed directly (not just reached through `session`) so
-    /// `isEngineAvailable(_:)`/a downloaded variant's row live-update the
-    /// moment "模型管理" (`ModelManagementView`) downloads or deletes
-    /// something — `RecordingSession` no longer triggers downloads itself
-    /// (see `resolveModelPath`'s doc) and doesn't re-publish on every
-    /// download tick, only on `statusMessage` changes. Passed in explicitly
-    /// (not defaulted to `.shared`) and expected to be the exact same
-    /// instance `session` (injected separately, via `.environmentObject`,
-    /// since `SettingsView()` is constructed before that's available) was
-    /// itself given — see `RecordingSession.init`'s own injectable
-    /// `modelDownloadManager` parameter. Hardcoding `.shared` here instead
-    /// would silently observe the wrong manager for any `RecordingSession`
-    /// constructed with a non-`shared` one (a test, an eventual SwiftUI
-    /// preview).
+    @EnvironmentObject private var navigation: SettingsNavigationState
+    /// Observed directly (not just reached through `session`) so the engine
+    /// picker's labels/inline download cards live-update the moment
+    /// something is downloaded or deleted in the "模型库管理" tab —
+    /// `RecordingSession` no longer triggers downloads itself and doesn't
+    /// re-publish on every download tick, only on `statusMessage` changes.
+    /// Passed in explicitly (not defaulted to `.shared`) and expected to be
+    /// the exact same instance `session` was itself given — see
+    /// `RecordingSession.init`'s own injectable `modelDownloadManager`
+    /// parameter. Hardcoding `.shared` here instead would silently observe
+    /// the wrong manager for any `RecordingSession` constructed with a
+    /// non-`shared` one (a test, an eventual SwiftUI preview).
     @ObservedObject private var downloadManager: ModelDownloadManager
+    /// Task 4.3 (异常状态内联重试), mirroring `ModelManagementView`'s own —
+    /// this tab's inline download row shows its own failure message rather
+    /// than a modal `.alert`.
+    @State private var inlineDownloadFailures: [String: String] = [:]
+    /// Task 4.2 (下载前磁盘空间可视化预检) for the inline row.
+    @State private var inlineDiskSpaceWarning: (variant: ModelVariant, error: ModelDownloadError)?
 
     init(modelDownloadManager: ModelDownloadManager) {
         self.downloadManager = modelDownloadManager
     }
 
     var body: some View {
+        TabView(selection: $navigation.selectedTab) {
+            engineTab
+                .tabItem { Label(SettingsTab.engines.title, systemImage: SettingsTab.engines.systemImage) }
+                .tag(SettingsTab.engines)
+            modelsTab
+                .tabItem { Label(SettingsTab.models.title, systemImage: SettingsTab.models.systemImage) }
+                .tag(SettingsTab.models)
+            languageTab
+                .tabItem { Label(SettingsTab.language.title, systemImage: SettingsTab.language.systemImage) }
+                .tag(SettingsTab.language)
+            aboutTab
+                .tabItem { Label(SettingsTab.about.title, systemImage: SettingsTab.about.systemImage) }
+                .tag(SettingsTab.about)
+        }
+        // Task 3.1 — fixed 560×480, big enough for the richer engine cards/
+        // memory console without the old 440pt-wide `Form` clipping them.
+        .frame(width: 560, height: 480)
+    }
+
+    // MARK: - Tab 1: 语音与引擎
+
+    private var engineTab: some View {
         Form {
             Section("识别引擎 (ASR)") {
-                HStack {
-                    Picker("引擎", selection: $session.transcriptionEngineID) {
-                        ForEach(
-                            ProviderCatalog.transcriptionEngines.filter {
-                                isEngineAvailable($0, currentID: session.transcriptionEngineID)
-                            }
-                        ) { engine in
-                            Text(engineLabel(for: engine)).tag(engine.id)
-                        }
+                Picker("引擎", selection: $session.transcriptionEngineID) {
+                    // Task 1.3 (引擎列表展示全部候选) — every catalog engine
+                    // is always listed, downloaded or not; an undownloaded
+                    // `.model` engine is labeled rather than filtered out
+                    // entirely (see `engineLabel(for:)`), so it stays
+                    // discoverable instead of silently "vanishing" until
+                    // something's downloaded for it.
+                    ForEach(ProviderCatalog.transcriptionEngines) { engine in
+                        Text(engineLabel(for: engine)).tag(engine.id)
                     }
-                    .disabled(isBusy)
-                    // Deliberately *not* disabled — opening a window doesn't
-                    // touch engine/model selection, so there's no race with
-                    // an in-flight preload/recording to guard against.
-                    // `.disabled` must be applied to this button directly
-                    // (not to some shared ancestor covering both it and the
-                    // `Picker` above, then overridden here with
-                    // `.disabled(false)`): SwiftUI's `isEnabled` environment
-                    // value only ever goes *more* disabled going down the
-                    // view tree, so a descendant can never re-enable itself
-                    // once an ancestor already set it to `false`.
-                    modelManagementButton
                 }
+                .disabled(isBusy)
                 modelVariantPicker(
                     for: session.transcriptionEngineID,
                     selection: Binding(
@@ -73,23 +80,20 @@ struct SettingsView: View {
                     )
                 )
                 .disabled(isBusy)
-                noLocalModelHint(for: ProviderCatalog.transcriptionEngines)
+                // Task 3.2 (内联模型下载与状态卡片) — no more bouncing to a
+                // separate window: an undownloaded `.model` engine's
+                // download button/progress renders right here.
+                inlineDownloadSection(forEngineID: session.transcriptionEngineID)
             }
 
             Section("翻译引擎") {
-                HStack {
-                    Picker("引擎", selection: $session.translationEngineID) {
-                        ForEach(
-                            ProviderCatalog.translationEngines.filter {
-                                isEngineAvailable($0, currentID: session.translationEngineID)
-                            }
-                        ) { engine in
-                            Text(engineLabel(for: engine)).tag(engine.id)
-                        }
+                Picker("引擎", selection: $session.translationEngineID) {
+                    // Same reasoning as the ASR engine `Picker` above.
+                    ForEach(ProviderCatalog.translationEngines) { engine in
+                        Text(engineLabel(for: engine)).tag(engine.id)
                     }
-                    .disabled(isBusy)
-                    modelManagementButton
                 }
+                .disabled(isBusy)
                 modelVariantPicker(
                     for: session.translationEngineID,
                     selection: Binding(
@@ -98,16 +102,11 @@ struct SettingsView: View {
                     )
                 )
                 .disabled(isBusy)
-                noLocalModelHint(for: ProviderCatalog.translationEngines)
+                inlineDownloadSection(forEngineID: session.translationEngineID)
                 // T3PO is the only engine with a WAIT/TRANS decision to bias
-                // (see `TranslationCommitEagerness`'s doc), so it gets its
-                // own picker; every other (one-shot) engine instead exposes
-                // the actual character threshold it reads
-                // (`TranslationConfig.earlyTranslateThreshold`'s doc) as a
-                // plain, directly user-configurable number — showing both
-                // controls at once, or the wrong one for the selected
-                // engine, would just be confusing. Deliberately *not*
-                // `.disabled(isBusy)` in either branch — safe to change
+                // (see `TranslationCommitEagerness`'s doc), so its picker
+                // stays right here next to the engine choice it biases.
+                // Deliberately *not* `.disabled(isBusy)` — safe to change
                 // mid-recording, same as `targetLanguageCode`'s picker.
                 if session.translationEngineID == "model.t3po" {
                     Picker("翻译提交策略", selection: $session.translationCommitEagerness) {
@@ -115,38 +114,329 @@ struct SettingsView: View {
                             Text(eagerness.displayName).tag(eagerness)
                         }
                     }
-                } else {
-                    Stepper(
-                        "长句提前翻译阈值：\(session.translationEarlyTranslateThreshold) 字",
-                        value: $session.translationEarlyTranslateThreshold, in: 20...1000, step: 10
+                }
+            }
+
+            // Problem 2 (round-4 user report) — every other one-shot
+            // translation engine (HY-MT1.5/system translation, i.e. every
+            // `.model`-kind ASR pairing except T3PO) instead exposes the
+            // actual character threshold it reads
+            // (`TranslationConfig.earlyTranslateThreshold`'s doc) as a
+            // plain, directly user-configurable number. Sitting as a bare
+            // `Stepper` wedged between the engine `Picker`s and the memory
+            // console read as an unexplained, out-of-place control; it now
+            // gets its own titled/explained section instead. Same
+            // visibility rule as before — hidden outright (not just
+            // disabled) under T3PO (has its own picker above) or the system
+            // ASR engine (see the doc below for why it's a genuine no-op
+            // there), rather than shown greyed-out with nothing to act on.
+            if session.translationEngineID != "model.t3po", session.transcriptionEngineKind != .system {
+                Section("翻译输出") {
+                    Text(
+                        "缓存的原文达到该字数的一半、且遇到句号/问号/换行等断句点时，会提前把已缓存内容翻译一次；"
+                            + "达到完整阈值后，即使还没遇到断句点也会强制翻译，避免长句迟迟不出字。"
+                            + "数值越低出字越快，但长句越容易被拆成更多段；数值越高单段更完整，但可能等得更久。"
                     )
-                    // See `TranslationConfig.earlyTranslateThreshold`'s doc
-                    // for why this caveat is real, not just a hedge:
-                    // `SystemTranscriptionProvider` never reports committed
-                    // text via `.appended` mid-utterance — a finalized
-                    // result *is* its segment boundary — so
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    // Task 1.4 (清理无效参数干扰) — See
+                    // `TranslationConfig.earlyTranslateThreshold`'s doc for
+                    // why this is a genuine no-op under the system ASR
+                    // engine: `SystemTranscriptionProvider` never reports
+                    // committed text via `.appended` mid-utterance — a
+                    // finalized result *is* its segment boundary — so
                     // `translationProvider.feed(_:)` only ever runs once per
                     // segment, with the whole utterance already, immediately
                     // followed by `flush()` in the same call. There's
                     // nothing "early" left to translate by then.
-                    if session.transcriptionEngineKind == .system {
-                        Text("系统自带识别引擎按句子结束才提交文本，此设置对该引擎无实际效果")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    Stepper(
+                        "长句提前翻译阈值：\(session.translationEarlyTranslateThreshold) 字",
+                        value: $session.translationEarlyTranslateThreshold, in: 20...1000, step: 10
+                    )
+                    .help("达到这个字数就提前翻译一次，不必等整句说完；数值越低出字越快，长句可能被拆得更碎。")
                 }
             }
 
+            memoryConsole
+        }
+        .padding(20)
+    }
+
+    /// `isPreloadingModel` alongside `isSessionActive`: switching engines
+    /// mid-preload would race `preloadModel()`'s in-flight `loadModel()`
+    /// calls against `discardLoadedModelsIfStale()` unloading the very
+    /// providers it's still awaiting.
+    private var isBusy: Bool {
+        session.isSessionActive || session.isPreloadingModel
+    }
+
+    /// Task 1.3 (引擎列表展示全部候选) — every catalog engine is always
+    /// listed by the `Picker`s above regardless of download state; this
+    /// only labels the undownloaded ones so they still read as "go get
+    /// this" rather than "ready to use".
+    private func hasDownloadedVariant(_ engine: EngineDescriptor) -> Bool {
+        guard engine.kind == .model else { return true }
+        return ProviderCatalog.modelVariants(forEngineID: engine.id)
+            .contains { downloadManager.isDownloaded($0) }
+    }
+
+    private func engineLabel(for engine: EngineDescriptor) -> String {
+        hasDownloadedVariant(engine) ? engine.displayName : "\(engine.displayName)（未下载 · 点击配置）"
+    }
+
+    /// Lists *downloaded* variants — plus the currently-selected one even if
+    /// it isn't downloaded (deleted via "模型库管理", or a stale/synced
+    /// selection), to avoid a blank `Picker` selection; marked "（未下载）"
+    /// for the same reason `engineLabel(for:)` marks its engine-level
+    /// equivalent.
+    @ViewBuilder
+    private func modelVariantPicker(for engineID: String, selection: Binding<String?>) -> some View {
+        let variants = ProviderCatalog.modelVariants(forEngineID: engineID)
+        let selectedID = selection.wrappedValue
+        let shown = variants.filter { downloadManager.isDownloaded($0) || $0.id == selectedID }
+        if !shown.isEmpty {
+            Picker("模型", selection: selection) {
+                ForEach(shown) { variant in
+                    Text(variantLabel(for: variant)).tag(Optional(variant.id))
+                }
+            }
+        }
+    }
+
+    private func variantLabel(for variant: ModelVariant) -> String {
+        downloadManager.isDownloaded(variant)
+            ? "\(variant.displayName) · 约 \(variant.approximateSizeMB) MB"
+            : "\(variant.displayName)（未下载）"
+    }
+
+    /// Task 3.2 — an undownloaded `.model` engine that's currently selected
+    /// gets an inline download row per catalog variant, right below its
+    /// `Picker`s, instead of only being reachable via "模型库管理". Each row
+    /// mirrors the "模型库管理" tab's own download affordance (percent,
+    /// progress bar, speed/ETA once available).
+    @ViewBuilder
+    private func inlineDownloadSection(forEngineID engineID: String) -> some View {
+        if let engine = (ProviderCatalog.transcriptionEngines + ProviderCatalog.translationEngines)
+            .first(where: { $0.id == engineID }), engine.kind == .model, !hasDownloadedVariant(engine) {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(ProviderCatalog.modelVariants(forEngineID: engineID)) { variant in
+                    inlineDownloadRow(for: variant)
+                }
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    @ViewBuilder
+    private func inlineDownloadRow(for variant: ModelVariant) -> some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(variant.displayName).font(.callout)
+                if downloadManager.isDownloading(variant) {
+                    if let fraction = downloadManager.downloadProgress[variant.id] {
+                        Text("下载中 \(Int((fraction * 100).rounded()))%")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        ProgressView(value: fraction)
+                        if let stats = downloadManager.downloadStats[variant.id] {
+                            Text(stats.summaryLine)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Text("准备下载…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        ProgressView().progressViewStyle(.linear)
+                    }
+                } else if let message = inlineDownloadFailures[variant.id] {
+                    Text("⚠️ 下载中断：\(message)")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    HStack {
+                        Button("立即重试") { downloadInline(variant) }.font(.caption)
+                        if variant.downloadURL != nil {
+                            Button("复制下载链接") { copyDownloadLink(for: variant) }.font(.caption)
+                        }
+                    }
+                } else {
+                    Text("约 \(variant.approximateSizeMB) MB · 尚未下载")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            if downloadManager.isDownloading(variant) {
+                Button("取消") { downloadManager.cancelDownload(for: variant) }
+            } else {
+                Button("⬇️ 一键下载并启用") { downloadInline(variant) }
+            }
+        }
+        // Task 4.2 — same copy as `ModelManagementView`'s own disk-space
+        // alert (Docs/UX-SETTINGS-MODEL-MANAGEMENT.md §4.6.1).
+        .alert(
+            "磁盘空间不足",
+            isPresented: Binding(
+                get: { inlineDiskSpaceWarning?.variant.id == variant.id },
+                set: { if !$0 { inlineDiskSpaceWarning = nil } }
+            )
+        ) {
+            Button("打开存储空间管理") {
+                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.settings.Storage")!)
+                inlineDiskSpaceWarning = nil
+            }
+            Button("知道了", role: .cancel) { inlineDiskSpaceWarning = nil }
+        } message: {
+            if let inlineDiskSpaceWarning {
+                Text("下载「\(inlineDiskSpaceWarning.variant.displayName)」\(inlineDiskSpaceWarning.error.errorDescription ?? "")。请清理磁盘空间后重试。")
+            }
+        }
+    }
+
+    private func copyDownloadLink(for variant: ModelVariant) {
+        guard let downloadURL = variant.downloadURL else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(downloadURL.absoluteString, forType: .string)
+    }
+
+    /// Unlike "模型库管理"'s own download button, this one always applies
+    /// the newly-downloaded variant to the engine/variant selection that's
+    /// already active on this tab — the whole point of downloading inline
+    /// is "I already picked this engine, just get me going", not a second
+    /// implicit auto-activation decision the way `ModelManagementView`'s
+    /// (which can be triggered for an engine that *isn't* currently
+    /// selected) needs to make.
+    private func downloadInline(_ variant: ModelVariant) {
+        inlineDownloadFailures[variant.id] = nil
+        // Task 4.2 — checked before the transfer starts, same as
+        // `ModelManagementView.download(_:)`.
+        if let warning = downloadManager.insufficientDiskSpaceWarning(for: variant) {
+            inlineDiskSpaceWarning = (variant, warning)
+            return
+        }
+        Task {
+            do {
+                _ = try await downloadManager.ensureDownloaded(variant)
+                if ProviderCatalog.transcriptionEngines.contains(where: { $0.id == variant.engineID }) {
+                    session.transcriptionModelVariantID = variant.id
+                } else {
+                    session.translationModelVariantID = variant.id
+                }
+            } catch is CancellationError {
+                // The user's own "取消" tap — not a failure worth surfacing.
+            } catch {
+                // Task 4.3 — inline on this row, not just `statusMessage`.
+                inlineDownloadFailures[variant.id] = error.localizedDescription
+            }
+        }
+    }
+
+    // MARK: - Memory & preload console (Task 3.3)
+
+    /// Moves the floating panel's "预加载模型"/"模型已就绪" affordance
+    /// (`FloatingTranscriptView.modelStatusControl`) into Settings, per
+    /// Docs/UX-SETTINGS-MODEL-MANAGEMENT.md §4.2.2 — same
+    /// `session.preloadModel()`/`session.unloadModels()` calls, just a
+    /// second, more discoverable entry point for users who keep the panel
+    /// hidden. Only shown once a `.model`-kind engine is actually selected
+    /// for something (`usesOnDeviceModelEngine`) — a `.system`-only
+    /// configuration has nothing to preload/release.
+    @ViewBuilder
+    private var memoryConsole: some View {
+        if session.usesOnDeviceModelEngine {
+            Section("引擎运行与显存状态") {
+                HStack(spacing: 6) {
+                    statusIndicatorDot
+                    Text(memoryStatusText)
+                        .font(.callout)
+                }
+                Text("预计占用统一内存：约 \(estimatedMemoryGB) GB")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Button {
+                        Task { await session.preloadModel() }
+                    } label: {
+                        HStack(spacing: 5) {
+                            if session.isPreloadingModel {
+                                ProgressView().controlSize(.small)
+                            }
+                            Text(session.isPreloadingModel ? "加载中…" : "⚡ 预加载到显存")
+                        }
+                    }
+                    .disabled(session.isSessionActive || session.isPreloadingModel || session.isModelLoaded)
+
+                    Button("🧹 释放显存占用") {
+                        session.unloadModels()
+                    }
+                    .disabled(!session.isModelLoaded || session.isSessionActive || session.isPreloadingModel)
+                }
+            }
+        }
+    }
+
+    private var statusIndicatorDot: some View {
+        Circle()
+            .fill(statusIndicatorColor)
+            .frame(width: 10, height: 10)
+    }
+
+    private var statusIndicatorColor: Color {
+        if session.isPreloadingModel { return .yellow }
+        return session.isModelLoaded ? .green : .gray
+    }
+
+    private var memoryStatusText: String {
+        if session.isPreloadingModel { return "🟡 正在加载中…" }
+        return session.isModelLoaded ? "🟢 当前模型已加载至显存 (就绪)" : "⚪ 空闲 (未载入显存)"
+    }
+
+    /// Sum of `recommendedMemoryGB` for every currently-selected `.model`
+    /// engine's active variant — an estimate, not a live measurement (no
+    /// API here for actual RSS/VRAM), same spirit as §4.2.2's "预计占用统一
+    /// 内存：12.4 GB (R2T2: 2.4GB + T3PO: 10.0GB)" line.
+    private var estimatedMemoryGB: Int {
+        var total = 0
+        if session.transcriptionEngineKind == .model, let variant = session.currentTranscriptionModelVariant {
+            total += variant.recommendedMemoryGB
+        }
+        if session.translationEngineKind == .model, let variant = session.currentTranslationModelVariant {
+            total += variant.recommendedMemoryGB
+        }
+        return total
+    }
+
+    // MARK: - Tab 2: 模型库管理
+
+    private var modelsTab: some View {
+        ModelManagementView(modelDownloadManager: downloadManager)
+    }
+
+    // MARK: - Tab 3: 语言与悬浮窗
+
+    private var languageTab: some View {
+        Form {
             Section("语言") {
                 SourceLanguagePicker(
                     sourceLanguageCode: $session.sourceLanguageCode,
                     transcriptionEngineKind: session.transcriptionEngineKind
                 )
-                TargetLanguagePicker(targetLanguageCode: $session.targetLanguageCode)
+                TargetLanguagePicker(
+                    targetLanguageCode: $session.targetLanguageCode,
+                    translationEngineID: session.translationEngineID,
+                    onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
+                    // Belt-and-suspenders alongside this whole `Section`'s
+                    // own `.disabled(isBusy)` below (Review Round 1
+                    // Must-Fix 1) — keeps the button's own guard/caption
+                    // correct even if this picker is ever reused outside
+                    // a `.disabled` ancestor.
+                    isSessionActive: session.isSessionActive
+                )
             }
             .disabled(isBusy)
 
-            // Deliberately outside the `.disabled(isBusy)` sections above —
+            // Deliberately outside the `.disabled(isBusy)` section above —
             // these only ever touch `FloatingTranscriptView`'s own SwiftUI
             // opacity (see `panelBackgroundOpacity`/`panelContentOpacity`'s
             // docs), never anything `start()` reads once at setup time, so
@@ -171,84 +461,6 @@ struct SettingsView: View {
             }
         }
         .padding(20)
-        .frame(width: 440)
-    }
-
-    /// `isPreloadingModel` alongside `isSessionActive`: switching engines
-    /// mid-preload would race `preloadModel()`'s in-flight `loadModel()`
-    /// calls against `discardLoadedModelsIfStale()` unloading the very
-    /// providers it's still awaiting. Applied to each control individually
-    /// (not to a `Section`/the whole `Form`) specifically so
-    /// `modelManagementButton` can go undisabled sitting right next to a
-    /// disabled `Picker` — see that property's doc.
-    private var isBusy: Bool {
-        session.isSessionActive || session.isPreloadingModel
-    }
-
-    /// Next to each engine `Picker` (not buried at the bottom of the form) —
-    /// downloading/deleting a `.model`-kind engine's weights always happens
-    /// in "模型管理" (`ModelManagementView`) now, never inline here, so this
-    /// is the whole form's only way back to it.
-    private var modelManagementButton: some View {
-        Button("模型管理…") {
-            NSApp.activate(ignoringOtherApps: true)
-            openWindow(id: "modelManagement")
-        }
-    }
-
-    /// A `.model`-kind engine only shows up in the engine `Picker` above once
-    /// something for it has been downloaded — bootstrapping a brand-new
-    /// engine always goes through the "模型管理" window instead (see
-    /// `ModelManagementView`), which lists every catalog variant regardless
-    /// of download state. The *currently selected* engine (`currentID` —
-    /// `session.transcriptionEngineID`/`translationEngineID` respectively,
-    /// passed in rather than checked against both here, since the two
-    /// selections are otherwise unrelated) is always kept visible even with
-    /// nothing downloaded for it (e.g. its only variant was just deleted via
-    /// Model Management, or a synced `UserDefaults` value names an engine
-    /// this machine hasn't downloaded yet) — filtering it out entirely left
-    /// the `Picker`'s binding pointing at a tag no longer in its options,
-    /// which SwiftUI renders as a blank/no-selection control instead of
-    /// showing what's actually selected. `engineLabel(for:)` marks that case
-    /// "（未下载）" so it doesn't silently read as a normal, ready-to-use
-    /// option.
-    private func isEngineAvailable(_ engine: EngineDescriptor, currentID: String) -> Bool {
-        if engine.id == currentID {
-            return true
-        }
-        return hasDownloadedVariant(engine)
-    }
-
-    private func hasDownloadedVariant(_ engine: EngineDescriptor) -> Bool {
-        guard engine.kind == .model else { return true }
-        return ProviderCatalog.modelVariants(forEngineID: engine.id)
-            .contains { downloadManager.isDownloaded($0) }
-    }
-
-    private func engineLabel(for engine: EngineDescriptor) -> String {
-        hasDownloadedVariant(engine) ? engine.displayName : "\(engine.displayName)（未下载）"
-    }
-
-    /// Lists *downloaded* variants, same reasoning as `isEngineAvailable(_:)`
-    /// above — plus the currently-selected one even if it isn't downloaded
-    /// (deleted via Model Management, or a stale/synced selection), again to
-    /// avoid a blank `Picker` selection; marked "（未下载）" for the same
-    /// reason `engineLabel(for:)` marks its engine-level equivalent. An
-    /// engine is only ever listed above once at least one of its variants is
-    /// downloaded, so in the common case this `Picker` is never actually
-    /// empty.
-    @ViewBuilder
-    private func modelVariantPicker(for engineID: String, selection: Binding<String?>) -> some View {
-        let variants = ProviderCatalog.modelVariants(forEngineID: engineID)
-        let selectedID = selection.wrappedValue
-        let shown = variants.filter { downloadManager.isDownloaded($0) || $0.id == selectedID }
-        if !shown.isEmpty {
-            Picker("模型", selection: selection) {
-                ForEach(shown) { variant in
-                    Text(variantLabel(for: variant)).tag(Optional(variant.id))
-                }
-            }
-        }
     }
 
     private func opacitySlider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
@@ -267,30 +479,34 @@ struct SettingsView: View {
         }
     }
 
-    /// Shown under a category's engine `Picker` whenever it's currently
-    /// showing only `.system` engines — without this, a `.model`-kind engine
-    /// simply not appearing in the list (see `isEngineAvailable(_:)`) reads
-    /// as a missing feature/bug rather than "go download one first", since
-    /// nothing else on this screen ever mentions "模型管理". Assumes `engines`
-    /// contains at least one `.model`-kind entry, true for both categories
-    /// today (`model.r2t2`/`model.t3po`) — if a future category is ever
-    /// `.system`-only (no `.model` engine in the catalog at all for it),
-    /// this would show the hint permanently for that category with nothing
-    /// to ever download; guard with
-    /// `engines.contains(where: { $0.kind == .model })` first if that
-    /// happens.
-    @ViewBuilder
-    private func noLocalModelHint(for engines: [EngineDescriptor]) -> some View {
-        if !engines.contains(where: { $0.kind == .model && hasDownloadedVariant($0) }) {
-            Text("还没有可用的本地模型，点击上方「模型管理…」下载后即可选用")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    // MARK: - Tab 4: 关于
+
+    private var aboutTab: some View {
+        Form {
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("OmniVoice").font(.title2.bold())
+                    Text("macOS 离线实时双语字幕与转录工具")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Text("版本 \(appVersionString)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+            }
+            Section("引擎") {
+                Text("系统引擎基于 macOS Speech / Translation 框架；本地引擎基于 audio.cpp（R2T2）与 llama.cpp（T3PO / HY-MT1.5），完全离线运行。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .padding(20)
     }
 
-    private func variantLabel(for variant: ModelVariant) -> String {
-        downloadManager.isDownloaded(variant)
-            ? "\(variant.displayName) · 约 \(variant.approximateSizeMB) MB"
-            : "\(variant.displayName)（未下载）"
+    private var appVersionString: String {
+        let shortVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+        return build.map { "\(shortVersion) (\($0))" } ?? shortVersion
     }
 }
