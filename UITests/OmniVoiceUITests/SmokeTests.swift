@@ -9,8 +9,7 @@ final class SmokeTests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        OmniVoiceUITestApp.resetUserDefaults()
-        app = OmniVoiceUITestApp.launch()
+        app = OmniVoiceUITestApp.launchFreshOnboarding()
     }
 
     /// Always runs even if the test body's assertion fails first
@@ -20,6 +19,7 @@ final class SmokeTests: XCTestCase {
     /// the next test's `launch()` instead of that test getting its own
     /// fresh process (see `terminateAnyRunningInstance()`'s doc).
     override func tearDownWithError() throws {
+        guard let app else { return }
         app.terminate()
     }
 

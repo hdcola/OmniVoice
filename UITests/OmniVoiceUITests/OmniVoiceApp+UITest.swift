@@ -55,7 +55,7 @@ enum OmniVoiceUITestApp {
         let deadline = Date().addingTimeInterval(5)
         while Date() < deadline,
             NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == bundleIdentifier }) {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            Thread.sleep(forTimeInterval: 0.1)
         }
     }
 
@@ -95,6 +95,33 @@ enum OmniVoiceUITestApp {
         }
         let app = XCUIApplication(url: appBundleURL)
         app.launch()
+        return app
+    }
+
+    /// `resetUserDefaults()` + `launch()`, with a generous wait for the
+    /// onboarding window instead of a short one. This app is `LSUIElement`/
+    /// `.accessory`-policy (menu-bar-only, no Dock icon) — on at least one
+    /// shared, multi-user host this repo's CI/dev machines can run on,
+    /// `testmanagerd`'s automation-mode handshake with an `.accessory` app
+    /// launched via `XCUIApplication(url:)` (as opposed to a plain `open`,
+    /// which always showed onboarding in 2-4s in side-by-side comparisons)
+    /// was observed to intermittently never complete within even a 90s wait,
+    /// while the automation accessibility connection itself stayed alive and
+    /// responsive throughout (repeated successful hierarchy queries, per
+    /// `log show --predicate 'process contains "testmanagerd"'`). Neither a
+    /// missing `get-task-allow` entitlement nor forcing `.regular` activation
+    /// policy from a `XCODE_SCHEME_NAME`-gated test-only code path fixed it
+    /// (both tried and reverted — see this task's final report for the full
+    /// writeup). If this test suite hangs/times out entirely on a given
+    /// machine, that's this same underlying issue, not a regression in the
+    /// app or these tests; re-running on a quieter host is the known
+    /// workaround so far.
+    static func launchFreshOnboarding(timeout: TimeInterval = 90) -> XCUIApplication {
+        resetUserDefaults()
+        let app = launch()
+        if !app.windows["欢迎使用 OmniVoice"].waitForExistence(timeout: timeout) {
+            XCTFail("onboarding window did not appear within \(timeout)s of launch")
+        }
         return app
     }
 }
