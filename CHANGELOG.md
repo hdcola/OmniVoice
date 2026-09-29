@@ -14,6 +14,8 @@ The format is based on Keep a Changelog.
 
 ### Changed
 
+- chore(settings): show a caption under "长句提前翻译阈值" clarifying it has no effect while the system transcription engine is selected (it only reports committed text once a segment closes, so there's no still-talking window left for an early translation to beat) (#27)
+
 ### Fixed
 
 - fix(translation): fix `SystemTranslationProvider` misrouting/losing a translation across back-to-back utterances — an early, still-in-flight translation request could have its result committed into the wrong (following) segment's row, or a segment's row-close signal could be dropped entirely if another utterance started before that request resolved (#27)
@@ -25,6 +27,8 @@ The format is based on Keep a Changelog.
 - fix(inference): construct and decode each `llama_batch` within the scope its underlying pointer is actually valid for, instead of across two separate calls (undefined behavior per Swift's pointer-conversion rules, even though it worked in practice) (#27)
 - fix(translation): raise HY-MT1.5's generation length cap from 200 to 1024 tokens, so a translation of a long buffered utterance (the early-translate threshold is user-configurable up to 1000 characters) doesn't get cut off mid-sentence (#27)
 - fix(translation): don't insert a space before a translation fragment that starts with punctuation, so joined fragments read "Hello, world." not "Hello , world." (#27)
+- fix(translation): trim trailing newlines (not just spaces) before checking whether an ASR delta ends a sentence, so a trailing newline no longer silently defeats the early-translate soft-break check (#27)
+- fix(inference): use the Swift string's own UTF-8 byte count instead of `strlen` on the converted C string when tokenizing, so an input containing an embedded null byte can't be silently undercounted (#27)
 
 ### Dependencies
 

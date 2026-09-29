@@ -531,6 +531,52 @@ follow-ups:
   lost either way once its stream is abandoned; this fix is only about the
   counter, not recovering it).
 
+**Round 5** — framed by its own review as findings/follow-up notes rather
+than urgent bugs, but two were real robustness fixes worth taking anyway:
+
+- **`earlyTranslateThreshold` is effectively inert for the system
+  transcription engine, not just less useful** — confirmed by checking
+  `SystemTranscriptionProvider`'s own doc: a finalized result *is* its
+  segment boundary, so it never reports committed text via `.appended`
+  while someone is still talking. `RecordingSession.handle(_:)`'s
+  `.segmentClosed` case is the *only* time a translation provider ever sees
+  that segment's text at all — one `feed(_:)` call with the whole
+  utterance, immediately followed by `flush()` in the same call — so
+  there's no still-talking window left for an early translation to beat.
+  This is correct, expected behavior (translating still-changing volatile
+  ASR text would waste compute and flicker, exactly like the existing
+  "translation never runs on `.revised` text" rule this project already
+  documents), not a bug — but it wasn't documented anywhere, so a user
+  could reasonably expect the "长句提前翻译阈值" setting to help while using
+  the system ASR engine, when it can't. Documented in
+  `TranslationConfig.earlyTranslateThreshold`'s doc, and `SettingsView` now
+  shows a caption under that setting when the system transcription engine
+  is selected, saying so.
+- **`SentenceBoundary.endsSentence`/`endsWithBreak` trimmed only
+  `.whitespaces`, not `.whitespacesAndNewlines`** — an ASR delta trailing
+  in a newline would leave `.last` reading the newline itself, never the
+  real sentence-ending punctuation before it, silently defeating the
+  check. This directly affects the `earlyTranslateThreshold` soft-break
+  logic added in this PR (and, pre-existing, T3PO's own
+  `forceBreakThreshold`+`SentenceBoundary` combo), so fixed rather than
+  left as a documentation-only note.
+- **`LlamaGenerationSupport`'s tokenize calls used `strlen(textPtr)` on a
+  C string instead of the Swift string's own `utf8.count`** — functionally
+  equivalent for ordinary text, but `strlen` stops at the first `\0` byte,
+  silently undercounting for the (unlikely, but possible) case of an input
+  containing an embedded null; `text.utf8.count` has no such blind spot
+  and needs no pointer scan to get it. Fixed both call sites
+  (`tokenCount(of:vocab:)` and `generate`'s own tokenize call).
+- **Confirmed as already covered, not a new finding**: a translated
+  fragment starting with an opening quote/paren (`isPunctuation` is also
+  true for those) would skip the inter-fragment space `appendTranslation`
+  inserts, same as a fragment starting with closing punctuation — e.g.
+  `He said:"hello"` instead of `He said: "hello"`. Left as-is per the
+  review's own conclusion: a model's sentence/clause split essentially
+  never lands right before an opening quote/paren in practice, so this
+  edge case isn't worth special-casing away from the general
+  "`isPunctuation` means no space" rule.
+
 ### Smoke test findings (fixed)
 
 Manual smoke test (`fixbug/show-floating-panel-on-start`, PR #2) caught four

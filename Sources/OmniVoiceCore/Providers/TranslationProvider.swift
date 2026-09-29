@@ -29,6 +29,18 @@ public struct TranslationConfig: Sendable {
     /// small vocabulary is for concepts every engine can express in its own
     /// terms, and a one-shot engine's "how long is too long" genuinely is
     /// just a character count.
+    ///
+    /// **Only actually helps mid-utterance when paired with a `.model`-kind
+    /// transcription engine (R2T2)** — `SystemTranscriptionProvider` never
+    /// reports committed text via `.appended` while someone is still
+    /// talking (see that class's own doc: a finalized result *is* its
+    /// segment boundary), so `RecordingSession.handle(_:)`'s
+    /// `.segmentClosed` case is the *only* time a translation provider ever
+    /// sees that segment's text at all — one `feed(_:)` call with the whole
+    /// utterance, immediately followed by `flush()`. There's no
+    /// still-talking window left for an early translation to actually beat;
+    /// this setting is effectively inert for the system transcription
+    /// engine, not just less useful.
     public var earlyTranslateThreshold: Int
 
     public init(

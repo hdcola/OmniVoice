@@ -120,6 +120,20 @@ struct SettingsView: View {
                         "长句提前翻译阈值：\(session.translationEarlyTranslateThreshold) 字",
                         value: $session.translationEarlyTranslateThreshold, in: 20...1000, step: 10
                     )
+                    // See `TranslationConfig.earlyTranslateThreshold`'s doc
+                    // for why this caveat is real, not just a hedge:
+                    // `SystemTranscriptionProvider` never reports committed
+                    // text via `.appended` mid-utterance — a finalized
+                    // result *is* its segment boundary — so
+                    // `translationProvider.feed(_:)` only ever runs once per
+                    // segment, with the whole utterance already, immediately
+                    // followed by `flush()` in the same call. There's
+                    // nothing "early" left to translate by then.
+                    if session.transcriptionEngineKind == .system {
+                        Text("系统自带识别引擎按句子结束才提交文本，此设置对该引擎无实际效果")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 

@@ -18,8 +18,12 @@ public enum SentenceBoundary {
     /// unscripted/narrated speech.
     public static let softBreakPunctuation: Set<Character> = [",", "，", "、", "：", ":"]
 
+    /// `.whitespacesAndNewlines`, not just `.whitespaces` — an ASR delta
+    /// trailing in a newline (some engines' output does) would otherwise
+    /// leave `.last` reading the newline itself, never the real
+    /// sentence-ending punctuation before it, silently defeating this check.
     public static func endsSentence(_ text: String) -> Bool {
-        text.trimmingCharacters(in: .whitespaces).last.map { endingPunctuation.contains($0) } ?? false
+        text.trimmingCharacters(in: .whitespacesAndNewlines).last.map { endingPunctuation.contains($0) } ?? false
     }
 
     /// Same as `endsSentence`, but also accepts a soft break (e.g. a Chinese
@@ -29,7 +33,7 @@ public enum SentenceBoundary {
     /// `AppModel.ingestModelSourceText` doc for why a backward search
     /// duplicates text across rows.
     public static func endsWithBreak(_ text: String) -> Bool {
-        text.trimmingCharacters(in: .whitespaces).last.map {
+        text.trimmingCharacters(in: .whitespacesAndNewlines).last.map {
             endingPunctuation.contains($0) || softBreakPunctuation.contains($0)
         } ?? false
     }

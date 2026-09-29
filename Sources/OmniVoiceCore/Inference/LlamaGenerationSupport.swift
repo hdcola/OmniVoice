@@ -15,8 +15,13 @@ enum LlamaGeneration {
     /// returning `-n` when the (here, zero-sized) output buffer is too
     /// small for `n` tokens.
     static func tokenCount(of text: String, vocab: OpaquePointer) -> Int32 {
+        // `text.utf8.count`, not `strlen(textPtr)` on the C string `text`
+        // was converted to — `strlen` stops at the first `\0` byte, which
+        // would silently undercount for a (however unlikely) input with an
+        // embedded null; the Swift string's own UTF-8 byte count has no
+        // such blind spot and needs no pointer scan to get.
         let n = text.withCString { textPtr in
-            llama_tokenize(vocab, textPtr, Int32(strlen(textPtr)), nil, 0, true, true)
+            llama_tokenize(vocab, textPtr, Int32(text.utf8.count), nil, 0, true, true)
         }
         return n < 0 ? -n : n
     }
@@ -115,7 +120,9 @@ enum LlamaGeneration {
         guard neededTokens > 0 else { return "" }
         var tokens = [llama_token](repeating: 0, count: neededTokens)
         let nTokens = prompt.withCString { promptPtr in
-            llama_tokenize(vocab, promptPtr, Int32(strlen(promptPtr)), &tokens, Int32(tokens.count), true, true)
+            // Same `text.utf8.count`-over-`strlen` reasoning as
+            // `tokenCount(of:vocab:)`'s doc.
+            llama_tokenize(vocab, promptPtr, Int32(prompt.utf8.count), &tokens, Int32(tokens.count), true, true)
         }
         guard nTokens > 0, Int(nTokens) <= tokens.count else { return "" }
         tokens = Array(tokens.prefix(Int(nTokens)))
