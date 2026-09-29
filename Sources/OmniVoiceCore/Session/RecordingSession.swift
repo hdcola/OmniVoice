@@ -803,6 +803,15 @@ public final class RecordingSession: ObservableObject {
 
     public func start() async {
         guard !isRunning, !isStopping, !isStarting, !isPreloadingModel else { return }
+        // Reset at the very top, before any of the early-return guards below
+        // — these used to reset partway through this method, after several
+        // early-failure `return`s (missing audio source, model not
+        // downloaded), so a stale permission-needed flag/deeplink button from
+        // a *previous* failed attempt could persist even once the actual
+        // permission issue was resolved, if the user then hit one of those
+        // earlier, unrelated failures.
+        screenRecordingPermissionNeeded = false
+        microphonePermissionNeeded = false
         // No mic and no system audio would mean no audio source at all —
         // fail fast with a friendly message rather than silently starting a
         // session that will never produce a single transcribed word.
@@ -905,8 +914,6 @@ public final class RecordingSession: ObservableObject {
         lines = [TranscriptLine(id: 0)]
         sourceRowIndex = 0
         translationRowIndex = 0
-        screenRecordingPermissionNeeded = false
-        microphonePermissionNeeded = false
 
         if let sessionStore {
             activeSessionRecord = sessionStore.createSession(
@@ -1093,15 +1100,23 @@ public final class RecordingSession: ObservableObject {
         elapsedSeconds = 0
         elapsedTimer?.invalidate()
         let recordingStartDate = Date()
-        // `Timer.scheduledTimer` schedules on the current run loop — safe
-        // here since `start()` only ever runs on the main actor. Hops back
-        // through `Task { @MainActor in ... }` anyway (not a bare closure
-        // write) since a `Timer`'s fire callback itself isn't actor-isolated.
-        elapsedTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        // `Timer(timeInterval:repeats:)` + an explicit `RunLoop.main.add(_:forMode:
+        // .common)` — not `Timer.scheduledTimer`, which only ever schedules on
+        // `RunLoop.Mode.default` and would stop firing entirely while the main
+        // run loop is in `.eventTracking` mode (dragging the floating panel,
+        // an open menu, actively interacting with a control), silently
+        // freezing this readout during exactly the interactions a user
+        // performs constantly. Safe to construct here since `start()` only
+        // ever runs on the main actor. Hops back through `Task { @MainActor
+        // in ... }` anyway (not a bare closure write) since a `Timer`'s fire
+        // callback itself isn't actor-isolated.
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.elapsedSeconds = Int(Date().timeIntervalSince(recordingStartDate))
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        elapsedTimer = timer
     }
 
     public func stop() async {

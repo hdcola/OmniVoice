@@ -32,10 +32,20 @@ struct FloatingTranscriptView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if isControlsVisible {
-                controlBar
-                Divider()
-            }
+            // Always kept in the view hierarchy (never structurally
+            // inserted/removed based on `isControlsVisible`) and faded via
+            // `.opacity` instead — a structural insert/remove here shrinks
+            // `TranscriptListView`'s container height without changing its
+            // content height, which `.onScrollGeometryChange` misreads as
+            // "the user scrolled away" and unpins auto-scroll just from a
+            // mouse hover. `.allowsHitTesting(false)` while hidden keeps an
+            // invisible control bar/status bar from intercepting hover/clicks
+            // meant for the transcript beneath them.
+            controlBar
+                .opacity(isControlsVisible ? 1 : 0)
+                .allowsHitTesting(isControlsVisible)
+            Divider()
+                .opacity(isControlsVisible ? 1 : 0)
             // `.equatable()`: `TranscriptListView` takes `lines`/`isRunning`
             // as plain values rather than observing `session` itself — see
             // its own doc for why, and why that's the point of pulling it
@@ -47,10 +57,11 @@ struct FloatingTranscriptView: View {
                 fontScale: session.panelFontScale
             )
             .equatable()
-            if isControlsVisible {
-                Divider()
-                statusBar
-            }
+            Divider()
+                .opacity(isControlsVisible ? 1 : 0)
+            statusBar
+                .opacity(isControlsVisible ? 1 : 0)
+                .allowsHitTesting(isControlsVisible)
         }
         .animation(.easeInOut(duration: 0.2), value: isControlsVisible)
         // Applied to the whole content stack, not the background below —
@@ -111,6 +122,20 @@ struct FloatingTranscriptView: View {
     /// because it has this panel's key-window constraint, but so the two
     /// don't offer different language options.)
     private var controlBar: some View {
+        // Wrapped in a horizontal `ScrollView` rather than a fixed-width
+        // `HStack` alone: even after shrinking the display-mode/font-scale
+        // pickers below to `.fixedSize()`, the full row (start/stop, both
+        // language pickers, the elapsed timer, both new pickers, copy, and
+        // close) can still exceed the panel's 380pt minimum width — this is
+        // the safety net that scrolls instead of clipping/truncating any
+        // control at that width, rather than relying solely on the panel
+        // never being resized narrower than what the row happens to need.
+        ScrollView(.horizontal, showsIndicators: false) {
+            controlBarContent
+        }
+    }
+
+    private var controlBarContent: some View {
         HStack(spacing: 10) {
             Button {
                 Task {
@@ -175,13 +200,19 @@ struct FloatingTranscriptView: View {
             }
 
             // 显示模式切换（提案 3.1.B）：双语对照 / 仅译文 / 仅原文。
+            // `.fixedSize()` instead of a fixed `.frame(width:)` — the old
+            // 90pt/70pt widths (sized for this picker's *widest* option, not
+            // its current one) were a big part of why the control bar's
+            // natural width overflowed the panel's 380pt minimum; sizing to
+            // the currently-selected label's actual content is narrower in
+            // every case but still never clips whichever option is showing.
             Picker("显示模式", selection: $session.panelDisplayMode) {
                 ForEach(PanelDisplayMode.allCases, id: \.self) { mode in
                     Text(mode.displayName).tag(mode)
                 }
             }
             .labelsHidden()
-            .frame(width: 90)
+            .fixedSize()
 
             // 字号档位（提案 3.1.C）：标准 / 大 / 特大。
             Picker("字号", selection: $session.panelFontScale) {
@@ -190,9 +221,9 @@ struct FloatingTranscriptView: View {
                 }
             }
             .labelsHidden()
-            .frame(width: 70)
+            .fixedSize()
 
-            Spacer()
+            Spacer(minLength: 20)
 
             // "一键复制全文" (proposal 3.1.D / roadmap P1_3) — copies the
             // whole current transcript, not just a single selected line;
@@ -262,10 +293,18 @@ struct FloatingTranscriptView: View {
             // in `statusMessage`, leaving the user to hunt for the right
             // settings pane themselves.
             if session.microphonePermissionNeeded {
-                permissionSettingsButton(urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+                permissionSettingsButton(
+                    urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
+                    systemImage: "mic.slash",
+                    tooltip: "前往系统设置授权麦克风"
+                )
             }
             if session.screenRecordingPermissionNeeded {
-                permissionSettingsButton(urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
+                permissionSettingsButton(
+                    urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+                    systemImage: "display",
+                    tooltip: "前往系统设置授权屏幕录制"
+                )
             }
 
             Spacer()
@@ -355,16 +394,19 @@ struct FloatingTranscriptView: View {
 
     /// One button, reused for both the microphone and screen-recording
     /// privacy panes above — `x-apple.systempreferences:` URLs are always
-    /// well-formed literals here, so the force-unwrap is safe.
-    private func permissionSettingsButton(urlString: String) -> some View {
+    /// well-formed literals here, so the force-unwrap is safe. Takes a
+    /// distinct `systemImage`/`tooltip` per call site: with both permissions
+    /// missing at once, two identical gear icons with the same tooltip gave
+    /// no way to tell which one addressed which permission.
+    private func permissionSettingsButton(urlString: String, systemImage: String, tooltip: String) -> some View {
         Button {
             NSWorkspace.shared.open(URL(string: urlString)!)
         } label: {
-            Image(systemName: "gearshape")
+            Image(systemName: systemImage)
         }
         .buttonStyle(.plain)
         .foregroundStyle(.orange)
-        .help("前往系统设置授权")
+        .help(tooltip)
     }
 
     /// Live feedback that audio is actually being picked up — without this,
@@ -586,10 +628,22 @@ private struct TranscriptLineRow: View {
                     Text(line.displaySource)
                         .font(.system(size: CGFloat(fontScale.sourceFontSize), weight: .medium))
                 }
-                if displayMode != .sourceOnly, !line.displayTranslation.isEmpty {
-                    Text(line.displayTranslation)
-                        .font(.system(size: CGFloat(fontScale.translationFontSize)))
-                        .foregroundStyle(.secondary)
+                if displayMode != .sourceOnly {
+                    if !line.displayTranslation.isEmpty {
+                        Text(line.displayTranslation)
+                            .font(.system(size: CGFloat(fontScale.translationFontSize)))
+                            .foregroundStyle(.secondary)
+                    } else if displayMode == .translationOnly {
+                        // `.translationOnly` otherwise renders a completely
+                        // empty row for a line whose translation hasn't
+                        // committed yet — the source text, dimmed/italicized,
+                        // stands in as a temporary placeholder so there's at
+                        // least some indication speech was detected, instead
+                        // of the row looking blank until the translation lands.
+                        Text(line.displaySource)
+                            .font(.system(size: CGFloat(fontScale.translationFontSize)).italic())
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .textSelection(.enabled)

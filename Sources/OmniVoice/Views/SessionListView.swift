@@ -34,19 +34,30 @@ struct SessionListView: View {
                     row(for: session)
                 }
                 .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) {
-                        pendingDeletion = session
-                    } label: {
-                        Label("删除", systemImage: "trash")
+                    // Never offered for the still-in-progress session
+                    // (`endedAt == nil`, the one `RecordingSession` is
+                    // actively appending to/ending) — see `pendingDeletion`'s
+                    // delete handler below for why deleting it is unsafe.
+                    if session.endedAt != nil {
+                        Button(role: .destructive) {
+                            pendingDeletion = session
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
                     }
                 }
                 .contextMenu {
                     Button("重命名…") { beginRename(session) }
-                    Button("删除会话…", role: .destructive) { pendingDeletion = session }
+                    if session.endedAt != nil {
+                        Button("删除会话…", role: .destructive) { pendingDeletion = session }
+                    }
                 }
             }
             .onDeleteCommand {
-                guard let selectedID, let session = sessions.first(where: { $0.id == selectedID }) else { return }
+                guard let selectedID,
+                    let session = sessions.first(where: { $0.id == selectedID }),
+                    session.endedAt != nil
+                else { return }
                 pendingDeletion = session
             }
             .searchable(text: $searchText, prompt: "搜索转录或翻译内容")
@@ -70,12 +81,31 @@ struct SessionListView: View {
             titleVisibility: .visible
         ) {
             Button("删除", role: .destructive) {
-                if let session = pendingDeletion {
+                if let session = pendingDeletion, session.endedAt != nil {
                     // `RecordingSessionRecord`'s `@Relationship(deleteRule:
                     // .cascade, ...)` already cascades to every one of its
                     // `UtteranceRecord`s — no separate cleanup needed here.
+                    //
+                    // Never the still-in-progress session (`endedAt == nil`,
+                    // guarded above defensively even though every path that
+                    // sets `pendingDeletion` already excludes it): this
+                    // view's `modelContext` and `RecordingSession`'s
+                    // `SessionStore` share the same `ModelContainer.mainContext`,
+                    // so deleting that session's model object here would
+                    // delete the very object `RecordingSession` still holds a
+                    // live reference to — the next `appendUtterance`/`endSession`
+                    // call would then mutate/save a deleted SwiftData model.
                     modelContext.delete(session)
                     try? modelContext.save()
+                    // Resetting stale selection after a delete — leaving
+                    // `selectedID` pointing at the now-deleted session's
+                    // UUID left the detail pane blank instead of resetting to
+                    // the "选择一个会话" placeholder, and a subsequent ⌫ did
+                    // nothing since `selectedID` no longer resolved to any
+                    // session.
+                    if selectedID == session.id {
+                        selectedID = nil
+                    }
                 }
                 pendingDeletion = nil
             }
@@ -145,22 +175,39 @@ struct SessionListView: View {
         .padding(.vertical, 2)
     }
 
+    /// Cached formatters for `relativeTimeLabel(for:)` below — allocating a
+    /// fresh `DateFormatter` on every row render is a real (if minor) scroll
+    /// perf cost at list scale, matching the `static let` pattern
+    /// `SessionExporter.dateFormatter` already uses elsewhere.
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+    private static let monthDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M月d日"
+        return formatter
+    }()
+    private static let yearMonthDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年M月d日"
+        return formatter
+    }()
+
     /// "今天 14:30" / "昨天 09:15" / "9月20日" (this year, no year) / a full
     /// dated string once the year itself is no longer implied.
     private static func relativeTimeLabel(for date: Date) -> String {
         let calendar = Calendar.current
-        let timeFormatter = DateFormatter()
-        timeFormatter.dateFormat = "HH:mm"
         if calendar.isDateInToday(date) {
             return "今天 \(timeFormatter.string(from: date))"
         }
         if calendar.isDateInYesterday(date) {
             return "昨天 \(timeFormatter.string(from: date))"
         }
-        let formatter = DateFormatter()
-        formatter.dateFormat = calendar.isDate(date, equalTo: .now, toGranularity: .year)
-            ? "M月d日"
-            : "yyyy年M月d日"
+        let formatter = calendar.isDate(date, equalTo: .now, toGranularity: .year)
+            ? monthDayFormatter
+            : yearMonthDayFormatter
         return formatter.string(from: date)
     }
 
@@ -181,9 +228,17 @@ struct SessionListView: View {
     /// ever offered for a `.model`-kind ASR engine — see `RecordingSession
     /// .sourceLanguageCode`'s doc).
     private static func languagePairLabel(for session: RecordingSessionRecord) -> String {
-        let sourceLabel = session.sourceLanguageCode
-            .flatMap { code in LanguageCatalog.common.first { $0.code == code }?.displayName }
-            ?? "自动"
+        // Only an actually-nil `sourceLanguageCode` means "自动" (auto-
+        // detect) — a non-nil code that just isn't in `LanguageCatalog.common`
+        // (an unrecognized/custom code) should fall back to showing the raw
+        // code itself, same as `targetLabel` below already does, not be
+        // mistaken for "auto-detect".
+        let sourceLabel: String
+        if let code = session.sourceLanguageCode {
+            sourceLabel = LanguageCatalog.common.first { $0.code == code }?.displayName ?? code
+        } else {
+            sourceLabel = "自动"
+        }
         let targetLabel = LanguageCatalog.common.first { $0.code == session.targetLanguageCode }?.displayName
             ?? session.targetLanguageCode
         return "\(sourceLabel) ➔ \(targetLabel)"

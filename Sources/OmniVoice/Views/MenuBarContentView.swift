@@ -49,6 +49,15 @@ struct MenuBarContentView: View {
         // hidden, this dropdown is the only place the user can see *why*
         // the button below is grayed out — a plain "开始转录" that just
         // doesn't respond reads as broken, not as "busy".
+        // Elapsed-time readout (proposal 3.1.E/3.2) — the floating panel
+        // already shows this in its control bar, but with the panel hidden
+        // this dropdown had no equivalent, even though `elapsedTimeString`'s
+        // own doc says it drives both.
+        if session.isRunning {
+            Text(session.elapsedTimeString)
+                .font(.caption.monospacedDigit())
+        }
+
         Button(
             session.isRunning ? "停止转录"
                 : (session.isStarting ? "启动中…" : (session.isPreloadingModel ? "预加载中…" : "开始转录"))
@@ -168,7 +177,12 @@ struct MenuBarLabel: View {
         // this icon once the floating panel itself is hidden (see the
         // proposal's 3.2 "录制状态动态反馈").
         if session.isRunning {
+            // `MenuBarExtra`'s label image is a template image by default
+            // (`NSImage.isTemplate`), which strips `.foregroundStyle(.red)`
+            // down to monochrome — `.renderingMode(.original)` opts this
+            // specific image out of that so the red actually renders.
             Image(systemName: "record.circle.fill")
+                .renderingMode(.original)
                 .foregroundStyle(.red)
                 .symbolEffect(.pulse, isActive: true)
         } else if let fraction = downloadManager.downloadProgress.values.max() {
