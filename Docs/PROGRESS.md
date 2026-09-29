@@ -192,6 +192,98 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       built — see those PRs' review comments). Still ad-hoc signed only
       (no Developer ID/notarization yet — see Open Items #4).
 
+- [x] **HY-MT1.5 wired up as a second, one-shot local translation engine**
+      (2026-09-28): added `model.hymt15` alongside `model.t3po` in
+      `ProviderCatalog` (two variants: HY-MT1.5-1.8B Q4_K_M ~1.06GB/Q8_0
+      ~1.82GB — a genuinely low-memory option, since neither R2T2's nor
+      T3PO's own HF repos carry anything smaller than what's already
+      pinned). Unlike T3PO, HY-MT1.5 has no trained WAIT/TRANS control
+      signal (see "Known gaps" below) — `HYMT15Translator`
+      (`Sources/OmniVoiceCore/Inference/HYMT15Translator.swift`) never
+      probes mid-utterance or emits a preview: `feed()` only buffers,
+      `flush()` translates the whole buffer once, same cadence
+      `SystemTranslationProvider` uses. Wrapped by
+      `HYMT15TranslationProvider` (`TranslationProvider` conformance,
+      mirrors `ModelTranslationProvider`'s shape) and dispatched from
+      `RecordingSession.makeTranslationProvider(engineID:modelPath:)`,
+      which now switches on `engineID` itself (not just
+      `EngineDescriptor.kind`) since translation has two different
+      `.model`-kind provider classes. The mechanical llama.cpp plumbing
+      shared by both models (tokenize, chat-template application, the
+      clear-KV-cache-and-decode loop) was extracted into
+      `LlamaGenerationSupport.swift` as a pure refactor of
+      `InProcessTranslator` first (verified: all 70 existing tests still
+      pass, T3PO's behavior unchanged) before `HYMT15Translator` was added
+      on top of it. **Mic-driven UI smoke test done** (2026-09-28, Open
+      Items #7): downloaded the real HY-MT1.5-1.8B Q4_K_M weights, selected
+      `model.hymt15` in Settings, recorded live mic audio, and stopped — a
+      one-shot translation landed per segment as expected, no crash. HY-MT1.5's
+      license is still unclear (no LICENSE file found in its HF repos),
+      same "re-check before commercial use" bucket as R2T2/T3PO, arguably
+      needing more attention since it doesn't even have a clear license file
+      today.
+
+- [x] **System-audio-only recording ("无" mic option)** (2026-09-28): added
+      `AudioInputDevice.none`/`.noneID` as a real, always-present entry named
+      "无" in the microphone picker (`RecordingSession.refreshDevices()`) —
+      not "无（仅系统声音）" as an earlier version of this had it, since
+      "包含系统声音" is a separate, independently-toggled setting, not implied
+      by this one. For recording a meeting/lecture played through the Mac's
+      own output with no one talking into a mic. Selecting it skips
+      `MicrophoneCapture` entirely in `start()` and puts `AudioMixer` into a
+      `micEnabled: false` mode where system audio (not the mic) drives the
+      whole pipeline directly — including `UtteranceSegmenter`'s VAD, which
+      previously only ever saw raw mic samples (`mic.onBuffer`), so without
+      this it would never have fired a single utterance boundary with no mic
+      present. `start()` fails fast with a friendly `statusMessage` if "无"
+      is selected while "包含系统声音" is off (no audio source at all), and
+      aborts the same way mid-`start()` if system-audio capture itself then
+      fails to start (unlike the normal mic+system-audio case, there's no
+      mic-only fallback to quietly continue with).
+- [x] **User-configurable translation commit eagerness, for every engine**
+      (2026-09-28, two iterations): `TranslationCommitEagerness`
+      (`.fast`/`.balanced`/`.thorough`) is this app's own vocabulary for "how
+      eagerly does T3PO commit vs. wait for more context" — threaded through
+      `TranslationConfig.commitEagerness` (initial value) and
+      `TranslationProvider.updateCommitEagerness(_:)` (mid-recording
+      changes), exactly `updateTargetLanguage(_:)`'s existing two-path
+      pattern. T3PO maps it onto its existing `TranslationLatencyMode`/`tau`
+      calibration inside `ModelTranslationProvider`; only `model.t3po` has a
+      WAIT/TRANS decision to bias in the first place, so `SettingsView`
+      shows this picker only for that engine. HY-MT1.5/system translation —
+      one-shot engines with no WAIT/TRANS concept — instead read a separate,
+      directly user-configurable `RecordingSession.translationEarlyTranslateThreshold`
+      (a plain character count, default 150, range 20...1000, a `Stepper` in
+      `SettingsView` shown for those two engines instead of the eagerness
+      picker) threaded through `TranslationConfig.earlyTranslateThreshold`/
+      `TranslationProvider.updateEarlyTranslateThreshold(_:)` — a second,
+      independent setting rather than a 4th case of
+      `TranslationCommitEagerness`, since a one-shot engine's "how long is
+      too long" has no probabilistic-bias equivalent to keep in the same
+      small enum (first version of this had one-shot engines reading fixed
+      per-`TranslationCommitEagerness`-case numbers instead; replaced after
+      feedback that the actual thresholds should be user-adjustable, not
+      just a 3-tier preset). Once the buffer crosses half that threshold,
+      these engines watch for the next newly-fed delta that ends a sentence
+      (`SentenceBoundary.endsSentence`) and translate as soon as one arrives,
+      instead of cutting mid-sentence purely by length — same idea as T3PO's
+      own `forceBreakThreshold`+`SentenceBoundary` combination; crossing the
+      full threshold forces a translation regardless of punctuation, so
+      continuous unpunctuated speech still can't grow the buffer without
+      limit. That early translation is a "sub-commit", not a real flush:
+      `HYMT15Translator.feed(sourceDelta:)` reuses `translateBufferLocked()`
+      (the same primitive `flush()` calls, which only ever fires `onCommit`,
+      never `onFlushBoundary`) so it appends into the segment's still-open
+      translation row instead of closing it — mirroring T3PO's own
+      forced-probe-vs-real-flush distinction. `SystemTranslationProvider`
+      needed the same distinction plumbed through its async SwiftUI
+      `.translationTask` bridge, since its actual translation happens later
+      than `feed`/`flush` return: `TranslationBridgeRequest` gained an
+      `isFinal` flag, `receiveResult(_:)` became `receiveResult(_:isFinal:)`,
+      and `RecordingSession.resolveTranslationBridgeResult(_:)`/
+      `FloatingTranscriptView`'s `.translationTask` loop now thread that flag
+      through so only a final result advances `translationRowIndex`.
+
 ### Code review findings (fixed)
 
 A review of the scaffold PR caught three real bugs, all fixed on
@@ -216,6 +308,274 @@ A review of the scaffold PR caught three real bugs, all fixed on
   `notifyUtteranceBoundary()` are now `nonisolated` in the protocol to
   document that this is the hot audio-path exception to the rest of the
   protocol's `@MainActor` default.
+
+### Code review findings, PR #27 (fixed)
+
+Two review rounds on PR #27 (HY-MT1.5 + no-mic recording + configurable
+translation timing), both fixed on `feature/hymt15-translation-engine`
+before merge:
+
+**Round 1** caught two real bugs and one repo-process gap:
+
+- **`SystemTranslationProvider` row misalignment, take two**: the
+  `earlyTranslateThreshold` feature reintroduced a version of the original
+  scaffold-PR bug above — an early (non-final) bridge request drains
+  `buffer`, so a `flush()` arriving before that request's async result comes
+  back sees an *empty* buffer and, previously, fired `onFlushBoundary`
+  immediately anyway, advancing `translationRowIndex` before the pending
+  request's `onCommit` ever landed — misrouting that commit into the next
+  segment's row once it finally resolved. First fix attempt used a
+  `pendingBridgeRequestCount`/`pendingFlushBoundary` pair to defer the
+  boundary — **round 2** found that attempt itself still broke on a second
+  utterance starting before the first one's early request resolved (see
+  below), so the final fix is different — see that entry.
+- **`LlamaGenerationSupport.applyChatTemplate` buffer-resize retry could
+  read out of bounds**: `llama_chat_apply_template`'s C++ implementation
+  copies the formatted prompt via `strncpy(buf, formatted_chat.c_str(),
+  length)`, which only null-terminates when `length` is *larger* than the
+  source — resizing the retry buffer to exactly `n` (the reported byte
+  count) left no room for a `\0` anywhere in it, so the following
+  `String(cString:)` could read past the buffer hunting for one. First fix
+  attempt allocated `n + 1` but left the *trigger condition* (`if n >
+  bufSize`) unfixed — **round 2** caught that too (see below). Also
+  hardened `LlamaGeneration.generate` alongside it: the token buffer is now
+  sized from an exact `tokenCount(of:vocab:)` dry run instead of a
+  `prompt.utf8.count + 16` guess (not reliably >= the real token count for
+  every tokenizer/language), and generated token pieces are now accumulated
+  as raw bytes and decoded to UTF-8 once at the end instead of per token —
+  a byte-level BPE vocab can split one multi-byte CJK character across more
+  than one token, and decoding each piece independently could hit an
+  incomplete byte sequence mid-character and silently corrupt it into
+  U+FFFD.
+- **Missing `CHANGELOG.md` entries**: `AGENTS.md`'s "All user-facing changes
+  must be recorded in `CHANGELOG.md`" wasn't followed for this PR's three
+  features. Added under `[Unreleased]`.
+
+Also added in round 1, defensively, not in response to a real bug:
+`AudioMixer.submitMic` now guards `micEnabled` itself too (mirroring
+`submitSystemAudio`'s existing guard) — nothing calls it in
+`micEnabled: false` mode today, since `RecordingSession.start()` never
+constructs a `MicrophoneCapture` in that mode, but the class's own
+invariant should hold regardless of a future caller's wiring.
+
+**Round 2** re-reviewed round 1's own fixes and caught two of them were
+still wrong, plus one real UX gap and one false-positive report (kept here
+for the record — it's useful to know a report was checked and rejected, not
+just which ones were accepted):
+
+- **`SystemTranslationProvider`'s round-1 fix could still permanently
+  swallow a boundary**: `pendingFlushBoundary` was a single flag — it could
+  only remember "one boundary is owed", not "how many". Trace: utterance 1
+  sends an early request then ends (`flush()` defers, `pendingFlushBoundary
+  = true`); before that request resolves, utterance 2 begins *and ends too*
+  (its own `flush()` finds a non-empty buffer, sends a normal final
+  request, `pendingBridgeRequestCount` now counts both). Utterance 1's
+  early request finally resolves — `pendingBridgeRequestCount` drops to 1,
+  not 0, so the deferred boundary still doesn't fire. Utterance 2's final
+  request then resolves, firing `onFlushBoundary` *once* for what were
+  really two utterances — permanently losing one boundary, merging both
+  utterances' text into one row, and misaligning every row after it.
+  Rewritten to a design with no separate flag/counter-threshold logic at
+  all: `sendBridgeRequest(isFinal:)` now sends an empty-text, `isFinal:
+  true` **sentinel** request through the same bridge instead of deferring
+  internally, relying on `FloatingTranscriptView`'s `.translationTask` loop
+  already consuming `translationBridgeStream()` strictly in FIFO order (one
+  request fully resolved before the next is even dequeued) to guarantee the
+  sentinel resolves in the correct position automatically. `receiveResult(_:isFinal:)`
+  simply skips `onCommit` for an empty result and fires `onFlushBoundary`
+  for every final result, sentinel or not — no bookkeeping beyond a plain
+  `pendingBridgeRequestCount` (kept only so a *true* "nothing pending"
+  `flush()` can still fire immediately without a round trip). Regression
+  test (`twoUtterancesInFlightAtOnceEachGetTheirOwnBoundaryAndCommit`)
+  reproduces the exact two-utterance trace above.
+- **`LlamaGenerationSupport.applyChatTemplate`'s retry condition missed the
+  exact-fit case**: `if n > bufSize` skips the resize-and-retry whenever the
+  formatted prompt's length lands *exactly* on the initial 8192-byte
+  buffer — `strncpy` still doesn't null-terminate in that case (per the
+  round-1 finding above), so `n == bufSize` was just as unterminated as
+  `n > bufSize`, silently falling through to the same out-of-bounds
+  `String(cString:)` read. Fixed to `if n >= bufSize`.
+- **UX gap, not a bug**: `RecordingSession.appendTranslation` concatenated
+  multiple commits into one row (T3PO's mid-segment forced probes, or a
+  one-shot engine's `earlyTranslateThreshold`-driven early commit) with no
+  separator — fine for Chinese/Japanese (no inter-word spacing), but for a
+  space-separated target language (English, Korean) two fragments joined
+  mid-sentence read as "store.And bought" with no space. Fixed by inserting
+  a single space between fragments for those languages, skipped if either
+  side already has whitespace there.
+- **False positive, checked and rejected**: the review flagged
+  `RecordingSession.init()`'s restore of a persisted
+  `translationEarlyTranslateThreshold` as bypassing the property's own
+  `didSet` clamp (`min...max(20...1000)`), since Swift documents that
+  property observers don't fire during a class's own initializer. Verified
+  empirically with a throwaway test (persist `99999`, construct a fresh
+  `RecordingSession`, assert the restored value): `didSet` *does* fire for
+  a plain assignment written later in `init()`'s body (as opposed to a
+  property's own default-value literal) — the "observers don't fire in
+  init" exemption is only for that literal default, not for a subsequent
+  ordinary assignment statement in the same initializer. No code change
+  needed; noted here so this exact (plausible-sounding, but wrong) claim
+  doesn't get "fixed" again without re-checking it.
+
+Also added in round 2, as suggested test coverage rather than a bug fix:
+`AudioMixerTests` (mic-enabled/disabled dispatch, mixing/clipping, level
+calculation — this class had no dedicated tests before this PR added its
+`micEnabled` mode).
+
+**Round 3** caught one more real bug (a leftover from round 2's own fix),
+one robustness gap, one documentation inaccuracy with a real behavioral
+consequence, and confirmed one prior finding was already an accepted,
+documented trade-off rather than something to fix:
+
+- **`SystemTranslationProvider.start(config:)`/`stop()` never reset
+  `pendingBridgeRequestCount`**: round 2's FIFO-sentinel fix added this
+  counter but never cleared it — a request left unresolved from an
+  interrupted prior session (the panel torn down mid-translate, or the
+  recording stopped before the on-device translate call returned) would
+  leak a stale positive count into the next session using the same
+  instance (`.system`-kind providers are eligible for the same
+  `reusingLoaded` reuse path a `.model`-kind engine's weights use), making
+  that session's very first empty `flush()` wrongly believe something was
+  still in flight and send a needless sentinel request. Fixed by resetting
+  the count in both `start(config:)` and `stop()`.
+- **`LlamaGeneration.generate`'s `llama_token_to_piece` call didn't handle
+  its negative-return convention**: same "return `-size` when the buffer's
+  too small" convention as `llama_tokenize`/`llama_chat_apply_template`
+  (see the round-1/round-2 findings above) — the 64-byte `pieceBuf` covers
+  a typical single-token piece but isn't guaranteed for every one (a long
+  byte-fallback sequence or an unusual special/control token), and the code
+  only checked `n > 0`, silently dropping that token's contribution to the
+  output entirely on a negative return with no sign anything went wrong.
+  Fixed with the same retry-with-exact-size pattern used elsewhere in this
+  file.
+- **`ModelLanguageMapping`'s docs claimed `LanguageCatalog` "only ever
+  offers `zh`/`en`/`ja`/`ko`"** — false; it offers 16 (see
+  `LanguageCatalog.common`), and `TargetLanguagePicker` doesn't filter by
+  engine, unlike `SourceLanguagePicker`'s existing
+  `supportsSystemASRSource` filtering. So picking most of those 16 while a
+  local model engine is selected silently mistranslates into Chinese with
+  no error — a real, if pre-existing (not introduced by this PR), UX gap,
+  not just a wrong comment. Fixed the docs to say so accurately; the actual
+  behavioral fix (extending `HYMT15TargetLanguage`/`T3POTargetLanguage`'s
+  coverage, and/or gating the picker per engine) is scoped as a follow-up,
+  not pulled into this PR — see "Known gaps" below.
+- **Confirmed as an accepted trade-off, not a new finding**:
+  `HYMT15Translator.translateBufferLocked`'s context-overflow trim drops
+  from the *front of the untranslated source text itself* (unlike T3PO,
+  which trims already-translated history) — permanently losing whatever
+  was said first in an exceptionally long buffer, rather than gracefully
+  degrading. Only reachable with an extreme `earlyTranslateThreshold`
+  setting on a small context window; the code comment now says so
+  explicitly instead of implying (via "same concern...documents") that
+  it's exactly analogous to T3PO's safe history-trimming.
+
+**Round 4** caught two more real bugs (one severe) and two real UX
+follow-ups:
+
+- **`SystemTranslationProvider.sendBridgeRequest(isFinal:)` cleared
+  `buffer` before checking whether there was anywhere to send it**: for a
+  **non-final** (early) send with no bridging view attached yet
+  (`onBridgeRequest == nil`), `buffer = ""` ran unconditionally, then the
+  `guard let onBridgeRequest else { ...; return }` branch returned without
+  ever restoring it — silently and *permanently* dropping that text (worse
+  than the accepted "lose one row's translation" trade-off for the
+  **final** case, which is a deliberate segment-boundary decision, not an
+  accident). Fixed by only clearing `buffer` once a send actually can
+  happen, or for the already-accepted final/no-bridge case; a non-final
+  send with nowhere to go now leaves `buffer` untouched so the text goes
+  out whenever a bridge *does* become available. Added a regression test.
+- **`LlamaGeneration.generate` used a `llama_batch` after the pointer
+  backing it was only guaranteed valid for**: `llama_batch_get_one` just
+  wraps whatever pointer it's given (doesn't copy the array's contents),
+  and Swift's `&array`/`&scalar` pointer conversion is documented as valid
+  *only during the call it's passed to* — constructing the batch in one
+  statement (`let initialBatch = llama_batch_get_one(&tokens, ...)`) and
+  using it in a later, separate call (`llama_decode(ctx, initialBatch)`)
+  is undefined behavior even though it happens to work against the current
+  toolchain. This pattern was ported unchanged from `InProcessTranslator`'s
+  original (pre-this-PR) code when it was extracted into
+  `LlamaGenerationSupport.generate`, not introduced by this PR — but now
+  shared by both T3PO and HY-MT1.5, worth fixing here. Fixed by
+  constructing and decoding each batch inside the same
+  `withUnsafeMutableBufferPointer`/`withUnsafeMutablePointer` closure, so
+  both stay within the pointer's one guaranteed-valid scope.
+- **HY-MT1.5's `maxNewTokens = 200` risked truncating a long translation**:
+  copied from T3PO's own constant, but T3PO always translates one small,
+  already-committed delta at a time (short output by construction) while
+  HY-MT1.5 translates a whole buffered utterance in one call — and
+  `earlyTranslateThreshold` is user-configurable up to 1000 characters,
+  comfortably capable of needing a translation longer than 200 tokens
+  (~130-180 English words) with no indication anything was cut off. Bumped
+  to 1024, well within the context-budget headroom
+  `translateBufferLocked`'s own trimming already accounts for.
+- **UX follow-up**: `appendTranslation`'s space-insertion fix (round 2
+  above) didn't check whether the *new* fragment itself starts with
+  punctuation — a translated chunk's boundary doesn't have to land on the
+  same word/clause break the source text's did, so a fragment could start
+  with e.g. a comma, producing "Hello , world." instead of "Hello, world."
+  Fixed by also skipping the space when `text.first?.isPunctuation` is
+  true.
+- **UX follow-up**: a mid-recording target-language change rebuilds
+  `FloatingTranscriptView`'s whole bridge stream/continuation
+  (`RecordingSession.translationBridgeStream()` creates a fresh one every
+  call), abandoning whatever was consuming the old one — any request
+  already sent through it that hadn't resolved yet never would, leaking
+  `pendingBridgeRequestCount` the same way round 3's stop/start-reuse gap
+  did, just via a different trigger. Fixed by implementing
+  `updateTargetLanguage(_:)` (previously the inherited no-op — this
+  provider has no persistent per-session target to actually retarget, see
+  that method's protocol doc) to reset the counter too. A narrow window
+  where a request genuinely still resolving through the not-yet-torn-down
+  old stream races this reset is accepted, not chased further — see the
+  method's own doc for why (that request's translation content is already
+  lost either way once its stream is abandoned; this fix is only about the
+  counter, not recovering it).
+
+**Round 5** — framed by its own review as findings/follow-up notes rather
+than urgent bugs, but two were real robustness fixes worth taking anyway:
+
+- **`earlyTranslateThreshold` is effectively inert for the system
+  transcription engine, not just less useful** — confirmed by checking
+  `SystemTranscriptionProvider`'s own doc: a finalized result *is* its
+  segment boundary, so it never reports committed text via `.appended`
+  while someone is still talking. `RecordingSession.handle(_:)`'s
+  `.segmentClosed` case is the *only* time a translation provider ever sees
+  that segment's text at all — one `feed(_:)` call with the whole
+  utterance, immediately followed by `flush()` in the same call — so
+  there's no still-talking window left for an early translation to beat.
+  This is correct, expected behavior (translating still-changing volatile
+  ASR text would waste compute and flicker, exactly like the existing
+  "translation never runs on `.revised` text" rule this project already
+  documents), not a bug — but it wasn't documented anywhere, so a user
+  could reasonably expect the "长句提前翻译阈值" setting to help while using
+  the system ASR engine, when it can't. Documented in
+  `TranslationConfig.earlyTranslateThreshold`'s doc, and `SettingsView` now
+  shows a caption under that setting when the system transcription engine
+  is selected, saying so.
+- **`SentenceBoundary.endsSentence`/`endsWithBreak` trimmed only
+  `.whitespaces`, not `.whitespacesAndNewlines`** — an ASR delta trailing
+  in a newline would leave `.last` reading the newline itself, never the
+  real sentence-ending punctuation before it, silently defeating the
+  check. This directly affects the `earlyTranslateThreshold` soft-break
+  logic added in this PR (and, pre-existing, T3PO's own
+  `forceBreakThreshold`+`SentenceBoundary` combo), so fixed rather than
+  left as a documentation-only note.
+- **`LlamaGenerationSupport`'s tokenize calls used `strlen(textPtr)` on a
+  C string instead of the Swift string's own `utf8.count`** — functionally
+  equivalent for ordinary text, but `strlen` stops at the first `\0` byte,
+  silently undercounting for the (unlikely, but possible) case of an input
+  containing an embedded null; `text.utf8.count` has no such blind spot
+  and needs no pointer scan to get it. Fixed both call sites
+  (`tokenCount(of:vocab:)` and `generate`'s own tokenize call).
+- **Confirmed as already covered, not a new finding**: a translated
+  fragment starting with an opening quote/paren (`isPunctuation` is also
+  true for those) would skip the inter-fragment space `appendTranslation`
+  inserts, same as a fragment starting with closing punctuation — e.g.
+  `He said:"hello"` instead of `He said: "hello"`. Left as-is per the
+  review's own conclusion: a model's sentence/clause split essentially
+  never lands right before an opening quote/paren in practice, so this
+  edge case isn't worth special-casing away from the general
+  "`isPunctuation` means no space" rule.
 
 ### Smoke test findings (fixed)
 
@@ -367,9 +727,28 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    explicitly deferred ("搭架子" / stub first) per the product discussion;
    none of the actual placeholder work has been started yet.
 6. **Model license re-check** — before any commercial use, not before this.
+7. ~~**HY-MT1.5 mic smoke test**~~ — **done** (2026-09-28): downloaded the
+   real `models/HY-MT1.5-GGUF/HY-MT1.5-1.8B-Q4_K_M.gguf` weights, selected
+   `model.hymt15` in Settings, recorded live mic audio, stopped — a
+   one-shot translation landed per segment as expected (no live preview, no
+   crash, no hang). This item is now closed.
 
 ### Known gaps / things to double check when touching nearby code
 
+- **T3PO/HY-MT1.5 silently mistranslate into Chinese for most of
+  `LanguageCatalog`'s 16 target languages** — `ModelLanguageMapping`'s
+  `t3poTargetLanguage(forCode:)`/`hyMT15TargetLanguage(forCode:)` only
+  recognize `zh`/`en`/`ja`/`ko`; `TargetLanguagePicker` doesn't filter by
+  engine the way `SourceLanguagePicker` already does for
+  `supportsSystemASRSource`, so picking e.g. French while a local model
+  engine is selected produces Chinese output with no error or warning.
+  `SystemTranslationProvider` doesn't have this gap (`Translation` covers
+  the whole catalog). HY-MT1.5's own model card documents official support
+  for several of the missing languages (French/German/Spanish/...), so
+  extending `HYMT15TargetLanguage` is likely the easier half of a real fix;
+  gating the picker per engine (mirroring `supportsSystemASRSource`) would
+  close the rest. Not fixed yet — caught in PR #27's third review round,
+  scoped as a follow-up rather than pulled into that PR.
 - **R2T2 (`model.r2t2`) used to SIGSEGV the whole process on audio.cpp before
   our pinned commit — root-caused, fixed upstream, and now pinned past the
   fix (no local patch needed anymore, see Open Items #1).**
@@ -435,6 +814,29 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
   *original* target for that whole session, not each utterance's actual
   translated-into language. Fine for now (no UI exposes per-utterance target
   language anyway); would need per-utterance tracking if that ever surfaces.
+- **HY-MT1.5 has no WAIT/TRANS control signal** — unlike T3PO (see
+  `InProcessTranslator`'s class doc for that trick), Tencent's model card
+  documents only a single "translate the following complete segment"
+  instruction turn, with no trained behavior for "not enough context yet,
+  say nothing." `HYMT15Translator` is built around that: no incremental
+  probing, no preview, translation only happens once per `flush()`. If a
+  future model in this same "one-shot" family *does* need mid-utterance
+  probing, this class isn't the place to add it — a third
+  `LocalTranslationStrategy`-shaped abstraction would be worth revisiting at
+  that point instead of bolting more special cases onto either existing
+  class.
+- **`model.hymt15` is the first `.model`-kind engine with more than one
+  catalog variant** — activates a previously-hypothetical edge case
+  `RecordingSession.hasDownloadedModelVariant(engineID:)`'s doc already
+  flagged: deleting the *currently-selected* variant via Model Management
+  while a *different* variant of the same engine stays downloaded leaves
+  the stale selection pointing at the deleted one (still handled gracefully
+  via the existing "尚未下载" `statusMessage`/Settings "（未下载）" label,
+  just not auto-switched to the still-downloaded sibling variant). Fine to
+  leave as-is per that doc's own reasoning; would need
+  `validateAndNormalizeModelVariantSelections()` to gain a "fall back to
+  another downloaded variant of the same engine" case if this friction ever
+  actually bothers a user.
 - No handling yet for what happens if `SessionStore.init()` throws (disk
   full, schema mismatch after a future migration) beyond "history window has
   no data" — `RecordingSession` itself keeps working with `sessionStore ==

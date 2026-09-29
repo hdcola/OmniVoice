@@ -8,6 +8,14 @@ import Testing
         #expect(!SentenceBoundary.endsSentence("Hello world"))
     }
 
+    /// `.whitespaces` alone doesn't include `\n`/`\r\n` — a trailing
+    /// newline after the real sentence-ending punctuation must not defeat
+    /// this check.
+    @Test func endsSentenceTrimsTrailingNewlinesBeforeChecking() {
+        #expect(SentenceBoundary.endsSentence("Hello world.\n"))
+        #expect(SentenceBoundary.endsSentence("你好。\r\n"))
+    }
+
     @Test func endsWithBreakAlsoAcceptsSoftBreaks() {
         #expect(SentenceBoundary.endsWithBreak("first clause,"))
         #expect(SentenceBoundary.endsWithBreak("第一句，"))

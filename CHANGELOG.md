@@ -8,9 +8,27 @@ The format is based on Keep a Changelog.
 
 ### Added
 
+- feat(translation): add Tencent's HY-MT1.5 1.8B as a second, one-shot in-process local translation engine (`model.hymt15`) alongside T3PO — a genuinely low-memory option (~1.06GB/~1.82GB vs. T3PO's ~9.8GB) (#27)
+- feat(audio): add a "无" microphone option for system-audio-only recording (a meeting/lecture played through the Mac's own output, no one talking into a mic) (#27)
+- feat(translation): make translation commit timing user-configurable — a "翻译提交策略" picker for T3PO's WAIT/TRANS bias, and a directly adjustable "长句提前翻译阈值" character count for one-shot engines (HY-MT1.5/system translation), so a single long, pause-free utterance no longer waits for the whole thing before any translation shows up (#27)
+
 ### Changed
 
+- chore(settings): show a caption under "长句提前翻译阈值" clarifying it has no effect while the system transcription engine is selected (it only reports committed text once a segment closes, so there's no still-talking window left for an early translation to beat) (#27)
+
 ### Fixed
+
+- fix(translation): fix `SystemTranslationProvider` misrouting/losing a translation across back-to-back utterances — an early, still-in-flight translation request could have its result committed into the wrong (following) segment's row, or a segment's row-close signal could be dropped entirely if another utterance started before that request resolved (#27)
+- fix(translation): insert a space between multiple translation commits appended to the same row for a space-separated target language (English/Korean), so an early-translated fragment and the rest of the sentence don't run together with no separation (#27)
+- fix(inference): avoid a potential out-of-bounds read in `LlamaGenerationSupport.applyChatTemplate`'s buffer-resize retry (missing room for the C string's null terminator, including when the formatted prompt's length exactly matched the initial buffer size) and accumulate generated tokens as raw bytes before decoding to UTF-8 once, instead of per token (which could otherwise split a multi-byte CJK character across two tokens and corrupt it) (#27)
+- fix(inference): retry `llama_token_to_piece` with a larger buffer instead of silently dropping a token's contribution to the output when its piece doesn't fit the default 64-byte buffer (#27)
+- fix(translation): reset `SystemTranslationProvider`'s in-flight request tracking on `start(config:)`/`stop()`/a mid-recording target-language change, so a request left unresolved by an interrupted prior recording or an abandoned bridge stream can't affect a later one reusing the same provider instance (#27)
+- fix(translation): stop `SystemTranslationProvider` from permanently losing buffered text when an early translation triggers before the floating panel has finished mounting (#27)
+- fix(inference): construct and decode each `llama_batch` within the scope its underlying pointer is actually valid for, instead of across two separate calls (undefined behavior per Swift's pointer-conversion rules, even though it worked in practice) (#27)
+- fix(translation): raise HY-MT1.5's generation length cap from 200 to 1024 tokens, so a translation of a long buffered utterance (the early-translate threshold is user-configurable up to 1000 characters) doesn't get cut off mid-sentence (#27)
+- fix(translation): don't insert a space before a translation fragment that starts with punctuation, so joined fragments read "Hello, world." not "Hello , world." (#27)
+- fix(translation): trim trailing newlines (not just spaces) before checking whether an ASR delta ends a sentence, so a trailing newline no longer silently defeats the early-translate soft-break check (#27)
+- fix(inference): use the Swift string's own UTF-8 byte count instead of `strlen` on the converted C string when tokenizing, so an input containing an embedded null byte can't be silently undercounted (#27)
 
 ### Dependencies
 

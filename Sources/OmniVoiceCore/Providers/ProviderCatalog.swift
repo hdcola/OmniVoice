@@ -74,7 +74,8 @@ public enum ProviderCatalog {
 
     public static let translationEngines: [EngineDescriptor] = [
         EngineDescriptor(id: "system.translation", displayName: "系统自带 (Translation)", kind: .system),
-        EngineDescriptor(id: "model.t3po", displayName: "T3PO 模型", kind: .model),
+        EngineDescriptor(id: "model.t3po", displayName: "T3PO 模型（支持实时预览）", kind: .model),
+        EngineDescriptor(id: "model.hymt15", displayName: "HY-MT1.5 模型（低内存，无实时预览）", kind: .model),
     ]
 
     /// Model variants are keyed by `engineID` so a settings UI can filter
@@ -100,6 +101,29 @@ public enum ProviderCatalog {
                     "https://huggingface.co/netease-youdao/Confucius4-T3PO-GGUF/resolve/main/Confucius4-T3PO-Q5_K_M.gguf"
             )!,
             sha256: "019b162a8fdff3edb1e2469445043fc2ebb0de0fbda9ca6454bc86b5898fac35"
+        ),
+        // Tencent's HY-MT1.5-1.8B — the low-memory translation option: no
+        // smaller quantization exists in R2T2's/T3PO's own repos (see
+        // Docs/PROGRESS.md), so this is a separate, much smaller model
+        // family instead, at the cost of no live preview (one-shot only —
+        // see `HYMT15Translator`'s class doc). Sizes/hashes verified
+        // against the file's HF LFS metadata
+        // (`GET /api/models/tencent/HY-MT1.5-1.8B-GGUF?blobs=true`).
+        ModelVariant(
+            id: "hymt15-1.8b-q4_k_m", engineID: "model.hymt15", displayName: "HY-MT1.5 1.8B (Q4_K_M)",
+            quantization: "Q4_K_M", approximateSizeMB: 1080,
+            downloadURL: URL(
+                string: "https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/main/HY-MT1.5-1.8B-Q4_K_M.gguf"
+            )!,
+            sha256: "4383ac0c3c8e476de98ff979c2a3f069f8c4fb385e7860cf2d28da896cc477c7"
+        ),
+        ModelVariant(
+            id: "hymt15-1.8b-q8_0", engineID: "model.hymt15", displayName: "HY-MT1.5 1.8B (Q8_0)",
+            quantization: "Q8_0", approximateSizeMB: 1820,
+            downloadURL: URL(
+                string: "https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/main/HY-MT1.5-1.8B-Q8_0.gguf"
+            )!,
+            sha256: "6789b06d0902f2f5312c0e1703d56ccbddfcfb6c653d22519b7c720f7db9a98e"
         ),
     ]
 

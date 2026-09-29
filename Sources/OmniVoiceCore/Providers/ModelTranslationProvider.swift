@@ -42,10 +42,27 @@ public final class ModelTranslationProvider: TranslationProvider {
         // source language itself (see `InProcessTranslator.systemPrompt`'s
         // doc), same as its reference engine.
         translator.setTargetLanguage(ModelLanguageMapping.t3poTargetLanguage(forCode: config.targetLanguageCode))
+        translator.setLatencyMode(Self.latencyMode(for: config.commitEagerness))
     }
 
     public func updateTargetLanguage(_ code: String) {
         translator.setTargetLanguage(ModelLanguageMapping.t3poTargetLanguage(forCode: code))
+    }
+
+    public func updateCommitEagerness(_ eagerness: TranslationCommitEagerness) {
+        translator.setLatencyMode(Self.latencyMode(for: eagerness))
+    }
+
+    /// Maps this app's own `TranslationCommitEagerness` vocabulary onto
+    /// T3PO's specific calibrated `tau` points — see
+    /// `TranslationCommitEagerness`'s doc for why the mapping lives here,
+    /// not spread across `RecordingSession`/`SettingsView`.
+    private static func latencyMode(for eagerness: TranslationCommitEagerness) -> TranslationLatencyMode {
+        switch eagerness {
+        case .fast: return .low
+        case .balanced: return .native
+        case .thorough: return .high
+        }
     }
 
     public func feed(_ text: String) {

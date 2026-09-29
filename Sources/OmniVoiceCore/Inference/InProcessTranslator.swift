@@ -1,6 +1,10 @@
 import CLlamaCpp
 import Foundation
 
+/// Shared between every in-process translation model
+/// (`InProcessTranslator`/T3PO, `HYMT15Translator`) — kept generic (no
+/// model name baked into `.modelMissing`'s/`.notLoaded`'s wording) since both
+/// throw it.
 enum TranslatorError: LocalizedError {
     case modelMissing(String)
     case notLoaded
@@ -9,9 +13,9 @@ enum TranslatorError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .modelMissing(let path):
-            return "找不到 T3PO 模型权重: \(path)"
+            return "找不到模型权重: \(path)"
         case .notLoaded:
-            return "T3PO 模型尚未加载"
+            return "模型尚未加载"
         case .llamaCallFailed(let context):
             return context
         }
@@ -22,7 +26,7 @@ enum TranslatorError: LocalizedError {
 /// (`inference/latency.py` in netease-youdao/Confucius4-T3PO), applied as a
 /// logit bias on the stop tokens during non-forced probes — see
 /// `InProcessTranslator`'s header comment for what that bias actually does.
-enum TranslationLatencyMode {
+enum TranslationLatencyMode: Sendable {
     case low, native, high
 
     /// Positive commits earlier (lower latency, lower quality); negative
@@ -412,10 +416,7 @@ final class InProcessTranslator: @unchecked Sendable {
         while true {
             let sourceText = units.joined()
             guard let prompt = buildPromptLocked(sourceText: sourceText) else { return nil }
-            let tokenCount = prompt.withCString { textPtr -> Int32 in
-                let n = llama_tokenize(vocab, textPtr, Int32(strlen(textPtr)), nil, 0, true, true)
-                return n < 0 ? -n : n
-            }
+            let tokenCount = LlamaGeneration.tokenCount(of: prompt, vocab: vocab)
             if tokenCount <= budget || (history.isEmpty && units.count <= 1) {
                 return (sourceText, prompt)
             }
@@ -434,79 +435,23 @@ final class InProcessTranslator: @unchecked Sendable {
     /// produced it, hence the nesting.
     private func buildPromptLocked(sourceText: String) -> String? {
         guard let model else { return nil }
-        let tmpl = llama_model_chat_template(model, nil)
         let historyText = Self.serializeHistory(history)
         let userText = historyText.isEmpty ? sourceText : "\(historyText)\n---\n\(sourceText)"
         let systemPrompt = Self.systemPrompt(targetLanguage: tuning.targetLanguage.promptName)
-
-        return "system".withCString { systemRolePtr in
-            "user".withCString { userRolePtr in
-                systemPrompt.withCString { sysContentPtr -> String? in
-                    userText.withCString { userContentPtr -> String? in
-                        let messages = [
-                            llama_chat_message(role: systemRolePtr, content: sysContentPtr),
-                            llama_chat_message(role: userRolePtr, content: userContentPtr),
-                        ]
-                        var bufSize: Int32 = 8192
-                        var buf = [CChar](repeating: 0, count: Int(bufSize))
-                        var n = messages.withUnsafeBufferPointer { msgs in
-                            llama_chat_apply_template(tmpl, msgs.baseAddress, msgs.count, true, &buf, bufSize)
-                        }
-                        if n > bufSize {
-                            bufSize = n
-                            buf = [CChar](repeating: 0, count: Int(bufSize))
-                            n = messages.withUnsafeBufferPointer { msgs in
-                                llama_chat_apply_template(tmpl, msgs.baseAddress, msgs.count, true, &buf, bufSize)
-                            }
-                        }
-                        guard n > 0 else { return nil }
-                        return String(cString: buf)
-                    }
-                }
-            }
-        }
+        return LlamaGeneration.applyChatTemplate(model: model, systemPrompt: systemPrompt, userText: userText)
     }
 
-    // llama_sampler (unlike llama_model/llama_context/llama_vocab) is a
-    // fully-defined C struct in llama.h, not forward-declared-only — so
-    // Swift imports pointers to it as UnsafeMutablePointer<llama_sampler>,
-    // not OpaquePointer. Must match that exactly, not the OpaquePointer
-    // convention used for model/ctx/vocab below.
-    private static func makeLogitBiasSampler(
-        vocab: OpaquePointer, biases: [(id: llama_token, value: Float)]
-    ) -> UnsafeMutablePointer<llama_sampler>? {
-        let nVocab = llama_vocab_n_tokens(vocab)
-        let logitBias = biases.map { llama_logit_bias(token: $0.id, bias: $0.value) }
-        return logitBias.withUnsafeBufferPointer { buf in
-            llama_sampler_init_logit_bias(nVocab, Int32(buf.count), buf.baseAddress)
-        }
-    }
-
-    /// Clears the KV cache and reprocesses `prompt` from scratch (see the
-    /// class doc on why this is stateless-by-design), then greedily decodes
-    /// up to `maxNewTokens` — see the class doc's WAIT/TRANS section for
-    /// what `force` changes about the sampler chain used.
+    /// Greedily decodes up to `maxNewTokens` — see the class doc's WAIT/TRANS
+    /// section for what `force` changes about the sampler chain used.
     private func generateLocked(prompt: String, force: Bool) -> String {
         guard let model, let ctx, let vocab = llama_model_get_vocab(model) else { return "" }
-
-        llama_memory_clear(llama_get_memory(ctx), true)
-
-        var tokens = [llama_token](repeating: 0, count: prompt.utf8.count + 16)
-        let nTokens = prompt.withCString { promptPtr in
-            llama_tokenize(vocab, promptPtr, Int32(strlen(promptPtr)), &tokens, Int32(tokens.count), true, true)
-        }
-        guard nTokens > 0 else { return "" }
-        tokens = Array(tokens.prefix(Int(nTokens)))
-
-        let initialBatch = llama_batch_get_one(&tokens, Int32(tokens.count))
-        guard llama_decode(ctx, initialBatch) == 0 else { return "" }
 
         let sparams = llama_sampler_chain_default_params()
         guard let chain = llama_sampler_chain_init(sparams) else { return "" }
         defer { llama_sampler_free(chain) }
         if !force {
             let tau = tuning.latencyMode.tau
-            guard let waitBiasSampler = Self.makeLogitBiasSampler(
+            guard let waitBiasSampler = LlamaGeneration.makeLogitBiasSampler(
                 vocab: vocab, biases: Self.stopTokens.map { ($0.id, -tau * $0.scale) }
             ) else { return "" }
             llama_sampler_chain_add(chain, waitBiasSampler)
@@ -516,7 +461,7 @@ final class InProcessTranslator: @unchecked Sendable {
         var suppressChain: UnsafeMutablePointer<llama_sampler>?
         defer { if let suppressChain { llama_sampler_free(suppressChain) } }
         if force {
-            guard let suppressBias = Self.makeLogitBiasSampler(
+            guard let suppressBias = LlamaGeneration.makeLogitBiasSampler(
                 vocab: vocab, biases: Self.stopTokens.map { ($0.id, Float(-1e9)) }
             ) else { return "" }
             let suppressParams = llama_sampler_chain_default_params()
@@ -526,24 +471,10 @@ final class InProcessTranslator: @unchecked Sendable {
             suppressChain = built
         }
 
-        var output = ""
-        for i in 0..<Self.maxNewTokens {
-            let activeSampler = (force && i < Self.forceMinNewTokens) ? suppressChain! : chain
-            let newToken = llama_sampler_sample(activeSampler, ctx, -1)
-            llama_sampler_accept(activeSampler, newToken)
-            if llama_vocab_is_eog(vocab, newToken) { break }
-
-            var pieceBuf = [CChar](repeating: 0, count: 64)
-            let n = llama_token_to_piece(vocab, newToken, &pieceBuf, Int32(pieceBuf.count), 0, false)
-            if n > 0 {
-                output += String(decoding: pieceBuf[0..<Int(n)].map { UInt8(bitPattern: $0) }, as: UTF8.self)
-            }
-
-            var nextToken = newToken
-            let nextBatch = llama_batch_get_one(&nextToken, 1)
-            guard llama_decode(ctx, nextBatch) == 0 else { break }
-        }
-        return output
+        return LlamaGeneration.generate(
+            ctx: ctx, model: model, prompt: prompt, maxNewTokens: Self.maxNewTokens,
+            samplerForStep: { i in (force && i < Self.forceMinNewTokens) ? suppressChain! : chain }
+        )
     }
 
     /// Ends this recording's session — clears the buffered source text and

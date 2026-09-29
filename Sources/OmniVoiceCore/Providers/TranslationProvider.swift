@@ -12,11 +12,46 @@ public struct TranslationConfig: Sendable {
     /// Resolved path to a model weights file, only meaningful for `.model`
     /// providers.
     public var modelPath: URL?
+    /// See `TranslationCommitEagerness`'s doc — only meaningful for a
+    /// streaming `.model`-kind provider (T3PO); ignored by a one-shot one.
+    public var commitEagerness: TranslationCommitEagerness
+    /// User-configurable character count that justifies a **one-shot**
+    /// engine (`HYMT15Translator`, `SystemTranslationProvider`) translating
+    /// early, within a still-open ASR segment, rather than waiting for the
+    /// segment's real boundary — see `SystemTranslationProvider.feed(_:)`'s
+    /// doc for the full reasoning (a long, pause-free utterance shouldn't
+    /// leave the user waiting for a translation, or waiting on a large block
+    /// of text all at once, until the speaker finally stops). Ignored by
+    /// T3PO, which reads `commitEagerness` instead. A plain, directly
+    /// user-configurable number (not another `TranslationCommitEagerness`
+    /// case) since it has no probabilistic-bias equivalent to keep in the
+    /// same small enum vocabulary as `commitEagerness` — this app's own
+    /// small vocabulary is for concepts every engine can express in its own
+    /// terms, and a one-shot engine's "how long is too long" genuinely is
+    /// just a character count.
+    ///
+    /// **Only actually helps mid-utterance when paired with a `.model`-kind
+    /// transcription engine (R2T2)** — `SystemTranscriptionProvider` never
+    /// reports committed text via `.appended` while someone is still
+    /// talking (see that class's own doc: a finalized result *is* its
+    /// segment boundary), so `RecordingSession.handle(_:)`'s
+    /// `.segmentClosed` case is the *only* time a translation provider ever
+    /// sees that segment's text at all — one `feed(_:)` call with the whole
+    /// utterance, immediately followed by `flush()`. There's no
+    /// still-talking window left for an early translation to actually beat;
+    /// this setting is effectively inert for the system transcription
+    /// engine, not just less useful.
+    public var earlyTranslateThreshold: Int
 
-    public init(sourceLanguageCode: String? = nil, targetLanguageCode: String, modelPath: URL? = nil) {
+    public init(
+        sourceLanguageCode: String? = nil, targetLanguageCode: String, modelPath: URL? = nil,
+        commitEagerness: TranslationCommitEagerness = .balanced, earlyTranslateThreshold: Int = 150
+    ) {
         self.sourceLanguageCode = sourceLanguageCode
         self.targetLanguageCode = targetLanguageCode
         self.modelPath = modelPath
+        self.commitEagerness = commitEagerness
+        self.earlyTranslateThreshold = earlyTranslateThreshold
     }
 }
 
@@ -69,6 +104,18 @@ public protocol TranslationProvider: AnyObject {
     /// persistent per-session target to update.
     func updateTargetLanguage(_ code: String)
 
+    /// Same mid-session-retargeting reasoning as `updateTargetLanguage(_:)`'s
+    /// doc, for `TranslationCommitEagerness` instead of target language — the
+    /// default no-op is correct for a one-shot provider, which has nothing to
+    /// retune here.
+    func updateCommitEagerness(_ eagerness: TranslationCommitEagerness)
+
+    /// Same mid-session reasoning as `updateTargetLanguage(_:)`'s doc, for
+    /// `TranslationConfig.earlyTranslateThreshold` instead — the default
+    /// no-op is correct for T3PO, which has nothing to retune here (it reads
+    /// `commitEagerness` instead).
+    func updateEarlyTranslateThreshold(_ characters: Int)
+
     /// Appends new source text to translate. Safe to call at any point after
     /// `start(config:)`.
     func feed(_ text: String)
@@ -83,4 +130,6 @@ public protocol TranslationProvider: AnyObject {
 
 extension TranslationProvider {
     public func updateTargetLanguage(_ code: String) {}
+    public func updateCommitEagerness(_ eagerness: TranslationCommitEagerness) {}
+    public func updateEarlyTranslateThreshold(_ characters: Int) {}
 }

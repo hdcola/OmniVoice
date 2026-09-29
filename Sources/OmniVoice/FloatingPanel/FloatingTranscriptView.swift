@@ -52,8 +52,20 @@ struct FloatingTranscriptView: View {
         .onChange(of: session.targetLanguageCode) { rebuildConfiguration() }
         .translationTask(translationConfiguration) { translationSession in
             for await request in session.translationBridgeStream() {
+                // An empty-text request is a boundary-only "sentinel" (see
+                // `TranslationBridgeRequest.text`'s doc) — nothing to
+                // translate, so skip the round-trip and resolve it
+                // immediately. Consuming this stream strictly in order (one
+                // `await` fully finishing before the next iteration even
+                // starts) is exactly what lets `SystemTranslationProvider`
+                // rely on a sentinel to preserve ordering without its own
+                // counting/flag bookkeeping.
+                if request.text.isEmpty {
+                    session.resolveTranslationBridgeResult("", isFinal: request.isFinal)
+                    continue
+                }
                 let result = try? await translationSession.translate(request.text)
-                session.resolveTranslationBridgeResult(result?.targetText ?? "")
+                session.resolveTranslationBridgeResult(result?.targetText ?? "", isFinal: request.isFinal)
             }
         }
     }

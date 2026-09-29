@@ -99,6 +99,42 @@ struct SettingsView: View {
                 )
                 .disabled(isBusy)
                 noLocalModelHint(for: ProviderCatalog.translationEngines)
+                // T3PO is the only engine with a WAIT/TRANS decision to bias
+                // (see `TranslationCommitEagerness`'s doc), so it gets its
+                // own picker; every other (one-shot) engine instead exposes
+                // the actual character threshold it reads
+                // (`TranslationConfig.earlyTranslateThreshold`'s doc) as a
+                // plain, directly user-configurable number — showing both
+                // controls at once, or the wrong one for the selected
+                // engine, would just be confusing. Deliberately *not*
+                // `.disabled(isBusy)` in either branch — safe to change
+                // mid-recording, same as `targetLanguageCode`'s picker.
+                if session.translationEngineID == "model.t3po" {
+                    Picker("翻译提交策略", selection: $session.translationCommitEagerness) {
+                        ForEach(TranslationCommitEagerness.allCases, id: \.self) { eagerness in
+                            Text(eagerness.displayName).tag(eagerness)
+                        }
+                    }
+                } else {
+                    Stepper(
+                        "长句提前翻译阈值：\(session.translationEarlyTranslateThreshold) 字",
+                        value: $session.translationEarlyTranslateThreshold, in: 20...1000, step: 10
+                    )
+                    // See `TranslationConfig.earlyTranslateThreshold`'s doc
+                    // for why this caveat is real, not just a hedge:
+                    // `SystemTranscriptionProvider` never reports committed
+                    // text via `.appended` mid-utterance — a finalized
+                    // result *is* its segment boundary — so
+                    // `translationProvider.feed(_:)` only ever runs once per
+                    // segment, with the whole utterance already, immediately
+                    // followed by `flush()` in the same call. There's
+                    // nothing "early" left to translate by then.
+                    if session.transcriptionEngineKind == .system {
+                        Text("系统自带识别引擎按句子结束才提交文本，此设置对该引擎无实际效果")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
 
             Section("语言") {
