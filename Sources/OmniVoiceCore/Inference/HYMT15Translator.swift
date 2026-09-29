@@ -50,6 +50,10 @@ final class HYMT15Translator: @unchecked Sendable {
     var onFlushBoundary: (() -> Void)?
 
     private var targetLanguage: HYMT15TargetLanguage = .chinese
+    /// See `TranslationConfig.earlyTranslateThreshold`'s doc — read fresh in
+    /// `feedLocked`, same "mutate only via a queue-dispatched setter"
+    /// reasoning as `InProcessTranslator.tuning`'s doc.
+    private var earlyTranslateThreshold = 150
 
     private let queue = DispatchQueue(label: "org.omnivoice.inprocess.hymt15")
 
@@ -144,14 +148,32 @@ final class HYMT15Translator: @unchecked Sendable {
         ctx = context
     }
 
-    /// Appends one ASR delta/tail to the source buffer. Never triggers
-    /// inference on its own — see the class doc for why this model only
-    /// ever translates at `flush()`. Safe to call before `loadModel()`
-    /// finishes or after `unload()` — a no-op.
+    /// Appends one ASR delta/tail to the source buffer — and, once the
+    /// buffer crosses half of `earlyTranslateThreshold`, watches for the
+    /// next delta that ends a sentence and translates early as soon as one
+    /// arrives, rather than cutting mid-sentence purely by length; crossing
+    /// the full `earlyTranslateThreshold` forces an early translation
+    /// regardless of punctuation (see
+    /// `TranslationConfig.earlyTranslateThreshold`'s doc for the full
+    /// reasoning: a single long, pause-free utterance shouldn't leave the
+    /// user waiting for a translation, or waiting on a large block of text
+    /// all at once, until the speaker finally stops). That early translation
+    /// reuses `translateBufferLocked()` — the same primitive `flush()` uses
+    /// below — which only ever calls `onCommit`, never `onFlushBoundary`, so
+    /// it appends into the segment's still-open translation row instead of
+    /// closing it. Safe to call before `loadModel()` finishes or after
+    /// `unload()` — a no-op.
     func feed(sourceDelta: String) {
         queue.async {
             guard self.model != nil, self.ctx != nil, !sourceDelta.isEmpty else { return }
             self.buffer.append(sourceDelta)
+            let bufferedLength = self.buffer.reduce(0) { $0 + $1.count }
+            let threshold = self.earlyTranslateThreshold
+            let crossedHardCap = bufferedLength >= threshold
+            let crossedSoftBreak = bufferedLength >= threshold / 2 && SentenceBoundary.endsSentence(sourceDelta)
+            if crossedHardCap || crossedSoftBreak {
+                self.translateBufferLocked()
+            }
         }
     }
 
@@ -170,6 +192,10 @@ final class HYMT15Translator: @unchecked Sendable {
 
     func setTargetLanguage(_ language: HYMT15TargetLanguage) {
         queue.async { self.targetLanguage = language }
+    }
+
+    func setEarlyTranslateThreshold(_ characters: Int) {
+        queue.async { self.earlyTranslateThreshold = characters }
     }
 
     private func translateBufferLocked() {

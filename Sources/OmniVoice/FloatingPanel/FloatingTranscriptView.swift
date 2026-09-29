@@ -53,7 +53,7 @@ struct FloatingTranscriptView: View {
         .translationTask(translationConfiguration) { translationSession in
             for await request in session.translationBridgeStream() {
                 let result = try? await translationSession.translate(request.text)
-                session.resolveTranslationBridgeResult(result?.targetText ?? "")
+                session.resolveTranslationBridgeResult(result?.targetText ?? "", isFinal: request.isFinal)
             }
         }
     }

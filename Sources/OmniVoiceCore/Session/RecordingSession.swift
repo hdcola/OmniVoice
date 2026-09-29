@@ -224,6 +224,37 @@ public final class RecordingSession: ObservableObject {
         }
     }
 
+    /// See `TranslationCommitEagerness`'s doc — only `model.t3po` reads this
+    /// today; every other translation engine's `updateCommitEagerness(_:)`
+    /// is a no-op. Same "safe to set whether or not a recording is active"
+    /// reasoning as `targetLanguageCode`'s `didSet`.
+    @Published public var translationCommitEagerness: TranslationCommitEagerness = .balanced {
+        didSet {
+            Self.defaults.set(translationCommitEagerness.rawValue, forKey: PersistedSettingsKey.translationCommitEagerness)
+            translationProvider?.updateCommitEagerness(translationCommitEagerness)
+        }
+    }
+
+    /// See `TranslationConfig.earlyTranslateThreshold`'s doc — only a
+    /// one-shot translation engine (`system.translation`/`model.hymt15`)
+    /// reads this; T3PO's `updateEarlyTranslateThreshold(_:)` is a no-op
+    /// (it reads `translationCommitEagerness` instead). Clamped the same
+    /// way `panelBackgroundOpacity`'s `didSet` is — a public, externally
+    /// settable property needs its own guard even though `SettingsView`'s
+    /// own control already constrains its range. Same "safe to set whether
+    /// or not a recording is active" reasoning as `targetLanguageCode`'s
+    /// `didSet`.
+    @Published public var translationEarlyTranslateThreshold: Int = 150 {
+        didSet {
+            let clamped = min(max(translationEarlyTranslateThreshold, 20), 1000)
+            if clamped != translationEarlyTranslateThreshold {
+                translationEarlyTranslateThreshold = clamped
+            }
+            Self.defaults.set(clamped, forKey: PersistedSettingsKey.translationEarlyTranslateThreshold)
+            translationProvider?.updateEarlyTranslateThreshold(clamped)
+        }
+    }
+
     /// Nil only if `transcriptionEngineID` somehow doesn't match any known
     /// engine (shouldn't happen — it's only ever set from
     /// `ProviderCatalog.transcriptionEngines`).
@@ -376,6 +407,15 @@ public final class RecordingSession: ObservableObject {
         if defaults.object(forKey: PersistedSettingsKey.includeSystemAudio) != nil {
             includeSystemAudio = defaults.bool(forKey: PersistedSettingsKey.includeSystemAudio)
         }
+        if let value = defaults.string(forKey: PersistedSettingsKey.translationCommitEagerness),
+            let eagerness = TranslationCommitEagerness(rawValue: value) {
+            translationCommitEagerness = eagerness
+        }
+        if defaults.object(forKey: PersistedSettingsKey.translationEarlyTranslateThreshold) != nil {
+            translationEarlyTranslateThreshold = defaults.integer(
+                forKey: PersistedSettingsKey.translationEarlyTranslateThreshold
+            )
+        }
         selectedDeviceID = defaults.string(forKey: PersistedSettingsKey.selectedDeviceID)
         transcriptionModelVariantID = defaults.string(forKey: PersistedSettingsKey.transcriptionModelVariantID)
         translationModelVariantID = defaults.string(forKey: PersistedSettingsKey.translationModelVariantID)
@@ -474,7 +514,11 @@ public final class RecordingSession: ObservableObject {
     private var isReconcilingDevices = false
 
     public func refreshDevices() {
-        inputDevices = [.systemDefault] + MicrophoneCapture.availableDevices()
+        // `.none` is appended last, not first — an unmatched/disconnected
+        // selection should still fall back to `.systemDefault` (below), the
+        // same as before this option existed, not silently start capturing
+        // no microphone at all.
+        inputDevices = [.systemDefault] + MicrophoneCapture.availableDevices() + [.none]
 
         // Reconciling/switching `selectedDeviceID` while a recording is
         // active would just desync the UI from reality: `start()` already
@@ -710,6 +754,13 @@ public final class RecordingSession: ObservableObject {
 
     public func start() async {
         guard !isRunning, !isStopping, !isStarting, !isPreloadingModel else { return }
+        // No mic and no system audio would mean no audio source at all —
+        // fail fast with a friendly message rather than silently starting a
+        // session that will never produce a single transcribed word.
+        guard selectedDeviceID != AudioInputDevice.noneID || includeSystemAudio else {
+            statusMessage = "麦克风已设为「无」，请先开启「包含系统声音」，否则没有可用的音频来源"
+            return
+        }
         isStarting = true
         defer { isStarting = false }
 
@@ -840,7 +891,9 @@ public final class RecordingSession: ObservableObject {
             }
             try await translation.start(config: TranslationConfig(
                 sourceLanguageCode: sourceLanguageCode,
-                targetLanguageCode: targetLanguageCode
+                targetLanguageCode: targetLanguageCode,
+                commitEagerness: translationCommitEagerness,
+                earlyTranslateThreshold: translationEarlyTranslateThreshold
             ))
         } catch {
             statusMessage = "翻译引擎启动失败: \(error.localizedDescription)"
@@ -913,7 +966,15 @@ public final class RecordingSession: ObservableObject {
         }
         vadSegmenter = segmenter
 
-        let mixer = AudioMixer(includeSystemAudio: includeSystemAudio)
+        // "无" mic selection: no `MicrophoneCapture` at all — system audio
+        // becomes the whole pipeline (both the sample stream `AudioMixer`
+        // emits and what drives `segmenter`'s VAD, which otherwise only ever
+        // sees mic samples via `mic.onBuffer` below). The top-of-`start()`
+        // guard above already ensures `includeSystemAudio` is `true`
+        // whenever this is the case, so there's always a real audio source.
+        let micEnabled = selectedDeviceID != AudioInputDevice.noneID
+
+        let mixer = AudioMixer(includeSystemAudio: includeSystemAudio, micEnabled: micEnabled)
         mixer.onPCMChunk = { [weak transcription] samples in
             transcription?.push(samples: samples)
         }
@@ -922,30 +983,50 @@ public final class RecordingSession: ObservableObject {
         }
         self.mixer = mixer
 
-        let mic = MicrophoneCapture(deviceID: selectedDeviceID)
-        mic.onBuffer = { [weak mixer, weak segmenter] samples in
-            mixer?.submitMic(samples)
-            segmenter?.submit(samples)
+        if micEnabled {
+            let mic = MicrophoneCapture(deviceID: selectedDeviceID)
+            mic.onBuffer = { [weak mixer, weak segmenter] samples in
+                mixer?.submitMic(samples)
+                segmenter?.submit(samples)
+            }
+            do {
+                try mic.start()
+            } catch {
+                statusMessage = "麦克风启动失败: \(error.localizedDescription)"
+                await transcription.stop()
+                await translation.stop()
+                return
+            }
+            micCapture = mic
         }
-        do {
-            try mic.start()
-        } catch {
-            statusMessage = "麦克风启动失败: \(error.localizedDescription)"
-            await transcription.stop()
-            await translation.stop()
-            return
-        }
-        micCapture = mic
 
         if includeSystemAudio {
             let sys = SystemAudioCapture()
-            sys.onBuffer = { [weak mixer] samples in mixer?.submitSystemAudio(samples) }
+            sys.onBuffer = { [weak mixer, weak segmenter] samples in
+                mixer?.submitSystemAudio(samples)
+                // With no mic, system audio is the only stream — it has to
+                // drive `segmenter`'s VAD too, or an utterance boundary
+                // (and therefore a translation `flush()`/R2T2 `rotateStream()`)
+                // would simply never fire.
+                if !micEnabled { segmenter?.submit(samples) }
+            }
             do {
                 try await sys.start()
                 systemAudioCapture = sys
             } catch {
                 screenRecordingPermissionNeeded = true
                 statusMessage = "系统音频启动失败（可能需要在系统设置里授权屏幕录制权限）: \(error.localizedDescription)"
+                // Unlike the normal mic+system-audio case (where a failed
+                // system-audio start just quietly falls back to mic-only
+                // transcription), with no mic there is now no audio source
+                // at all — starting anyway would leave `isRunning == true`
+                // forever transcribing silence. Abort like the mic-start
+                // failure path above does.
+                if !micEnabled {
+                    await transcription.stop()
+                    await translation.stop()
+                    return
+                }
             }
         }
 
@@ -991,7 +1072,7 @@ public final class RecordingSession: ObservableObject {
     /// A long-lived SwiftUI view drains this with `.translationTask` to
     /// perform the actual `TranslationSession` call (which can only happen
     /// inside a view) and reports results back via
-    /// `resolveTranslationBridgeResult(_:)`. Call once, when that view
+    /// `resolveTranslationBridgeResult(_:isFinal:)`. Call once, when that view
     /// mounts — not per recording — since this continuation is meant to
     /// outlive individual start/stop cycles (see `SystemTranslationProvider`'s
     /// doc). Yields nothing while the active translation engine isn't a
@@ -1002,8 +1083,11 @@ public final class RecordingSession: ObservableObject {
         return stream
     }
 
-    public func resolveTranslationBridgeResult(_ text: String) {
-        (translationProvider as? SystemTranslationProvider)?.receiveResult(text)
+    /// `isFinal` must be the same `request.isFinal` the bridging view got
+    /// this result's request from — see `TranslationBridgeRequest.isFinal`'s
+    /// doc for what it changes.
+    public func resolveTranslationBridgeResult(_ text: String, isFinal: Bool) {
+        (translationProvider as? SystemTranslationProvider)?.receiveResult(text, isFinal: isFinal)
     }
 
     public var currentSourceLanguage: Locale.Language? {
@@ -1156,6 +1240,8 @@ enum PersistedSettingsKey {
     static let translationEngineID = "org.omnivoice.translationEngineID"
     static let sourceLanguageCode = "org.omnivoice.sourceLanguageCode"
     static let targetLanguageCode = "org.omnivoice.targetLanguageCode"
+    static let translationCommitEagerness = "org.omnivoice.translationCommitEagerness"
+    static let translationEarlyTranslateThreshold = "org.omnivoice.translationEarlyTranslateThreshold"
     static let includeSystemAudio = "org.omnivoice.includeSystemAudio"
     static let selectedDeviceID = "org.omnivoice.selectedDeviceID"
     static let transcriptionModelVariantID = "org.omnivoice.transcriptionModelVariantID"

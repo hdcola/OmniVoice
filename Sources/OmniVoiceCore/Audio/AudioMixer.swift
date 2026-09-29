@@ -10,18 +10,26 @@ import Foundation
 /// yet) and summed in with clipping. Simple POC-grade mixer, not a
 /// sample-accurate one — ported unchanged from `mac-poc-hybrid`'s
 /// `Audio/AudioMixer.swift`.
+///
+/// `micEnabled: false` (a "无" mic selection — system-audio-only recording,
+/// see `AudioInputDevice.none`'s doc) flips which stream drives the clock:
+/// `submitMic` is simply never called by the caller in that mode, and
+/// `submitSystemAudio` emits its samples directly and immediately instead of
+/// buffering them for a mic callback that will never come.
 final class AudioMixer {
     var onPCMChunk: (([Float]) -> Void)?
     /// Peak level (0...1) of each emitted (post-mix) chunk, for a UI meter.
     var onLevel: ((Float) -> Void)?
 
     private let includeSystemAudio: Bool
+    private let micEnabled: Bool
     private let queue = DispatchQueue(label: "org.omnivoice.mixer")
     private var systemBuffer: [Float] = []
     private let maxSystemBufferSamples = 16000 * 2 // ~2s of slack at 16kHz
 
-    init(includeSystemAudio: Bool) {
+    init(includeSystemAudio: Bool, micEnabled: Bool = true) {
         self.includeSystemAudio = includeSystemAudio
+        self.micEnabled = micEnabled
     }
 
     func submitMic(_ samples: [Float]) {
@@ -47,6 +55,13 @@ final class AudioMixer {
     func submitSystemAudio(_ samples: [Float]) {
         guard includeSystemAudio else { return }
         queue.async {
+            guard self.micEnabled else {
+                // No mic ever calls `submitMic` in this mode — system audio
+                // itself is the master clock, emitted as it arrives rather
+                // than buffered for a mic callback that will never come.
+                self.emit(samples)
+                return
+            }
             self.systemBuffer.append(contentsOf: samples)
             if self.systemBuffer.count > self.maxSystemBufferSamples {
                 self.systemBuffer.removeFirst(self.systemBuffer.count - self.maxSystemBufferSamples)

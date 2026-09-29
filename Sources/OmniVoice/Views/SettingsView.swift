@@ -99,6 +99,28 @@ struct SettingsView: View {
                 )
                 .disabled(isBusy)
                 noLocalModelHint(for: ProviderCatalog.translationEngines)
+                // T3PO is the only engine with a WAIT/TRANS decision to bias
+                // (see `TranslationCommitEagerness`'s doc), so it gets its
+                // own picker; every other (one-shot) engine instead exposes
+                // the actual character threshold it reads
+                // (`TranslationConfig.earlyTranslateThreshold`'s doc) as a
+                // plain, directly user-configurable number — showing both
+                // controls at once, or the wrong one for the selected
+                // engine, would just be confusing. Deliberately *not*
+                // `.disabled(isBusy)` in either branch — safe to change
+                // mid-recording, same as `targetLanguageCode`'s picker.
+                if session.translationEngineID == "model.t3po" {
+                    Picker("翻译提交策略", selection: $session.translationCommitEagerness) {
+                        ForEach(TranslationCommitEagerness.allCases, id: \.self) { eagerness in
+                            Text(eagerness.displayName).tag(eagerness)
+                        }
+                    }
+                } else {
+                    Stepper(
+                        "长句提前翻译阈值：\(session.translationEarlyTranslateThreshold) 字",
+                        value: $session.translationEarlyTranslateThreshold, in: 20...1000, step: 10
+                    )
+                }
             }
 
             Section("语言") {

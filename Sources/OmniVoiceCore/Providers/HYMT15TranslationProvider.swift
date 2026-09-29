@@ -3,7 +3,9 @@ import Foundation
 /// HY-MT1.5 in-process model translation engine — wraps `HYMT15Translator`
 /// to conform to `TranslationProvider`. See `HYMT15Translator`'s class doc
 /// for why, unlike `ModelTranslationProvider` (T3PO), this engine never
-/// fires `onPreview` — it's a one-shot model, translated only at `flush()`.
+/// fires `onPreview` — it's a one-shot model, translated at `flush()` (a
+/// real ASR segment boundary) or, for a long enough buffered utterance,
+/// early — see `TranslationConfig.earlyTranslateThreshold`'s doc.
 public final class HYMT15TranslationProvider: TranslationProvider {
     public var onCommit: ((String) -> Void)?
     public var onPreview: ((String) -> Void)?
@@ -37,10 +39,15 @@ public final class HYMT15TranslationProvider: TranslationProvider {
         // reasoning as `ModelTranslationProvider.start(config:)`'s doc:
         // HY-MT1.5's prompt only names the target language.
         translator.setTargetLanguage(ModelLanguageMapping.hyMT15TargetLanguage(forCode: config.targetLanguageCode))
+        translator.setEarlyTranslateThreshold(config.earlyTranslateThreshold)
     }
 
     public func updateTargetLanguage(_ code: String) {
         translator.setTargetLanguage(ModelLanguageMapping.hyMT15TargetLanguage(forCode: code))
+    }
+
+    public func updateEarlyTranslateThreshold(_ characters: Int) {
+        translator.setEarlyTranslateThreshold(characters)
     }
 
     public func feed(_ text: String) {

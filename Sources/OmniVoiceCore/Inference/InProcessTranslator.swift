@@ -26,7 +26,7 @@ enum TranslatorError: LocalizedError {
 /// (`inference/latency.py` in netease-youdao/Confucius4-T3PO), applied as a
 /// logit bias on the stop tokens during non-forced probes — see
 /// `InProcessTranslator`'s header comment for what that bias actually does.
-enum TranslationLatencyMode {
+enum TranslationLatencyMode: Sendable {
     case low, native, high
 
     /// Positive commits earlier (lower latency, lower quality); negative

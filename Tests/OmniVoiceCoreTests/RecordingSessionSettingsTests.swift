@@ -619,4 +619,75 @@ struct RecordingSessionSettingsTests {
         session.isStopping = false
         #expect(!session.isSessionActive)
     }
+
+    @Test func translationCommitEagernessDefaultsToBalanced() {
+        let session = RecordingSession()
+        #expect(session.translationCommitEagerness == .balanced)
+    }
+
+    @Test func translationCommitEagernessIsRestoredFromPersistedValue() {
+        withPersisted([PersistedSettingsKey.translationCommitEagerness: TranslationCommitEagerness.fast.rawValue]) {
+            let session = RecordingSession()
+            #expect(session.translationCommitEagerness == .fast)
+        }
+    }
+
+    @Test func settingTranslationCommitEagernessPersistsIt() {
+        defer { defaults.removeObject(forKey: PersistedSettingsKey.translationCommitEagerness) }
+        let session = RecordingSession()
+        session.translationCommitEagerness = .thorough
+        #expect(defaults.string(forKey: PersistedSettingsKey.translationCommitEagerness) == "thorough")
+    }
+
+    @Test func translationEarlyTranslateThresholdDefaultsTo150() {
+        let session = RecordingSession()
+        #expect(session.translationEarlyTranslateThreshold == 150)
+    }
+
+    @Test func translationEarlyTranslateThresholdIsRestoredFromPersistedValue() {
+        withPersisted([PersistedSettingsKey.translationEarlyTranslateThreshold: 300]) {
+            let session = RecordingSession()
+            #expect(session.translationEarlyTranslateThreshold == 300)
+        }
+    }
+
+    @Test func settingTranslationEarlyTranslateThresholdPersistsIt() {
+        defer { defaults.removeObject(forKey: PersistedSettingsKey.translationEarlyTranslateThreshold) }
+        let session = RecordingSession()
+        session.translationEarlyTranslateThreshold = 300
+        #expect(defaults.integer(forKey: PersistedSettingsKey.translationEarlyTranslateThreshold) == 300)
+    }
+
+    @Test func translationEarlyTranslateThresholdClampsToItsRange() {
+        defer { defaults.removeObject(forKey: PersistedSettingsKey.translationEarlyTranslateThreshold) }
+        let session = RecordingSession()
+        session.translationEarlyTranslateThreshold = 5
+        #expect(session.translationEarlyTranslateThreshold == 20)
+
+        session.translationEarlyTranslateThreshold = 5000
+        #expect(session.translationEarlyTranslateThreshold == 1000)
+    }
+
+    @Test func refreshDevicesAlwaysOffersANoMicOption() {
+        let session = RecordingSession()
+        session.refreshDevices()
+        #expect(session.inputDevices.contains(where: { $0.id == AudioInputDevice.noneID }))
+    }
+
+    /// `start()`'s very first guard — before any model loading or real audio
+    /// capture — refuses "no mic, no system audio" (no audio source at all)
+    /// with a friendly `statusMessage` rather than starting a session that
+    /// will never transcribe anything. Safe to call in CI: this guard
+    /// returns before `start()` ever touches `MicrophoneCapture`/
+    /// `SystemAudioCapture`/model loading.
+    @Test func startRefusesNoMicAndNoSystemAudio() async {
+        let session = RecordingSession()
+        session.selectedDeviceID = AudioInputDevice.noneID
+        session.includeSystemAudio = false
+
+        await session.start()
+
+        #expect(!session.isRunning)
+        #expect(session.statusMessage.contains("包含系统声音"))
+    }
 }

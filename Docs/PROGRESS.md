@@ -223,6 +223,67 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       needing more attention since it doesn't even have a clear license file
       today.
 
+- [x] **System-audio-only recording ("无" mic option)** (2026-09-28): added
+      `AudioInputDevice.none`/`.noneID` as a real, always-present entry named
+      "无" in the microphone picker (`RecordingSession.refreshDevices()`) —
+      not "无（仅系统声音）" as an earlier version of this had it, since
+      "包含系统声音" is a separate, independently-toggled setting, not implied
+      by this one. For recording a meeting/lecture played through the Mac's
+      own output with no one talking into a mic. Selecting it skips
+      `MicrophoneCapture` entirely in `start()` and puts `AudioMixer` into a
+      `micEnabled: false` mode where system audio (not the mic) drives the
+      whole pipeline directly — including `UtteranceSegmenter`'s VAD, which
+      previously only ever saw raw mic samples (`mic.onBuffer`), so without
+      this it would never have fired a single utterance boundary with no mic
+      present. `start()` fails fast with a friendly `statusMessage` if "无"
+      is selected while "包含系统声音" is off (no audio source at all), and
+      aborts the same way mid-`start()` if system-audio capture itself then
+      fails to start (unlike the normal mic+system-audio case, there's no
+      mic-only fallback to quietly continue with).
+- [x] **User-configurable translation commit eagerness, for every engine**
+      (2026-09-28, two iterations): `TranslationCommitEagerness`
+      (`.fast`/`.balanced`/`.thorough`) is this app's own vocabulary for "how
+      eagerly does T3PO commit vs. wait for more context" — threaded through
+      `TranslationConfig.commitEagerness` (initial value) and
+      `TranslationProvider.updateCommitEagerness(_:)` (mid-recording
+      changes), exactly `updateTargetLanguage(_:)`'s existing two-path
+      pattern. T3PO maps it onto its existing `TranslationLatencyMode`/`tau`
+      calibration inside `ModelTranslationProvider`; only `model.t3po` has a
+      WAIT/TRANS decision to bias in the first place, so `SettingsView`
+      shows this picker only for that engine. HY-MT1.5/system translation —
+      one-shot engines with no WAIT/TRANS concept — instead read a separate,
+      directly user-configurable `RecordingSession.translationEarlyTranslateThreshold`
+      (a plain character count, default 150, range 20...1000, a `Stepper` in
+      `SettingsView` shown for those two engines instead of the eagerness
+      picker) threaded through `TranslationConfig.earlyTranslateThreshold`/
+      `TranslationProvider.updateEarlyTranslateThreshold(_:)` — a second,
+      independent setting rather than a 4th case of
+      `TranslationCommitEagerness`, since a one-shot engine's "how long is
+      too long" has no probabilistic-bias equivalent to keep in the same
+      small enum (first version of this had one-shot engines reading fixed
+      per-`TranslationCommitEagerness`-case numbers instead; replaced after
+      feedback that the actual thresholds should be user-adjustable, not
+      just a 3-tier preset). Once the buffer crosses half that threshold,
+      these engines watch for the next newly-fed delta that ends a sentence
+      (`SentenceBoundary.endsSentence`) and translate as soon as one arrives,
+      instead of cutting mid-sentence purely by length — same idea as T3PO's
+      own `forceBreakThreshold`+`SentenceBoundary` combination; crossing the
+      full threshold forces a translation regardless of punctuation, so
+      continuous unpunctuated speech still can't grow the buffer without
+      limit. That early translation is a "sub-commit", not a real flush:
+      `HYMT15Translator.feed(sourceDelta:)` reuses `translateBufferLocked()`
+      (the same primitive `flush()` calls, which only ever fires `onCommit`,
+      never `onFlushBoundary`) so it appends into the segment's still-open
+      translation row instead of closing it — mirroring T3PO's own
+      forced-probe-vs-real-flush distinction. `SystemTranslationProvider`
+      needed the same distinction plumbed through its async SwiftUI
+      `.translationTask` bridge, since its actual translation happens later
+      than `feed`/`flush` return: `TranslationBridgeRequest` gained an
+      `isFinal` flag, `receiveResult(_:)` became `receiveResult(_:isFinal:)`,
+      and `RecordingSession.resolveTranslationBridgeResult(_:)`/
+      `FloatingTranscriptView`'s `.translationTask` loop now thread that flag
+      through so only a final result advances `translationRowIndex`.
+
 ### Code review findings (fixed)
 
 A review of the scaffold PR caught three real bugs, all fixed on
