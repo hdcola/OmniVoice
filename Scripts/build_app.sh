@@ -17,6 +17,11 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 
 cp "$BUILD_DIR/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 cp "$SCRIPT_DIR/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
+if [ ! -f "$ROOT_DIR/Resources/AppIcon.icns" ]; then
+  echo "error: $ROOT_DIR/Resources/AppIcon.icns not found (Info.plist references CFBundleIconFile=AppIcon)" >&2
+  exit 1
+fi
+cp "$ROOT_DIR/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 
 # Package.swift links CAudioCpp/llama against third_party/{audio.cpp,llama.cpp}
 # with absolute-path -rpath entries (see Package.swift's audioCppLibDir/

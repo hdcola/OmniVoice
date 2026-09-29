@@ -16,6 +16,8 @@
     <string>APPL</string>
     <key>CFBundleExecutable</key>
     <string>OmniVoice</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>LSMinimumSystemVersion</key>
     <string>26.0</string>
     <!-- Menu-bar-only app: no Dock icon, no app-switcher entry, no default
