@@ -8,6 +8,20 @@ The format is based on Keep a Changelog.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.3.0] - 2026-09-29
+
+### Added
+
 - feat(history): support deleting (swipe, context menu, or ⌫) and renaming past recordings, and show relative-time, duration, language-pair, and utterance-count tags on each row (Docs/UI_UX_DESIGN_PROPOSAL.md §3.3) (#30)
 - feat(history): add "复制全文"/"仅复制译文" clipboard actions to the session detail toolbar, and enable text selection on its transcript (#30)
 - feat(history): show a small relative "[mm:ss]" timestamp before each transcript line in the session detail view (§3.3.C) (#30)
