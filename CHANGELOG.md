@@ -7,16 +7,6 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-
-- feat(history): support deleting (swipe, context menu, or ⌫) and renaming past recordings, and show relative-time, duration, language-pair, and utterance-count tags on each row (Docs/UI_UX_DESIGN_PROPOSAL.md §3.3) (#30)
-- feat(history): add "复制全文"/"仅复制译文" clipboard actions to the session detail toolbar, and enable text selection on its transcript (#30)
-- feat(history): show a small relative "[mm:ss]" timestamp before each transcript line in the session detail view (§3.3.C) (#30)
-- feat(panel): enable text selection on the floating panel's transcript, with a per-line hover "复制本句" button and a panel-wide "复制全文" button (§3.1.D) (#30)
-- feat(panel): add a one-tap deeplink to the relevant System Settings privacy pane when microphone or screen-recording permission is missing (§3.4.C) (#30)
-- feat(menubar): show a pulsing red recording indicator in the menu bar icon while a session is running, so recording state stays visible even with the floating panel hidden (§3.2) (#30)
-- feat(menubar): show the live elapsed-time readout in the menu bar dropdown too, not just the floating panel (§3.1.E/3.2) (#30)
-- feat(panel): add auto-hiding controls (mouse-leave fades the control/status bars after 2s), a display-mode switch (双语对照/仅译文/仅原文), font-size presets (标准/大/特大), and a live elapsed-time readout (§3.1.A–C, E) (#30)
-- feat(scripts): add `Scripts/setup_third_party.sh`, automating the `third_party/{audio.cpp,llama.cpp}` clone/cmake setup documented in `Docs/MODEL_ENGINE_SETUP.md` — idempotent (safe to re-run; leaves an existing pinned checkout, an already-built target, or already-downloaded weights alone), with `--with-models`/`--force`/`--skip-audio`/`--skip-llama` flags (#31)
 - feat(settings): milestone 1 of `Docs/UX-SETTINGS-MODEL-MANAGEMENT.md` — always list every ASR/translation engine (downloaded or not, labeled "（未下载 · 点击配置）", routing to "模型管理" on selection); keep "自动检测" visible-but-disabled under the system ASR engine instead of hiding it; warn (with a one-click switch to the system translation engine) when a local-model translation engine is paired with a target language `ModelLanguageMapping` would silently fall back to Chinese for; hide the "长句提前翻译阈值" stepper entirely under the system ASR engine instead of showing it disabled
 - feat(models): milestone 2 of `Docs/UX-SETTINGS-MODEL-MANAGEMENT.md` — "模型管理" now auto-switches the matching engine category (ASR/translation) to a freshly-downloaded model when it's still on its system default, with an undo-able banner and a companion-model download nudge; `ModelVariant`/`EngineDescriptor` gained user-facing `summary`/`badge`/`recommendedMemoryGB` fields, rendered as rich model cards; two one-click recommended bundles (标准实时双语方案/轻量方案) sit above the model list; `ModelDownloadManager` now publishes per-variant `downloadStats` (instantaneous MB/s + ETA), shown under each downloading card's progress bar
 - feat(settings): milestone 3 of `Docs/UX-SETTINGS-MODEL-MANAGEMENT.md` — `SettingsView` is now a 560×480 `TabView` ("语音与引擎"/"模型库管理"/"语言与悬浮窗"/"关于"), replacing the separate 440pt-wide "模型管理" window; selecting an undownloaded engine in "语音与引擎" shows an inline download row (percent/progress/speed/ETA) instead of bouncing to another window; a new "引擎运行与显存状态" console exposes `session.preloadModel()`/`unloadModels()` with a status light and an estimated-memory readout, alongside the floating panel's existing affordance; the menu bar's "模型管理…" now opens Settings directly on the "模型库管理" tab via a shared, `UserDefaults`-persisted `SettingsNavigationState`
@@ -27,11 +17,36 @@ The format is based on Keep a Changelog.
 ### Changed
 
 ### Fixed
-
 - fix(settings): "模型库管理" tab's content is now wrapped in a `ScrollView` — with both recommended-bundle cards, every ASR/translation model variant, and their download status all rendered, it routinely exceeded the Settings window's fixed 560×480 size and the bottom cards/buttons were clipped off and unreachable; every card now stays reachable by scrolling (round-4 user report)
 - fix(models): audit recommended-bundle status/remaining-download logic — extracted the per-bundle download-state computation into a new, unit-tested `ModelBundle.status(isDownloaded:)` (see `ModelBundleStatusTests`), which resolves strictly against each bundle's own `variantIDs` (never a sibling quantization or another variant of the same engine family, and never a variant counted twice), so "已下载 X/Y" and "一键下载剩余组件" always refer to only that bundle's own missing components. Each bundle card also now lists its member variants individually (✅/⬜) instead of just a bare count — two recommended bundles can legitimately share a variant (both currently include R2T2 Q8_0), so downloading it via one bundle correctly, and now visibly, counts toward the other's total too, instead of reading as a contradictory "already complete" with no explanation of why (round-4 user report)
 - fix(ux): address round-2 review must-fix finding — `OnboardingView.finish(startDownload:)` used to mark onboarding complete and call `onFinished()` (which closes/releases the window) unconditionally, even when `startBundleDownload()` had just set `diskSpaceWarningMessage` for an insufficient-disk-space failure; the window closed in the same run-loop turn, destroying the `.alert` before it could render and permanently skipping the wizard on future launches. `startBundleDownload()` now returns whether it actually started something (or had nothing to do), and `finish(startDownload:)` only completes/closes on success, leaving the window open with its alert visible and the wizard retriable on a disk-space failure
 - fix(ux): address Docs/UX-REVIEW-ROUND-1.md's 5 must-fix findings — `TargetLanguagePicker`'s "一键切换为系统翻译引擎" button no longer fires mid-recording (was tearing down the active `translationProvider` via `discardLoadedModelsIfStale()`); the same picker now renders as a compact popover-triggered warning icon inside the floating panel's single-row control bar instead of a full multi-line card that blew its height out to 120pt+; `ModelManagementView`'s post-download auto-activation and `OnboardingView`'s post-download engine activation both now skip while a recording is active, instead of force-switching the engine an active session is using; `OnboardingView`'s "高精离线大模型模式" download now pre-flights combined disk space before starting (via `ModelDownloadManager.insufficientDiskSpaceWarning(forTotalMB:)`) and actually activates R2T2/T3PO once each finishes, instead of silently no-op'ing on either; `ModelDownloadManager.handleProgress`'s speed/ETA computation and `downloadStats` publish now happen only on throttle-surviving updates, instead of unconditionally ahead of the throttle check (which was firing `objectWillChange` hundreds of times per second on a fast connection)
+
+### Dependencies
+
+### Documentation
+
+### Tests
+- test(models): add `ModelBundleStatusTests`, pinning the round-4 recommended-bundle report's exact scenario (R2T2 Q8_0 downloaded, T3PO Q5_K_M not) plus sibling-quantization and full-completion cases against `ModelBundle.status(isDownloaded:)`
+
+## [0.3.0] - 2026-09-29
+
+### Added
+
+- feat(history): support deleting (swipe, context menu, or ⌫) and renaming past recordings, and show relative-time, duration, language-pair, and utterance-count tags on each row (Docs/UI_UX_DESIGN_PROPOSAL.md §3.3) (#30)
+- feat(history): add "复制全文"/"仅复制译文" clipboard actions to the session detail toolbar, and enable text selection on its transcript (#30)
+- feat(history): show a small relative "[mm:ss]" timestamp before each transcript line in the session detail view (§3.3.C) (#30)
+- feat(panel): enable text selection on the floating panel's transcript, with a per-line hover "复制本句" button and a panel-wide "复制全文" button (§3.1.D) (#30)
+- feat(panel): add a one-tap deeplink to the relevant System Settings privacy pane when microphone or screen-recording permission is missing (§3.4.C) (#30)
+- feat(menubar): show a pulsing red recording indicator in the menu bar icon while a session is running, so recording state stays visible even with the floating panel hidden (§3.2) (#30)
+- feat(menubar): show the live elapsed-time readout in the menu bar dropdown too, not just the floating panel (§3.1.E/3.2) (#30)
+- feat(panel): add auto-hiding controls (mouse-leave fades the control/status bars after 2s), a display-mode switch (双语对照/仅译文/仅原文), font-size presets (标准/大/特大), and a live elapsed-time readout (§3.1.A–C, E) (#30)
+- feat(scripts): add `Scripts/setup_third_party.sh`, automating the `third_party/{audio.cpp,llama.cpp}` clone/cmake setup documented in `Docs/MODEL_ENGINE_SETUP.md` — idempotent (safe to re-run; leaves an existing pinned checkout, an already-built target, or already-downloaded weights alone), with `--with-models`/`--force`/`--skip-audio`/`--skip-llama` flags (#31)
+
+### Changed
+
+### Fixed
+
 - fix(panel): stop the auto-hide controls fade from unpinning transcript auto-scroll — toggling `controlBar`/`statusBar` in/out of the view tree shrank `TranscriptListView`'s container height without changing its content height, which `.onScrollGeometryChange` misread as the user scrolling away just from a mouse hover; both bars now stay in the hierarchy and fade via `.opacity` instead (#30)
 - fix(panel): keep every control bar element visible at the panel's 380pt minimum width — the timer/display-mode/font-scale controls previously pushed its natural width past 600pt, clipping controls on a narrow panel; the display-mode/font-scale pickers now size to their content instead of a fixed 90pt/70pt frame, and the whole bar scrolls horizontally as a fallback instead of clipping (#30)
 - fix(history): reset `selectedID` after deleting the currently-selected session, so the detail pane falls back to the "选择一个会话" placeholder instead of rendering blank, and a subsequent ⌫ keeps working (#30)
@@ -47,8 +62,6 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 ### Tests
-
-- test(models): add `ModelBundleStatusTests`, pinning the round-4 recommended-bundle report's exact scenario (R2T2 Q8_0 downloaded, T3PO Q5_K_M not) plus sibling-quantization and full-completion cases against `ModelBundle.status(isDownloaded:)`
 
 ## [0.2.0] - 2026-09-29
 
