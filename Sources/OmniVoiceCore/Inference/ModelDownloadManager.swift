@@ -40,6 +40,35 @@ public struct DownloadStats: Sendable, Equatable {
     /// `nil` while `bytesPerSecond` is still `0` (nothing to divide by) —
     /// e.g. the first callback, or a transfer that's momentarily stalled.
     public let etaSeconds: Double?
+
+    /// One formatted line ("速度：18.5 MB/s | 已下载：1.6 GB / 2.31 GB | 剩余时间：
+    /// 约 42 秒") — shared by every download-progress card so the wording
+    /// stays identical wherever this is shown (Docs/UX-SETTINGS-MODEL-MANAGEMENT.md
+    /// §4.3.2/§4.5's status-text column).
+    public var summaryLine: String {
+        let speed = Self.formatBytes(bytesPerSecond) + "/s"
+        let downloaded = Self.formatBytes(Double(bytesWritten))
+        let total = Self.formatBytes(Double(totalBytes))
+        let etaText = etaSeconds.map(Self.formatDuration) ?? "计算中…"
+        return "速度：\(speed) | 已下载：\(downloaded) / \(total) | 剩余时间：约 \(etaText)"
+    }
+
+    private static func formatBytes(_ bytes: Double) -> String {
+        if bytes >= 1024 * 1024 * 1024 {
+            return String(format: "%.2f GB", bytes / (1024 * 1024 * 1024))
+        }
+        return String(format: "%.1f MB", bytes / (1024 * 1024))
+    }
+
+    private static func formatDuration(_ seconds: Double) -> String {
+        let totalSeconds = max(0, Int(seconds.rounded()))
+        if totalSeconds >= 3600 {
+            return "\(totalSeconds / 3600) 小时 \((totalSeconds % 3600) / 60) 分钟"
+        } else if totalSeconds >= 60 {
+            return "\(totalSeconds / 60) 分 \(totalSeconds % 60) 秒"
+        }
+        return "\(totalSeconds) 秒"
+    }
 }
 
 /// Downloads and caches a `.model`-kind engine's weights on first use (see

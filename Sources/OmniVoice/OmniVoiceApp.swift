@@ -5,12 +5,19 @@ import SwiftUI
 @main
 struct OmniVoiceApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    /// Task 3.4 — shared between `MenuBarContentView` (whose "模型管理…" row
+    /// needs to steer `SettingsView` before that view even exists, since
+    /// `Settings { ... }` only constructs its content on first open) and
+    /// `SettingsView` itself (whose `TabView` binds directly to
+    /// `selectedTab`). See `SettingsNavigationState`'s own doc.
+    @StateObject private var settingsNavigation = SettingsNavigationState()
 
     var body: some Scene {
         MenuBarExtra {
             MenuBarContentView(modelDownloadManager: appDelegate.session.modelDownloadManager)
                 .environmentObject(appDelegate.session)
                 .environmentObject(appDelegate)
+                .environmentObject(settingsNavigation)
         } label: {
             MenuBarLabel(modelDownloadManager: appDelegate.session.modelDownloadManager, session: appDelegate.session)
         }
@@ -22,26 +29,16 @@ struct OmniVoiceApp: App {
                 .modelContainerIfAvailable(appDelegate.modelContainer)
         }
 
-        // `Window`, not `WindowGroup` — a `WindowGroup` opens a brand new
-        // window instance on every `openWindow(id:)` call (it's designed for
-        // multi-document windows), which repeated clicks on "模型管理…"/the
-        // Settings shortcut would otherwise keep stacking up. `Window` is
-        // macOS's singleton-window scene: `openWindow(id:)` reuses/refocuses
-        // the one instance instead.
-        Window("模型管理", id: "modelManagement") {
-            ModelManagementView(modelDownloadManager: appDelegate.session.modelDownloadManager)
-                .environmentObject(appDelegate.session)
-        }
-        // Without this, the window's frame defaults to something larger
-        // than `ModelManagementView`'s own `.frame(width: 460)` content,
-        // leaving visible empty space the user could then drag even wider —
-        // `.contentSize` keeps the window sized to exactly what its content
-        // asks for.
-        .windowResizability(.contentSize)
-
+        // "模型库管理" now lives as a tab inside `SettingsView` (Task 3.1/3.4)
+        // instead of this standalone `Window` scene — a click on "模型管理…"
+        // opens Settings and switches `settingsNavigation.selectedTab` to
+        // `.models` rather than a second window, so there's exactly one
+        // place model download/delete state is rendered, not two that could
+        // drift out of sync mid-download.
         Settings {
             SettingsView(modelDownloadManager: appDelegate.session.modelDownloadManager)
                 .environmentObject(appDelegate.session)
+                .environmentObject(settingsNavigation)
         }
     }
 }

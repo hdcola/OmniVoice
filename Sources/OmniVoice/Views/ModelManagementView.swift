@@ -53,7 +53,6 @@ struct ModelManagementView: View {
             }
         }
         .padding(20)
-        .frame(width: 520)
         .alert(
             errorTitle,
             isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
@@ -298,7 +297,7 @@ struct ModelManagementView: View {
                 .font(.caption)
             ProgressView(value: fraction)
             if let stats = downloadManager.downloadStats[variant.id] {
-                Text(downloadStatsLine(stats))
+                Text(stats.summaryLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -314,31 +313,6 @@ struct ModelManagementView: View {
             ProgressView()
                 .progressViewStyle(.linear)
         }
-    }
-
-    private func downloadStatsLine(_ stats: DownloadStats) -> String {
-        let speed = Self.formatBytes(stats.bytesPerSecond) + "/s"
-        let downloaded = Self.formatBytes(Double(stats.bytesWritten))
-        let total = Self.formatBytes(Double(stats.totalBytes))
-        let etaText = stats.etaSeconds.map(Self.formatDuration) ?? "计算中…"
-        return "速度：\(speed) | 已下载：\(downloaded) / \(total) | 剩余时间：约 \(etaText)"
-    }
-
-    private static func formatBytes(_ bytes: Double) -> String {
-        if bytes >= 1024 * 1024 * 1024 {
-            return String(format: "%.2f GB", bytes / (1024 * 1024 * 1024))
-        }
-        return String(format: "%.1f MB", bytes / (1024 * 1024))
-    }
-
-    private static func formatDuration(_ seconds: Double) -> String {
-        let totalSeconds = max(0, Int(seconds.rounded()))
-        if totalSeconds >= 3600 {
-            return "\(totalSeconds / 3600) 小时 \((totalSeconds % 3600) / 60) 分钟"
-        } else if totalSeconds >= 60 {
-            return "\(totalSeconds / 60) 分 \(totalSeconds % 60) 秒"
-        }
-        return "\(totalSeconds) 秒"
     }
 
     @ViewBuilder
