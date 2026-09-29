@@ -48,23 +48,34 @@ struct ModelManagementView: View {
     }
 
     var body: some View {
-        Form {
-            if let activationBanner {
-                activationBannerView(activationBanner)
-            }
-            bundleSection
-            Section("识别引擎模型") {
-                ForEach(ProviderCatalog.transcriptionEngines.filter { $0.kind == .model }) { engine in
-                    variantRows(forEngineID: engine.id)
+        // Problem 3a (round-4 user report) — this tab's host window
+        // (`SettingsView`) is a fixed 560×480 `TabView`, and a bare `Form`
+        // doesn't scroll on macOS: with both recommended-bundle cards, every
+        // ASR/translation model variant, and their download status all
+        // rendered, the content routinely exceeds 480pt and the bottom
+        // cards/buttons were simply clipped off, unreachable. Wrapping the
+        // `Form` in a `ScrollView` is the minimal fix — the window itself
+        // stays the fixed size every other tab already assumes, and every
+        // card stays reachable by scrolling instead.
+        ScrollView {
+            Form {
+                if let activationBanner {
+                    activationBannerView(activationBanner)
+                }
+                bundleSection
+                Section("识别引擎模型") {
+                    ForEach(ProviderCatalog.transcriptionEngines.filter { $0.kind == .model }) { engine in
+                        variantRows(forEngineID: engine.id)
+                    }
+                }
+                Section("翻译引擎模型") {
+                    ForEach(ProviderCatalog.translationEngines.filter { $0.kind == .model }) { engine in
+                        variantRows(forEngineID: engine.id)
+                    }
                 }
             }
-            Section("翻译引擎模型") {
-                ForEach(ProviderCatalog.translationEngines.filter { $0.kind == .model }) { engine in
-                    variantRows(forEngineID: engine.id)
-                }
-            }
+            .padding(20)
         }
-        .padding(20)
         .alert(
             errorTitle,
             isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
@@ -216,32 +227,54 @@ struct ModelManagementView: View {
         }
     }
 
-    private func bundleVariants(_ bundle: ModelBundle) -> [ModelVariant] {
-        bundle.variantIDs.compactMap(ProviderCatalog.variant(forID:))
+    /// Round-4 user report (Docs/UX-SETTINGS-MODEL-MANAGEMENT.md's bundle
+    /// section) — a bare "已下载 X/Y" count reads as contradictory once two
+    /// bundles share a variant (both recommended pairings here use
+    /// `r2t2-q8_0`): downloading R2T2 for 方案A also, correctly, counts
+    /// toward 方案B's own total, but nothing on screen said *why* 方案B could
+    /// already show progress the user never explicitly asked it to download.
+    /// This itemized checklist makes that shared state visible per variant,
+    /// instead of only a count — see `bundleCard(for:)`.
+    private func bundleChecklist(_ status: ModelBundleStatus) -> some View {
+        ForEach(status.variants) { variant in
+            HStack(spacing: 4) {
+                let isDownloaded = status.downloadedVariants.contains(variant)
+                Image(systemName: isDownloaded ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isDownloaded ? Color.green : Color.secondary)
+                Text(variant.displayName)
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
     }
 
     private func bundleCard(for bundle: ModelBundle) -> some View {
-        let variants = bundleVariants(bundle)
-        let downloadedCount = variants.filter { downloadManager.isDownloaded($0) }.count
-        let remaining = variants.filter { !downloadManager.isDownloaded($0) }
-        let isBundleDownloading = variants.contains { downloadManager.isDownloading($0) || pendingBundleDownloads.contains($0.id) }
-        let remainingSizeMB = remaining.reduce(0) { $0 + $1.approximateSizeMB }
+        // `ModelBundle.status(isDownloaded:)` resolves strictly against
+        // `bundle.variantIDs` — the exact quantization each bundle names,
+        // never every variant sharing its engine family, and never counted
+        // twice (see that type's doc for the full reasoning this was
+        // audited against).
+        let status = bundle.status(isDownloaded: downloadManager.isDownloaded)
+        let isBundleDownloading = status.variants.contains {
+            downloadManager.isDownloading($0) || pendingBundleDownloads.contains($0.id)
+        }
 
         return VStack(alignment: .leading, spacing: 6) {
             Text(bundle.displayName).font(.headline)
             Text(bundle.summary)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            bundleChecklist(status)
             HStack {
                 Text(
-                    downloadedCount == variants.count
+                    status.isFullyDownloaded
                         ? "状态：已全部下载"
-                        : "状态：已下载 \(downloadedCount)/\(variants.count)"
+                        : "状态：已下载 \(status.downloadedVariants.count)/\(status.variants.count)"
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 Spacer()
-                if downloadedCount < variants.count {
+                if !status.isFullyDownloaded {
                     Button {
                         downloadBundle(bundle)
                     } label: {
@@ -252,9 +285,9 @@ struct ModelManagementView: View {
                             }
                         } else {
                             Text(
-                                downloadedCount == 0
-                                    ? "⬇️ 一键配置此方案（约 \(remainingSizeMB) MB）"
-                                    : "⬇️ 一键下载剩余组件（约 \(remainingSizeMB) MB）"
+                                status.downloadedVariants.isEmpty
+                                    ? "⬇️ 一键配置此方案（约 \(status.remainingSizeMB) MB）"
+                                    : "⬇️ 一键下载剩余组件（约 \(status.remainingSizeMB) MB）"
                             )
                         }
                     }
@@ -268,7 +301,7 @@ struct ModelManagementView: View {
     }
 
     private func downloadBundle(_ bundle: ModelBundle) {
-        let variants = bundleVariants(bundle).filter { !downloadManager.isDownloaded($0) }
+        let variants = bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants
         for variant in variants {
             pendingBundleDownloads.insert(variant.id)
             download(variant) {

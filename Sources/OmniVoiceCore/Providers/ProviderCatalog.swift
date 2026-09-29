@@ -226,3 +226,40 @@ public enum ProviderCatalog {
         modelVariants.first { $0.id == id }
     }
 }
+
+/// A `ModelBundle`'s download state, resolved strictly against the exact
+/// `ModelVariant`s its `variantIDs` name — never every variant belonging to
+/// the same `engineID`, and never a variant counted twice. Two bundles can
+/// legitimately share a variant (both recommended pairings in
+/// `ProviderCatalog.bundles` use `r2t2-q8_0`), so downloading it via one
+/// bundle correctly reads as already-done in the other too — this type only
+/// *reports* that shared state, it never infers a variant as downloaded from
+/// a sibling quantization or its engine ID the way an `engineID`-keyed check
+/// would.
+public struct ModelBundleStatus: Sendable {
+    public let variants: [ModelVariant]
+    public let downloadedVariants: [ModelVariant]
+    public let remainingVariants: [ModelVariant]
+
+    public var isFullyDownloaded: Bool { remainingVariants.isEmpty }
+
+    /// Total size of only the variants this specific bundle is still
+    /// missing — never the whole bundle's size, and never another bundle's
+    /// variants, so a "一键下载剩余组件" button's stated size always matches
+    /// exactly what tapping it will transfer.
+    public var remainingSizeMB: Int { remainingVariants.reduce(0) { $0 + $1.approximateSizeMB } }
+}
+
+extension ModelBundle {
+    /// - Parameter isDownloaded: typically `ModelDownloadManager.isDownloaded(_:)`,
+    ///   injected so this stays testable without a real `ModelDownloadManager`/
+    ///   filesystem.
+    public func status(isDownloaded: (ModelVariant) -> Bool) -> ModelBundleStatus {
+        let variants = variantIDs.compactMap(ProviderCatalog.variant(forID:))
+        return ModelBundleStatus(
+            variants: variants,
+            downloadedVariants: variants.filter(isDownloaded),
+            remainingVariants: variants.filter { !isDownloaded($0) }
+        )
+    }
+}
