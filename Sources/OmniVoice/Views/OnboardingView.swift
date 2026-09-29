@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import OmniVoiceCore
 import SwiftUI
@@ -25,6 +26,13 @@ struct OnboardingView: View {
     @State private var selectedMode: Mode = .offlineModel
     @State private var microphoneAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     @State private var screenRecordingAuthorized = CGPreflightScreenCaptureAccess()
+    /// Review Round 1 Must-Fix 4 (首次启动向导下载大模型后无法自动激活，且缺乏磁盘
+    /// 空间检查) — surfaced via `.alert` on this view rather than silently
+    /// declining the download the way `try?` around `ensureDownloaded(_:)`
+    /// used to (see this file's previous revision): a user who's already
+    /// closed this window by the time that failure would have surfaced had
+    /// no way to find out the "后台下载中" promise never actually started.
+    @State private var diskSpaceWarningMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -75,6 +83,18 @@ struct OnboardingView: View {
         }
         .padding(20)
         .frame(width: 520)
+        .alert(
+            "磁盘空间不足",
+            isPresented: Binding(get: { diskSpaceWarningMessage != nil }, set: { if !$0 { diskSpaceWarningMessage = nil } })
+        ) {
+            Button("打开存储空间管理") {
+                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.settings.Storage")!)
+                diskSpaceWarningMessage = nil
+            }
+            Button("知道了", role: .cancel) { diskSpaceWarningMessage = nil }
+        } message: {
+            Text(diskSpaceWarningMessage ?? "")
+        }
     }
 
     private func permissionRow(title: String, isAuthorized: Bool, requestAction: @escaping () -> Void) -> some View {
@@ -135,25 +155,80 @@ struct OnboardingView: View {
     /// "高精离线大模型模式" path, kicks off the standard realtime bundle
     /// (R2T2 + T3PO) download in the background per §4.7's "点击‘高精离线大
     /// 模型模式’：后台自动将 R2T2 与 T3PO 加入下载队列...转入正常主界面" rule.
-    /// Deliberately does *not* switch `session.transcriptionEngineID`/
-    /// `translationEngineID` itself — `ModelManagementView`'s existing Task
-    /// 2.1 auto-activation banner already does that the moment each model
-    /// finishes downloading, so this stays a single code path instead of a
-    /// second, separate "switch engine" implementation here.
+    ///
+    /// Review Round 1 Must-Fix 4 — a insufficient-disk-space warning here
+    /// blocks the download from starting (rather than only discovering it
+    /// after `ensureDownloaded(_:)` throws, silently, behind `try?`, with
+    /// this window already closed and no one left to tell); and each
+    /// variant's completion now activates its engine itself, rather than
+    /// relying on `ModelManagementView`'s own Task 2.1 banner logic — that
+    /// view isn't guaranteed to ever be mounted for a fresh install that
+    /// never opens Settings, so nothing would otherwise act on "下载完成后将
+    /// 自动为您无缝启用" at all.
     private func finish(startDownload: Bool) {
         UserDefaults.standard.set(true, forKey: PersistedOnboardingKey.hasCompletedOnboarding)
         if startDownload {
-            for bundle in ProviderCatalog.bundles where bundle.id == "bundle.standard-realtime" {
-                for variantID in bundle.variantIDs {
-                    guard let variant = ProviderCatalog.variant(forID: variantID),
-                          !downloadManager.isDownloaded(variant)
-                    else { continue }
-                    Task { _ = try? await downloadManager.ensureDownloaded(variant) }
-                }
-            }
-            session.statusMessage = "模型正在后台下载中，下载完成后将自动为您无缝启用"
+            startBundleDownload()
         }
         onFinished()
+    }
+
+    private func startBundleDownload() {
+        guard let bundle = ProviderCatalog.bundles.first(where: { $0.id == "bundle.standard-realtime" }) else {
+            return
+        }
+        let variants = bundle.variantIDs.compactMap(ProviderCatalog.variant(forID:))
+            .filter { !downloadManager.isDownloaded($0) }
+        guard !variants.isEmpty else { return }
+
+        // Task 4.2 — one preflight check against the *combined* remaining
+        // size, not each variant checked individually as it starts (which
+        // would let an early, smaller variant pass a check the batch as a
+        // whole can't actually satisfy).
+        let totalMB = variants.reduce(0) { $0 + $1.approximateSizeMB }
+        if let warning = downloadManager.insufficientDiskSpaceWarning(forTotalMB: totalMB) {
+            diskSpaceWarningMessage =
+                "下载「\(bundle.displayName)」\(warning.errorDescription ?? "")。请清理磁盘空间后重试。"
+            return
+        }
+
+        for variant in variants {
+            Task {
+                do {
+                    _ = try await downloadManager.ensureDownloaded(variant)
+                    activateIfStillSystemEngine(variant)
+                } catch {
+                    // Best-effort background download — a failure here still
+                    // leaves this variant's own inline retry card reachable
+                    // from "模型库管理"/"语音与引擎" (Task 4.3) once the user
+                    // opens Settings, so there's no separate error UI to
+                    // surface from this already-dismissed onboarding window.
+                }
+            }
+        }
+        session.statusMessage = "模型正在后台下载中，下载完成后将自动为您无缝启用"
+    }
+
+    /// Mirrors `ModelManagementView.autoActivateIfSystemEngineStillSelected(_:)`
+    /// (Task 2.1) — kept as its own small copy here rather than shared,
+    /// since that view's version also needs to build an undo-able banner
+    /// this already-dismissed onboarding window has nowhere to show.
+    /// Guarded by `!session.isSessionActive` for the same reason Round 1's
+    /// Must-Fix 3 added that guard there: a multi-minute download can
+    /// easily span a recording started on the system engine in the
+    /// meantime, and switching engines mid-recording would tear down the
+    /// live provider that recording is still feeding.
+    private func activateIfStillSystemEngine(_ variant: ModelVariant) {
+        guard !session.isSessionActive else { return }
+        if ProviderCatalog.transcriptionEngines.contains(where: { $0.id == variant.engineID }) {
+            guard session.transcriptionEngineKind == .system else { return }
+            session.transcriptionEngineID = variant.engineID
+            session.transcriptionModelVariantID = variant.id
+        } else if ProviderCatalog.translationEngines.contains(where: { $0.id == variant.engineID }) {
+            guard session.translationEngineKind == .system else { return }
+            session.translationEngineID = variant.engineID
+            session.translationModelVariantID = variant.id
+        }
     }
 }
 

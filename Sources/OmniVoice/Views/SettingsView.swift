@@ -407,7 +407,13 @@ struct SettingsView: View {
                 TargetLanguagePicker(
                     targetLanguageCode: $session.targetLanguageCode,
                     translationEngineID: session.translationEngineID,
-                    onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" }
+                    onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
+                    // Belt-and-suspenders alongside this whole `Section`'s
+                    // own `.disabled(isBusy)` below (Review Round 1
+                    // Must-Fix 1) — keeps the button's own guard/caption
+                    // correct even if this picker is ever reused outside
+                    // a `.disabled` ancestor.
+                    isSessionActive: session.isSessionActive
                 )
             }
             .disabled(isBusy)

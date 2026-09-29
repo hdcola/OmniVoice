@@ -90,8 +90,33 @@ struct TargetLanguagePicker: View {
     /// doesn't have to fabricate one.
     var translationEngineID: String?
     /// Invoked when the user taps "一键将翻译引擎切换为「系统自带 (Translation)」"
-    /// in the warning card below.
+    /// in the warning card/popover below. Review Round 1 Must-Fix 1 — this
+    /// closure ultimately sets `session.translationEngineID`, whose `didSet`
+    /// unconditionally calls `discardLoadedModelsIfStale()`, tearing down
+    /// the live `translationProvider` an active recording is still feeding.
+    /// `isSessionActive` below is what stops that button from firing mid-
+    /// recording in the first place — this callback is the escape hatch a
+    /// non-UI caller (there isn't one today) would still need to guard
+    /// itself; every real call site instead relies on the `.disabled(_:)`
+    /// applied at the button below.
     var onSwitchToSystemTranslation: (() -> Void)?
+    /// Review Round 1 Must-Fix 1 (悬浮窗中允许在录制中切换引擎) — disables the
+    /// warning card's "一键切换" button while a recording is running/
+    /// starting/stopping, same invariant every other engine-selection
+    /// control in the app already observes (`RecordingSession.isSessionActive`'s
+    /// doc: "each provider's session is set up fresh from these values at
+    /// the top of `start()`, so changing them during that setup would
+    /// either race the read or silently not apply to the run in progress").
+    var isSessionActive: Bool = false
+    /// Review Round 1 Must-Fix 2 (悬浮窗控制栏被全宽警告卡片挤压变形) — `true`
+    /// for the floating panel's single-row `controlBarContent` `HStack`,
+    /// where the full multi-line `antiFallbackWarningCard` would blow the
+    /// bar's ~30pt height out to 120pt+ and shove the transcript list down;
+    /// `false` (the default) keeps `SettingsView`'s own vertical `Form`
+    /// layout, where that card fits naturally.
+    var isCompact: Bool = false
+
+    @State private var isCompactWarningPresented = false
 
     private var isLocalModelEngine: Bool {
         translationEngineID == "model.t3po" || translationEngineID == "model.hymt15"
@@ -100,6 +125,8 @@ struct TargetLanguagePicker: View {
     private var isCurrentTargetNativelySupported: Bool {
         ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: targetLanguageCode)
     }
+
+    private var showsWarning: Bool { isLocalModelEngine && !isCurrentTargetNativelySupported }
 
     private var nativeOptions: [LanguageOption] {
         LanguageCatalog.common.filter { ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: $0.code) }
@@ -110,32 +137,64 @@ struct TargetLanguagePicker: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Picker("目标语言", selection: $targetLanguageCode) {
-                if isLocalModelEngine {
-                    Section("★ 原生流式推荐 (T3PO 完美支持)") {
-                        ForEach(nativeOptions) { option in
-                            Text(option.displayName).tag(option.code)
-                        }
-                    }
-                    Section("⚠️ 其他语言（需系统翻译引擎支持）") {
-                        ForEach(otherOptions) { option in
-                            Text(option.displayName).tag(option.code)
-                        }
-                    }
-                } else {
-                    ForEach(LanguageCatalog.common) { option in
+        if isCompact {
+            HStack(spacing: 4) {
+                picker
+                if showsWarning {
+                    compactWarningButton
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                picker
+                if showsWarning {
+                    antiFallbackWarningCard
+                }
+            }
+        }
+    }
+
+    private var picker: some View {
+        Picker("目标语言", selection: $targetLanguageCode) {
+            if isLocalModelEngine {
+                Section("★ 原生流式推荐 (T3PO 完美支持)") {
+                    ForEach(nativeOptions) { option in
                         Text(option.displayName).tag(option.code)
                     }
                 }
-                if !LanguageCatalog.common.contains(where: { $0.code == targetLanguageCode }) {
-                    Text("\(targetLanguageCode)（自定义）").tag(targetLanguageCode)
+                Section("⚠️ 其他语言（需系统翻译引擎支持）") {
+                    ForEach(otherOptions) { option in
+                        Text(option.displayName).tag(option.code)
+                    }
+                }
+            } else {
+                ForEach(LanguageCatalog.common) { option in
+                    Text(option.displayName).tag(option.code)
                 }
             }
-
-            if isLocalModelEngine && !isCurrentTargetNativelySupported {
-                antiFallbackWarningCard
+            if !LanguageCatalog.common.contains(where: { $0.code == targetLanguageCode }) {
+                Text("\(targetLanguageCode)（自定义）").tag(targetLanguageCode)
             }
+        }
+    }
+
+    /// Compact stand-in for `antiFallbackWarningCard` (Must-Fix 2) — a
+    /// single-glyph affordance that fits the floating panel's one-row
+    /// control bar instead of a multi-line card, surfacing the same
+    /// warning/switch action in a `.popover` on tap.
+    private var compactWarningButton: some View {
+        Button {
+            isCompactWarningPresented = true
+        } label: {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+        }
+        .buttonStyle(.plain)
+        .help("语言支持提示")
+        .popover(isPresented: $isCompactWarningPresented) {
+            warningContent
+                .frame(width: 260)
+                .padding()
         }
     }
 
@@ -147,6 +206,13 @@ struct TargetLanguagePicker: View {
     /// doc), so the user can still proceed and get Chinese output if that's
     /// actually what they want.
     private var antiFallbackWarningCard: some View {
+        warningContent
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var warningContent: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label("语言支持提示", systemImage: "exclamationmark.triangle.fill")
                 .font(.caption.bold())
@@ -157,15 +223,22 @@ struct TargetLanguagePicker: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             if let onSwitchToSystemTranslation {
-                Button("一键将翻译引擎切换为「系统自带 (Translation)」") {
+                Button(switchButtonTitle) {
+                    // Belt-and-suspenders alongside `.disabled(isSessionActive)`
+                    // below — see this property's doc.
+                    guard !isSessionActive else { return }
                     onSwitchToSystemTranslation()
                 }
+                .disabled(isSessionActive)
                 .font(.caption)
             }
         }
-        .padding(8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var switchButtonTitle: String {
+        isSessionActive
+            ? "一键将翻译引擎切换为「系统自带 (Translation)」（录制结束后生效）"
+            : "一键将翻译引擎切换为「系统自带 (Translation)」"
     }
 
     private var targetDisplayName: String {

@@ -259,7 +259,18 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// determined — same "never block a download on an unknowable" stance
     /// `availableDiskSpaceMB(at:)` itself documents.
     public func insufficientDiskSpaceWarning(for variant: ModelVariant) -> ModelDownloadError? {
-        let requiredMB = variant.approximateSizeMB + Self.diskSpaceSafetyMarginMB
+        insufficientDiskSpaceWarning(forTotalMB: variant.approximateSizeMB)
+    }
+
+    /// Same check as `insufficientDiskSpaceWarning(for:)`, against a
+    /// pre-summed size instead of a single variant's — for a caller
+    /// downloading several variants back to back (a bundle, or Onboarding's
+    /// "高精离线大模型模式") that needs one up-front check against the whole
+    /// batch's combined size, not just each variant's own (which would let
+    /// an early, individually-small variant pass a check that the batch as
+    /// a whole can't actually satisfy).
+    public func insufficientDiskSpaceWarning(forTotalMB totalMB: Int) -> ModelDownloadError? {
+        let requiredMB = totalMB + Self.diskSpaceSafetyMarginMB
         guard let availableMB = Self.availableDiskSpaceMB(at: cacheDirectory), availableMB < requiredMB else {
             return nil
         }
@@ -448,14 +459,29 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// never gets stuck just short of "done".
     fileprivate func handleProgress(variantID: String, fraction: Double, bytesWritten: Int64, totalBytes: Int64) {
         let now = Date()
-        // `downloadStats` is computed *before* the throttle `return` below —
-        // otherwise a byte-delta sample skipped by the throttle would make
-        // the next surviving sample's `dt`/`db` span more than one actual
-        // callback, which is fine for the speed math (still a real delta),
-        // but skipping the sample update itself would leave `lastByteSample`
-        // stale and understate speed on the next call. Simplest to just
-        // always update the sample/stats, and only throttle the
-        // `@Published downloadProgress`/`progressHandlers` fan-out below.
+        // Review Round 1 Must-Fix 5 — this early `return` must come *before*
+        // any `@Published` write, `downloadStats` included: a `Dictionary`-
+        // backed `@Published` property's setter fires `objectWillChange`
+        // unconditionally on every assignment regardless of whether the
+        // value actually changed, so computing/publishing `downloadStats`
+        // ahead of this check (an earlier revision did exactly that) defeats
+        // the whole point of throttling `downloadProgress` below it — a
+        // high-bandwidth transfer would still drive hundreds of SwiftUI
+        // redraws per second on the main actor, exactly what this guard
+        // exists to prevent.
+        if let last = lastReportedProgress[variantID], fraction < 1.0,
+            fraction - last.fraction < 0.005, now.timeIntervalSince(last.time) < 0.1
+        {
+            return
+        }
+        lastReportedProgress[variantID] = (fraction, now)
+        downloadProgress[variantID] = fraction
+
+        // Computed only on a throttle-surviving update — the byte-delta
+        // window this spans is therefore itself throttled to ~100ms/~0.5%
+        // apart, which also makes the resulting speed *more* stable than
+        // computing it per raw callback would (each raw callback can be as
+        // little as one ~64KB TCP read apart).
         let bytesPerSecond: Double
         if let sample = lastByteSample[variantID] {
             let elapsed = now.timeIntervalSince(sample.time)
@@ -471,13 +497,6 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
             bytesPerSecond: bytesPerSecond, etaSeconds: etaSeconds
         )
 
-        if let last = lastReportedProgress[variantID], fraction < 1.0,
-            fraction - last.fraction < 0.005, now.timeIntervalSince(last.time) < 0.1
-        {
-            return
-        }
-        lastReportedProgress[variantID] = (fraction, now)
-        downloadProgress[variantID] = fraction
         progressHandlers[variantID]?.forEach { $0(fraction) }
     }
 

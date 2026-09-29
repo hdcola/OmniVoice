@@ -156,7 +156,18 @@ struct ModelManagementView: View {
     /// over a *different* model the user deliberately picked would be a much
     /// more surprising override than switching away from the always-available
     /// system default.
+    ///
+    /// Review Round 1 Must-Fix 3 — also a no-op while `session.isSessionActive`:
+    /// a download can take minutes, easily long enough to span a recording
+    /// started on the system engine in the meantime, and flipping
+    /// `transcriptionEngineID`/`translationEngineID` here would fire their
+    /// `didSet`'s unconditional `discardLoadedModelsIfStale()`, tearing down
+    /// the very engine that recording is actively feeding. The download
+    /// itself still completes and stays ready — this only defers the
+    /// *auto-activation*, which a later, idle download-completion (or the
+    /// user switching manually afterward) can still apply.
     private func autoActivateIfSystemEngineStillSelected(_ variant: ModelVariant) {
+        guard !session.isSessionActive else { return }
         if ProviderCatalog.transcriptionEngines.contains(where: { $0.id == variant.engineID }) {
             guard session.transcriptionEngineKind == .system else { return }
             let previousEngineID = session.transcriptionEngineID
