@@ -29,13 +29,24 @@ final class FloatingPanelControlBarAutoHideTests: XCTestCase {
         app.terminate()
     }
 
-    /// A coordinate far outside the 420×280 panel (which
-    /// `FloatingTranscriptPanel.positionAtBottomCenterOfScreen()` places at
-    /// the bottom-center of the main screen) — top-left corner of the
-    /// screen, always clear of it regardless of screen size.
+    /// A coordinate guaranteed to be outside the floating panel, regardless
+    /// of screen size or the panel's own position/frame.
+    ///
+    /// `app.coordinate(withNormalizedOffset:)` resolves relative to
+    /// `XCUIApplication`'s own bounding box — once onboarding is dismissed,
+    /// the floating panel is the app's *only* open window, so that bounding
+    /// box degenerates to the panel's own 420×280 frame
+    /// (`FloatingTranscriptPanel.positionAtBottomCenterOfScreen()`). A fixed
+    /// `dx: 20, dy: 20` offset off its origin previously landed back inside
+    /// the panel's own control bar instead of moving the mouse away — this
+    /// hovers the system menu bar instead, a separate top-level accessibility
+    /// element (`app.menuBars`) whose frame spans the full screen width at
+    /// its very top, nowhere near the panel however it's positioned. Hovering
+    /// (not clicking) it is safe — menus open on click, not hover.
     private func moveMouseAwayFromPanel() {
-        let farCorner = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 20, dy: 20))
-        farCorner.hover()
+        let menuBar = app.menuBars.firstMatch
+        XCTAssertTrue(menuBar.waitForExistence(timeout: 5))
+        menuBar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
     }
 
     /// Baseline: chrome (start button, close button) is visible/hittable the

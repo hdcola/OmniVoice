@@ -44,7 +44,14 @@ final class SettingsDisabledStateTests: XCTestCase {
     /// be enabled — a regression here (an always-`.disabled` picker, say)
     /// would permanently lock the user out of switching engines.
     func testEnginePickersAreEnabledWhenIdle() {
-        let enginePickers = app.popUpButtons.matching(identifier: "引擎")
+        // `matching(identifier:)` matches only `accessibilityIdentifier`,
+        // which these SwiftUI `Picker("引擎", ...)`s never set (only their
+        // label) — use a label predicate instead, the same way the
+        // single-element subscript `app.popUpButtons["引擎"]` below (and in
+        // `CrossSurfaceModelStateSyncTests`) already matches by label, just
+        // as a proper multi-element query since there are two of these
+        // (ASR + translation engine).
+        let enginePickers = app.popUpButtons.matching(NSPredicate(format: "label == %@", "引擎"))
         XCTAssertTrue(enginePickers.firstMatch.waitForExistence(timeout: 10))
         for index in 0..<enginePickers.count {
             XCTAssertTrue(enginePickers.element(boundBy: index).isEnabled, "engine picker \(index) should be enabled while idle")

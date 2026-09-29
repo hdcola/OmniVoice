@@ -78,10 +78,14 @@ given machine, try a different one before assuming a regression.
   happy paths for `OnboardingView.finish(startDownload:)` closing the window
   promptly. The disk-space-insufficient regression path itself (Round 1/2
   must-fix) is **not** exercised here — see that file's doc for why.
-- `FloatingPanelAutoScrollTests.swift` — item 2: only the empty-transcript
-  baseline (pinned by default, no jump button). Full auto-scroll/jump-button
-  behavior needs live transcript content this harness can't inject — see
-  that file's doc.
+- `FloatingPanelAutoScrollTests.swift` — item 2: **only the empty-transcript
+  baseline** (pinned by default, no jump button) — it does not exercise
+  auto-scroll, scroll-away detection, or the jump button, the actual state
+  machine this item was scoped to cover. Live transcript content needs a real
+  ASR session (mic TCC permission), out of reach for a black-box UI test;
+  real coverage would need either a test-injection seam for synthetic
+  transcript lines, or a unit-level test in `OmniVoiceCoreTests` that drives
+  `TranscriptListView`'s `@State` directly — see that file's doc.
 - `SettingsDisabledStateTests.swift` — item 3: the idle-state baseline and
   the `isModelLoaded == false` half of the memory console's disabled matrix.
   The rest of the matrix needs microphone permission or a downloaded model —

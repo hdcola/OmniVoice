@@ -43,9 +43,9 @@ final class CrossSurfaceModelStateSyncTests: XCTestCase {
     func testSelectingAnOnDeviceEngineShowsThePreloadControlOnBothSurfaces() {
         openSettings()
 
-        let engineEnginePicker = app.popUpButtons["引擎"].firstMatch
-        XCTAssertTrue(engineEnginePicker.waitForExistence(timeout: 10))
-        engineEnginePicker.click()
+        let enginePicker = app.popUpButtons["引擎"].firstMatch
+        XCTAssertTrue(enginePicker.waitForExistence(timeout: 10))
+        enginePicker.click()
         let r2t2MenuItem = app.menuItems["R2T2 离线大模型（未下载 · 点击配置）"]
         XCTAssertTrue(r2t2MenuItem.waitForExistence(timeout: 5))
         r2t2MenuItem.click()

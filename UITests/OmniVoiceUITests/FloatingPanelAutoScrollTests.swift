@@ -18,6 +18,19 @@ import XCTest
 /// What IS reachable without any of that: the list's own baseline state
 /// with no content — pinned by default, and the jump button correctly
 /// absent (nothing to jump to, and nothing to have scrolled away from).
+///
+/// **This file does NOT test auto-scroll, scroll-away detection, or the
+/// jump-button appearing/re-pinning — the actual state machine this item was
+/// scoped to cover.** It only pins down the empty-list baseline above; treat
+/// it as a placeholder for that coverage, not a substitute for it. Real
+/// coverage of `isPinnedToBottom`/`isProgrammaticScrollInFlight` would need
+/// either (a) a test-only seam in `RecordingSession`/`TranscriptListView` to
+/// inject synthetic transcript lines without a live ASR session, or (b) a
+/// SwiftUI-preview-driven or `ViewInspector`-style unit test at the
+/// `OmniVoiceCoreTests` level that can construct `TranscriptListView`
+/// directly with a canned `[TranscriptLine]` and drive its `@State` — neither
+/// exists today, and adding the former would be a production-code change
+/// outside a UI-test task's remit.
 final class FloatingPanelAutoScrollTests: XCTestCase {
     private var app: XCUIApplication!
 

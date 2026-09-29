@@ -21,9 +21,11 @@
 name: OmniVoiceUITests
 options:
   bundleIdPrefix: org.hdcola
-  # Keep the generated project itself out of git; only `project.yml` (this
-  # file) is source of truth. Re-run `xcodegen generate` after cloning or
-  # pulling a change here. (See UITests/README.md for the full how-to-run.)
+  # OmniVoiceUITests.xcodeproj itself IS committed (so contributors can build
+  # and run these tests without installing xcodegen) — `project.yml` (this
+  # file) stays the source of truth regardless; re-run `xcodegen generate`
+  # after editing it, and commit the resulting project changes alongside.
+  # (See UITests/README.md for the full how-to-run.)
   createIntermediateGroups: true
 settings:
   base:
