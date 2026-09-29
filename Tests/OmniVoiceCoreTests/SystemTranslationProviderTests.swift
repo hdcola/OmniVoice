@@ -25,6 +25,34 @@ struct SystemTranslationProviderTests {
         }
     }
 
+    /// `pendingBridgeRequestCount` must not leak across a `start(config:)`
+    /// (a `.system`-kind provider can be reused across a stop()/start()
+    /// cycle, same `reusingLoaded` path a `.model`-kind engine's weights
+    /// use to skip reloading) — otherwise a request left unresolved from an
+    /// interrupted prior session would make this instance's very first
+    /// `flush()` wrongly believe something is still in flight.
+    @Test func startResetsPendingBridgeRequestCountLeftOverFromAPriorSession() async throws {
+        let provider = SystemTranslationProvider()
+        var requests: [TranslationBridgeRequest] = []
+        var flushBoundaryCount = 0
+        provider.onBridgeRequest = { requests.append($0) }
+        provider.onFlushBoundary = { flushBoundaryCount += 1 }
+        try await provider.start(config: TranslationConfig(targetLanguageCode: "zh-CN", earlyTranslateThreshold: 60))
+
+        // Leave a request "in flight" (never resolved) — simulating a prior
+        // session interrupted before its result came back.
+        provider.feed(String(repeating: "x", count: 60))
+        #expect(requests.count == 1)
+
+        // A fresh start() (this instance being reused for a new recording)
+        // must not carry that stale count forward.
+        try await provider.start(config: TranslationConfig(targetLanguageCode: "zh-CN"))
+        provider.flush() // buffer is empty — should fire immediately, not send a stale sentinel
+
+        #expect(requests.count == 1) // no new (sentinel) request sent
+        #expect(flushBoundaryCount == 1)
+    }
+
     @Test func feedBelowThresholdSendsNoBridgeRequest() async throws {
         let provider = SystemTranslationProvider()
         var requests: [TranslationBridgeRequest] = []

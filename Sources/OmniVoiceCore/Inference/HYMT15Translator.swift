@@ -212,8 +212,17 @@ final class HYMT15Translator: @unchecked Sendable {
         // A single buffered utterance can in principle still overflow a
         // small context — trim from the front of the source text and
         // rebuild the prompt rather than risking `llama_decode`'s hard
-        // `abort()` on an over-budget batch (same concern
-        // `InProcessTranslator.fittedSourceAndPromptLocked` documents).
+        // `abort()` on an over-budget batch. Same *mechanism*
+        // `InProcessTranslator.fittedSourceAndPromptLocked` uses, but a
+        // different trade-off: T3PO trims stale (source, target) *history*
+        // first — already-translated text, safe to drop. Here there's no
+        // history to trim; `trimmedSource` is the untranslated text itself,
+        // so trimming its front permanently drops whatever was said first
+        // in this buffer, uncommitted, never translated. Only reachable at
+        // all with an exceptionally large `earlyTranslateThreshold` (user
+        // configurable up to 1000) on a small context window — accepted as
+        // a last-resort safety valve against a hard crash, not a graceful
+        // degradation.
         let budget = Int32(llama_n_ctx(ctx)) - Int32(Self.maxNewTokens)
         var trimmedSource = sourceText
         while LlamaGeneration.tokenCount(of: prompt, vocab: vocab) > budget, trimmedSource.count > 1 {

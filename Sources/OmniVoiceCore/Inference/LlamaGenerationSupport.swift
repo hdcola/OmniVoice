@@ -137,8 +137,18 @@ enum LlamaGeneration {
             llama_sampler_accept(sampler, newToken)
             if llama_vocab_is_eog(vocab, newToken) { break }
 
+            // Same negative-return-means-"needed this many bytes" convention
+            // as `llama_tokenize`'s — 64 bytes covers a typical single-token
+            // piece, but not guaranteed for every one (a long byte-fallback
+            // sequence or an unusual special/control token could exceed
+            // it), and silently dropping a token instead of retrying would
+            // lose a chunk of the output with no sign anything went wrong.
             var pieceBuf = [CChar](repeating: 0, count: 64)
-            let n = llama_token_to_piece(vocab, newToken, &pieceBuf, Int32(pieceBuf.count), 0, false)
+            var n = llama_token_to_piece(vocab, newToken, &pieceBuf, Int32(pieceBuf.count), 0, false)
+            if n < 0 {
+                pieceBuf = [CChar](repeating: 0, count: Int(-n))
+                n = llama_token_to_piece(vocab, newToken, &pieceBuf, Int32(pieceBuf.count), 0, false)
+            }
             if n > 0 {
                 outputBytes.append(contentsOf: pieceBuf[0..<Int(n)].map { UInt8(bitPattern: $0) })
             }

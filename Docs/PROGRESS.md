@@ -421,7 +421,53 @@ Also added in round 2, as suggested test coverage rather than a bug fix:
 `AudioMixerTests` (mic-enabled/disabled dispatch, mixing/clipping, level
 calculation — this class had no dedicated tests before this PR added its
 `micEnabled` mode).
-caller's wiring.
+
+**Round 3** caught one more real bug (a leftover from round 2's own fix),
+one robustness gap, one documentation inaccuracy with a real behavioral
+consequence, and confirmed one prior finding was already an accepted,
+documented trade-off rather than something to fix:
+
+- **`SystemTranslationProvider.start(config:)`/`stop()` never reset
+  `pendingBridgeRequestCount`**: round 2's FIFO-sentinel fix added this
+  counter but never cleared it — a request left unresolved from an
+  interrupted prior session (the panel torn down mid-translate, or the
+  recording stopped before the on-device translate call returned) would
+  leak a stale positive count into the next session using the same
+  instance (`.system`-kind providers are eligible for the same
+  `reusingLoaded` reuse path a `.model`-kind engine's weights use), making
+  that session's very first empty `flush()` wrongly believe something was
+  still in flight and send a needless sentinel request. Fixed by resetting
+  the count in both `start(config:)` and `stop()`.
+- **`LlamaGeneration.generate`'s `llama_token_to_piece` call didn't handle
+  its negative-return convention**: same "return `-size` when the buffer's
+  too small" convention as `llama_tokenize`/`llama_chat_apply_template`
+  (see the round-1/round-2 findings above) — the 64-byte `pieceBuf` covers
+  a typical single-token piece but isn't guaranteed for every one (a long
+  byte-fallback sequence or an unusual special/control token), and the code
+  only checked `n > 0`, silently dropping that token's contribution to the
+  output entirely on a negative return with no sign anything went wrong.
+  Fixed with the same retry-with-exact-size pattern used elsewhere in this
+  file.
+- **`ModelLanguageMapping`'s docs claimed `LanguageCatalog` "only ever
+  offers `zh`/`en`/`ja`/`ko`"** — false; it offers 16 (see
+  `LanguageCatalog.common`), and `TargetLanguagePicker` doesn't filter by
+  engine, unlike `SourceLanguagePicker`'s existing
+  `supportsSystemASRSource` filtering. So picking most of those 16 while a
+  local model engine is selected silently mistranslates into Chinese with
+  no error — a real, if pre-existing (not introduced by this PR), UX gap,
+  not just a wrong comment. Fixed the docs to say so accurately; the actual
+  behavioral fix (extending `HYMT15TargetLanguage`/`T3POTargetLanguage`'s
+  coverage, and/or gating the picker per engine) is scoped as a follow-up,
+  not pulled into this PR — see "Known gaps" below.
+- **Confirmed as an accepted trade-off, not a new finding**:
+  `HYMT15Translator.translateBufferLocked`'s context-overflow trim drops
+  from the *front of the untranslated source text itself* (unlike T3PO,
+  which trims already-translated history) — permanently losing whatever
+  was said first in an exceptionally long buffer, rather than gracefully
+  degrading. Only reachable with an extreme `earlyTranslateThreshold`
+  setting on a small context window; the code comment now says so
+  explicitly instead of implying (via "same concern...documents") that
+  it's exactly analogous to T3PO's safe history-trimming.
 
 ### Smoke test findings (fixed)
 
@@ -581,6 +627,20 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
 
 ### Known gaps / things to double check when touching nearby code
 
+- **T3PO/HY-MT1.5 silently mistranslate into Chinese for most of
+  `LanguageCatalog`'s 16 target languages** — `ModelLanguageMapping`'s
+  `t3poTargetLanguage(forCode:)`/`hyMT15TargetLanguage(forCode:)` only
+  recognize `zh`/`en`/`ja`/`ko`; `TargetLanguagePicker` doesn't filter by
+  engine the way `SourceLanguagePicker` already does for
+  `supportsSystemASRSource`, so picking e.g. French while a local model
+  engine is selected produces Chinese output with no error or warning.
+  `SystemTranslationProvider` doesn't have this gap (`Translation` covers
+  the whole catalog). HY-MT1.5's own model card documents official support
+  for several of the missing languages (French/German/Spanish/...), so
+  extending `HYMT15TargetLanguage` is likely the easier half of a real fix;
+  gating the picker per engine (mirroring `supportsSystemASRSource`) would
+  close the rest. Not fixed yet — caught in PR #27's third review round,
+  scoped as a follow-up rather than pulled into that PR.
 - **R2T2 (`model.r2t2`) used to SIGSEGV the whole process on audio.cpp before
   our pinned commit — root-caused, fixed upstream, and now pinned past the
   fix (no local patch needed anymore, see Open Items #1).**

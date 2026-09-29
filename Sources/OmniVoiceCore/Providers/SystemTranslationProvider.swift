@@ -74,6 +74,15 @@ public final class SystemTranslationProvider: TranslationProvider {
     public func start(config: TranslationConfig) async throws {
         self.config = config
         buffer = ""
+        // `RecordingSession` can reuse this same instance across a
+        // stop()/start() cycle (a `.system`-kind engine is eligible for the
+        // same `reusingLoaded` path a `.model`-kind one uses to skip
+        // reloading weights) — a request left unresolved from a prior,
+        // interrupted session (the panel torn down mid-translate, say)
+        // would otherwise leak a stale positive count into this one, making
+        // its very first empty `flush()` wrongly think something is still
+        // in flight and send a needless sentinel request.
+        pendingBridgeRequestCount = 0
     }
 
     public func updateEarlyTranslateThreshold(_ characters: Int) {
@@ -173,7 +182,13 @@ public final class SystemTranslationProvider: TranslationProvider {
         onBridgeRequest(TranslationBridgeRequest(text: text, isFinal: isFinal))
     }
 
-    public func stop() async {}
+    public func stop() async {
+        // Same reasoning as `start(config:)`'s reset — a request already
+        // sent but not yet resolved when the recording stops should never
+        // affect the *next* recording, whether or not this instance itself
+        // ends up reused.
+        pendingBridgeRequestCount = 0
+    }
 
     /// Called by the bridging view once a request's `translate(_:)`
     /// resolves (or, for an empty-text sentinel request — see

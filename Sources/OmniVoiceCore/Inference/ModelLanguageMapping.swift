@@ -15,10 +15,21 @@ enum ModelLanguageMapping {
         return match(code) ?? .auto
     }
 
-    /// Falls back to `.chinese` for anything T3PO has no name for — this
-    /// catalog only ever offers `zh`/`en`/`ja`/`ko` as translation targets
-    /// (see `LanguageCatalog`), so this should only miss on a future target
-    /// language addition that hasn't been taught to T3PO yet.
+    /// Falls back to `.chinese` for anything T3PO has no name for. **Not**
+    /// just a future-proofing edge case: `LanguageCatalog.common` already
+    /// offers 16 target languages (French/German/Spanish/Russian/... —
+    /// `TargetLanguagePicker` doesn't filter by engine), and `match(_:)`
+    /// below only recognizes 4 of them — so picking, say, French as the
+    /// target while T3PO is the selected translation engine silently
+    /// translates into Chinese instead, with no error or warning anywhere.
+    /// `SystemTranslationProvider` doesn't have this gap (`Translation`
+    /// covers the whole catalog) — this is specific to the two local
+    /// models' own small, fixed language sets. Worth a real fix (extending
+    /// `T3POTargetLanguage`/`HYMT15TargetLanguage` to cover more of the
+    /// catalog where the model actually supports it, or gating the picker
+    /// per engine the way `LanguageOption.supportsSystemASRSource` already
+    /// gates source language by transcription engine) rather than living
+    /// with indefinitely — not done in this pass, see `Docs/PROGRESS.md`.
     static func t3poTargetLanguage(forCode code: String) -> T3POTargetLanguage {
         switch match(code) {
         case .chinese: return .chinese
@@ -29,9 +40,13 @@ enum ModelLanguageMapping {
         }
     }
 
-    /// Same fallback reasoning as `t3poTargetLanguage(forCode:)` — this
-    /// catalog only ever offers `zh`/`en`/`ja`/`ko` as translation targets,
-    /// a subset of HY-MT1.5's own much larger supported language list.
+    /// Same fallback gap as `t3poTargetLanguage(forCode:)`'s doc describes —
+    /// only more unfortunate here, since HY-MT1.5's own model card actually
+    /// documents official support for French/German/Spanish/... (a good
+    /// chunk of what `LanguageCatalog.common` offers) — this mapping just
+    /// doesn't expose any of that yet, so those target languages fall back
+    /// to Chinese for HY-MT1.5 too even though the underlying model could
+    /// likely handle them correctly.
     static func hyMT15TargetLanguage(forCode code: String) -> HYMT15TargetLanguage {
         switch match(code) {
         case .chinese: return .chinese
