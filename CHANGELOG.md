@@ -17,6 +17,7 @@ The format is based on Keep a Changelog.
 - feat(menubar): show the live elapsed-time readout in the menu bar dropdown too, not just the floating panel (§3.1.E/3.2) (#30)
 - feat(panel): add auto-hiding controls (mouse-leave fades the control/status bars after 2s), a display-mode switch (双语对照/仅译文/仅原文), font-size presets (标准/大/特大), and a live elapsed-time readout (§3.1.A–C, E) (#30)
 - feat(scripts): add `Scripts/setup_third_party.sh`, automating the `third_party/{audio.cpp,llama.cpp}` clone/cmake setup documented in `Docs/MODEL_ENGINE_SETUP.md` — idempotent (safe to re-run; leaves an existing pinned checkout, an already-built target, or already-downloaded weights alone), with `--with-models`/`--force`/`--skip-audio`/`--skip-llama` flags (#31)
+- feat(settings): milestone 1 of `Docs/UX-SETTINGS-MODEL-MANAGEMENT.md` — always list every ASR/translation engine (downloaded or not, labeled "（未下载 · 点击配置）", routing to "模型管理" on selection); keep "自动检测" visible-but-disabled under the system ASR engine instead of hiding it; warn (with a one-click switch to the system translation engine) when a local-model translation engine is paired with a target language `ModelLanguageMapping` would silently fall back to Chinese for; hide the "长句提前翻译阈值" stepper entirely under the system ASR engine instead of showing it disabled
 
 ### Changed
 

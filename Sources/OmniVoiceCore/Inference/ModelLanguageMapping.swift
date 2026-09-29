@@ -7,12 +7,23 @@ import Foundation
 /// `"ja"`, `"ko"`) so regional variants (`zh-TW`, `en-GB`, ...) still map,
 /// same as the model's own coarse notion of "a language" rather than "a
 /// locale".
-enum ModelLanguageMapping {
+public enum ModelLanguageMapping {
     /// `nil` (auto-detect) for anything R2T2 has no name for, or for `nil`
     /// itself ("自动" in the picker).
     static func recognitionLanguage(forCode code: String?) -> RecognitionLanguage {
         guard let code else { return .auto }
         return match(code) ?? .auto
+    }
+
+    /// Read-only UI query, deliberately separate from `t3poTargetLanguage(forCode:)`/
+    /// `hyMT15TargetLanguage(forCode:)` below — those two keep their existing
+    /// silent-fallback-to-Chinese behavior unchanged (see their own docs for
+    /// why that's a known gap, not fixed in this pass); this just answers
+    /// "would that fallback kick in for `code`", so a settings UI can warn
+    /// *before* the user hits it instead of after. `true` for exactly the
+    /// same codes `match(_:)` below recognizes (zh/yue/en/ja/ko).
+    public static func isNativelyTranslatableByLocalModel(code: String) -> Bool {
+        match(code) != nil
     }
 
     /// Falls back to `.chinese` for anything T3PO has no name for. **Not**

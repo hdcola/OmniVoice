@@ -44,15 +44,20 @@ struct SettingsView: View {
             Section("识别引擎 (ASR)") {
                 HStack {
                     Picker("引擎", selection: $session.transcriptionEngineID) {
-                        ForEach(
-                            ProviderCatalog.transcriptionEngines.filter {
-                                isEngineAvailable($0, currentID: session.transcriptionEngineID)
-                            }
-                        ) { engine in
+                        // Task 1.3 (引擎列表展示全部候选) — every catalog
+                        // engine is always listed, downloaded or not; an
+                        // undownloaded `.model` engine is labeled rather
+                        // than filtered out entirely (see `engineLabel(for:)`),
+                        // so it stays discoverable instead of silently
+                        // "vanishing" until something's downloaded for it.
+                        ForEach(ProviderCatalog.transcriptionEngines) { engine in
                             Text(engineLabel(for: engine)).tag(engine.id)
                         }
                     }
                     .disabled(isBusy)
+                    .onChange(of: session.transcriptionEngineID) { _, newValue in
+                        routeToModelManagementIfUndownloaded(engineID: newValue)
+                    }
                     // Deliberately *not* disabled — opening a window doesn't
                     // touch engine/model selection, so there's no race with
                     // an in-flight preload/recording to guard against.
@@ -73,21 +78,20 @@ struct SettingsView: View {
                     )
                 )
                 .disabled(isBusy)
-                noLocalModelHint(for: ProviderCatalog.transcriptionEngines)
             }
 
             Section("翻译引擎") {
                 HStack {
                     Picker("引擎", selection: $session.translationEngineID) {
-                        ForEach(
-                            ProviderCatalog.translationEngines.filter {
-                                isEngineAvailable($0, currentID: session.translationEngineID)
-                            }
-                        ) { engine in
+                        // Same reasoning as the ASR engine `Picker` above.
+                        ForEach(ProviderCatalog.translationEngines) { engine in
                             Text(engineLabel(for: engine)).tag(engine.id)
                         }
                     }
                     .disabled(isBusy)
+                    .onChange(of: session.translationEngineID) { _, newValue in
+                        routeToModelManagementIfUndownloaded(engineID: newValue)
+                    }
                     modelManagementButton
                 }
                 modelVariantPicker(
@@ -98,7 +102,6 @@ struct SettingsView: View {
                     )
                 )
                 .disabled(isBusy)
-                noLocalModelHint(for: ProviderCatalog.translationEngines)
                 // T3PO is the only engine with a WAIT/TRANS decision to bias
                 // (see `TranslationCommitEagerness`'s doc), so it gets its
                 // own picker; every other (one-shot) engine instead exposes
@@ -115,25 +118,25 @@ struct SettingsView: View {
                             Text(eagerness.displayName).tag(eagerness)
                         }
                     }
-                } else {
+                } else if session.transcriptionEngineKind != .system {
+                    // Task 1.4 (清理无效参数干扰) — See
+                    // `TranslationConfig.earlyTranslateThreshold`'s doc for
+                    // why this Stepper is a genuine no-op under the system
+                    // ASR engine: `SystemTranscriptionProvider` never reports
+                    // committed text via `.appended` mid-utterance — a
+                    // finalized result *is* its segment boundary — so
+                    // `translationProvider.feed(_:)` only ever runs once per
+                    // segment, with the whole utterance already, immediately
+                    // followed by `flush()` in the same call. There's
+                    // nothing "early" left to translate by then. Rather than
+                    // show it disabled with an explanatory caption (the old
+                    // behavior), it's hidden outright — a control that's
+                    // always a no-op for the current configuration
+                    // shouldn't be on screen at all.
                     Stepper(
                         "长句提前翻译阈值：\(session.translationEarlyTranslateThreshold) 字",
                         value: $session.translationEarlyTranslateThreshold, in: 20...1000, step: 10
                     )
-                    // See `TranslationConfig.earlyTranslateThreshold`'s doc
-                    // for why this caveat is real, not just a hedge:
-                    // `SystemTranscriptionProvider` never reports committed
-                    // text via `.appended` mid-utterance — a finalized
-                    // result *is* its segment boundary — so
-                    // `translationProvider.feed(_:)` only ever runs once per
-                    // segment, with the whole utterance already, immediately
-                    // followed by `flush()` in the same call. There's
-                    // nothing "early" left to translate by then.
-                    if session.transcriptionEngineKind == .system {
-                        Text("系统自带识别引擎按句子结束才提交文本，此设置对该引擎无实际效果")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
                 }
             }
 
@@ -142,7 +145,11 @@ struct SettingsView: View {
                     sourceLanguageCode: $session.sourceLanguageCode,
                     transcriptionEngineKind: session.transcriptionEngineKind
                 )
-                TargetLanguagePicker(targetLanguageCode: $session.targetLanguageCode)
+                TargetLanguagePicker(
+                    targetLanguageCode: $session.targetLanguageCode,
+                    translationEngineID: session.translationEngineID,
+                    onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" }
+                )
             }
             .disabled(isBusy)
 
@@ -196,29 +203,11 @@ struct SettingsView: View {
         }
     }
 
-    /// A `.model`-kind engine only shows up in the engine `Picker` above once
-    /// something for it has been downloaded — bootstrapping a brand-new
-    /// engine always goes through the "模型管理" window instead (see
-    /// `ModelManagementView`), which lists every catalog variant regardless
-    /// of download state. The *currently selected* engine (`currentID` —
-    /// `session.transcriptionEngineID`/`translationEngineID` respectively,
-    /// passed in rather than checked against both here, since the two
-    /// selections are otherwise unrelated) is always kept visible even with
-    /// nothing downloaded for it (e.g. its only variant was just deleted via
-    /// Model Management, or a synced `UserDefaults` value names an engine
-    /// this machine hasn't downloaded yet) — filtering it out entirely left
-    /// the `Picker`'s binding pointing at a tag no longer in its options,
-    /// which SwiftUI renders as a blank/no-selection control instead of
-    /// showing what's actually selected. `engineLabel(for:)` marks that case
-    /// "（未下载）" so it doesn't silently read as a normal, ready-to-use
-    /// option.
-    private func isEngineAvailable(_ engine: EngineDescriptor, currentID: String) -> Bool {
-        if engine.id == currentID {
-            return true
-        }
-        return hasDownloadedVariant(engine)
-    }
-
+    /// Task 1.3 (引擎列表展示全部候选) — every catalog engine is now always
+    /// listed by the `Picker`s above regardless of download state (no more
+    /// `isEngineAvailable`-style filtering); this only labels the
+    /// undownloaded ones so they still read as "go get this" rather than
+    /// "ready to use".
     private func hasDownloadedVariant(_ engine: EngineDescriptor) -> Bool {
         guard engine.kind == .model else { return true }
         return ProviderCatalog.modelVariants(forEngineID: engine.id)
@@ -226,7 +215,23 @@ struct SettingsView: View {
     }
 
     private func engineLabel(for engine: EngineDescriptor) -> String {
-        hasDownloadedVariant(engine) ? engine.displayName : "\(engine.displayName)（未下载）"
+        hasDownloadedVariant(engine) ? engine.displayName : "\(engine.displayName)（未下载 · 点击配置）"
+    }
+
+    /// Selecting an undownloaded `.model` engine has nowhere else to go —
+    /// there's nothing to actually switch to yet — so this opens "模型管理"
+    /// for the user instead of silently leaving the `Picker` pointed at an
+    /// engine with no weights behind it. Deliberately doesn't *revert* the
+    /// selection: the user's pick is kept (so it's still there when they come
+    /// back downloaded), and `RecordingSession.fallBackToSystemEngineIfModelUnavailable()`
+    /// is what actually guards `start()`/`preloadModel()` against running it
+    /// unavailable, not this UI-level nudge.
+    private func routeToModelManagementIfUndownloaded(engineID: String) {
+        guard let engine = (ProviderCatalog.transcriptionEngines + ProviderCatalog.translationEngines)
+            .first(where: { $0.id == engineID }), !hasDownloadedVariant(engine)
+        else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        openWindow(id: "modelManagement")
     }
 
     /// Lists *downloaded* variants, same reasoning as `isEngineAvailable(_:)`
@@ -264,27 +269,6 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
                 .frame(width: 40, alignment: .trailing)
-        }
-    }
-
-    /// Shown under a category's engine `Picker` whenever it's currently
-    /// showing only `.system` engines — without this, a `.model`-kind engine
-    /// simply not appearing in the list (see `isEngineAvailable(_:)`) reads
-    /// as a missing feature/bug rather than "go download one first", since
-    /// nothing else on this screen ever mentions "模型管理". Assumes `engines`
-    /// contains at least one `.model`-kind entry, true for both categories
-    /// today (`model.r2t2`/`model.t3po`) — if a future category is ever
-    /// `.system`-only (no `.model` engine in the catalog at all for it),
-    /// this would show the hint permanently for that category with nothing
-    /// to ever download; guard with
-    /// `engines.contains(where: { $0.kind == .model })` first if that
-    /// happens.
-    @ViewBuilder
-    private func noLocalModelHint(for engines: [EngineDescriptor]) -> some View {
-        if !engines.contains(where: { $0.kind == .model && hasDownloadedVariant($0) }) {
-            Text("还没有可用的本地模型，点击上方「模型管理…」下载后即可选用")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
