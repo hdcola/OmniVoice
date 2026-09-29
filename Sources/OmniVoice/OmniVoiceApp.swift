@@ -12,7 +12,7 @@ struct OmniVoiceApp: App {
                 .environmentObject(appDelegate.session)
                 .environmentObject(appDelegate)
         } label: {
-            MenuBarLabel(modelDownloadManager: appDelegate.session.modelDownloadManager)
+            MenuBarLabel(modelDownloadManager: appDelegate.session.modelDownloadManager, session: appDelegate.session)
         }
         .menuBarExtraStyle(.menu)
 

@@ -8,11 +8,29 @@ The format is based on Keep a Changelog.
 
 ### Added
 
-- feat(scripts): add `Scripts/setup_third_party.sh`, automating the `third_party/{audio.cpp,llama.cpp}` clone/cmake setup documented in `Docs/MODEL_ENGINE_SETUP.md` — idempotent (safe to re-run; leaves an existing pinned checkout, an already-built target, or already-downloaded weights alone), with `--with-models`/`--force`/`--skip-audio`/`--skip-llama` flags
+- feat(history): support deleting (swipe, context menu, or ⌫) and renaming past recordings, and show relative-time, duration, language-pair, and utterance-count tags on each row (Docs/UI_UX_DESIGN_PROPOSAL.md §3.3) (#30)
+- feat(history): add "复制全文"/"仅复制译文" clipboard actions to the session detail toolbar, and enable text selection on its transcript (#30)
+- feat(history): show a small relative "[mm:ss]" timestamp before each transcript line in the session detail view (§3.3.C) (#30)
+- feat(panel): enable text selection on the floating panel's transcript, with a per-line hover "复制本句" button and a panel-wide "复制全文" button (§3.1.D) (#30)
+- feat(panel): add a one-tap deeplink to the relevant System Settings privacy pane when microphone or screen-recording permission is missing (§3.4.C) (#30)
+- feat(menubar): show a pulsing red recording indicator in the menu bar icon while a session is running, so recording state stays visible even with the floating panel hidden (§3.2) (#30)
+- feat(menubar): show the live elapsed-time readout in the menu bar dropdown too, not just the floating panel (§3.1.E/3.2) (#30)
+- feat(panel): add auto-hiding controls (mouse-leave fades the control/status bars after 2s), a display-mode switch (双语对照/仅译文/仅原文), font-size presets (标准/大/特大), and a live elapsed-time readout (§3.1.A–C, E) (#30)
+- feat(scripts): add `Scripts/setup_third_party.sh`, automating the `third_party/{audio.cpp,llama.cpp}` clone/cmake setup documented in `Docs/MODEL_ENGINE_SETUP.md` — idempotent (safe to re-run; leaves an existing pinned checkout, an already-built target, or already-downloaded weights alone), with `--with-models`/`--force`/`--skip-audio`/`--skip-llama` flags (#31)
 
 ### Changed
 
 ### Fixed
+
+- fix(panel): stop the auto-hide controls fade from unpinning transcript auto-scroll — toggling `controlBar`/`statusBar` in/out of the view tree shrank `TranscriptListView`'s container height without changing its content height, which `.onScrollGeometryChange` misread as the user scrolling away just from a mouse hover; both bars now stay in the hierarchy and fade via `.opacity` instead (#30)
+- fix(panel): keep every control bar element visible at the panel's 380pt minimum width — the timer/display-mode/font-scale controls previously pushed its natural width past 600pt, clipping controls on a narrow panel; the display-mode/font-scale pickers now size to their content instead of a fixed 90pt/70pt frame, and the whole bar scrolls horizontally as a fallback instead of clipping (#30)
+- fix(history): reset `selectedID` after deleting the currently-selected session, so the detail pane falls back to the "选择一个会话" placeholder instead of rendering blank, and a subsequent ⌫ keeps working (#30)
+- fix(history): prevent deleting the still-in-progress recording from the History window — its swipe action/context-menu item/⌫ handler are now hidden/no-op while `endedAt == nil`, since that session's SwiftData model object is the same live object `RecordingSession` is still appending to (#30)
+- fix(panel): schedule the elapsed-time timer on `RunLoop.Mode.common`, not just `.default` — it previously froze while the main run loop was in `.eventTracking` mode (dragging the panel, an open menu, actively interacting with a control) (#30)
+- fix(panel): show a dimmed/italicized placeholder for a line whose translation hasn't arrived yet in "仅译文" display mode, instead of rendering a completely empty row (#30)
+- fix(session): move `microphonePermissionNeeded`/`screenRecordingPermissionNeeded`'s reset to the very top of `start()`, before its early-return guards, so a stale permission flag from a previous failed attempt can't persist through an unrelated later failure (#30)
+- fix(panel): give the microphone and screen-recording permission buttons distinct icons/tooltips instead of two identical gear icons with the same tooltip (#30)
+- fix(history): fall back to showing the raw code for an unrecognized (but non-nil) `sourceLanguageCode`, instead of incorrectly showing "自动" (which should only mean auto-detect) (#30)
 
 ### Dependencies
 

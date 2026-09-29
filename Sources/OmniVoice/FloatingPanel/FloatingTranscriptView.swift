@@ -1,3 +1,4 @@
+import AppKit
 import OmniVoiceCore
 import SwiftUI
 import Translation
@@ -20,20 +21,49 @@ struct FloatingTranscriptView: View {
     /// to inject it through in the first place.
     let onClose: () -> Void
     @State private var translationConfiguration: TranslationSession.Configuration?
+    /// Whether the control bar/status bar are shown — proposal 3.1.A
+    /// ("沉浸字幕模式与自动隐藏"): true while the mouse is over the panel or
+    /// has been for less than `Self.autoHideDelay` since it left, false
+    /// once that delay elapses, so a full-screen slide/video behind the
+    /// panel isn't permanently competing with idle chrome for attention.
+    @State private var isControlsVisible = true
+    @State private var autoHideTask: Task<Void, Never>?
+    private static let autoHideDelay: Duration = .seconds(2)
 
     var body: some View {
         VStack(spacing: 0) {
+            // Always kept in the view hierarchy (never structurally
+            // inserted/removed based on `isControlsVisible`) and faded via
+            // `.opacity` instead — a structural insert/remove here shrinks
+            // `TranscriptListView`'s container height without changing its
+            // content height, which `.onScrollGeometryChange` misreads as
+            // "the user scrolled away" and unpins auto-scroll just from a
+            // mouse hover. `.allowsHitTesting(false)` while hidden keeps an
+            // invisible control bar/status bar from intercepting hover/clicks
+            // meant for the transcript beneath them.
             controlBar
+                .opacity(isControlsVisible ? 1 : 0)
+                .allowsHitTesting(isControlsVisible)
             Divider()
+                .opacity(isControlsVisible ? 1 : 0)
             // `.equatable()`: `TranscriptListView` takes `lines`/`isRunning`
             // as plain values rather than observing `session` itself — see
             // its own doc for why, and why that's the point of pulling it
             // out of this view in the first place.
-            TranscriptListView(lines: session.lines, isRunning: session.isRunning)
-                .equatable()
+            TranscriptListView(
+                lines: session.lines,
+                isRunning: session.isRunning,
+                displayMode: session.panelDisplayMode,
+                fontScale: session.panelFontScale
+            )
+            .equatable()
             Divider()
+                .opacity(isControlsVisible ? 1 : 0)
             statusBar
+                .opacity(isControlsVisible ? 1 : 0)
+                .allowsHitTesting(isControlsVisible)
         }
+        .animation(.easeInOut(duration: 0.2), value: isControlsVisible)
         // Applied to the whole content stack, not the background below —
         // `session.panelContentOpacity`/`panelBackgroundOpacity` are
         // deliberately independent (see the former's doc): fading the
@@ -47,6 +77,18 @@ struct FloatingTranscriptView: View {
                 .fill(.ultraThinMaterial)
                 .opacity(session.panelBackgroundOpacity)
         )
+        .onHover { isHovering in
+            autoHideTask?.cancel()
+            if isHovering {
+                isControlsVisible = true
+            } else {
+                autoHideTask = Task {
+                    try? await Task.sleep(for: Self.autoHideDelay)
+                    guard !Task.isCancelled else { return }
+                    isControlsVisible = false
+                }
+            }
+        }
         .onAppear { rebuildConfiguration() }
         .onChange(of: session.sourceLanguageCode) { rebuildConfiguration() }
         .onChange(of: session.targetLanguageCode) { rebuildConfiguration() }
@@ -80,6 +122,20 @@ struct FloatingTranscriptView: View {
     /// because it has this panel's key-window constraint, but so the two
     /// don't offer different language options.)
     private var controlBar: some View {
+        // Wrapped in a horizontal `ScrollView` rather than a fixed-width
+        // `HStack` alone: even after shrinking the display-mode/font-scale
+        // pickers below to `.fixedSize()`, the full row (start/stop, both
+        // language pickers, the elapsed timer, both new pickers, copy, and
+        // close) can still exceed the panel's 380pt minimum width — this is
+        // the safety net that scrolls instead of clipping/truncating any
+        // control at that width, rather than relying solely on the panel
+        // never being resized narrower than what the row happens to need.
+        ScrollView(.horizontal, showsIndicators: false) {
+            controlBarContent
+        }
+    }
+
+    private var controlBarContent: some View {
         HStack(spacing: 10) {
             Button {
                 Task {
@@ -135,11 +191,75 @@ struct FloatingTranscriptView: View {
             TargetLanguagePicker(targetLanguageCode: $session.targetLanguageCode)
                 .labelsHidden()
 
-            Spacer()
+            // 录制计时器（提案 3.1.E）— 只在录制中显示，停止后复位，避免一个
+            // 静止的 "00:00:00" 常驻在控制栏里，看起来像是坏掉了。
+            if session.isRunning {
+                Text(session.elapsedTimeString)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            // 显示模式切换（提案 3.1.B）：双语对照 / 仅译文 / 仅原文。
+            // `.fixedSize()` instead of a fixed `.frame(width:)` — the old
+            // 90pt/70pt widths (sized for this picker's *widest* option, not
+            // its current one) were a big part of why the control bar's
+            // natural width overflowed the panel's 380pt minimum; sizing to
+            // the currently-selected label's actual content is narrower in
+            // every case but still never clips whichever option is showing.
+            Picker("显示模式", selection: $session.panelDisplayMode) {
+                ForEach(PanelDisplayMode.allCases, id: \.self) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .labelsHidden()
+            .fixedSize()
+
+            // 字号档位（提案 3.1.C）：标准 / 大 / 特大。
+            Picker("字号", selection: $session.panelFontScale) {
+                ForEach(PanelFontScale.allCases, id: \.self) { scale in
+                    Text(scale.displayName).tag(scale)
+                }
+            }
+            .labelsHidden()
+            .fixedSize()
+
+            Spacer(minLength: 20)
+
+            // "一键复制全文" (proposal 3.1.D / roadmap P1_3) — copies the
+            // whole current transcript, not just a single selected line;
+            // `TranscriptListView`'s own per-row hover button below handles
+            // the single-line case.
+            Button {
+                copyFullTranscript()
+            } label: {
+                Image(systemName: "doc.on.doc")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("复制全文")
+            .disabled(session.lines.allSatisfy(\.displaySource.isEmpty))
 
             PanelCloseButton(action: onClose)
         }
         .padding(10)
+    }
+
+    /// Copies every closed/in-progress transcript line as plain bilingual
+    /// text (source line, translation line below it) — same shape as
+    /// `SessionDetailView`'s "复制全文", just sourced from the live
+    /// in-memory `session.lines` instead of a persisted `RecordingSessionRecord`.
+    private func copyFullTranscript() {
+        let text = session.lines
+            .filter { !$0.displaySource.isEmpty }
+            .map { line in
+                line.displayTranslation.isEmpty
+                    ? line.displaySource
+                    : "\(line.displaySource)\n\(line.displayTranslation)"
+            }
+            .joined(separator: "\n\n")
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
     }
 
     /// Surfaces `RecordingSession.statusMessage` (e.g. "识别引擎启动失败:
@@ -166,6 +286,26 @@ struct FloatingTranscriptView: View {
                 // panel's default width — the tooltip is how the full text
                 // stays reachable without needing to widen the panel.
                 .help(session.statusMessage)
+
+            // One-tap deeplink straight to the relevant System Settings
+            // privacy pane (proposal 3.4.C) — without this, a denied
+            // mic/screen-recording permission only ever showed up as prose
+            // in `statusMessage`, leaving the user to hunt for the right
+            // settings pane themselves.
+            if session.microphonePermissionNeeded {
+                permissionSettingsButton(
+                    urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
+                    systemImage: "mic.slash",
+                    tooltip: "前往系统设置授权麦克风"
+                )
+            }
+            if session.screenRecordingPermissionNeeded {
+                permissionSettingsButton(
+                    urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+                    systemImage: "display",
+                    tooltip: "前往系统设置授权屏幕录制"
+                )
+            }
 
             Spacer()
 
@@ -252,6 +392,23 @@ struct FloatingTranscriptView: View {
         }
     }
 
+    /// One button, reused for both the microphone and screen-recording
+    /// privacy panes above — `x-apple.systempreferences:` URLs are always
+    /// well-formed literals here, so the force-unwrap is safe. Takes a
+    /// distinct `systemImage`/`tooltip` per call site: with both permissions
+    /// missing at once, two identical gear icons with the same tooltip gave
+    /// no way to tell which one addressed which permission.
+    private func permissionSettingsButton(urlString: String, systemImage: String, tooltip: String) -> some View {
+        Button {
+            NSWorkspace.shared.open(URL(string: urlString)!)
+        } label: {
+            Image(systemName: systemImage)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.orange)
+        .help(tooltip)
+    }
+
     /// Live feedback that audio is actually being picked up — without this,
     /// nothing on the panel changed between "转写中…" with the mic silent vs.
     /// the mic capturing normally, so a misconfigured input device (wrong
@@ -293,9 +450,12 @@ struct FloatingTranscriptView: View {
 private struct TranscriptListView: View, Equatable {
     let lines: [TranscriptLine]
     let isRunning: Bool
+    let displayMode: PanelDisplayMode
+    let fontScale: PanelFontScale
 
     static func == (lhs: TranscriptListView, rhs: TranscriptListView) -> Bool {
         lhs.lines == rhs.lines && lhs.isRunning == rhs.isRunning
+            && lhs.displayMode == rhs.displayMode && lhs.fontScale == rhs.fontScale
     }
 
     /// Whether this view should keep pinning itself to the bottom as new
@@ -355,15 +515,7 @@ private struct TranscriptListView: View, Equatable {
                     }
                     ForEach(lines) { line in
                         if !line.displaySource.isEmpty {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(line.displaySource)
-                                    .font(.system(size: 14, weight: .medium))
-                                if !line.displayTranslation.isEmpty {
-                                    Text(line.displayTranslation)
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
+                            TranscriptLineRow(line: line, displayMode: displayMode, fontScale: fontScale)
                         }
                     }
                     Color.clear
@@ -454,6 +606,70 @@ private struct TranscriptListView: View, Equatable {
         .buttonStyle(.borderedProminent)
         .controlSize(.small)
         .padding(.bottom, 8)
+    }
+}
+
+/// One transcript row — source line, translation line below it, and a
+/// hover-triggered copy button (proposal 3.1.D) that copies just this line's
+/// source+translation, distinct from `FloatingTranscriptView`'s own
+/// panel-wide "复制全文" button. `.textSelection(.enabled)` on top of that
+/// lets the user drag-select/copy a partial phrase directly, same as
+/// `SessionDetailView`'s history rows.
+private struct TranscriptLineRow: View {
+    let line: TranscriptLine
+    let displayMode: PanelDisplayMode
+    let fontScale: PanelFontScale
+    @State private var isHovering = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
+                if displayMode != .translationOnly {
+                    Text(line.displaySource)
+                        .font(.system(size: CGFloat(fontScale.sourceFontSize), weight: .medium))
+                }
+                if displayMode != .sourceOnly {
+                    if !line.displayTranslation.isEmpty {
+                        Text(line.displayTranslation)
+                            .font(.system(size: CGFloat(fontScale.translationFontSize)))
+                            .foregroundStyle(.secondary)
+                    } else if displayMode == .translationOnly {
+                        // `.translationOnly` otherwise renders a completely
+                        // empty row for a line whose translation hasn't
+                        // committed yet — the source text, dimmed/italicized,
+                        // stands in as a temporary placeholder so there's at
+                        // least some indication speech was detected, instead
+                        // of the row looking blank until the translation lands.
+                        Text(line.displaySource)
+                            .font(.system(size: CGFloat(fontScale.translationFontSize)).italic())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .textSelection(.enabled)
+
+            if isHovering {
+                Button {
+                    copyLine()
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("复制本句")
+            }
+        }
+        .onHover { isHovering = $0 }
+    }
+
+    private func copyLine() {
+        let text = line.displayTranslation.isEmpty
+            ? line.displaySource
+            : "\(line.displaySource)\n\(line.displayTranslation)"
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
     }
 }
 
