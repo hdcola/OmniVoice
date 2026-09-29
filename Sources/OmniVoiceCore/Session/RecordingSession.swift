@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 /// Engine-agnostic recording orchestrator — the single place that wires
@@ -73,6 +74,15 @@ public final class RecordingSession: ObservableObject {
     /// the Screen Recording TCC prompt hasn't been granted yet. Doesn't
     /// abort the run: mic-only transcription still proceeds.
     @Published public var screenRecordingPermissionNeeded = false
+    /// Set when `MicrophoneCapture.start()` throws while `AVCaptureDevice
+    /// .authorizationStatus(for: .audio)` isn't `.authorized` — almost always
+    /// means the microphone TCC prompt was denied/never granted, as opposed
+    /// to some other capture failure (wrong device, device unplugged mid-
+    /// setup, ...), which still surfaces via the generic `statusMessage`
+    /// instead. Drives a one-tap deeplink to System Settings' microphone
+    /// privacy pane (see `FloatingTranscriptView.statusBar`) rather than
+    /// leaving the user to find it themselves.
+    @Published public var microphonePermissionNeeded = false
 
     /// The floating panel's *background* opacity — `FloatingTranscriptView`
     /// applies this to just its `.ultraThinMaterial` background fill, not the
@@ -133,6 +143,37 @@ public final class RecordingSession: ObservableObject {
             }
             Self.defaults.set(clamped, forKey: PersistedSettingsKey.panelContentOpacity)
         }
+    }
+
+    /// Which of the transcript's two lines the floating panel shows —
+    /// proposal 3.1.B. Persisted (see `PersistedSettingsKey`).
+    @Published public var panelDisplayMode: PanelDisplayMode = .bilingual {
+        didSet {
+            Self.defaults.set(panelDisplayMode.rawValue, forKey: PersistedSettingsKey.panelDisplayMode)
+        }
+    }
+
+    /// Preset transcript font size — proposal 3.1.C. Persisted (see
+    /// `PersistedSettingsKey`).
+    @Published public var panelFontScale: PanelFontScale = .standard {
+        didSet {
+            Self.defaults.set(panelFontScale.rawValue, forKey: PersistedSettingsKey.panelFontScale)
+        }
+    }
+
+    /// Seconds since the current recording's `start()` call succeeded —
+    /// ticks once a second via `elapsedTimer` while `isRunning`, reset to 0
+    /// on `stop()`. Drives the panel/menu bar's "00:12:45" readout (proposal
+    /// 3.1.E/3.2). Not persisted — meaningless across a stop/start cycle.
+    @Published public var elapsedSeconds: Int = 0
+    private var elapsedTimer: Timer?
+
+    /// "00:12:45" — `elapsedSeconds` formatted as hours:minutes:seconds.
+    public var elapsedTimeString: String {
+        let hours = elapsedSeconds / 3600
+        let minutes = (elapsedSeconds % 3600) / 60
+        let seconds = elapsedSeconds % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
 
     /// Engine selection — only takes effect on the next `start()`, so a
@@ -424,6 +465,14 @@ public final class RecordingSession: ObservableObject {
         }
         if defaults.object(forKey: PersistedSettingsKey.panelContentOpacity) != nil {
             panelContentOpacity = defaults.double(forKey: PersistedSettingsKey.panelContentOpacity)
+        }
+        if let value = defaults.string(forKey: PersistedSettingsKey.panelDisplayMode),
+            let mode = PanelDisplayMode(rawValue: value) {
+            panelDisplayMode = mode
+        }
+        if let value = defaults.string(forKey: PersistedSettingsKey.panelFontScale),
+            let scale = PanelFontScale(rawValue: value) {
+            panelFontScale = scale
         }
 
         validateAndNormalizeSourceLanguage()
@@ -857,6 +906,7 @@ public final class RecordingSession: ObservableObject {
         sourceRowIndex = 0
         translationRowIndex = 0
         screenRecordingPermissionNeeded = false
+        microphonePermissionNeeded = false
 
         if let sessionStore {
             activeSessionRecord = sessionStore.createSession(
@@ -992,7 +1042,12 @@ public final class RecordingSession: ObservableObject {
             do {
                 try mic.start()
             } catch {
-                statusMessage = "麦克风启动失败: \(error.localizedDescription)"
+                if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized {
+                    microphonePermissionNeeded = true
+                    statusMessage = "麦克风权限未授权，请在系统设置中允许访问麦克风"
+                } else {
+                    statusMessage = "麦克风启动失败: \(error.localizedDescription)"
+                }
                 await transcription.stop()
                 await translation.stop()
                 return
@@ -1034,6 +1089,19 @@ public final class RecordingSession: ObservableObject {
         if !screenRecordingPermissionNeeded {
             statusMessage = "转写中…"
         }
+
+        elapsedSeconds = 0
+        elapsedTimer?.invalidate()
+        let recordingStartDate = Date()
+        // `Timer.scheduledTimer` schedules on the current run loop — safe
+        // here since `start()` only ever runs on the main actor. Hops back
+        // through `Task { @MainActor in ... }` anyway (not a bare closure
+        // write) since a `Timer`'s fire callback itself isn't actor-isolated.
+        elapsedTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.elapsedSeconds = Int(Date().timeIntervalSince(recordingStartDate))
+            }
+        }
     }
 
     public func stop() async {
@@ -1045,6 +1113,9 @@ public final class RecordingSession: ObservableObject {
         systemAudioCapture = nil
         mixer = nil
         vadSegmenter = nil
+        elapsedTimer?.invalidate()
+        elapsedTimer = nil
+        elapsedSeconds = 0
 
         // Ends this recording's stream/session on each provider without
         // unloading its model — `transcriptionProvider`/`translationProvider`
@@ -1281,4 +1352,6 @@ enum PersistedSettingsKey {
     static let translationModelVariantID = "org.omnivoice.translationModelVariantID"
     static let panelBackgroundOpacity = "org.omnivoice.panelBackgroundOpacity"
     static let panelContentOpacity = "org.omnivoice.panelContentOpacity"
+    static let panelDisplayMode = "org.omnivoice.panelDisplayMode"
+    static let panelFontScale = "org.omnivoice.panelFontScale"
 }
