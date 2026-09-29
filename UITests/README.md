@@ -1,0 +1,76 @@
+# OmniVoice UI tests
+
+SwiftPM has no notion of a "UI Testing Bundle" target — only
+library/executable/plain-XCTest targets — so driving the real app with
+`XCUIApplication` needs an Xcode project on top of this package. This
+directory is that project, generated from `project.yml` via
+[xcodegen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+
+It defines exactly **one** target: an *unhosted* UI Testing Bundle with no
+"Target Application" of its own. Each test instead launches the real,
+already-built `OmniVoice.app` bundle via `XCUIApplication(url:)` (a
+macOS/Catalyst-only initializer meant exactly for testing an app that isn't
+one of the project's own targets). This is deliberately the least invasive
+option: `swift build`/`swift test` for the SPM package (and the existing
+`OmniVoiceCoreTests` target) are completely untouched by anything in this
+directory — it only ever *reads* the package's build output, it never
+becomes a dependency of the package itself, so it never has to fight
+`Package.swift`'s `unsafeFlags` (Xcode rejects unsafe flags on any package
+dependency that isn't the directly-opened root package — exactly what
+embedding this package as a normal Xcode package dependency would hit).
+
+## Running the tests
+
+```sh
+# 1. Build the app bundle these tests launch (reuses the repo's own
+#    Scripts/build_app.sh — the same relocatable, ad-hoc-signed
+#    build/OmniVoice.app a real release build produces).
+../Scripts/build_app.sh
+
+# 2. (First time only, or after editing project.yml) regenerate the project.
+xcodegen generate
+
+# 3. Run the tests.
+xcodebuild -project OmniVoiceUITests.xcodeproj -scheme OmniVoiceUITests \
+  -destination 'platform=macOS' test
+```
+
+Or open `OmniVoiceUITests.xcodeproj` in Xcode and run the `OmniVoiceUITests`
+scheme's tests from there (⌘U) — steps 1–2 still need to have been run first.
+
+### macOS Accessibility permission
+
+The very first run on a machine will fail with **"Timed out while enabling
+automation mode"** unless the process driving `xcodebuild`/Xcode has
+Accessibility permission — this is a one-time, per-machine grant in **System
+Settings → Privacy & Security → Accessibility**, adding whatever app/terminal
+actually invokes the build (Xcode, Terminal, or an IDE like Orca if tests are
+run from inside one). No amount of retrying or reconfiguring the project
+works around this; it must be granted once, interactively, by a human.
+
+## What each test file covers
+
+- `SmokeTests.swift` — Phase A infra check: the app launches and its
+  onboarding window is visible. Nothing behavioral.
+- `OnboardingFinishFlowTests.swift` — item 1: the "跳过向导"/`.lightweight`
+  happy paths for `OnboardingView.finish(startDownload:)` closing the window
+  promptly. The disk-space-insufficient regression path itself (Round 1/2
+  must-fix) is **not** exercised here — see that file's doc for why.
+- `FloatingPanelAutoScrollTests.swift` — item 2: only the empty-transcript
+  baseline (pinned by default, no jump button). Full auto-scroll/jump-button
+  behavior needs live transcript content this harness can't inject — see
+  that file's doc.
+- `SettingsDisabledStateTests.swift` — item 3: the idle-state baseline and
+  the `isModelLoaded == false` half of the memory console's disabled matrix.
+  The rest of the matrix needs microphone permission or a downloaded model —
+  see that file's doc.
+- `FloatingPanelControlBarAutoHideTests.swift` — item 4: fully covered. The
+  2s auto-hide delay, re-show on hover, and drag-vs-control-click hit testing
+  need neither permissions nor downloads.
+- `CrossSurfaceModelStateSyncTests.swift` — item 5: Settings' memory console
+  and the floating panel's status control appear and disappear together when
+  an on-device engine is selected/falls back, without needing a real
+  download.
+
+See the top-level task report (or `CHANGELOG.md`'s `### Tests` entry) for the
+full reasoning on what's scoped down and why.
