@@ -8,9 +8,16 @@ The format is based on Keep a Changelog.
 
 ### Added
 
+- feat(translation): add Tencent's HY-MT1.5 1.8B as a second, one-shot in-process local translation engine (`model.hymt15`) alongside T3PO — a genuinely low-memory option (~1.06GB/~1.82GB vs. T3PO's ~9.8GB) (#27)
+- feat(audio): add a "无" microphone option for system-audio-only recording (a meeting/lecture played through the Mac's own output, no one talking into a mic) (#27)
+- feat(translation): make translation commit timing user-configurable — a "翻译提交策略" picker for T3PO's WAIT/TRANS bias, and a directly adjustable "长句提前翻译阈值" character count for one-shot engines (HY-MT1.5/system translation), so a single long, pause-free utterance no longer waits for the whole thing before any translation shows up (#27)
+
 ### Changed
 
 ### Fixed
+
+- fix(translation): defer `SystemTranslationProvider`'s flush boundary until an earlier, still-in-flight early translation request actually resolves, instead of advancing the translation row immediately and misrouting that request's result into the next segment (#27)
+- fix(inference): avoid a potential out-of-bounds read in `LlamaGenerationSupport.applyChatTemplate`'s buffer-resize retry (missing room for the C string's null terminator) and accumulate generated tokens as raw bytes before decoding to UTF-8 once, instead of per token (which could otherwise split a multi-byte CJK character across two tokens and corrupt it) (#27)
 
 ### Dependencies
 

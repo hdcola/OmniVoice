@@ -96,6 +96,48 @@ struct SystemTranslationProviderTests {
         #expect(requests.first?.isFinal == false)
     }
 
+    @Test func flushWithAnEmptyBufferAndNothingPendingFiresTheBoundaryImmediately() async throws {
+        let provider = SystemTranslationProvider()
+        var flushBoundaryCount = 0
+        provider.onBridgeRequest = { _ in }
+        provider.onFlushBoundary = { flushBoundaryCount += 1 }
+        try await provider.start(config: TranslationConfig(targetLanguageCode: "zh-CN"))
+
+        provider.flush()
+
+        #expect(flushBoundaryCount == 1)
+    }
+
+    /// Regression test for a real race: an early (non-final) request drains
+    /// the buffer, then a `flush()` (an ASR segment boundary arriving before
+    /// that request's async result comes back) must *not* fire
+    /// `onFlushBoundary` right away — doing so would advance
+    /// `translationRowIndex` before the pending request's `onCommit` lands,
+    /// misrouting that commit into the next segment's row once it finally
+    /// resolves. See `SystemTranslationProvider.sendBridgeRequest(isFinal:)`'s
+    /// doc.
+    @Test func flushDefersItsBoundaryUntilAnEarlierPendingRequestResolves() async throws {
+        let provider = SystemTranslationProvider()
+        var commits: [String] = []
+        var flushBoundaryCount = 0
+        provider.onBridgeRequest = { _ in }
+        provider.onCommit = { commits.append($0) }
+        provider.onFlushBoundary = { flushBoundaryCount += 1 }
+        try await provider.start(config: TranslationConfig(targetLanguageCode: "zh-CN", earlyTranslateThreshold: 60))
+
+        provider.feed(String(repeating: "x", count: 60)) // sends an early, non-final request
+        provider.flush() // buffer is now empty — must defer, not fire immediately
+
+        #expect(flushBoundaryCount == 0)
+        #expect(commits.isEmpty)
+
+        // The early request's result finally arrives.
+        provider.receiveResult("早期翻译", isFinal: false)
+
+        #expect(commits == ["早期翻译"])
+        #expect(flushBoundaryCount == 1) // the deferred boundary fires now, not before
+    }
+
     @Test func updateEarlyTranslateThresholdTakesEffectMidSession() async throws {
         let provider = SystemTranslationProvider()
         var requests: [TranslationBridgeRequest] = []

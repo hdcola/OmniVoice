@@ -42,7 +42,18 @@ enum LlamaGeneration {
                             llama_chat_apply_template(tmpl, msgs.baseAddress, msgs.count, true, &buf, bufSize)
                         }
                         if n > bufSize {
-                            bufSize = n
+                            // `n` is the formatted prompt's exact byte
+                            // length — `llama_chat_apply_template`'s C++
+                            // implementation copies it via `strncpy(buf,
+                            // formatted_chat.c_str(), length)`, which only
+                            // null-terminates when `length` is *larger*
+                            // than the source: allocating exactly `n` bytes
+                            // here would fill the whole buffer with real
+                            // content and leave no `\0` anywhere in it, so
+                            // `String(cString:)` below would then read past
+                            // the end of `buf` hunting for one. `n + 1`
+                            // guarantees room for that terminator.
+                            bufSize = n + 1
                             buf = [CChar](repeating: 0, count: Int(bufSize))
                             n = messages.withUnsafeBufferPointer { msgs in
                                 llama_chat_apply_template(tmpl, msgs.baseAddress, msgs.count, true, &buf, bufSize)
@@ -89,17 +100,32 @@ enum LlamaGeneration {
 
         llama_memory_clear(llama_get_memory(ctx), true)
 
-        var tokens = [llama_token](repeating: 0, count: prompt.utf8.count + 16)
+        // Sized from an exact dry-run count (`tokenCount(of:vocab:)`,
+        // `llama_tokenize`'s own "-n means n tokens needed" convention)
+        // rather than a `prompt.utf8.count`-based guess — a fixed slack
+        // constant can't be trusted to always cover the actual token count
+        // for every tokenizer/language (a byte-level BPE vocab can tokenize
+        // some scripts, notably CJK, less than 1:1 with UTF-8 bytes).
+        let neededTokens = Int(tokenCount(of: prompt, vocab: vocab))
+        guard neededTokens > 0 else { return "" }
+        var tokens = [llama_token](repeating: 0, count: neededTokens)
         let nTokens = prompt.withCString { promptPtr in
             llama_tokenize(vocab, promptPtr, Int32(strlen(promptPtr)), &tokens, Int32(tokens.count), true, true)
         }
-        guard nTokens > 0 else { return "" }
+        guard nTokens > 0, Int(nTokens) <= tokens.count else { return "" }
         tokens = Array(tokens.prefix(Int(nTokens)))
 
         let initialBatch = llama_batch_get_one(&tokens, Int32(tokens.count))
         guard llama_decode(ctx, initialBatch) == 0 else { return "" }
 
-        var output = ""
+        // Accumulated as raw bytes and decoded to UTF-8 once at the end,
+        // not per token — a byte-level tokenizer's vocab can (and for CJK
+        // output, routinely does) split one multi-byte UTF-8 character
+        // across more than one token/piece; decoding each piece on its own
+        // would hit an incomplete byte sequence mid-character and silently
+        // replace it with U+FFFD instead of ever seeing the complete
+        // character.
+        var outputBytes: [UInt8] = []
         for i in 0..<maxNewTokens {
             guard let sampler = samplerForStep(i) else { break }
             let newToken = llama_sampler_sample(sampler, ctx, -1)
@@ -109,13 +135,13 @@ enum LlamaGeneration {
             var pieceBuf = [CChar](repeating: 0, count: 64)
             let n = llama_token_to_piece(vocab, newToken, &pieceBuf, Int32(pieceBuf.count), 0, false)
             if n > 0 {
-                output += String(decoding: pieceBuf[0..<Int(n)].map { UInt8(bitPattern: $0) }, as: UTF8.self)
+                outputBytes.append(contentsOf: pieceBuf[0..<Int(n)].map { UInt8(bitPattern: $0) })
             }
 
             var nextToken = newToken
             let nextBatch = llama_batch_get_one(&nextToken, 1)
             guard llama_decode(ctx, nextBatch) == 0 else { break }
         }
-        return output
+        return String(decoding: outputBytes, as: UTF8.self)
     }
 }

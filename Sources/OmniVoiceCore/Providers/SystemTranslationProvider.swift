@@ -56,6 +56,31 @@ public final class SystemTranslationProvider: TranslationProvider {
 
     private var buffer = ""
     private var config: TranslationConfig?
+    /// How many bridge requests have been sent (via `onBridgeRequest`) but
+    /// not yet resolved (via `receiveResult(_:isFinal:)`) — see
+    /// `sendBridgeRequest(isFinal:)`'s doc for why this matters: without it,
+    /// a `flush()` that finds an empty buffer (because an earlier
+    /// `earlyTranslateThreshold`-driven request already drained it) would
+    /// fire `onFlushBoundary` — advancing `translationRowIndex` — *before*
+    /// that earlier request's result ever arrives, misrouting it into the
+    /// next segment's row instead.
+    private var pendingBridgeRequestCount = 0
+    /// Set instead of firing `onFlushBoundary` immediately when `flush()`
+    /// finds an empty buffer while `pendingBridgeRequestCount > 0` — cleared
+    /// and actually fired from `receiveResult(_:isFinal:)` once every
+    /// already-sent request has resolved.
+    ///
+    /// Known remaining gap: if the *next* segment starts (`feed(_:)` is
+    /// called again) and itself crosses `earlyTranslateThreshold` before the
+    /// deferred boundary above actually fires, that new segment's early
+    /// request resolves into the still-current (old) row — its `onCommit`
+    /// runs before `pendingFlushBoundary` is checked — rather than the new
+    /// one, since `translationRowIndex` hasn't advanced yet. This needs
+    /// back-to-back speech with essentially no pause across the segment
+    /// boundary to hit; tagging each request with which segment it belongs
+    /// to would close it fully, but that's a bigger change than this fix
+    /// warrants for how narrow the window is.
+    private var pendingFlushBoundary = false
 
     public init() {}
 
@@ -105,8 +130,12 @@ public final class SystemTranslationProvider: TranslationProvider {
     /// `receiveResult(_:isFinal:)`, once the commit it belongs to has
     /// actually happened.
     ///
-    /// If nothing is buffered, there's nothing to wait on, so the boundary
-    /// fires immediately — same as before.
+    /// If nothing is buffered *and nothing else is still in flight*, there's
+    /// nothing to wait on, so the boundary fires immediately. If the buffer
+    /// is only empty because an earlier `earlyTranslateThreshold`-driven
+    /// request already drained it, the same reasoning applies to *that*
+    /// request too — see `sendBridgeRequest(isFinal:)`'s doc for how that
+    /// case is deferred instead of misrouting the pending result.
     public func flush() {
         sendBridgeRequest(isFinal: true)
     }
@@ -115,9 +144,24 @@ public final class SystemTranslationProvider: TranslationProvider {
     /// `earlyTranslateThreshold`-driven early translation (`isFinal:
     /// false`) — see `TranslationBridgeRequest.isFinal`'s doc for what that
     /// flag changes downstream.
+    ///
+    /// A **final** call with an empty buffer needs special care: the buffer
+    /// can be empty either because nothing was ever fed (the common case —
+    /// safe to fire `onFlushBoundary` immediately), or because an earlier
+    /// `earlyTranslateThreshold`-driven request already drained it and
+    /// hasn't resolved yet (`pendingBridgeRequestCount > 0`) — firing the
+    /// boundary in that second case would advance `translationRowIndex`
+    /// before that request's result arrives, misrouting it into the next
+    /// segment's row once it finally does. `pendingFlushBoundary` defers to
+    /// `receiveResult(_:isFinal:)` in exactly that case.
     private func sendBridgeRequest(isFinal: Bool) {
         guard !buffer.isEmpty else {
-            if isFinal { onFlushBoundary?() }
+            guard isFinal else { return } // nothing buffered, nothing to send early
+            if pendingBridgeRequestCount > 0 {
+                pendingFlushBoundary = true
+            } else {
+                onFlushBoundary?()
+            }
             return
         }
         let text = buffer
@@ -135,6 +179,7 @@ public final class SystemTranslationProvider: TranslationProvider {
             if isFinal { onFlushBoundary?() }
             return
         }
+        pendingBridgeRequestCount += 1
         onBridgeRequest(TranslationBridgeRequest(text: text, isFinal: isFinal))
     }
 
@@ -145,10 +190,21 @@ public final class SystemTranslationProvider: TranslationProvider {
     /// translation as done, and only for a **final** result (see `flush()`'s
     /// doc and `TranslationBridgeRequest.isFinal`'s doc) — a non-final
     /// (early, `earlyTranslateThreshold`-driven) result still commits its
-    /// text into the segment's still-open row, it just doesn't close it.
+    /// text into the segment's still-open row, it just doesn't close it,
+    /// *unless* an earlier `flush()` already deferred its boundary to this
+    /// point (`pendingFlushBoundary`, see `sendBridgeRequest(isFinal:)`'s
+    /// doc) — once every outstanding request has resolved
+    /// (`pendingBridgeRequestCount` back at zero), the deferred boundary
+    /// fires here instead.
     public func receiveResult(_ text: String, isFinal: Bool) {
+        pendingBridgeRequestCount = max(0, pendingBridgeRequestCount - 1)
         onCommit?(text)
-        if isFinal { onFlushBoundary?() }
+        if isFinal {
+            onFlushBoundary?()
+        } else if pendingFlushBoundary && pendingBridgeRequestCount == 0 {
+            pendingFlushBoundary = false
+            onFlushBoundary?()
+        }
     }
 
     public var currentSourceLanguageCode: String? { config?.sourceLanguageCode }

@@ -34,6 +34,13 @@ final class AudioMixer {
 
     func submitMic(_ samples: [Float]) {
         queue.async {
+            // Defensive, not load-bearing today — `RecordingSession.start()`
+            // never constructs/wires a `MicrophoneCapture` at all when
+            // `micEnabled` is `false`, so nothing currently calls this in
+            // that mode. Guards it anyway so this class's own invariant
+            // ("no mic audio is ever mixed in when disabled") holds even if
+            // a future caller got that wiring wrong.
+            guard self.micEnabled else { return }
             guard self.includeSystemAudio else {
                 self.emit(samples)
                 return
