@@ -16,6 +16,8 @@ The format is based on Keep a Changelog.
 
 ### Documentation
 
+- docs(repo): remove `CLAUDE.md` symlink to `AGENTS.md`
+
 ### Tests
 
 ## [0.1.1] - 2026-09-28
