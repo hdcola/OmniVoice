@@ -247,15 +247,23 @@ real UI bugs, all fixed:
 
 Roughly in the order they'll likely get tackled — not a hard commitment.
 
-1. **Land the R2T2 fix upstream**: the crash is root-caused and fixed locally
-   (see "Known gaps" below), and submitted as
-   [0xShug0/audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712)
-   (verified still broken on upstream `main`, `90c56c2e`). Until that merges
-   and a release carrying it is pinned, the fix lives only as
-   `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch` and
-   every checkout has to apply it by hand. When it lands: bump the pin, drop
-   the patch, and drop the `git apply` step from
-   `Docs/MODEL_ENGINE_SETUP.md`.
+1. ~~**Land the R2T2 fix upstream**~~ — **done** (2026-09-28): merged as
+   [0xShug0/audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712) on
+   2026-09-27 (`77491a33`). `Docs/MODEL_ENGINE_SETUP.md`'s pin bumped to that
+   commit, the local
+   `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`
+   and its `git apply` step dropped; `Patches/audio.cpp/README.md` keeps
+   `repro_r2t2_finish.c` as a standalone regression check. **Verified**
+   (2026-09-28): rebuilt `third_party/audio.cpp` from a clean checkout at the
+   new pin (no local patch applied), `Patches/audio.cpp/repro_r2t2_finish.c`
+   prints `SURVIVED`/exit 0 against the real `r2t2-q8_0.gguf` weights (same
+   deterministic repro that used to SIGSEGV), and `swift build --configuration
+   release` + `swift test` (70 tests) + a packaged `build_app.sh` app
+   launching and quitting cleanly all pass. Not separately re-verified
+   through the mic-driven UI stop/rotate flow (only the library-level repro
+   and app launch/quit) — low risk, since the repro matches the original
+   crash frame-for-frame, but worth a mic smoke test before fully forgetting
+   about this.
 2. **Model download-on-first-use** (branch `feature/model-download-manager`):
    `ModelDownloadManager`
    (`Sources/OmniVoiceCore/Inference/ModelDownloadManager.swift`) downloads a
@@ -361,8 +369,9 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
 
 ### Known gaps / things to double check when touching nearby code
 
-- **R2T2 (`model.r2t2`) SIGSEGVs the whole process on an unpatched
-  audio.cpp — root-caused and fixed, but the fix is a local patch.**
+- **R2T2 (`model.r2t2`) used to SIGSEGV the whole process on audio.cpp before
+  our pinned commit — root-caused, fixed upstream, and now pinned past the
+  fix (no local patch needed anymore, see Open Items #1).**
   `audiocpp_stream_finish` — reached from `InProcessTranscriber.finishStream()`
   (Stop) or `rotateStream()` (a VAD boundary mid-recording) — crashes 3
   frames deep inside `libaudiocpp`. The earlier guess ("`reuse_graph=true`
@@ -390,13 +399,12 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
   2000-frame partial chunk, `audiocpp_stream_finish()` — matching the app's
   crash reports frame for frame, offset for offset, register for register.
   No mic, no long utterance needed; "after a longer utterance" was just the
-  easiest way to reach `chunk_id_ >= 2` with an empty tail. Fixed by
-  `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`
-  (bail out early when `ids` is empty). **Every `third_party/audio.cpp`
-  checkout must apply that patch** — it is a step in
-  `Docs/MODEL_ENGINE_SETUP.md`, and it is not upstream yet
-  ([audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712), Open
-  Items #1).
+  easiest way to reach `chunk_id_ >= 2` with an empty tail. Fixed upstream in
+  [audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712) (merged
+  2026-09-27, `77491a33`) by bailing out early when `ids` is empty.
+  `Docs/MODEL_ENGINE_SETUP.md`'s pin now points past that merge, so no local
+  patch is needed anymore — re-verified against a freshly rebuilt checkout at
+  the new pin, see Open Items #1.
   This was never a regression from porting `mac-poc-hybrid`; that reference
   has the same bug, which is consistent with its CHANGELOG admitting this
   interactive flow had never been manually run. T3PO translation

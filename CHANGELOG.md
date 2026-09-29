@@ -14,6 +14,8 @@ The format is based on Keep a Changelog.
 
 ### Dependencies
 
+- deps(audio.cpp): bump pinned `third_party/audio.cpp` checkout to `77491a33` — carries the upstream fix for the R2T2 streaming final-flush null-deref crash ([0xShug0/audio.cpp#712](https://github.com/0xShug0/audio.cpp/pull/712), merged 2026-09-27); drops the local `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch` and its `git apply` step from `Docs/MODEL_ENGINE_SETUP.md`
+
 ### Documentation
 
 - docs(repo): remove `CLAUDE.md` symlink to `AGENTS.md`
