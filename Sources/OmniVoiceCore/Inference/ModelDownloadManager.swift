@@ -250,6 +250,22 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         try FileManager.default.removeItem(at: url)
     }
 
+    /// Task 4.2 (下载前磁盘空间可视化预检) — the same disk-space check
+    /// `runJob(for:)` below performs as its own safety net, exposed here so
+    /// a download-initiating UI can show the "磁盘空间不足" warning *before*
+    /// starting a multi-GB transfer instead of only discovering it after
+    /// `ensureDownloaded(_:)` throws. `nil` (nothing to warn about) both
+    /// when there's enough space and when availability couldn't be
+    /// determined — same "never block a download on an unknowable" stance
+    /// `availableDiskSpaceMB(at:)` itself documents.
+    public func insufficientDiskSpaceWarning(for variant: ModelVariant) -> ModelDownloadError? {
+        let requiredMB = variant.approximateSizeMB + Self.diskSpaceSafetyMarginMB
+        guard let availableMB = Self.availableDiskSpaceMB(at: cacheDirectory), availableMB < requiredMB else {
+            return nil
+        }
+        return .insufficientDiskSpace(requiredMB: requiredMB, availableMB: availableMB)
+    }
+
     /// Downloads `variant`'s weights if not already cached, verifying their
     /// SHA-256 before the file is considered usable, and returns the local
     /// path either way. `progress` is called on the main actor with a

@@ -1,3 +1,4 @@
+import AppKit
 import OmniVoiceCore
 import SwiftUI
 
@@ -30,6 +31,17 @@ struct ModelManagementView: View {
     /// for reading a job's existence rather than waiting on its first
     /// progress tick.
     @State private var pendingBundleDownloads: Set<String> = []
+    /// Task 4.3 (异常状态内联重试) — per-variant failure message (network
+    /// interruption, checksum mismatch, ...), rendered as an inline error
+    /// bar on that variant's own card with "重试"/"复制下载链接" actions,
+    /// instead of a modal `.alert` that says nothing about *which* card
+    /// failed once dismissed.
+    @State private var failedVariants: [String: String] = [:]
+    /// Task 4.2 (下载前磁盘空间可视化预检) — set instead of starting a
+    /// download when `ModelDownloadManager.insufficientDiskSpaceWarning(for:)`
+    /// already knows it won't fit, so the user sees this *before* a
+    /// multi-GB transfer even begins.
+    @State private var diskSpaceWarning: (variant: ModelVariant, error: ModelDownloadError)?
 
     init(modelDownloadManager: ModelDownloadManager) {
         self.downloadManager = modelDownloadManager
@@ -73,6 +85,24 @@ struct ModelManagementView: View {
                 pendingDeletion = nil
             }
             Button("取消", role: .cancel) { pendingDeletion = nil }
+        }
+        // Task 4.2 — pre-flight disk-space warning, copy per
+        // Docs/UX-SETTINGS-MODEL-MANAGEMENT.md §4.6.1.
+        .alert(
+            "磁盘空间不足",
+            isPresented: Binding(get: { diskSpaceWarning != nil }, set: { if !$0 { diskSpaceWarning = nil } })
+        ) {
+            Button("打开存储空间管理") {
+                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.settings.Storage")!)
+                diskSpaceWarning = nil
+            }
+            Button("知道了", role: .cancel) { diskSpaceWarning = nil }
+        } message: {
+            if let diskSpaceWarning {
+                Text(
+                    "下载「\(diskSpaceWarning.variant.displayName)」\(diskSpaceWarning.error.errorDescription ?? "")。请清理磁盘空间后重试。"
+                )
+            }
         }
     }
 
@@ -274,11 +304,45 @@ struct ModelManagementView: View {
             Text("🟢 校验通过，就绪")
                 .font(.caption)
                 .foregroundStyle(.green)
+        } else if let message = failedVariants[variant.id] {
+            inlineFailureCard(for: variant, message: message)
         } else {
             Text("约 \(variant.approximateSizeMB) MB · 尚未下载")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// Task 4.3 (异常状态内联重试) — replaces the old modal error `.alert`
+    /// for a download failure: the card itself now says what went wrong,
+    /// with a same-tap retry and a "复制下载链接" escape hatch for a user
+    /// who'd rather fetch the file with a third-party downloader/on another
+    /// network and import it manually (Docs/UX-SETTINGS-MODEL-MANAGEMENT.md
+    /// §4.6.2).
+    private func inlineFailureCard(for variant: ModelVariant, message: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("⚠️ 下载中断：\(message)")
+                .font(.caption)
+                .foregroundStyle(.red)
+            HStack {
+                Button("立即重试") { download(variant) }
+                    .font(.caption)
+                if variant.downloadURL != nil {
+                    Button("复制下载链接") { copyDownloadLink(for: variant) }
+                        .font(.caption)
+                }
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func copyDownloadLink(for variant: ModelVariant) {
+        guard let downloadURL = variant.downloadURL else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(downloadURL.absoluteString, forType: .string)
     }
 
     /// Task 2.4's speed/ETA readout, rendered next to the determinate
@@ -337,6 +401,15 @@ struct ModelManagementView: View {
     }
 
     private func download(_ variant: ModelVariant, completion: (() -> Void)? = nil) {
+        failedVariants[variant.id] = nil
+        // Task 4.2 — checked here, before the transfer even starts, not just
+        // relying on `ensureDownloaded(_:)`'s own safety-net check deep
+        // inside `runJob(for:)`.
+        if let warning = downloadManager.insufficientDiskSpaceWarning(for: variant) {
+            diskSpaceWarning = (variant, warning)
+            completion?()
+            return
+        }
         Task {
             defer { completion?() }
             do {
@@ -345,8 +418,9 @@ struct ModelManagementView: View {
             } catch is CancellationError {
                 // The user's own "取消" tap — not a failure worth an alert.
             } catch {
-                errorTitle = "下载失败"
-                errorMessage = error.localizedDescription
+                // Task 4.3 — inline on this variant's own card, not a modal
+                // `.alert` (see `inlineFailureCard(for:message:)`'s doc).
+                failedVariants[variant.id] = error.localizedDescription
             }
         }
     }

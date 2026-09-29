@@ -1,3 +1,4 @@
+import AppKit
 import OmniVoiceCore
 import SwiftUI
 
@@ -23,6 +24,12 @@ struct SettingsView: View {
     /// the wrong manager for any `RecordingSession` constructed with a
     /// non-`shared` one (a test, an eventual SwiftUI preview).
     @ObservedObject private var downloadManager: ModelDownloadManager
+    /// Task 4.3 (异常状态内联重试), mirroring `ModelManagementView`'s own —
+    /// this tab's inline download row shows its own failure message rather
+    /// than a modal `.alert`.
+    @State private var inlineDownloadFailures: [String: String] = [:]
+    /// Task 4.2 (下载前磁盘空间可视化预检) for the inline row.
+    @State private var inlineDiskSpaceWarning: (variant: ModelVariant, error: ModelDownloadError)?
 
     init(modelDownloadManager: ModelDownloadManager) {
         self.downloadManager = modelDownloadManager
@@ -224,6 +231,16 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                         ProgressView().progressViewStyle(.linear)
                     }
+                } else if let message = inlineDownloadFailures[variant.id] {
+                    Text("⚠️ 下载中断：\(message)")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    HStack {
+                        Button("立即重试") { downloadInline(variant) }.font(.caption)
+                        if variant.downloadURL != nil {
+                            Button("复制下载链接") { copyDownloadLink(for: variant) }.font(.caption)
+                        }
+                    }
                 } else {
                     Text("约 \(variant.approximateSizeMB) MB · 尚未下载")
                         .font(.caption)
@@ -237,6 +254,32 @@ struct SettingsView: View {
                 Button("⬇️ 一键下载并启用") { downloadInline(variant) }
             }
         }
+        // Task 4.2 — same copy as `ModelManagementView`'s own disk-space
+        // alert (Docs/UX-SETTINGS-MODEL-MANAGEMENT.md §4.6.1).
+        .alert(
+            "磁盘空间不足",
+            isPresented: Binding(
+                get: { inlineDiskSpaceWarning?.variant.id == variant.id },
+                set: { if !$0 { inlineDiskSpaceWarning = nil } }
+            )
+        ) {
+            Button("打开存储空间管理") {
+                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.settings.Storage")!)
+                inlineDiskSpaceWarning = nil
+            }
+            Button("知道了", role: .cancel) { inlineDiskSpaceWarning = nil }
+        } message: {
+            if let inlineDiskSpaceWarning {
+                Text("下载「\(inlineDiskSpaceWarning.variant.displayName)」\(inlineDiskSpaceWarning.error.errorDescription ?? "")。请清理磁盘空间后重试。")
+            }
+        }
+    }
+
+    private func copyDownloadLink(for variant: ModelVariant) {
+        guard let downloadURL = variant.downloadURL else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(downloadURL.absoluteString, forType: .string)
     }
 
     /// Unlike "模型库管理"'s own download button, this one always applies
@@ -247,6 +290,13 @@ struct SettingsView: View {
     /// (which can be triggered for an engine that *isn't* currently
     /// selected) needs to make.
     private func downloadInline(_ variant: ModelVariant) {
+        inlineDownloadFailures[variant.id] = nil
+        // Task 4.2 — checked before the transfer starts, same as
+        // `ModelManagementView.download(_:)`.
+        if let warning = downloadManager.insufficientDiskSpaceWarning(for: variant) {
+            inlineDiskSpaceWarning = (variant, warning)
+            return
+        }
         Task {
             do {
                 _ = try await downloadManager.ensureDownloaded(variant)
@@ -258,7 +308,8 @@ struct SettingsView: View {
             } catch is CancellationError {
                 // The user's own "取消" tap — not a failure worth surfacing.
             } catch {
-                session.statusMessage = "下载失败：\(error.localizedDescription)"
+                // Task 4.3 — inline on this row, not just `statusMessage`.
+                inlineDownloadFailures[variant.id] = error.localizedDescription
             }
         }
     }
