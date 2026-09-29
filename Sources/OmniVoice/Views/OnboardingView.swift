@@ -165,21 +165,40 @@ struct OnboardingView: View {
     /// view isn't guaranteed to ever be mounted for a fresh install that
     /// never opens Settings, so nothing would otherwise act on "下载完成后将
     /// 自动为您无缝启用" at all.
+    ///
+    /// Review Round 2 Must-Fix — `startBundleDownload()` used to be called
+    /// and then unconditionally followed by marking onboarding complete and
+    /// calling `onFinished()` (which `AppDelegate` wires to close/release
+    /// this window). When the disk-space check above failed,
+    /// `diskSpaceWarningMessage` got set but the window closed in the very
+    /// same run loop turn regardless, destroying the `.alert` before SwiftUI
+    /// ever got a chance to present it — the user saw the wizard just
+    /// vanish with no explanation, while `hasCompletedOnboarding` was
+    /// already `true`, so it would never show again. `startBundleDownload()`
+    /// now reports whether it actually started something (or had nothing to
+    /// do), and `finish(startDownload:)` only marks completion/closes the
+    /// window when that's `true` — a disk-space failure instead leaves the
+    /// window open with its alert visible and the wizard retriable.
     private func finish(startDownload: Bool) {
-        UserDefaults.standard.set(true, forKey: PersistedOnboardingKey.hasCompletedOnboarding)
         if startDownload {
-            startBundleDownload()
+            guard startBundleDownload() else { return }
         }
+        UserDefaults.standard.set(true, forKey: PersistedOnboardingKey.hasCompletedOnboarding)
         onFinished()
     }
 
-    private func startBundleDownload() {
+    /// `true` if there was nothing to download, or a download was
+    /// successfully queued; `false` only when the disk-space preflight
+    /// failed and `diskSpaceWarningMessage` was set instead — see
+    /// `finish(startDownload:)`'s doc for why that distinction is what
+    /// keeps this window (and its alert) open on failure.
+    private func startBundleDownload() -> Bool {
         guard let bundle = ProviderCatalog.bundles.first(where: { $0.id == "bundle.standard-realtime" }) else {
-            return
+            return true
         }
         let variants = bundle.variantIDs.compactMap(ProviderCatalog.variant(forID:))
             .filter { !downloadManager.isDownloaded($0) }
-        guard !variants.isEmpty else { return }
+        guard !variants.isEmpty else { return true }
 
         // Task 4.2 — one preflight check against the *combined* remaining
         // size, not each variant checked individually as it starts (which
@@ -189,7 +208,7 @@ struct OnboardingView: View {
         if let warning = downloadManager.insufficientDiskSpaceWarning(forTotalMB: totalMB) {
             diskSpaceWarningMessage =
                 "下载「\(bundle.displayName)」\(warning.errorDescription ?? "")。请清理磁盘空间后重试。"
-            return
+            return false
         }
 
         for variant in variants {
@@ -207,6 +226,7 @@ struct OnboardingView: View {
             }
         }
         session.statusMessage = "模型正在后台下载中，下载完成后将自动为您无缝启用"
+        return true
     }
 
     /// Mirrors `ModelManagementView.autoActivateIfSystemEngineStillSelected(_:)`
