@@ -53,6 +53,54 @@ struct SystemTranslationProviderTests {
         #expect(flushBoundaryCount == 1)
     }
 
+    /// `updateTargetLanguage(_:)` resets the same counter for a different
+    /// reason — see its own doc: a mid-recording target-language change
+    /// rebuilds `FloatingTranscriptView`'s whole bridge stream, abandoning
+    /// whatever was consuming the old one, so a request sent through it
+    /// will never resolve either.
+    @Test func updateTargetLanguageResetsPendingBridgeRequestCount() async throws {
+        let provider = SystemTranslationProvider()
+        var requests: [TranslationBridgeRequest] = []
+        var flushBoundaryCount = 0
+        provider.onBridgeRequest = { requests.append($0) }
+        provider.onFlushBoundary = { flushBoundaryCount += 1 }
+        try await provider.start(config: TranslationConfig(targetLanguageCode: "zh-CN", earlyTranslateThreshold: 60))
+
+        provider.feed(String(repeating: "x", count: 60)) // sends a request that will never resolve
+        #expect(requests.count == 1)
+
+        provider.updateTargetLanguage("ja-JP")
+        provider.flush() // buffer is empty — should fire immediately, not send a stale sentinel
+
+        #expect(requests.count == 1)
+        #expect(flushBoundaryCount == 1)
+    }
+
+    /// Regression test: an early (non-final) `feed(_:)`-triggered send must
+    /// not lose `buffer`'s text when no bridging view is attached yet — an
+    /// earlier version cleared `buffer` unconditionally before checking
+    /// `onBridgeRequest`, silently and permanently dropping that text (worse
+    /// than simply not translating it early, which is the actual fallback
+    /// this preserves — the text stays buffered for the next
+    /// `feed()`/`flush()` that does find a bridge attached).
+    @Test func nonFinalSendWithNoBridgeAttachedPreservesTheBufferInsteadOfLosingIt() async throws {
+        let provider = SystemTranslationProvider()
+        try await provider.start(config: TranslationConfig(targetLanguageCode: "zh-CN", earlyTranslateThreshold: 60))
+        // `onBridgeRequest` deliberately left `nil` — no bridging view attached.
+
+        let longText = String(repeating: "x", count: 60)
+        provider.feed(longText) // crosses the threshold, but has nowhere to send
+
+        // Attaching a bridge now and flushing should still deliver the
+        // preserved text, not an empty one.
+        var requests: [TranslationBridgeRequest] = []
+        provider.onBridgeRequest = { requests.append($0) }
+        provider.flush()
+
+        #expect(requests.count == 1)
+        #expect(requests.first?.text == longText)
+    }
+
     @Test func feedBelowThresholdSendsNoBridgeRequest() async throws {
         let provider = SystemTranslationProvider()
         var requests: [TranslationBridgeRequest] = []

@@ -89,6 +89,31 @@ public final class SystemTranslationProvider: TranslationProvider {
         config?.earlyTranslateThreshold = characters
     }
 
+    /// This provider has no persistent per-session target to actually
+    /// retarget (see this method's protocol doc — `.translationTask`
+    /// rebuilds fresh from `RecordingSession` on every target-language
+    /// change instead), but that rebuild also replaces the whole bridge
+    /// stream/continuation (`RecordingSession.translationBridgeStream()`
+    /// creates a brand new one every call), abandoning whatever was
+    /// consuming the *old* one. Any request already sent through that old
+    /// stream but not yet resolved never will be — its
+    /// `receiveResult(_:isFinal:)` simply never gets called — which would
+    /// otherwise leak `pendingBridgeRequestCount` forever (a still-open
+    /// segment's every subsequent `flush()` wrongly deferring, believing
+    /// something is still in flight that in fact never will be). Reset it
+    /// here instead. A narrow window remains where a request genuinely
+    /// still resolving through the *not-yet-actually-torn-down* old stream
+    /// races this reset (its own later `receiveResult(_:isFinal:)` would
+    /// just decrement past zero, clamped harmlessly by `max(0, ...)`) — not
+    /// chased further, since switching target language mid-utterance was
+    /// already going to lose that in-flight translation's *content* one way
+    /// or another (the abandoned stream's continuation has nowhere left to
+    /// deliver its result to); this fix is only about the counter, not about
+    /// recovering that lost translation.
+    public func updateTargetLanguage(_ code: String) {
+        pendingBridgeRequestCount = 0
+    }
+
     /// Appends `text` — and, once `buffer` crosses half of
     /// `config.earlyTranslateThreshold` *and* `text` itself ends a sentence,
     /// sends an early, non-final bridge request rather than cutting
@@ -163,8 +188,6 @@ public final class SystemTranslationProvider: TranslationProvider {
             if isFinal { onFlushBoundary?() } // nothing buffered, nothing in flight
             return
         }
-        let text = buffer
-        buffer = ""
         guard let onBridgeRequest else {
             // No bridging view attached yet (e.g. the floating panel hasn't
             // been created) — there is nowhere for this request to go and
@@ -172,12 +195,20 @@ public final class SystemTranslationProvider: TranslationProvider {
             // a final request, firing the boundary anyway loses this one
             // row's translation, but *not* firing it would permanently
             // stall `translationRowIndex` and misalign every row after it —
-            // losing one translation is the smaller failure. For a
-            // non-final (early) request there's no row to close in the
-            // first place, so there's nothing to do but drop it.
-            if isFinal { onFlushBoundary?() }
+            // losing one translation is the smaller failure, so `buffer` is
+            // cleared here too. For a non-final (early) request, though,
+            // there's a *later* chance to send this same text (the next
+            // `feed()`/`flush()` that finds a bridge attached) — clearing
+            // `buffer` here would silently and permanently drop it instead,
+            // worse than just not translating it early, so it's left alone.
+            if isFinal {
+                buffer = ""
+                onFlushBoundary?()
+            }
             return
         }
+        let text = buffer
+        buffer = ""
         pendingBridgeRequestCount += 1
         onBridgeRequest(TranslationBridgeRequest(text: text, isFinal: isFinal))
     }

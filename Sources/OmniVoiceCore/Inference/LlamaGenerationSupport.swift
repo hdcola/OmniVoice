@@ -120,8 +120,21 @@ enum LlamaGeneration {
         guard nTokens > 0, Int(nTokens) <= tokens.count else { return "" }
         tokens = Array(tokens.prefix(Int(nTokens)))
 
-        let initialBatch = llama_batch_get_one(&tokens, Int32(tokens.count))
-        guard llama_decode(ctx, initialBatch) == 0 else { return "" }
+        // `llama_batch_get_one` just wraps whatever pointer it's given —
+        // it doesn't copy `tokens`' contents — so the batch it returns is
+        // only valid for as long as that pointer is: Swift's `&tokens`
+        // conversion is documented as valid *only during the call it's
+        // passed to*, so using the resulting `llama_batch` in a *separate*,
+        // later statement (as this used to, splitting the batch's
+        // construction from `llama_decode`'s call) is undefined behavior,
+        // not just theoretically — even though it "happens to work" against
+        // the current toolchain. Constructing the batch and decoding it
+        // inside the same `withUnsafeMutableBufferPointer` closure keeps
+        // both within the pointer's one guaranteed-valid scope.
+        let initialDecodeSucceeded = tokens.withUnsafeMutableBufferPointer { tokensBuf in
+            llama_decode(ctx, llama_batch_get_one(tokensBuf.baseAddress, Int32(tokensBuf.count))) == 0
+        }
+        guard initialDecodeSucceeded else { return "" }
 
         // Accumulated as raw bytes and decoded to UTF-8 once at the end,
         // not per token — a byte-level tokenizer's vocab can (and for CJK
@@ -153,9 +166,12 @@ enum LlamaGeneration {
                 outputBytes.append(contentsOf: pieceBuf[0..<Int(n)].map { UInt8(bitPattern: $0) })
             }
 
+            // Same scoping reasoning as the initial batch above.
             var nextToken = newToken
-            let nextBatch = llama_batch_get_one(&nextToken, 1)
-            guard llama_decode(ctx, nextBatch) == 0 else { break }
+            let nextDecodeSucceeded = withUnsafeMutablePointer(to: &nextToken) { tokenPtr in
+                llama_decode(ctx, llama_batch_get_one(tokenPtr, 1)) == 0
+            }
+            guard nextDecodeSucceeded else { break }
         }
         return String(decoding: outputBytes, as: UTF8.self)
     }

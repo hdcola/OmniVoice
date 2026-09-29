@@ -720,4 +720,14 @@ struct RecordingSessionSettingsTests {
 
         #expect(session.lines[0].translation == "Hello world.")
     }
+
+    @Test func appendTranslationDoesNotInsertASpaceBeforeLeadingPunctuation() {
+        let session = RecordingSession()
+        session.targetLanguageCode = "en-US"
+
+        session.appendTranslation("Hello")
+        session.appendTranslation(", world.")
+
+        #expect(session.lines[0].translation == "Hello, world.")
+    }
 }

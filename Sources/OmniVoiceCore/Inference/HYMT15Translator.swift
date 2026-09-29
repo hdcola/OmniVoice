@@ -64,7 +64,16 @@ final class HYMT15Translator: @unchecked Sendable {
     /// only ever consumed whole by `flush()`.
     private var buffer: [String] = []
 
-    private static let maxNewTokens = 200
+    /// Unlike T3PO's per-delta streaming generation (short by construction —
+    /// it's translating one small commit at a time), this model translates
+    /// a whole buffered utterance in one call, and `earlyTranslateThreshold`
+    /// is user-configurable up to 1000 characters — comfortably capable of
+    /// needing a translation longer than 200 tokens (roughly 130-180 words
+    /// of English, or ~160-180 Chinese characters), which `LlamaGeneration.generate`
+    /// would otherwise cut off mid-sentence with no indication anything was
+    /// truncated. 1024 leaves ample headroom under `n_ctx`'s 4096-token
+    /// window even after `translateBufferLocked`'s own budget accounting.
+    private static let maxNewTokens = 1024
     /// Tencent's own recommended sampling parameters for this model
     /// (HY-MT1.5 model card) — this model wasn't trained with T3PO's
     /// WAIT/TRANS logit-bias trick, so there's no reason to force greedy

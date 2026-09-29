@@ -1144,6 +1144,11 @@ public final class RecordingSession: ObservableObject {
         let needsSpace = !existing.isEmpty
             && !(existing.last?.isWhitespace ?? true)
             && !(text.first?.isWhitespace ?? true)
+            // A fragment starting with punctuation (a translated chunk's
+            // boundary doesn't have to land on the same word/clause break
+            // the *source* text's did) attaches directly to what came
+            // before it — "Hello, world." not "Hello , world.".
+            && !(text.first?.isPunctuation ?? false)
             && !Self.targetLanguageJoinsWithoutSpaces(targetLanguageCode)
         lines[translationRowIndex].translation += (needsSpace ? " " : "") + text
         lines[translationRowIndex].translationPreview = ""

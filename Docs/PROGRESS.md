@@ -469,6 +469,68 @@ documented trade-off rather than something to fix:
   explicitly instead of implying (via "same concern...documents") that
   it's exactly analogous to T3PO's safe history-trimming.
 
+**Round 4** caught two more real bugs (one severe) and two real UX
+follow-ups:
+
+- **`SystemTranslationProvider.sendBridgeRequest(isFinal:)` cleared
+  `buffer` before checking whether there was anywhere to send it**: for a
+  **non-final** (early) send with no bridging view attached yet
+  (`onBridgeRequest == nil`), `buffer = ""` ran unconditionally, then the
+  `guard let onBridgeRequest else { ...; return }` branch returned without
+  ever restoring it — silently and *permanently* dropping that text (worse
+  than the accepted "lose one row's translation" trade-off for the
+  **final** case, which is a deliberate segment-boundary decision, not an
+  accident). Fixed by only clearing `buffer` once a send actually can
+  happen, or for the already-accepted final/no-bridge case; a non-final
+  send with nowhere to go now leaves `buffer` untouched so the text goes
+  out whenever a bridge *does* become available. Added a regression test.
+- **`LlamaGeneration.generate` used a `llama_batch` after the pointer
+  backing it was only guaranteed valid for**: `llama_batch_get_one` just
+  wraps whatever pointer it's given (doesn't copy the array's contents),
+  and Swift's `&array`/`&scalar` pointer conversion is documented as valid
+  *only during the call it's passed to* — constructing the batch in one
+  statement (`let initialBatch = llama_batch_get_one(&tokens, ...)`) and
+  using it in a later, separate call (`llama_decode(ctx, initialBatch)`)
+  is undefined behavior even though it happens to work against the current
+  toolchain. This pattern was ported unchanged from `InProcessTranslator`'s
+  original (pre-this-PR) code when it was extracted into
+  `LlamaGenerationSupport.generate`, not introduced by this PR — but now
+  shared by both T3PO and HY-MT1.5, worth fixing here. Fixed by
+  constructing and decoding each batch inside the same
+  `withUnsafeMutableBufferPointer`/`withUnsafeMutablePointer` closure, so
+  both stay within the pointer's one guaranteed-valid scope.
+- **HY-MT1.5's `maxNewTokens = 200` risked truncating a long translation**:
+  copied from T3PO's own constant, but T3PO always translates one small,
+  already-committed delta at a time (short output by construction) while
+  HY-MT1.5 translates a whole buffered utterance in one call — and
+  `earlyTranslateThreshold` is user-configurable up to 1000 characters,
+  comfortably capable of needing a translation longer than 200 tokens
+  (~130-180 English words) with no indication anything was cut off. Bumped
+  to 1024, well within the context-budget headroom
+  `translateBufferLocked`'s own trimming already accounts for.
+- **UX follow-up**: `appendTranslation`'s space-insertion fix (round 2
+  above) didn't check whether the *new* fragment itself starts with
+  punctuation — a translated chunk's boundary doesn't have to land on the
+  same word/clause break the source text's did, so a fragment could start
+  with e.g. a comma, producing "Hello , world." instead of "Hello, world."
+  Fixed by also skipping the space when `text.first?.isPunctuation` is
+  true.
+- **UX follow-up**: a mid-recording target-language change rebuilds
+  `FloatingTranscriptView`'s whole bridge stream/continuation
+  (`RecordingSession.translationBridgeStream()` creates a fresh one every
+  call), abandoning whatever was consuming the old one — any request
+  already sent through it that hadn't resolved yet never would, leaking
+  `pendingBridgeRequestCount` the same way round 3's stop/start-reuse gap
+  did, just via a different trigger. Fixed by implementing
+  `updateTargetLanguage(_:)` (previously the inherited no-op — this
+  provider has no persistent per-session target to actually retarget, see
+  that method's protocol doc) to reset the counter too. A narrow window
+  where a request genuinely still resolving through the not-yet-torn-down
+  old stream races this reset is accepted, not chased further — see the
+  method's own doc for why (that request's translation content is already
+  lost either way once its stream is abandoned; this fix is only about the
+  counter, not recovering it).
+
 ### Smoke test findings (fixed)
 
 Manual smoke test (`fixbug/show-floating-panel-on-start`, PR #2) caught four

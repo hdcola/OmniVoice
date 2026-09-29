@@ -20,7 +20,11 @@ The format is based on Keep a Changelog.
 - fix(translation): insert a space between multiple translation commits appended to the same row for a space-separated target language (English/Korean), so an early-translated fragment and the rest of the sentence don't run together with no separation (#27)
 - fix(inference): avoid a potential out-of-bounds read in `LlamaGenerationSupport.applyChatTemplate`'s buffer-resize retry (missing room for the C string's null terminator, including when the formatted prompt's length exactly matched the initial buffer size) and accumulate generated tokens as raw bytes before decoding to UTF-8 once, instead of per token (which could otherwise split a multi-byte CJK character across two tokens and corrupt it) (#27)
 - fix(inference): retry `llama_token_to_piece` with a larger buffer instead of silently dropping a token's contribution to the output when its piece doesn't fit the default 64-byte buffer (#27)
-- fix(translation): reset `SystemTranslationProvider`'s in-flight request tracking on `start(config:)`/`stop()`, so a request left unresolved by an interrupted prior recording can't affect the next one reusing the same provider instance (#27)
+- fix(translation): reset `SystemTranslationProvider`'s in-flight request tracking on `start(config:)`/`stop()`/a mid-recording target-language change, so a request left unresolved by an interrupted prior recording or an abandoned bridge stream can't affect a later one reusing the same provider instance (#27)
+- fix(translation): stop `SystemTranslationProvider` from permanently losing buffered text when an early translation triggers before the floating panel has finished mounting (#27)
+- fix(inference): construct and decode each `llama_batch` within the scope its underlying pointer is actually valid for, instead of across two separate calls (undefined behavior per Swift's pointer-conversion rules, even though it worked in practice) (#27)
+- fix(translation): raise HY-MT1.5's generation length cap from 200 to 1024 tokens, so a translation of a long buffered utterance (the early-translate threshold is user-configurable up to 1000 characters) doesn't get cut off mid-sentence (#27)
+- fix(translation): don't insert a space before a translation fragment that starts with punctuation, so joined fragments read "Hello, world." not "Hello , world." (#27)
 
 ### Dependencies
 
