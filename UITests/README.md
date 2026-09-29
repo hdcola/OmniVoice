@@ -27,6 +27,13 @@ embedding this package as a normal Xcode package dependency would hit).
 #    build/OmniVoice.app a real release build produces).
 ../Scripts/build_app.sh
 
+# 1b. Re-sign it with the get-task-allow entitlement (Xcode adds this
+#     automatically to every Debug build it signs itself; build_app.sh
+#     doesn't, since it's meant to also produce real release-style builds —
+#     see uitest-entitlements.plist's doc). Needed for XCUITest's automation
+#     bridge to attach reliably.
+codesign --force --deep --sign - --entitlements uitest-entitlements.plist ../build/OmniVoice.app
+
 # 2. (First time only, or after editing project.yml) regenerate the project.
 xcodegen generate
 
@@ -47,6 +54,21 @@ Settings → Privacy & Security → Accessibility**, adding whatever app/termina
 actually invokes the build (Xcode, Terminal, or an IDE like Orca if tests are
 run from inside one). No amount of retrying or reconfiguring the project
 works around this; it must be granted once, interactively, by a human.
+
+### Known issue: intermittent hang on some hosts even with permission granted
+
+On at least one shared/multi-user dev host, `testmanagerd`'s automation-mode
+handshake with this app (`LSUIElement`/`.accessory` — menu-bar-only, no Dock
+icon) sometimes never completes, even after Accessibility permission is
+granted and even at a 90s wait — while the same app launched via plain `open`
+always shows its onboarding window within 2-4s. The automation accessibility
+connection itself stays alive and responsive throughout (confirmed via
+`log show --predicate 'process contains "testmanagerd"'`), so this reads as
+an app/XCUITest launch-path incompatibility specific to `.accessory`-policy
+apps, not a resource/timeout issue — see `OmniVoiceUITestApp.launchFreshOnboarding(_:)`'s
+doc for the full investigation (entitlements and forced `.regular` activation
+policy were both tried and didn't fix it). If this whole suite times out on a
+given machine, try a different one before assuming a regression.
 
 ## What each test file covers
 
