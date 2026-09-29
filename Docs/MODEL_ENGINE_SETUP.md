@@ -14,6 +14,13 @@ documents this same trade-off).
 This is a one-time, per-checkout setup step — nothing here is downloaded or
 built automatically.
 
+`Scripts/setup_third_party.sh` automates the clone/cmake steps below (pass
+`--with-models` to also fetch the GGUF weights in step 3, `--force` to
+rebuild an already-built target, `--skip-audio`/`--skip-llama` to do only
+one side). It's safe to re-run — an existing checkout at the pinned commit,
+an already-built target, or already-downloaded weights are left alone. The
+manual steps are kept below for reference/troubleshooting.
+
 ## 1. audio.cpp (R2T2 ASR)
 
 ```bash

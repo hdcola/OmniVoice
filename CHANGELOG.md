@@ -8,6 +8,8 @@ The format is based on Keep a Changelog.
 
 ### Added
 
+- feat(scripts): add `Scripts/setup_third_party.sh`, automating the `third_party/{audio.cpp,llama.cpp}` clone/cmake setup documented in `Docs/MODEL_ENGINE_SETUP.md` — idempotent (safe to re-run; leaves an existing pinned checkout, an already-built target, or already-downloaded weights alone), with `--with-models`/`--force`/`--skip-audio`/`--skip-llama` flags
+
 ### Changed
 
 ### Fixed
