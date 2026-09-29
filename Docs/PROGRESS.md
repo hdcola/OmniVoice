@@ -214,11 +214,14 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       `LlamaGenerationSupport.swift` as a pure refactor of
       `InProcessTranslator` first (verified: all 70 existing tests still
       pass, T3PO's behavior unchanged) before `HYMT15Translator` was added
-      on top of it. **Not yet smoke-tested against real downloaded
-      weights** (see Open Items) — HY-MT1.5's license is also unclear (no
-      LICENSE file found in its HF repos), same "re-check before commercial
-      use" bucket as R2T2/T3PO, arguably needing more attention since it
-      doesn't even have a clear license file today.
+      on top of it. **Mic-driven UI smoke test done** (2026-09-28, Open
+      Items #7): downloaded the real HY-MT1.5-1.8B Q4_K_M weights, selected
+      `model.hymt15` in Settings, recorded live mic audio, and stopped — a
+      one-shot translation landed per segment as expected, no crash. HY-MT1.5's
+      license is still unclear (no LICENSE file found in its HF repos),
+      same "re-check before commercial use" bucket as R2T2/T3PO, arguably
+      needing more attention since it doesn't even have a clear license file
+      today.
 
 ### Code review findings (fixed)
 
@@ -395,11 +398,11 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
    explicitly deferred ("搭架子" / stub first) per the product discussion;
    none of the actual placeholder work has been started yet.
 6. **Model license re-check** — before any commercial use, not before this.
-7. **HY-MT1.5 mic smoke test**: download the real
-   `models/HY-MT1.5-GGUF/HY-MT1.5-1.8B-Q4_K_M.gguf` weights, select
-   `model.hymt15` in Settings, record live mic audio, stop — confirm a
-   one-shot translation actually lands per segment (no crash, no hang),
-   the same way R2T2's Open Item #1 was verified. Not done yet.
+7. ~~**HY-MT1.5 mic smoke test**~~ — **done** (2026-09-28): downloaded the
+   real `models/HY-MT1.5-GGUF/HY-MT1.5-1.8B-Q4_K_M.gguf` weights, selected
+   `model.hymt15` in Settings, recorded live mic audio, stopped — a
+   one-shot translation landed per segment as expected (no live preview, no
+   crash, no hang). This item is now closed.
 
 ### Known gaps / things to double check when touching nearby code
 
