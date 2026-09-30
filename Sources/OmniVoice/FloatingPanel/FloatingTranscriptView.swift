@@ -634,14 +634,11 @@ private struct TranscriptLineRow: View {
         HStack(alignment: .top, spacing: 6) {
             VStack(alignment: .leading, spacing: 2) {
                 if displayMode != .translationOnly {
-                    Text(line.displaySource)
-                        .font(.system(size: CGFloat(fontScale.sourceFontSize), weight: .medium))
+                    sourceView
                 }
                 if displayMode != .sourceOnly {
                     if !line.displayTranslation.isEmpty {
-                        Text(line.displayTranslation)
-                            .font(.system(size: CGFloat(fontScale.translationFontSize)))
-                            .foregroundStyle(.secondary)
+                        translationView
                     } else if displayMode == .translationOnly {
                         // `.translationOnly` otherwise renders a completely
                         // empty row for a line whose translation hasn't
@@ -679,6 +676,44 @@ private struct TranscriptLineRow: View {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+    }
+
+    @ViewBuilder
+    private var sourceView: some View {
+        if line.sourceTentative.isEmpty {
+            Text(line.source)
+                .font(.system(size: CGFloat(fontScale.sourceFontSize), weight: .medium))
+        } else if line.source.isEmpty {
+            Text(line.sourceTentative)
+                .font(.system(size: CGFloat(fontScale.sourceFontSize), weight: .medium))
+                .foregroundStyle(.primary.opacity(0.7))
+        } else {
+            (Text(line.source)
+                .font(.system(size: CGFloat(fontScale.sourceFontSize), weight: .medium))
+            + Text(line.sourceTentative)
+                .font(.system(size: CGFloat(fontScale.sourceFontSize), weight: .medium))
+                .foregroundStyle(.primary.opacity(0.7)))
+        }
+    }
+
+    @ViewBuilder
+    private var translationView: some View {
+        if line.translationPreview.isEmpty {
+            Text(line.translation)
+                .font(.system(size: CGFloat(fontScale.translationFontSize)))
+                .foregroundStyle(.secondary)
+        } else if line.translation.isEmpty {
+            Text(line.translationPreview)
+                .font(.system(size: CGFloat(fontScale.translationFontSize)).italic())
+                .foregroundStyle(.secondary.opacity(0.75))
+        } else {
+            (Text(line.translation)
+                .font(.system(size: CGFloat(fontScale.translationFontSize)))
+                .foregroundStyle(.secondary)
+            + Text(line.translationPreview)
+                .font(.system(size: CGFloat(fontScale.translationFontSize)).italic())
+                .foregroundStyle(.secondary.opacity(0.75)))
+        }
     }
 }
 
