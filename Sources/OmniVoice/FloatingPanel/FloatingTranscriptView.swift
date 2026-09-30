@@ -281,8 +281,13 @@ struct FloatingTranscriptView: View {
             fontScalePicker
         } label: {
             Image(systemName: "textformat.size")
+                .foregroundStyle(.secondary)
         }
-        .menuStyle(.borderlessButton)
+        // `.button` + `.plain` rather than `.borderlessButton`: the latter
+        // is drawn by AppKit and ignores the label's `.secondary` style, so
+        // the icon rendered brighter than the neighboring copy button.
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
         .help("显示选项")

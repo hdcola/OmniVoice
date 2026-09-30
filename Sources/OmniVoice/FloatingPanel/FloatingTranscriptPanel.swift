@@ -53,7 +53,10 @@ final class DraggableHostingView<Content: View>: NSHostingView<Content> {
     /// transcript's scroll view spans the full width) would otherwise
     /// receive them, so `mouseDown` below can start a resize.
     override func hitTest(_ point: NSPoint) -> NSView? {
-        if let superview, resizeEdge(at: convert(point, from: superview)) != nil {
+        // `point` is in the superview's coordinates; with no superview
+        // (e.g. hosted outside a window in a test) it's already local.
+        let localPoint = superview.map { convert(point, from: $0) } ?? point
+        if resizeEdge(at: localPoint) != nil {
             return self
         }
         return super.hitTest(point)
