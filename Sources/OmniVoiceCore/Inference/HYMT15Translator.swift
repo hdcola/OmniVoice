@@ -17,6 +17,16 @@ enum HYMT15TargetLanguage {
         case .korean: return "Korean"
         }
     }
+
+    /// For `HYMT15Translator.textUserTurn`'s Chinese-instruction form.
+    var chineseName: String {
+        switch self {
+        case .chinese: return "中文"
+        case .english: return "英语"
+        case .japanese: return "日语"
+        case .korean: return "韩语"
+        }
+    }
 }
 
 /// Runs Tencent's HY-MT1.5 translation model **in-process** via llama.cpp's
@@ -106,6 +116,25 @@ final class HYMT15Translator: @unchecked Sendable {
         - Keep every ⟦n⟧ placeholder exactly as written; it represents an untranslated code, link, or entity.
         - Return ONLY the direct \(targetLanguage) translation of the current speech segment. Never include explanations, pleasantries, quotation marks, or markdown wrappers.
         """
+    }
+
+    /// The single user turn `translateText(_:targetLanguage:sourceLanguageCode:)`
+    /// sends — HY-MT1.5's own model-card prompts, verbatim, with **no**
+    /// system prompt. Deliberately not `systemPrompt(targetLanguage:)`'s
+    /// contract reworded for text: tried first, and on a selection
+    /// containing `⟦n⟧` placeholders (any code/URL, via `EntityMasker`) the
+    /// 1.8B model translated the *system prompt itself* into the target
+    /// language instead of the user's text. The card's plain instruction
+    /// kept placeholders intact without being told to, kept line breaks,
+    /// and translated an "ignore previous instructions" source as text.
+    ///
+    /// The card uses a Chinese instruction whenever Chinese is on either
+    /// side of the pair, and an English one otherwise.
+    static func textUserTurn(source: String, targetLanguage: HYMT15TargetLanguage, sourceIsChinese: Bool) -> String {
+        if targetLanguage == .chinese || sourceIsChinese {
+            return "将以下文本翻译为\(targetLanguage.chineseName)，注意只需要输出翻译后的结果，不要额外解释：\n\n\(source)"
+        }
+        return "Translate the following segment into \(targetLanguage.promptName), without additional explanation.\n\n\(source)"
     }
 
     /// Formats the user turn with optional recent utterance context.
@@ -353,6 +382,16 @@ final class HYMT15Translator: @unchecked Sendable {
         }
     }
 
+    /// Swaps `onCommit`/`onFlushBoundary` on `queue`, ordered against any
+    /// in-flight `flush()` reading them — needed now that an instance can
+    /// outlive the provider that first set them (see `HYMT15ModelPool`).
+    func setCallbacks(onCommit: ((String) -> Void)?, onFlushBoundary: (() -> Void)?) {
+        queue.sync {
+            self.onCommit = onCommit
+            self.onFlushBoundary = onFlushBoundary
+        }
+    }
+
     func setEarlyTranslateThreshold(_ characters: Int) {
         queue.async { self.earlyTranslateThreshold = characters }
     }
@@ -413,6 +452,61 @@ final class HYMT15Translator: @unchecked Sendable {
         guard !output.isEmpty else { return }
         appendHistoryLocked(source: rawSource, translation: output)
         onCommit?(output)
+    }
+
+    /// One-shot translation of a standalone piece of text — the selection
+    /// translation panel's entry point (see `SelectionTranslator`), entirely
+    /// separate from the streaming `feed`/`flush` path above: it never reads
+    /// or writes `buffer`/`history`/`targetLanguage`, so it can't leak
+    /// context into (or out of) a recording that happens to share this
+    /// class. Still funnels through the same serial `queue`, since `ctx` is
+    /// not safe to decode on concurrently.
+    ///
+    /// Unlike `translateBufferLocked`, an over-budget source throws
+    /// `TranslatorError.textTooLong` instead of being trimmed from the
+    /// front — silently dropping the start of a user's own selection is
+    /// much worse than dropping stale speech. Callers keep inputs well under
+    /// the limit (`SelectionTextChunker`), so this is a safety net.
+    func translateText(
+        _ text: String, targetLanguage: HYMT15TargetLanguage, sourceIsChinese: Bool
+    ) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                continuation.resume(with: Result {
+                    try self.translateTextLocked(text, targetLanguage: targetLanguage, sourceIsChinese: sourceIsChinese)
+                })
+            }
+        }
+    }
+
+    private func translateTextLocked(
+        _ text: String, targetLanguage: HYMT15TargetLanguage, sourceIsChinese: Bool
+    ) throws -> String {
+        guard let ctx, let model, let vocab = llama_model_get_vocab(model) else {
+            throw TranslatorError.notLoaded
+        }
+        let (maskedSource, verbatim) = EntityMasker.mask(text)
+        guard let prompt = LlamaGeneration.applyChatTemplate(
+            model: model,
+            systemPrompt: nil,
+            userText: Self.textUserTurn(source: maskedSource, targetLanguage: targetLanguage, sourceIsChinese: sourceIsChinese)
+        ) else {
+            throw TranslatorError.llamaCallFailed("HY-MT1.5 提示词模板构建失败")
+        }
+        let budget = Int32(llama_n_ctx(ctx)) - Int32(Self.maxNewTokens)
+        guard LlamaGeneration.tokenCount(of: prompt, vocab: vocab) <= budget else {
+            throw TranslatorError.textTooLong
+        }
+        guard let sampler = Self.makeSamplerChain(vocab: vocab) else {
+            throw TranslatorError.llamaCallFailed("创建 HY-MT1.5 采样器失败")
+        }
+        defer { llama_sampler_free(sampler) }
+
+        let rawOutput = LlamaGeneration.generate(
+            ctx: ctx, model: model, prompt: prompt, maxNewTokens: Self.maxNewTokens,
+            samplerForStep: { _ in sampler }
+        )
+        return EntityMasker.restore(translation: Self.cleanOutput(rawOutput), verbatim: verbatim)
     }
 
     private func appendHistoryLocked(source: String, translation: String) {

@@ -30,6 +30,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// Task 4.1 (首次启动向导) — kept alive only for as long as the window
     /// itself is open; released once the user finishes/skips it.
     private var onboardingWindow: NSWindow?
+    /// ⌥A/⌥S selection translation — constructed here (not lazily) for the
+    /// same reason as `session`: its global hot keys must work from launch,
+    /// before any menu or window has been opened.
+    let selectionController: SelectionTranslationController
 
     override init() {
         // A failed store (disk full, corrupted schema after a migration
@@ -38,7 +42,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // nil store as "don't persist".
         let store = try? SessionStore()
         sessionStore = store
-        session = RecordingSession(sessionStore: store)
+        let session = RecordingSession(sessionStore: store)
+        self.session = session
+        selectionController = SelectionTranslationController(
+            translator: SelectionTranslator(
+                modelDownloadManager: session.modelDownloadManager,
+                preferredModelVariantID: { [weak session] in session?.translationModelVariantID },
+                recordingEngineID: { [weak session] in session?.translationEngineID }
+            )
+        )
         super.init()
     }
 
@@ -143,5 +155,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // GPU resources outlive process exit (see
         // `InProcessTranslator.unload()`'s doc).
         session.unloadModelsBeforeQuit()
+        // Same Metal exit-time concern for the selection panel's own
+        // HY-MT1.5 copy (see `SelectionTranslator`'s doc).
+        selectionController.translator.unloadModelBeforeQuit()
     }
 }

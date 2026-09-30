@@ -48,6 +48,16 @@ history and open items.
   German, Spanish, Italian, Portuguese, and more) shared between the panel
   and Settings, plus an engine-aware "自动" (auto-detect source) option once
   a local-model ASR engine is available.
+- **Selection translation (⌥A) and screenshot translation (⌥S)**, modeled
+  on [Cida](https://github.com/Xuanwo/cida) but fully on-device: select text
+  in any app and press ⌥A, or press ⌥S and frame part of the screen (text
+  recognized locally with Vision). A floating panel translates it with the
+  system Translation framework or HY-MT1.5 — text in "my language" goes to
+  your foreign language, everything else comes into "my language". ⏎
+  translates, ⇧⏎ inserts a newline, Esc hides. Shortcuts, engine and
+  languages live in Settings → 选词翻译. Reading the selection needs the
+  Accessibility permission (without it, copy and paste into the panel);
+  ⌥S needs Screen Recording.
 - **Session history**: past recordings persisted locally (SwiftData), with
   a searchable history window and Markdown export.
 - **Settings persistence**: engine choice, language pair, mic device, and

@@ -12,6 +12,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var session: RecordingSession
     @EnvironmentObject private var navigation: SettingsNavigationState
+    @EnvironmentObject private var selectionController: SelectionTranslationController
     /// Observed directly (not just reached through `session`) so the engine
     /// picker's labels/inline download cards live-update the moment
     /// something is downloaded or deleted in the "模型库管理" tab —
@@ -46,6 +47,13 @@ struct SettingsView: View {
             languageTab
                 .tabItem { Label(SettingsTab.language.title, systemImage: SettingsTab.language.systemImage) }
                 .tag(SettingsTab.language)
+            SelectionTranslationSettingsView(
+                controller: selectionController,
+                translator: selectionController.translator,
+                downloadManager: downloadManager
+            )
+                .tabItem { Label(SettingsTab.selection.title, systemImage: SettingsTab.selection.systemImage) }
+                .tag(SettingsTab.selection)
             aboutTab
                 .tabItem { Label(SettingsTab.about.title, systemImage: SettingsTab.about.systemImage) }
                 .tag(SettingsTab.about)

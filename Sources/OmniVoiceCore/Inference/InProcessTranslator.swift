@@ -9,6 +9,8 @@ enum TranslatorError: LocalizedError {
     case modelMissing(String)
     case notLoaded
     case llamaCallFailed(String)
+    /// See `HYMT15Translator.translateText(_:targetLanguage:sourceIsChinese:)`'s doc.
+    case textTooLong
 
     var errorDescription: String? {
         switch self {
@@ -18,6 +20,8 @@ enum TranslatorError: LocalizedError {
             return "模型尚未加载"
         case .llamaCallFailed(let context):
             return context
+        case .textTooLong:
+            return "这段文字太长，超出了模型一次能翻译的长度"
         }
     }
 }

@@ -1,12 +1,14 @@
 import Foundation
 import SwiftUI
 
-/// One of `SettingsView`'s four tabs (Task 3.1) — Docs/UX-SETTINGS-MODEL-MANAGEMENT.md
-/// §4.1's "语音与引擎 / 模型库管理 / 语言与字幕 / 关于".
+/// One of `SettingsView`'s tabs (Task 3.1) — Docs/UX-SETTINGS-MODEL-MANAGEMENT.md
+/// §4.1's "语音与引擎 / 模型库管理 / 语言与字幕 / 关于", plus "选词翻译"
+/// (`SelectionTranslationSettingsView`).
 enum SettingsTab: String, CaseIterable, Identifiable {
     case engines
     case models
     case language
+    case selection
     case about
 
     var id: String { rawValue }
@@ -16,6 +18,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .engines: return "语音与引擎"
         case .models: return "模型库管理"
         case .language: return "语言与悬浮窗"
+        case .selection: return "选词翻译"
         case .about: return "关于"
         }
     }
@@ -25,6 +28,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .engines: return "mic"
         case .models: return "shippingbox"
         case .language: return "globe"
+        case .selection: return "character.book.closed"
         case .about: return "info.circle"
         }
     }
