@@ -96,4 +96,22 @@ import Testing
         #expect(HYMT15Translator.cleanOutput("현재：안녕하세요", hadContext: true) == "안녕하세요")
         #expect(HYMT15Translator.cleanOutput("번역：안녕하세요", hadContext: false) == "안녕하세요")
     }
+
+    @Test func cleanOutputStripsFenceAfterALeadingLabel() {
+        let labelledFence = "Translation: ```zh\n你好，世界！\n```"
+        #expect(HYMT15Translator.cleanOutput(labelledFence, hadContext: false) == "你好，世界！")
+    }
+
+    @Test func cleanOutputSkipsEchoedLinesBetweenCurrentAndTranslation() {
+        let echoed = "Current: Hello\nSource: Hello\nTranslation: 你好"
+        #expect(HYMT15Translator.cleanOutput(echoed, hadContext: true) == "你好")
+    }
+
+    @Test func cleanOutputStripsCJKCornerBrackets() {
+        #expect(HYMT15Translator.cleanOutput("「你好，世界」") == "你好，世界")
+        #expect(HYMT15Translator.cleanOutput("『你好，世界』") == "你好，世界")
+        // Only unwraps when the outer pair is the only pair.
+        let notWrapped = "「你好」他说「再见」"
+        #expect(HYMT15Translator.cleanOutput(notWrapped) == notWrapped)
+    }
 }

@@ -30,7 +30,7 @@ public struct EntityMasker: Sendable {
         // transcripts of CJK speech (e.g. "执行--dry-run选项") — but a short
         // flag's body is letters-only, so a negative number like -1 or -3.14
         // is never masked.
-        findMatches(regex: flagRegex, in: text, into: &matches)
+        findMatches(regex: flagRegex, in: text, into: &matches, trimTrailingPunctuation: true)
 
         // 5. Code identifiers:
         // - snake_case / dunder (e.g. parse_args, model_path, MAX_BUFFER_SIZE,
@@ -150,10 +150,15 @@ public struct EntityMasker: Sendable {
     )
     // `-[a-zA-Z]+` (one or more *letters*) also covers combined short flags
     // like `-rf`, `-czvf`, `-Wall` — it still can't match a negative number
-    // (`-1`, `-3.14`) since digits aren't letters.
+    // (`-1`, `-3.14`) since digits aren't letters. The `=value` part is
+    // restricted to common CLI-value characters (or a quoted string) rather
+    // than "any non-whitespace" — CJK ASR transcripts have no space after a
+    // flag's value, so `--output=foo选项` would otherwise swallow "选项"
+    // into the masked entity too.
     private static let flagRegex = try! NSRegularExpression(
-        pattern: #"(?<![a-zA-Z0-9_-])(?:--[a-zA-Z0-9_-]+(?:=[^\s]+)?|-[a-zA-Z]+(?:=[^\s]+)?)(?![a-zA-Z0-9_-])"#
+        pattern: #"(?<![a-zA-Z0-9_-])(?:--[a-zA-Z0-9_-]+(?:="# + flagValue + #")?|-[a-zA-Z]+(?:="# + flagValue + #")?)(?![a-zA-Z0-9_-])"#
     )
+    private static let flagValue = #"(?:"[^"]+"|'[^']+'|[a-zA-Z0-9_.~/-]+)"#
     private static let snakeRegex = try! NSRegularExpression(
         pattern: #"(?<![a-zA-Z0-9_])(?:__[a-zA-Z][a-zA-Z0-9]*__|_*[a-zA-Z][a-zA-Z0-9]*(?:_+[a-zA-Z0-9]+)+_*)(?![a-zA-Z0-9_])"#
     )

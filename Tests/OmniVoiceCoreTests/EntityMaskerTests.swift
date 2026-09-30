@@ -188,4 +188,22 @@ import Testing
         #expect(masked2 == "please check (⟦0⟧) now")
         #expect(verbatim2 == ["https://github.com"])
     }
+
+    @Test func flagValueDoesNotSwallowFollowingCJKText() {
+        let (masked, verbatim) = EntityMasker.mask("执行--output=foo选项")
+        #expect(masked == "执行⟦0⟧选项")
+        #expect(verbatim == ["--output=foo"])
+    }
+
+    @Test func trimsTrailingPunctuationFromFlagValues() {
+        let (masked, verbatim) = EntityMasker.mask("Run with --filter=abc, then test.")
+        #expect(masked == "Run with ⟦0⟧, then test.")
+        #expect(verbatim == ["--filter=abc"])
+    }
+
+    @Test func masksQuotedFlagValuesContainingSpaces() {
+        let (masked, verbatim) = EntityMasker.mask("Run with --message=\"hello world\" now")
+        #expect(masked == "Run with ⟦0⟧ now")
+        #expect(verbatim == ["--message=\"hello world\""])
+    }
 }

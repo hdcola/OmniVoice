@@ -24,6 +24,8 @@ The format is based on Keep a Changelog.
 - perf(translation): precompile `EntityMasker`'s regular expressions once instead of on every `mask`/`restore` call (#38)
 - fix(translation): `EntityMasker` no longer masks "a.m."/"p.m." as a filename (requires a 2+ character basename), masks combined short CLI flags like `-rf`/`-czvf`/`-Wall`, and keeps a balanced parenthesis inside a masked URL (e.g. a Wikipedia link) while still trimming one that only wraps the URL (#38)
 - fix(translation): `cleanOutput` strips a leaked `Translation:`-style label even on a context-free turn, and recognizes the fullwidth Korean `현재：`/`번역：` label variants (#38)
+- fix(translation): `EntityMasker`'s CLI-flag value no longer swallows trailing CJK text with no separating space (`--output=foo选项`), and its trailing-punctuation trim now applies to flags too (#38)
+- fix(translation): `cleanOutput` strips a markdown fence that comes after a leaked `Translation:` label, not just one wrapping the whole reply or only the labelled answer; `stripContextEcho` now discards any echoed lines (e.g. a repeated `Source:`) between `Current:` and a following `Translation:` instead of leaking them; and it unwraps CJK corner brackets (`「...」`/`『...』`) the same way it already does ASCII/curly quotes (#38)
 
 ### Dependencies
 

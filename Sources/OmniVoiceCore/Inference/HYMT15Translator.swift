@@ -153,6 +153,10 @@ final class HYMT15Translator: @unchecked Sendable {
         }
         cleaned = stripMarkdownFence(cleaned)
         cleaned = stripTranslationLabel(cleaned)
+        // A label can precede the fence rather than sit inside it
+        // (`Translation: ```zh\n你好\n```), so re-check for one now that the
+        // label's gone — idempotent no-op when there wasn't one.
+        cleaned = stripMarkdownFence(cleaned)
         return stripWrappingQuotes(cleaned)
     }
 
@@ -177,15 +181,24 @@ final class HYMT15Translator: @unchecked Sendable {
         return body.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Wrapping quote pairs to unwrap — ASCII, curly, and the CJK corner
+    /// brackets (「...」/『...』) a CJK-tuned model also reaches for.
+    private static let wrappingQuotePairs: [(open: Character, close: Character)] = [
+        ("\"", "\""), ("“", "”"), ("「", "」"), ("『", "』"),
+    ]
+
     /// Only unwraps quotes when the outer pair is the only pair — otherwise
     /// `"Yes" he said "no"` would lose two unrelated quote marks.
     private static func stripWrappingQuotes(_ text: String) -> String {
         guard text.count >= 2 else { return text }
         let inner = text.dropFirst().dropLast()
-        let asciiWrapped = text.hasPrefix("\"") && text.hasSuffix("\"") && !inner.contains("\"")
-        let smartWrapped = text.hasPrefix("“") && text.hasSuffix("”") && !inner.contains(where: { "“”".contains($0) })
-        guard asciiWrapped || smartWrapped else { return text }
-        return inner.trimmingCharacters(in: .whitespacesAndNewlines)
+        for pair in wrappingQuotePairs
+        where text.hasPrefix(String(pair.open)) && text.hasSuffix(String(pair.close))
+            && !inner.contains(where: { $0 == pair.open || $0 == pair.close })
+        {
+            return inner.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return text
     }
 
     /// Keeps only the text after the last echoed `Current:` label (or `---`
@@ -199,15 +212,16 @@ final class HYMT15Translator: @unchecked Sendable {
         }) {
             let trimmed = lines[lastLabelled].trimmingCharacters(in: .whitespaces)
             var rest = Array(lines[(lastLabelled + 1)...])
-            // If a `Translation:` line follows, the model echoed both the
-            // source (on the `Current:` line) and its real answer after it —
-            // keep only that answer, not the still-untranslated remainder of
-            // the `Current:` line.
-            let hasFollowingTranslation = rest.contains { line in
+            // If a `Translation:` line follows (possibly after other echoed
+            // lines, e.g. a repeated `Source:`), the model echoed both the
+            // source and its real answer — keep only from that line down,
+            // discarding everything still-untranslated before it.
+            if let transIdx = rest.firstIndex(where: { line in
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
                 return translationLabels.contains(where: trimmed.hasPrefix)
-            }
-            if !hasFollowingTranslation, let label = currentLabels.first(where: trimmed.hasPrefix) {
+            }) {
+                rest = Array(rest[transIdx...])
+            } else if let label = currentLabels.first(where: trimmed.hasPrefix) {
                 rest.insert(String(trimmed.dropFirst(label.count)), at: 0)
             }
             lines = rest
