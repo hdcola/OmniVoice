@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Build (swift build)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: swift --version
+        run: swift --version
+
+      # Package.swift links against third_party/{audio.cpp,llama.cpp}'s
+      # built dylibs unconditionally (see Docs/MODEL_ENGINE_SETUP.md) — even
+      # a plain `swift build` cannot succeed without them, model weights
+      # aside. Cache the checkout+build so this only pays the (slow) cmake
+      # build cost when the pinned commits in setup_third_party.sh change.
+      - name: Cache third_party native dependencies
+        id: cache-third-party
+        uses: actions/cache@v4
+        with:
+          path: third_party
+          key: third-party-${{ runner.os }}-${{ hashFiles('Scripts/setup_third_party.sh') }}
+
+      - name: Ensure cmake is available
+        run: command -v cmake || brew install cmake
+
+      - name: Set up third_party (audio.cpp / llama.cpp)
+        if: steps.cache-third-party.outputs.cache-hit != 'true'
+        run: Scripts/setup_third_party.sh
+
+      - name: swift build
+        run: swift build
+
+      # `swift test` is deliberately NOT run here. This package's tests use
+      # Swift Testing (@Test/import Testing), and every Xcode 26.x on this
+      # runner image (tried both the default 26.6 and 26.5) crashes
+      # compiling them: "error: unexpected input file:
+      # .../plugins/testing" / "error: fatalError", right around the same
+      # test file every time. This reproduces on this runner image only —
+      # `swift test` (114/114) passes locally on Xcode 27. A standalone
+      # Swiftly-installed toolchain isn't a workaround either: it can't
+      # build the app target's SwiftUI/SwiftData/Translation framework
+      # usage (@Query, .modelContainer, .translationTask all need Xcode's
+      # own toolchain+SDK pairing), and Xcode 27 isn't preinstalled on this
+      # image (only 26.0.1-26.6, per actions/runner-images' macos-26-arm64
+      # readme) — installing it on demand would need Apple ID credentials
+      # and a slow first-time download. `swift build` is kept as the CI
+      # gate (catches compile/link regressions) until this image ships a
+      # fixed Xcode 26.x or defaults to 27; re-add `swift test` then.
+
+  # UITests/ (XCUITest against the real app) is intentionally NOT run here.
+  # It needs a one-time, interactive Accessibility-permission grant for the
+  # process driving xcodebuild (System Settings > Privacy & Security >
+  # Accessibility), which a fresh, unattended GitHub-hosted macOS runner has
+  # no way to provide, plus that suite has known host-specific flakiness
+  # documented in UITests/README.md. Run it locally, or wire up a
+  # self-hosted runner with that permission pre-granted and add a
+  # workflow_dispatch-triggered job here once one exists.

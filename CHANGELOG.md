@@ -9,6 +9,7 @@ The format is based on Keep a Changelog.
 ### Added
 
 ### Changed
+- chore(ci): add a GitHub Actions workflow that builds `third_party/{audio.cpp,llama.cpp}` (cached by their pinned commits) and runs `swift build` on every push to `main` and every pull request as a compile/link regression gate; `swift test` is deliberately not run in CI yet — every Xcode 26.x on the current macOS runner image crashes compiling this package's Swift Testing suites (a runner-image toolchain bug, tests pass locally on Xcode 27), and XCUITest coverage under `UITests/` also needs a one-time interactive Accessibility-permission grant an unattended runner can't provide
 
 ### Fixed
 
