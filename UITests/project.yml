@@ -1,0 +1,60 @@
+# Generates OmniVoiceUITests.xcodeproj — the wrapper Xcode project this SPM
+# package needs so XCUITest can exist at all (SwiftPM itself has no notion of
+# a "UI Testing Bundle" target: only library/executable/plain-XCTest
+# targets — see Package.swift's own doc on the package split for why this
+# repo has no Xcode project otherwise). Regenerate after editing this file:
+#
+#   cd UITests && xcodegen generate
+#
+# This defines exactly ONE target: an *unhosted* UI Testing Bundle with no
+# "Target Application" of its own. Instead, each test launches the real
+# `OmniVoice.app` built by `../Scripts/build_app.sh` via
+# `XCUIApplication(url:)` (macOS/Catalyst-only API — see
+# `XCUIApplication.initWithURL:`'s header doc: "Returns a proxy for the
+# application at the specified file system URL", exactly the "test an app
+# built outside this Xcode project" case). This is deliberately the least
+# invasive option: `swift build`/`swift test` for the SPM package (and the
+# existing OmniVoiceCoreTests target) are completely untouched — this
+# project only ever *reads* the package, it never becomes a dependency of it
+# and never needs the CAudioCpp/CLlamaCpp `unsafeFlags` that a normal
+# "add this SPM package to an Xcode project" route would choke on.
+name: OmniVoiceUITests
+options:
+  bundleIdPrefix: org.hdcola
+  # OmniVoiceUITests.xcodeproj itself IS committed (so contributors can build
+  # and run these tests without installing xcodegen) — `project.yml` (this
+  # file) stays the source of truth regardless; re-run `xcodegen generate`
+  # after editing it, and commit the resulting project changes alongside.
+  # (See UITests/README.md for the full how-to-run.)
+  createIntermediateGroups: true
+settings:
+  base:
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    SWIFT_VERSION: "6.0"
+targets:
+  OmniVoiceUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: OmniVoiceUITests
+    settings:
+      base:
+        # No TEST_HOST / BUNDLE_LOADER — this is an "unhosted" UI test
+        # bundle. Xcode still requires *some* scheme to run it against, so
+        # the scheme below points its "Target Application" at nothing and
+        # each test supplies its own `XCUIApplication(url:)` instead.
+        PRODUCT_BUNDLE_IDENTIFIER: org.hdcola.omnivoice.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+schemes:
+  OmniVoiceUITests:
+    build:
+      targets:
+        OmniVoiceUITests: [test]
+    test:
+      config: Debug
+      targets:
+        - OmniVoiceUITests
+      commandLineArguments: []

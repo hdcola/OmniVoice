@@ -8,3 +8,9 @@ build/
 # history. See Docs/MODEL_ENGINE_SETUP.md for how to fetch/build these.
 /third_party/
 /models/
+
+# UITests/OmniVoiceUITests.xcodeproj itself IS committed (xcodegen-generated,
+# see UITests/project.yml) so `xcodebuild test` works without requiring
+# xcodegen — but per-developer Xcode state under it never should be.
+UITests/OmniVoiceUITests.xcodeproj/xcuserdata/
+UITests/OmniVoiceUITests.xcodeproj/project.xcworkspace/xcuserdata/
