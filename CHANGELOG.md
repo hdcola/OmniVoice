@@ -19,6 +19,9 @@ The format is based on Keep a Changelog.
 - fix(translation): clear HY-MT1.5 context history when the target language changes, and strip echoed `Current:`/`Translation:` labels from context-prompted output (#38)
 - fix(translation): only unwrap quotes that wrap the whole output, keep single-line fenced output, and count translations toward the history cap while always keeping the latest pair (#38)
 - fix(translation): `EntityMasker` no longer masks ordinary prose (`e.g`, `U.S`, `Mr.Smith`, `and/or`), and restores placeholders the model garbled instead of leaving bare numbers (#38)
+- fix(translation): strip a fenced code block wrapping echoed context (or just the answer after it), and drop an echoed `Current:` source line when a `Translation:` line follows it, instead of leaking either into the transcript (#38)
+- fix(translation): `EntityMasker` masks `-c`/`-h`-style single-letter flags and flags with no preceding space (common in space-less CJK ASR output) without mistaking a negative number for one; masks `~/`, `./`, `../` single-segment paths and `__dunder__` identifiers; trims trailing sentence punctuation off masked URLs/paths (#38)
+- perf(translation): precompile `EntityMasker`'s regular expressions once instead of on every `mask`/`restore` call (#38)
 
 ### Dependencies
 

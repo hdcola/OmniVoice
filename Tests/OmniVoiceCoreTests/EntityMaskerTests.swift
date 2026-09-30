@@ -116,8 +116,51 @@ import Testing
         #expect(verbatim == ["~/Downloads/model.gguf"])
     }
 
+    @Test func masksSingleSegmentHomeAndRelativePaths() {
+        for input in ["Check ~/Downloads now", "Run ./build now", "See ../parent now"] {
+            let (_, verbatim) = EntityMasker.mask(input)
+            #expect(verbatim.count == 1, "\(input)")
+        }
+    }
+
     @Test func masksSnakeCaseWithLeadingUnderscore() {
         let (_, verbatim) = EntityMasker.mask("Call _private_helper first")
         #expect(verbatim == ["_private_helper"])
+    }
+
+    @Test func masksDunderIdentifiers() {
+        let (masked, verbatim) = EntityMasker.mask("Define __init__ and __main__ here")
+        #expect(masked == "Define ⟦0⟧ and ⟦1⟧ here")
+        #expect(verbatim == ["__init__", "__main__"])
+    }
+
+    @Test func trimsTrailingSentencePunctuationFromUrlsAndPaths() {
+        let (masked1, verbatim1) = EntityMasker.mask("Please visit https://github.com.")
+        #expect(masked1 == "Please visit ⟦0⟧.")
+        #expect(verbatim1 == ["https://github.com"])
+
+        let (masked2, verbatim2) = EntityMasker.mask("See https://example.com, it is good.")
+        #expect(masked2 == "See ⟦0⟧, it is good.")
+        #expect(verbatim2 == ["https://example.com"])
+
+        let (masked3, verbatim3) = EntityMasker.mask("The log is in /usr/local/bin.")
+        #expect(masked3 == "The log is in ⟦0⟧.")
+        #expect(verbatim3 == ["/usr/local/bin"])
+    }
+
+    @Test func masksShortCliFlagsAndFlagsWithoutLeadingSpace() {
+        let (masked, verbatim) = EntityMasker.mask("Run with -c now")
+        #expect(masked == "Run with ⟦0⟧ now")
+        #expect(verbatim == ["-c"])
+
+        let (maskedZh, verbatimZh) = EntityMasker.mask("执行--dry-run选项")
+        #expect(maskedZh == "执行⟦0⟧选项")
+        #expect(verbatimZh == ["--dry-run"])
+    }
+
+    @Test func doesNotMaskNegativeNumbersAsFlags() {
+        let (masked, verbatim) = EntityMasker.mask("The temperature is -1 degrees, or -3.14 exactly.")
+        #expect(masked == "The temperature is -1 degrees, or -3.14 exactly.")
+        #expect(verbatim.isEmpty)
     }
 }

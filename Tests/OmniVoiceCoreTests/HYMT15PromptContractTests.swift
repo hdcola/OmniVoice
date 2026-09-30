@@ -68,4 +68,20 @@ import Testing
         // Without context in the prompt, label-like text is left untouched.
         #expect(HYMT15Translator.cleanOutput("Current: 电流", hadContext: false) == "Current: 电流")
     }
+
+    @Test func cleanOutputStripsFenceWrappingEchoedContext() {
+        // The whole reply — echoed "Current:" label included — is wrapped
+        // in a single fence.
+        let fenced = "```\nCurrent: 第一个议题是预算。\n```"
+        #expect(HYMT15Translator.cleanOutput(fenced, hadContext: true) == "第一个议题是预算。")
+
+        // Only the real answer after "Current:" is fenced.
+        let innerFenced = "Current: ```第一个议题是预算。```"
+        #expect(HYMT15Translator.cleanOutput(innerFenced, hadContext: true) == "第一个议题是预算。")
+    }
+
+    @Test func cleanOutputDropsEchoedSourceWhenTranslationLineFollows() {
+        let echoed = "Context:\nSource: Hi\nTranslation: 你好\n---\nCurrent: Good morning\nTranslation: 早上好"
+        #expect(HYMT15Translator.cleanOutput(echoed, hadContext: true) == "早上好")
+    }
 }

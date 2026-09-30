@@ -133,36 +133,48 @@ final class HYMT15Translator: @unchecked Sendable {
     /// Strips markdown fences, quotes, or conversational wrappers if the LLM
     /// output them. `hadContext` means the prompt used `formatUserTurn`'s
     /// labelled layout, so any echoed labels/context block are removed too.
+    ///
+    /// Fences are stripped both before and after the context-echo pass:
+    /// a small model can wrap the *whole* reply (echoed context included) in
+    /// a single fence, or wrap only the real answer that follows a `Current:`
+    /// label — either way, exactly one of the two passes needs to see the
+    /// fence delimiters to remove them, and running the same idempotent step
+    /// twice is a no-op when there's nothing left to strip.
     static func cleanOutput(_ text: String, hadContext: Bool = false) -> String {
         var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if hadContext {
+            cleaned = stripMarkdownFence(cleaned)
             cleaned = stripContextEcho(cleaned)
         }
-        if cleaned.hasPrefix("```") {
-            var body = cleaned.dropFirst(3)
-            // Drop an info-string line (```zh) — but only if it looks like
-            // one, so a single-line ```text``` isn't swallowed whole.
-            if let newline = body.firstIndex(of: "\n"),
-               body[..<newline].allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "+-_".contains($0)) })
-            {
-                body = body[body.index(after: newline)...]
-            }
-            if let fence = body.range(of: "```", options: .backwards) {
-                body = body[..<fence.lowerBound]
-            }
-            cleaned = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        cleaned = stripMarkdownFence(cleaned)
+        return stripWrappingQuotes(cleaned)
+    }
+
+    private static func stripMarkdownFence(_ text: String) -> String {
+        guard text.hasPrefix("```") else { return text }
+        var body = text.dropFirst(3)
+        // Drop an info-string line (```zh) — but only if it looks like
+        // one, so a single-line ```text``` isn't swallowed whole.
+        if let newline = body.firstIndex(of: "\n"),
+           body[..<newline].allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "+-_".contains($0)) })
+        {
+            body = body[body.index(after: newline)...]
         }
-        // Only unwrap when the outer quotes are the only quotes — otherwise
-        // `"Yes" he said "no"` would lose two unrelated quote marks.
-        if cleaned.count >= 2 {
-            let inner = cleaned.dropFirst().dropLast()
-            let asciiWrapped = cleaned.hasPrefix("\"") && cleaned.hasSuffix("\"") && !inner.contains("\"")
-            let smartWrapped = cleaned.hasPrefix("“") && cleaned.hasSuffix("”") && !inner.contains(where: { "“”".contains($0) })
-            if asciiWrapped || smartWrapped {
-                cleaned = inner.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
+        if let fence = body.range(of: "```", options: .backwards) {
+            body = body[..<fence.lowerBound]
         }
-        return cleaned
+        return body.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Only unwraps quotes when the outer pair is the only pair — otherwise
+    /// `"Yes" he said "no"` would lose two unrelated quote marks.
+    private static func stripWrappingQuotes(_ text: String) -> String {
+        guard text.count >= 2 else { return text }
+        let inner = text.dropFirst().dropLast()
+        let asciiWrapped = text.hasPrefix("\"") && text.hasSuffix("\"") && !inner.contains("\"")
+        let smartWrapped = text.hasPrefix("“") && text.hasSuffix("”") && !inner.contains(where: { "“”".contains($0) })
+        guard asciiWrapped || smartWrapped else { return text }
+        return inner.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Keeps only the text after the last echoed `Current:` label (or `---`
@@ -175,7 +187,15 @@ final class HYMT15Translator: @unchecked Sendable {
         }) {
             let trimmed = lines[lastLabelled].trimmingCharacters(in: .whitespaces)
             var rest = Array(lines[(lastLabelled + 1)...])
-            if let label = currentLabels.first(where: trimmed.hasPrefix) {
+            // If a `Translation:` line follows, the model echoed both the
+            // source (on the `Current:` line) and its real answer after it —
+            // keep only that answer, not the still-untranslated remainder of
+            // the `Current:` line.
+            let hasFollowingTranslation = rest.contains { line in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                return translationLabels.contains(where: trimmed.hasPrefix)
+            }
+            if !hasFollowingTranslation, let label = currentLabels.first(where: trimmed.hasPrefix) {
                 rest.insert(String(trimmed.dropFirst(label.count)), at: 0)
             }
             lines = rest
