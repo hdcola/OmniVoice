@@ -160,7 +160,8 @@ public enum SelectionTextChunker {
             current += rest
         }
         closeCurrent()
-        return chunks
+        // `NLTokenizer` finding no sentence at all must not lose the text.
+        return chunks.isEmpty ? [paragraph] : chunks
     }
 }
 

@@ -61,6 +61,15 @@ final class SelectionTranslationController: ObservableObject {
         }
     }
 
+    deinit {
+        // Block-based observers aren't removed automatically. The
+        // controller lives as long as the app today; this keeps it honest
+        // if that ever changes.
+        if let resignKeyObserver {
+            NotificationCenter.default.removeObserver(resignKeyObserver)
+        }
+    }
+
     var isPanelVisible: Bool { panel.isVisible }
 
     // MARK: - Shortcuts

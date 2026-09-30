@@ -59,9 +59,13 @@ final class HYMT15ModelPool {
             return entry.translator
         } catch {
             // A failed load leaves nothing to share — the next `acquire`
-            // retries from scratch instead of re-reading this failure.
+            // retries from scratch instead of re-reading this failure. Every
+            // waiter on `load` sees the same failure, but the entry is only
+            // dropped once the last of them has let go, so it can never
+            // disappear from under a holder that still needs `release` to
+            // find it.
             entry.holders -= 1
-            if entries[path] === entry { entries[path] = nil }
+            if entry.holders <= 0, entries[path] === entry { entries[path] = nil }
             throw error
         }
     }

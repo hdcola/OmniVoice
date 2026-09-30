@@ -372,23 +372,36 @@ final class SelectionModelBackend: SelectionModelTranslating {
         }
     }
 
+    /// The hold is recorded in `held` *inside* the acquiring task, so every
+    /// caller waiting on it — not just the one that started it — resumes
+    /// with the hold already in place, and exactly one hold exists no matter
+    /// which resumes first. `acquiring` is cleared the same way on failure,
+    /// so a failed load (a corrupt file, say) is retried by the next
+    /// translation instead of replaying the cached failure forever.
     private func translator(for url: URL) async throws -> HYMT15Translator {
         if let held, held.url == url { return held.translator }
         if let acquiring, acquiring.url == url { return try await acquiring.task.value }
         unload()
         let pool = pool
-        let task = Task { try await pool.acquire(modelURL: url) }
-        acquiring = (url, task)
-        let translator = try await task.value
-        guard acquiring?.url == url else {
-            // Released (or switched to other weights) while this was
-            // loading — give the hold straight back.
-            pool.release(translator)
-            throw CancellationError()
+        let task = Task { [weak self] () throws -> HYMT15Translator in
+            do {
+                let translator = try await pool.acquire(modelURL: url)
+                guard let self, self.acquiring?.url == url else {
+                    // Released (or switched to other weights) while this
+                    // was loading — give the hold straight back.
+                    pool.release(translator)
+                    throw CancellationError()
+                }
+                self.acquiring = nil
+                self.held = (url, translator)
+                return translator
+            } catch {
+                if self?.acquiring?.url == url { self?.acquiring = nil }
+                throw error
+            }
         }
-        acquiring = nil
-        held = (url, translator)
-        return translator
+        acquiring = (url, task)
+        return try await task.value
     }
 
     private func scheduleIdleRelease() {

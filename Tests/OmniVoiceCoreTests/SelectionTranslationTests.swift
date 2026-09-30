@@ -385,6 +385,36 @@ private final class FakeModelBackend: SelectionModelTranslating {
         }
     }
 
+    @Test func concurrentFailedAcquisitionsAllFailAndTheNextOneRetries() async {
+        let pool = HYMT15ModelPool()
+        async let first: Void = { _ = try? await pool.acquire(modelURL: missing) }()
+        async let second: Void = { _ = try? await pool.acquire(modelURL: missing) }()
+        _ = await (first, second)
+        #expect(!pool.isLoaded(modelURL: missing))
+        await #expect(throws: TranslatorError.self) { _ = try await pool.acquire(modelURL: missing) }
+    }
+
+    /// A failed load must not be replayed: once the file appears (here, an
+    /// invalid one), the next translation tries to load it for real — so
+    /// the error changes from "missing" to "load failed".
+    @Test func selectionBackendRetriesAfterAFailedLoad() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("omnivoice-test-\(UUID().uuidString).gguf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let backend = SelectionModelBackend(pool: HYMT15ModelPool())
+
+        do {
+            _ = try await backend.translate("hi", targetLanguage: .chinese, sourceIsChinese: false, modelURL: url)
+            Issue.record("expected the missing file to fail")
+        } catch TranslatorError.modelMissing {}
+
+        try Data("not a gguf".utf8).write(to: url)
+        do {
+            _ = try await backend.translate("hi", targetLanguage: .chinese, sourceIsChinese: false, modelURL: url)
+            Issue.record("expected the invalid file to fail")
+        } catch TranslatorError.llamaCallFailed {}
+    }
+
     @Test func releasingAnUnknownTranslatorIsANoOp() {
         HYMT15ModelPool().release(HYMT15Translator())
     }

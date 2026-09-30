@@ -41,23 +41,33 @@ public final class HYMT15TranslationProvider: TranslationProvider {
             _ = try await acquiring.value
             return
         }
-        let task = Task { try await HYMT15ModelPool.shared.acquire(modelURL: modelPath) }
-        acquiring = task
-        defer { acquiring = nil }
-        let acquired = try await task.value
-        if releaseWhenAcquired {
-            // `unload()` ran while the weights were still loading.
-            releaseWhenAcquired = false
-            HYMT15ModelPool.shared.release(acquired)
-            return
+        // The task itself installs `translator` (or gives the hold back),
+        // not the caller after its `await`: every overlapping caller
+        // resumes from the same `task.value`, in no guaranteed order, and
+        // one resuming before the installer would otherwise return with
+        // `translator` still nil — its `feed`s silently dropped.
+        let modelPath = modelPath
+        let task = Task { [weak self] () throws -> HYMT15Translator in
+            defer { self?.acquiring = nil }
+            let acquired = try await HYMT15ModelPool.shared.acquire(modelURL: modelPath)
+            guard let self, !self.releaseWhenAcquired else {
+                // `unload()` ran (or this provider went away) while the
+                // weights were still loading.
+                self?.releaseWhenAcquired = false
+                HYMT15ModelPool.shared.release(acquired)
+                return acquired
+            }
+            acquired.setCallbacks(
+                onCommit: { [weak self] text in self?.onCommit?(text) },
+                onFlushBoundary: { [weak self] in self?.onFlushBoundary?() }
+            )
+            acquired.setTargetLanguage(self.targetLanguage)
+            acquired.setEarlyTranslateThreshold(self.earlyTranslateThreshold)
+            self.translator = acquired
+            return acquired
         }
-        acquired.setCallbacks(
-            onCommit: { [weak self] text in self?.onCommit?(text) },
-            onFlushBoundary: { [weak self] in self?.onFlushBoundary?() }
-        )
-        acquired.setTargetLanguage(targetLanguage)
-        acquired.setEarlyTranslateThreshold(earlyTranslateThreshold)
-        translator = acquired
+        acquiring = task
+        _ = try await task.value
     }
 
     public func unload() {
