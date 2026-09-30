@@ -7,14 +7,14 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(selection): select text in any app and press ⌥A to translate it in a new floating panel — Cida-style: the selection is read via Accessibility (falling back to a synthetic ⌘C that restores the pasteboard), text in "my language" goes to the configured foreign language and everything else comes into "my language", ⏎ translates / ⇧⏎ inserts a newline / Esc hides, and results survive hiding the panel
-- feat(selection): press ⌥S to frame a region of the screen and translate its text, recognized on-device with Vision (needs Screen Recording permission)
-- feat(selection): both features run fully on-device on either the system Translation framework or HY-MT1.5; paragraphs are translated one at a time so long selections fill in progressively and keep their line breaks and list markers
-- feat(settings): new "选词翻译" settings tab — recordable global shortcuts, engine (defaulting to "跟随录音设置", which uses the recording's engine and substitutes HY-MT1.5 — or the system engine if it isn't downloaded — for T3PO), my/foreign language, and Accessibility/Screen Recording permission status; the menu bar gains "打开翻译面板" and "截图翻译"
-- feat(translation): `HYMT15Translator.translateText(_:targetLanguage:sourceIsChinese:)` one-shot text translation using HY-MT1.5's own model-card prompt, independent of the streaming transcript path
+- feat(selection): select text in any app and press ⌥A to translate it in a new floating panel — Cida-style: the selection is read via Accessibility (falling back to a synthetic ⌘C that restores the pasteboard), text in "my language" goes to the configured foreign language and everything else comes into "my language", ⏎ translates / ⇧⏎ inserts a newline / Esc hides, and results survive hiding the panel (#40)
+- feat(selection): press ⌥S to frame a region of the screen and translate its text, recognized on-device with Vision (needs Screen Recording permission) (#40)
+- feat(selection): both features run fully on-device on either the system Translation framework or HY-MT1.5; paragraphs are translated one at a time so long selections fill in progressively and keep their line breaks and list markers (#40)
+- feat(settings): new "选词翻译" settings tab — recordable global shortcuts, engine (defaulting to "跟随录音设置", which uses the recording's engine and substitutes HY-MT1.5 — or the system engine if it isn't downloaded — for T3PO), my/foreign language, and Accessibility/Screen Recording permission status; the menu bar gains "打开翻译面板" and "截图翻译" (#40)
+- feat(translation): `HYMT15Translator.translateText(_:targetLanguage:sourceIsChinese:)` one-shot text translation using HY-MT1.5's own model-card prompt, independent of the streaming transcript path (#40)
 
 ### Changed
-- refactor(translation): HY-MT1.5 weights are now shared through a reference-counted `HYMT15ModelPool`, so a HY-MT1.5 recording and the selection panel use one loaded copy instead of two; the panel releases its hold after 5 idle minutes
+- refactor(translation): HY-MT1.5 weights are now shared through a reference-counted `HYMT15ModelPool`, so a HY-MT1.5 recording and the selection panel use one loaded copy instead of two; the panel releases its hold after 5 idle minutes (#40)
 - refactor(settings): replace the "长句提前翻译阈值" `Stepper` + three-line explanatory paragraph with a single labeled numeric `TextField` (full explanation moved to a "?" tooltip); keep the "翻译输出"/"引擎运行与显存状态" sections always present and swap only their interior content per selected engine, and animate the remaining engine-switch layout changes, instead of whole sections popping in and out (round-5 user report)
 
 ### Fixed
@@ -22,10 +22,10 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
-- docs(readme): document ⌥A selection translation and ⌥S screenshot translation
+- docs(readme): document ⌥A selection translation and ⌥S screenshot translation (#40)
 
 ### Tests
-- test(selection): `SelectionTextChunker`, `SelectionLanguageDirection`, `SelectionTranslator` (with a fake model backend), `RecognizedTextLayout`, and HY-MT1.5's text prompt
+- test(selection): `SelectionTextChunker`, `SelectionLanguageDirection`, `SelectionTranslator` (with a fake model backend), `RecognizedTextLayout`, and HY-MT1.5's text prompt (#40)
 
 ## [0.4.0] - 2026-09-30
 
