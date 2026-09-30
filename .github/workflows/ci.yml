@@ -17,16 +17,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The Xcode-bundled Swift toolchain on this runner image crashes
-      # compiling swift-testing suites ("error: unexpected input file:
-      # .../plugins/testing", a bug in that image's bundled swift-testing
-      # macro plugin, not in this package). Install a standalone toolchain
-      # via Swiftly instead of relying on Xcode's — Package.swift declares
-      # swift-tools-version 6.2, so pin at least that.
-      - name: Set up Swift toolchain
-        uses: swift-actions/setup-swift@v3
-        with:
-          swift-version: "6.2"
+      # This runner image's default Xcode (26.6) crashes compiling
+      # swift-testing suites: "error: unexpected input file:
+      # .../plugins/testing", a bug in that specific version's bundled
+      # swift-testing macro plugin, not in this package. A standalone
+      # Swiftly-installed toolchain isn't an option either — it can't build
+      # the app target's SwiftUI/SwiftData/Translation framework usage
+      # (@Query, .modelContainer, .translationTask all need Xcode's own
+      # toolchain+SDK pairing). Pin an older Xcode already on this image
+      # instead (see actions/runner-images' macos-26-arm64 readme for the
+      # installed list) until 26.6's plugin is fixed upstream.
+      - name: Select Xcode 26.5
+        run: sudo xcode-select -s /Applications/Xcode_26.5.app
 
       - name: swift --version
         run: swift --version
