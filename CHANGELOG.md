@@ -7,17 +7,33 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(translation): add `EntityMasker` to protect technical terms, URLs, paths, CLI flags, and code identifiers from translation distortion using `⟦n⟧` placeholders (#38)
+- feat(translation): add prompt contract (data isolation, zero commentary) and sliding context window to `HYMT15Translator` inspired by Cida (#38)
 
 ### Changed
+- feat(ui): visually differentiate committed transcript text from live tentative/preview text in `FloatingTranscriptView` using inline styled concatenation (#38)
 - chore(ci): add a GitHub Actions workflow that builds `third_party/{audio.cpp,llama.cpp}` (cached by their pinned commits) and runs `swift build` on every push to `main` and every pull request as a compile/link regression gate; `swift test` is deliberately not run in CI yet — every Xcode 26.x on the current macOS runner image crashes compiling this package's Swift Testing suites (a runner-image toolchain bug, tests pass locally on Xcode 27), and XCUITest coverage under `UITests/` also needs a one-time interactive Accessibility-permission grant an unattended runner can't provide
 
 ### Fixed
+- fix(translation): resolve duplicate identifier masking and safe budget trimming to prevent corrupted placeholders (#38)
+- fix(translation): clear HY-MT1.5 context history when the target language changes, and strip echoed `Current:`/`Translation:` labels from context-prompted output (#38)
+- fix(translation): only unwrap quotes that wrap the whole output, keep single-line fenced output, and count translations toward the history cap while always keeping the latest pair (#38)
+- fix(translation): `EntityMasker` no longer masks ordinary prose (`e.g`, `U.S`, `Mr.Smith`, `and/or`), and restores placeholders the model garbled instead of leaving bare numbers (#38)
+- fix(translation): strip a fenced code block wrapping echoed context (or just the answer after it), and drop an echoed `Current:` source line when a `Translation:` line follows it, instead of leaking either into the transcript (#38)
+- fix(translation): `EntityMasker` masks `-c`/`-h`-style single-letter flags and flags with no preceding space (common in space-less CJK ASR output) without mistaking a negative number for one; masks `~/`, `./`, `../` single-segment paths and `__dunder__` identifiers; trims trailing sentence punctuation off masked URLs/paths (#38)
+- perf(translation): precompile `EntityMasker`'s regular expressions once instead of on every `mask`/`restore` call (#38)
+- fix(translation): `EntityMasker` no longer masks "a.m."/"p.m." as a filename (requires a 2+ character basename), masks combined short CLI flags like `-rf`/`-czvf`/`-Wall`, and keeps a balanced parenthesis inside a masked URL (e.g. a Wikipedia link) while still trimming one that only wraps the URL (#38)
+- fix(translation): `cleanOutput` strips a leaked `Translation:`-style label even on a context-free turn, and recognizes the fullwidth Korean `현재：`/`번역：` label variants (#38)
+- fix(translation): `EntityMasker`'s CLI-flag value no longer swallows trailing CJK text with no separating space (`--output=foo选项`), and its trailing-punctuation trim now applies to flags too (#38)
+- fix(translation): `cleanOutput` strips a markdown fence that comes after a leaked `Translation:` label, not just one wrapping the whole reply or only the labelled answer; `stripContextEcho` now discards any echoed lines (e.g. a repeated `Source:`) between `Current:` and a following `Translation:` instead of leaking them; and it unwraps CJK corner brackets (`「...」`/`『...』`) the same way it already does ASCII/curly quotes (#38)
+- fix(translation): `cleanOutput` now re-applies fence/label/quote stripping until stable, so a leaked `Translation:` label hidden inside wrapping quotes (`"Translation: Hello world"`) is fully unwrapped instead of surfacing the label; `EntityMasker`'s CLI-flag value now allows `:`, so a flag value that's itself a URL or host:port (`--url=https://...`, `--addr=127.0.0.1:8080`) is masked whole instead of splitting and leaving an unmasked remainder (#38)
 
 ### Dependencies
 
 ### Documentation
 
 ### Tests
+- test(translation): add unit test suites `EntityMaskerTests` and `HYMT15PromptContractTests` (#38)
 
 ## [0.3.1] - 2026-09-29
 
