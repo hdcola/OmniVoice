@@ -18,6 +18,7 @@ struct OmniVoiceApp: App {
                 .environmentObject(appDelegate.session)
                 .environmentObject(appDelegate)
                 .environmentObject(settingsNavigation)
+                .environmentObject(appDelegate.selectionController)
         } label: {
             MenuBarLabel(modelDownloadManager: appDelegate.session.modelDownloadManager, session: appDelegate.session)
         }
@@ -39,6 +40,7 @@ struct OmniVoiceApp: App {
             SettingsView(modelDownloadManager: appDelegate.session.modelDownloadManager)
                 .environmentObject(appDelegate.session)
                 .environmentObject(settingsNavigation)
+                .environmentObject(appDelegate.selectionController)
         }
     }
 }

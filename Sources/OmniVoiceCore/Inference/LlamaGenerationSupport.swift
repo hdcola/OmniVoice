@@ -28,19 +28,24 @@ enum LlamaGeneration {
 
     /// Applies `model`'s own built-in chat template
     /// (`llama_model_chat_template(model, nil)`) to a single (system, user)
-    /// message pair. Every role/content C string must stay alive for the
-    /// whole `llama_chat_apply_template` call, not just the `withCString`
-    /// that produced it, hence the nesting.
-    static func applyChatTemplate(model: OpaquePointer, systemPrompt: String, userText: String) -> String? {
+    /// message pair — or, with a nil `systemPrompt`, a lone user message
+    /// (HY-MT1.5's model card documents no system prompt at all; see
+    /// `HYMT15Translator.textUserTurn`). Every role/content C string must
+    /// stay alive for the whole `llama_chat_apply_template` call, not just
+    /// the `withCString` that produced it, hence the nesting.
+    static func applyChatTemplate(model: OpaquePointer, systemPrompt: String?, userText: String) -> String? {
         let tmpl = llama_model_chat_template(model, nil)
         return "system".withCString { systemRolePtr in
             "user".withCString { userRolePtr in
-                systemPrompt.withCString { sysContentPtr -> String? in
+                (systemPrompt ?? "").withCString { sysContentPtr -> String? in
                     userText.withCString { userContentPtr -> String? in
-                        let messages = [
+                        var messages = [
                             llama_chat_message(role: systemRolePtr, content: sysContentPtr),
                             llama_chat_message(role: userRolePtr, content: userContentPtr),
                         ]
+                        if systemPrompt == nil {
+                            messages.removeFirst()
+                        }
                         var bufSize: Int32 = 8192
                         var buf = [CChar](repeating: 0, count: Int(bufSize))
                         var n = messages.withUnsafeBufferPointer { msgs in

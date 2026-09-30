@@ -11,6 +11,17 @@ import Testing
         #expect(prompt.contains("Never include explanations, pleasantries, quotation marks, or markdown wrappers"))
     }
 
+    @Test func textUserTurnUsesModelCardPrompts() {
+        let intoChinese = HYMT15Translator.textUserTurn(source: "Hello", targetLanguage: .chinese, sourceIsChinese: false)
+        #expect(intoChinese == "将以下文本翻译为中文，注意只需要输出翻译后的结果，不要额外解释：\n\nHello")
+
+        let fromChinese = HYMT15Translator.textUserTurn(source: "你好", targetLanguage: .english, sourceIsChinese: true)
+        #expect(fromChinese == "将以下文本翻译为英语，注意只需要输出翻译后的结果，不要额外解释：\n\n你好")
+
+        let noChinese = HYMT15Translator.textUserTurn(source: "Hello", targetLanguage: .japanese, sourceIsChinese: false)
+        #expect(noChinese == "Translate the following segment into Japanese, without additional explanation.\n\nHello")
+    }
+
     @Test func formatUserTurnWithoutHistoryReturnsDirectSource() {
         let formatted = HYMT15Translator.formatUserTurn(currentSource: "Hello world", history: [])
         #expect(formatted == "Hello world")

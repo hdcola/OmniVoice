@@ -1245,8 +1245,7 @@ public final class RecordingSession: ObservableObject {
     /// languages (see `LanguageCatalog`) where that's true; everything else
     /// (notably English and Korean) does.
     private static func targetLanguageJoinsWithoutSpaces(_ code: String) -> Bool {
-        let primary = code.split(separator: "-").first.map(String.init)?.lowercased() ?? code.lowercased()
-        return primary == "zh" || primary == "ja" || primary == "yue"
+        SelectionLanguageDirection.joinsWithoutSpaces(code)
     }
 
     private func updateTranslationPreview(_ text: String) {

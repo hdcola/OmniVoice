@@ -10,6 +10,9 @@ struct MenuBarContentView: View {
     @EnvironmentObject private var session: RecordingSession
     @EnvironmentObject private var appDelegate: AppDelegate
     @EnvironmentObject private var settingsNavigation: SettingsNavigationState
+    /// Observed (not just reached through `appDelegate`) so the rows below
+    /// pick up a shortcut re-recorded in Settings.
+    @EnvironmentObject private var selectionController: SelectionTranslationController
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     /// Same instance `SettingsView`/`ModelManagementView` observe — see
@@ -83,6 +86,19 @@ struct MenuBarContentView: View {
 
         Divider()
 
+        // The global shortcuts are the main way in; these rows make the
+        // feature discoverable and show which keys to press. The panel
+        // opens as it was left rather than reading a selection — by the time
+        // a menu row is clicked, the menu itself holds the focus.
+        Button(menuTitle("打开翻译面板", for: .translateSelection)) {
+            selectionController.showPanel()
+        }
+        Button(menuTitle("截图翻译", for: .captureText)) {
+            selectionController.perform(.captureText)
+        }
+
+        Divider()
+
         // Audio source — changed far less often than start/stop or the
         // language pair (which live on the floating panel instead), but
         // still frequent enough to want here rather than buried in
@@ -138,6 +154,11 @@ struct MenuBarContentView: View {
             NSApp.terminate(nil)
         }
         .keyboardShortcut("q")
+    }
+
+    private func menuTitle(_ title: String, for action: GlobalShortcutAction) -> String {
+        guard let shortcut = selectionController.shortcuts[action] else { return title }
+        return "\(title)（\(shortcut.displayText)）"
     }
 
     /// "模型管理…", plus a live progress readout once a download is running
