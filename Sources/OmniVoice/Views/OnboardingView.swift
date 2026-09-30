@@ -299,3 +299,9 @@ struct OnboardingView: View {
 enum PersistedOnboardingKey {
     static let hasCompletedOnboarding = "org.omnivoice.hasCompletedOnboarding"
 }
+
+enum PersistedFloatingPanelKey {
+    /// Bool, absent means `true` — whether the live-transcript floating panel
+    /// opens automatically at launch.
+    static let showOnLaunch = "org.omnivoice.floatingPanel.showOnLaunch"
+}
