@@ -122,117 +122,39 @@ struct FloatingTranscriptView: View {
     /// because it has this panel's key-window constraint, but so the two
     /// don't offer different language options.)
     private var controlBar: some View {
-        // Wrapped in a horizontal `ScrollView` rather than a fixed-width
-        // `HStack` alone: even after shrinking the display-mode/font-scale
-        // pickers below to `.fixedSize()`, the full row (start/stop, both
-        // language pickers, the elapsed timer, both new pickers, copy, and
-        // close) can still exceed the panel's 380pt minimum width — this is
-        // the safety net that scrolls instead of clipping/truncating any
-        // control at that width, rather than relying solely on the panel
-        // never being resized narrower than what the row happens to need.
-        ScrollView(.horizontal, showsIndicators: false) {
-            controlBarContent
-        }
-    }
-
-    private var controlBarContent: some View {
+        // Copy/close live outside the adaptive part and are always pinned to
+        // the trailing edge — an earlier version wrapped the *whole* row in a
+        // horizontal `ScrollView`, which sized it to its natural width: at a
+        // narrow panel the close button scrolled off-screen, and at a wide
+        // one the row stayed left-aligned, leaving a big empty gap to the
+        // right of the close button (a `Spacer` inside a scroll view has no
+        // width to expand into).
         HStack(spacing: 10) {
-            Button {
-                Task {
-                    if session.isRunning {
-                        await session.stop()
-                    } else {
-                        await session.start()
-                    }
+            // Picks the first layout that fits the space left after the
+            // trailing buttons: everything inline at natural width, then the
+            // display-mode/font-scale pickers folded into one menu, and as a
+            // last resort language pickers that shrink (truncating their
+            // labels) instead of anything being hidden or scrolled away.
+            // `.layoutPriority(1)` makes the `HStack` offer this all of the
+            // remaining width first, instead of splitting it with the
+            // `Spacer` below.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    primaryControls(compressible: false)
+                    displayOptionPickers
                 }
-            } label: {
-                HStack(spacing: 5) {
-                    // Only while `isStarting` — a cold `start()` (no
-                    // preloaded model yet) does the exact same
-                    // possibly-multi-second `loadModel()` work
-                    // `preloadButton` guards, just without a warning first.
-                    // Without this spinner that stretch had zero visual
-                    // feedback beyond the static "启动中…" label — with the
-                    // main-actor-blocking bug fixed (see
-                    // `InProcessTranscriber.loadModel(modelPath:)`'s doc),
-                    // the window itself stays responsive through it, so this
-                    // is what actually shows something's happening.
-                    if session.isStarting {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                    Text(session.isRunning ? "停止" : (session.isStarting ? "启动中…" : "开始"))
+                HStack(spacing: 10) {
+                    primaryControls(compressible: false)
+                    displayOptionsMenu
+                }
+                HStack(spacing: 10) {
+                    primaryControls(compressible: true)
+                    displayOptionsMenu
                 }
             }
-            .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
+            .layoutPriority(1)
 
-            // Disabled for the whole start→stop lifecycle (isSessionActive,
-            // not just isRunning): it's only read once, at the top of
-            // `start()`, to configure the ASR engine for that recording
-            // (`SpeechAnalyzer`'s locale can't change mid-session) — editing
-            // it during setup would either race that read or silently not
-            // apply until the next start.
-            SourceLanguagePicker(
-                sourceLanguageCode: $session.sourceLanguageCode,
-                transcriptionEngineKind: session.transcriptionEngineKind
-            )
-            .labelsHidden()
-            .disabled(session.isSessionActive)
-
-            Image(systemName: "arrow.right")
-                .foregroundStyle(.secondary)
-                .font(.caption)
-
-            // Target stays editable while running: unlike source, it isn't
-            // baked into a provider at `start()` — the `.translationTask`
-            // above rebuilds `translationConfiguration` on every change, so
-            // switching it mid-recording actually retargets the next
-            // translated segment.
-            TargetLanguagePicker(
-                targetLanguageCode: $session.targetLanguageCode,
-                translationEngineID: session.translationEngineID,
-                onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
-                isSessionActive: session.isSessionActive,
-                // Review Round 1 Must-Fix 2 — the compact control bar is a
-                // single 30pt-tall row; the full multi-line warning card
-                // would blow that out and shove the transcript list down.
-                isCompact: true
-            )
-            .labelsHidden()
-
-            // 录制计时器（提案 3.1.E）— 只在录制中显示，停止后复位，避免一个
-            // 静止的 "00:00:00" 常驻在控制栏里，看起来像是坏掉了。
-            if session.isRunning {
-                Text(session.elapsedTimeString)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-
-            // 显示模式切换（提案 3.1.B）：双语对照 / 仅译文 / 仅原文。
-            // `.fixedSize()` instead of a fixed `.frame(width:)` — the old
-            // 90pt/70pt widths (sized for this picker's *widest* option, not
-            // its current one) were a big part of why the control bar's
-            // natural width overflowed the panel's 380pt minimum; sizing to
-            // the currently-selected label's actual content is narrower in
-            // every case but still never clips whichever option is showing.
-            Picker("显示模式", selection: $session.panelDisplayMode) {
-                ForEach(PanelDisplayMode.allCases, id: \.self) { mode in
-                    Text(mode.displayName).tag(mode)
-                }
-            }
-            .labelsHidden()
-            .fixedSize()
-
-            // 字号档位（提案 3.1.C）：标准 / 大 / 特大。
-            Picker("字号", selection: $session.panelFontScale) {
-                ForEach(PanelFontScale.allCases, id: \.self) { scale in
-                    Text(scale.displayName).tag(scale)
-                }
-            }
-            .labelsHidden()
-            .fixedSize()
-
-            Spacer(minLength: 20)
+            Spacer(minLength: 0)
 
             // "一键复制全文" (proposal 3.1.D / roadmap P1_3) — copies the
             // whole current transcript, not just a single selected line;
@@ -251,6 +173,135 @@ struct FloatingTranscriptView: View {
             PanelCloseButton(action: onClose)
         }
         .padding(10)
+    }
+
+    /// Start/stop, the source → target language pickers, and the timer.
+    /// The language pickers are flexible views that would otherwise stretch
+    /// across the whole bar in a wide panel, so they're pinned to their
+    /// natural width (the selected language's label) — except with
+    /// `compressible`, where they may shrink below it to fit a narrow one.
+    @ViewBuilder
+    private func primaryControls(compressible: Bool) -> some View {
+        Button {
+            Task {
+                if session.isRunning {
+                    await session.stop()
+                } else {
+                    await session.start()
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                // Only while `isStarting` — a cold `start()` (no
+                // preloaded model yet) does the exact same
+                // possibly-multi-second `loadModel()` work
+                // `preloadButton` guards, just without a warning first.
+                // Without this spinner that stretch had zero visual
+                // feedback beyond the static "启动中…" label — with the
+                // main-actor-blocking bug fixed (see
+                // `InProcessTranscriber.loadModel(modelPath:)`'s doc),
+                // the window itself stays responsive through it, so this
+                // is what actually shows something's happening.
+                if session.isStarting {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Text(session.isRunning ? "停止" : (session.isStarting ? "启动中…" : "开始"))
+            }
+        }
+        .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
+
+        // Disabled for the whole start→stop lifecycle (isSessionActive,
+        // not just isRunning): it's only read once, at the top of
+        // `start()`, to configure the ASR engine for that recording
+        // (`SpeechAnalyzer`'s locale can't change mid-session) — editing
+        // it during setup would either race that read or silently not
+        // apply until the next start.
+        SourceLanguagePicker(
+            sourceLanguageCode: $session.sourceLanguageCode,
+            transcriptionEngineKind: session.transcriptionEngineKind
+        )
+        .labelsHidden()
+        .disabled(session.isSessionActive)
+        .fixedSize(horizontal: !compressible, vertical: false)
+
+        Image(systemName: "arrow.right")
+            .foregroundStyle(.secondary)
+            .font(.caption)
+
+        // Target stays editable while running: unlike source, it isn't
+        // baked into a provider at `start()` — the `.translationTask`
+        // above rebuilds `translationConfiguration` on every change, so
+        // switching it mid-recording actually retargets the next
+        // translated segment.
+        TargetLanguagePicker(
+            targetLanguageCode: $session.targetLanguageCode,
+            translationEngineID: session.translationEngineID,
+            onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
+            isSessionActive: session.isSessionActive,
+            // Review Round 1 Must-Fix 2 — the compact control bar is a
+            // single 30pt-tall row; the full multi-line warning card
+            // would blow that out and shove the transcript list down.
+            isCompact: true
+        )
+        .labelsHidden()
+        .fixedSize(horizontal: !compressible, vertical: false)
+
+        // 录制计时器（提案 3.1.E）— 只在录制中显示，停止后复位，避免一个
+        // 静止的 "00:00:00" 常驻在控制栏里，看起来像是坏掉了。
+        if session.isRunning {
+            Text(session.elapsedTimeString)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// 显示模式切换（提案 3.1.B：双语对照 / 仅译文 / 仅原文）与字号档位
+    /// （提案 3.1.C：标准 / 大 / 特大），在控制栏放得下时直接平铺。
+    /// `.fixedSize()` instead of a fixed `.frame(width:)` — sizing to the
+    /// currently-selected label's actual content is narrower than one sized
+    /// for the widest option, but still never clips whichever one is showing.
+    @ViewBuilder
+    private var displayOptionPickers: some View {
+        displayModePicker
+            .labelsHidden()
+            .fixedSize()
+        fontScalePicker
+            .labelsHidden()
+            .fixedSize()
+    }
+
+    /// The same two pickers folded into a single icon menu, for when the
+    /// panel is too narrow to show them inline (see `controlBar`). A menu,
+    /// like the pickers themselves, still works from a plain mouse click on
+    /// this never-key panel.
+    private var displayOptionsMenu: some View {
+        Menu {
+            displayModePicker
+            fontScalePicker
+        } label: {
+            Image(systemName: "textformat.size")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("显示选项")
+    }
+
+    private var displayModePicker: some View {
+        Picker("显示模式", selection: $session.panelDisplayMode) {
+            ForEach(PanelDisplayMode.allCases, id: \.self) { mode in
+                Text(mode.displayName).tag(mode)
+            }
+        }
+    }
+
+    private var fontScalePicker: some View {
+        Picker("字号", selection: $session.panelFontScale) {
+            ForEach(PanelFontScale.allCases, id: \.self) { scale in
+                Text(scale.displayName).tag(scale)
+            }
+        }
     }
 
     /// Copies every closed/in-progress transcript line as plain bilingual

@@ -18,6 +18,8 @@ The format is based on Keep a Changelog.
 - refactor(settings): replace the "长句提前翻译阈值" `Stepper` + three-line explanatory paragraph with a single labeled numeric `TextField` (full explanation moved to a "?" tooltip); keep the "翻译输出"/"引擎运行与显存状态" sections always present and swap only their interior content per selected engine, and animate the remaining engine-switch layout changes, instead of whole sections popping in and out (round-5 user report)
 
 ### Fixed
+- fix(ui): the floating panel's top control bar now adapts to the panel width — copy/close stay pinned to the right edge (no empty gap when wide), language pickers keep their natural width instead of stretching, and when narrow the display-mode/font-size pickers fold into a menu and the language labels truncate instead of controls being clipped
+- fix(ui): hovering the floating panel's edges/corners now shows the matching resize cursor, and dragging there resizes the panel — previously only a thin strip outside the visible edge resized it, with no cursor feedback, because the window server ignores cursor changes from a background app (the non-activating panel's app is never active while hovered)
 
 ### Dependencies
 
