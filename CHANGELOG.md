@@ -16,6 +16,9 @@ The format is based on Keep a Changelog.
 
 ### Fixed
 - fix(translation): resolve duplicate identifier masking and safe budget trimming to prevent corrupted placeholders (#38)
+- fix(translation): clear HY-MT1.5 context history when the target language changes, and strip echoed `Current:`/`Translation:` labels from context-prompted output (#38)
+- fix(translation): only unwrap quotes that wrap the whole output, keep single-line fenced output, and count translations toward the history cap while always keeping the latest pair (#38)
+- fix(translation): `EntityMasker` no longer masks ordinary prose (`e.g`, `U.S`, `Mr.Smith`, `and/or`), and restores placeholders the model garbled instead of leaving bare numbers (#38)
 
 ### Dependencies
 

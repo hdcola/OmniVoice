@@ -50,7 +50,7 @@ import Testing
 
     @Test func handlesMismatchedOrOutOfRangePlaceholdersGracefully() {
         let restored = EntityMasker.restore(translation: "结果是 ⟦99⟧ 还有 ⟦abc⟧", verbatim: ["test"])
-        #expect(restored == "结果是 99 还有 abc")
+        #expect(restored == "结果是 还有 abc")
     }
 
     @Test func masksAndRestoresRepeatedIdenticalEntities() {
@@ -76,6 +76,48 @@ import Testing
 
     @Test func cleansDanglingOrBrokenBracketsGracefully() {
         let restored = EntityMasker.restore(translation: "结果 ⟦0⟧ 和 broken 0⟧ 以及 ⟦unclosed", verbatim: ["valid_token"])
-        #expect(restored == "结果 valid_token 和 broken 0 以及 unclosed")
+        #expect(restored == "结果 valid_token 和 broken valid_token 以及 unclosed")
+    }
+
+    @Test func restoresPlaceholdersWithInnerWhitespace() {
+        let restored = EntityMasker.restore(translation: "使用 ⟦ 0 ⟧ 和 ⟦1 ⟧", verbatim: ["model_path", "--verbose"])
+        #expect(restored == "使用 model_path 和 --verbose")
+    }
+
+    @Test func leavesPlainNumbersAndDropsUnknownPlaceholders() {
+        #expect(EntityMasker.restore(translation: "共 3 个", verbatim: ["x_y"]) == "共 3 个")
+        #expect(EntityMasker.restore(translation: "⟦5⟧ 结束", verbatim: []) == "结束")
+    }
+
+    @Test func doesNotMaskOrdinaryDottedProse() {
+        for input in ["See e.g. this", "Made in the U.S.", "Hi Mr.Smith", "okay.So we start", "okay.so we start"] {
+            let (masked, verbatim) = EntityMasker.mask(input)
+            #expect(masked == input, "\(input)")
+            #expect(verbatim.isEmpty, "\(input)")
+        }
+    }
+
+    @Test func masksDottedCodeAndFilenames() {
+        let (_, verbatim) = EntityMasker.mask("Open README.md, set config.modelPath and read self.view.frame.")
+        #expect(verbatim == ["README.md", "config.modelPath", "self.view.frame"])
+    }
+
+    @Test func doesNotMaskSlashesInsideWords() {
+        for input in ["use and/or/xor here", "about 1/2/3 of them"] {
+            let (masked, verbatim) = EntityMasker.mask(input)
+            #expect(masked == input, "\(input)")
+            #expect(verbatim.isEmpty, "\(input)")
+        }
+    }
+
+    @Test func masksHomeRelativePaths() {
+        let (masked, verbatim) = EntityMasker.mask("Check ~/Downloads/model.gguf now")
+        #expect(masked == "Check ⟦0⟧ now")
+        #expect(verbatim == ["~/Downloads/model.gguf"])
+    }
+
+    @Test func masksSnakeCaseWithLeadingUnderscore() {
+        let (_, verbatim) = EntityMasker.mask("Call _private_helper first")
+        #expect(verbatim == ["_private_helper"])
     }
 }

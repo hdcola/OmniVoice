@@ -47,4 +47,25 @@ import Testing
         let regular = "  普通干净文本  \n"
         #expect(HYMT15Translator.cleanOutput(regular) == "普通干净文本")
     }
+
+    @Test func cleanOutputKeepsInnerQuotes() {
+        let text = "\"Yes\" he said \"no\""
+        #expect(HYMT15Translator.cleanOutput(text) == text)
+        #expect(HYMT15Translator.cleanOutput("“是”他说“不”") == "“是”他说“不”")
+    }
+
+    @Test func cleanOutputHandlesSingleLineFence() {
+        #expect(HYMT15Translator.cleanOutput("```你好```") == "你好")
+        #expect(HYMT15Translator.cleanOutput("```你好\n世界```") == "你好\n世界")
+    }
+
+    @Test func cleanOutputStripsEchoedContextLabels() {
+        #expect(HYMT15Translator.cleanOutput("Current: 第一个议题是预算。", hadContext: true) == "第一个议题是预算。")
+        #expect(HYMT15Translator.cleanOutput("当前：第一个议题是预算。", hadContext: true) == "第一个议题是预算。")
+        #expect(HYMT15Translator.cleanOutput("Translation: 第一个议题是预算。", hadContext: true) == "第一个议题是预算。")
+        let echoed = "Context:\nSource: Hi\nTranslation: 你好\n---\nCurrent: 第一个议题是预算。"
+        #expect(HYMT15Translator.cleanOutput(echoed, hadContext: true) == "第一个议题是预算。")
+        // Without context in the prompt, label-like text is left untouched.
+        #expect(HYMT15Translator.cleanOutput("Current: 电流", hadContext: false) == "Current: 电流")
+    }
 }
