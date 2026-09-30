@@ -315,6 +315,18 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       onboarding wizard with three mode choices, disk-space pre-flight and
       inline download retry, plus the model-download/bundle-status review
       fixes (PR #33, including its code-review fix rounds).
+- [x] **0.4.0 release cut** (2026-09-30, `chore/release-0.4.0`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.4.0,
+      `CFBundleVersion` 7), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.4.0]` section, `README.md`'s version/download-link references
+      bumped to match. Bundles everything merged since `0.3.1`: local
+      model translation engineering enhancements inspired by Cida
+      (`EntityMasker` technical term / URL / CLI-flag masking and
+      restoration, prompt contract isolation and sliding context window
+      for HY-MT1.5, defensive quote/fence unwrapping fixpoint, live vs.
+      committed transcript visual styling, PR #38), XCUITest test
+      infrastructure and automated UI testing coverage (PR #36), and CI
+      build regression workflow (PR #37).
 
 ### Code review findings (fixed)
 
