@@ -17,6 +17,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The Xcode-bundled Swift toolchain on this runner image crashes
+      # compiling swift-testing suites ("error: unexpected input file:
+      # .../plugins/testing", a bug in that image's bundled swift-testing
+      # macro plugin, not in this package). Install a standalone toolchain
+      # via Swiftly instead of relying on Xcode's — Package.swift declares
+      # swift-tools-version 6.2, so pin at least that.
+      - name: Set up Swift toolchain
+        uses: swift-actions/setup-swift@v3
+        with:
+          swift-version: "6.2"
+
+      - name: swift --version
+        run: swift --version
+
       # Package.swift links against third_party/{audio.cpp,llama.cpp}'s
       # built dylibs unconditionally (see Docs/MODEL_ENGINE_SETUP.md) — even
       # a plain `swift build` cannot succeed without them, model weights
