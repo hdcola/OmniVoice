@@ -163,4 +163,29 @@ import Testing
         #expect(masked == "The temperature is -1 degrees, or -3.14 exactly.")
         #expect(verbatim.isEmpty)
     }
+
+    @Test func masksCombinedShortFlags() {
+        for (input, flag) in [("rm -rf now", "-rf"), ("tar -czvf now", "-czvf"), ("gcc -Wall now", "-Wall")] {
+            let (_, verbatim) = EntityMasker.mask(input)
+            #expect(verbatim == [flag], "\(input)")
+        }
+    }
+
+    @Test func doesNotMaskAmPmAsFilenames() {
+        for input in ["Meet at 10 a.m. tomorrow", "Call before 8 p.m. tonight"] {
+            let (masked, verbatim) = EntityMasker.mask(input)
+            #expect(masked == input, "\(input)")
+            #expect(verbatim.isEmpty, "\(input)")
+        }
+    }
+
+    @Test func keepsBalancedParenthesesInsideUrlsButTrimsWrappingOnes() {
+        let (masked1, verbatim1) = EntityMasker.mask("See https://en.wikipedia.org/wiki/Foo_(bar) for details.")
+        #expect(masked1 == "See ⟦0⟧ for details.")
+        #expect(verbatim1 == ["https://en.wikipedia.org/wiki/Foo_(bar)"])
+
+        let (masked2, verbatim2) = EntityMasker.mask("please check (https://github.com) now")
+        #expect(masked2 == "please check (⟦0⟧) now")
+        #expect(verbatim2 == ["https://github.com"])
+    }
 }

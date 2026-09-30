@@ -84,4 +84,16 @@ import Testing
         let echoed = "Context:\nSource: Hi\nTranslation: 你好\n---\nCurrent: Good morning\nTranslation: 早上好"
         #expect(HYMT15Translator.cleanOutput(echoed, hadContext: true) == "早上好")
     }
+
+    @Test func cleanOutputStripsEchoedTranslationLabelEvenWithoutContext() {
+        // A zero-shot turn (no "Current:" in the prompt to echo) can still
+        // get a leaked "Translation:" label from an instruction-tuned model.
+        #expect(HYMT15Translator.cleanOutput("Translation: 你好，世界", hadContext: false) == "你好，世界")
+        #expect(HYMT15Translator.cleanOutput("翻译：你好，世界", hadContext: false) == "你好，世界")
+    }
+
+    @Test func cleanOutputRecognizesFullwidthKoreanLabels() {
+        #expect(HYMT15Translator.cleanOutput("현재：안녕하세요", hadContext: true) == "안녕하세요")
+        #expect(HYMT15Translator.cleanOutput("번역：안녕하세요", hadContext: false) == "안녕하세요")
+    }
 }

@@ -22,6 +22,8 @@ The format is based on Keep a Changelog.
 - fix(translation): strip a fenced code block wrapping echoed context (or just the answer after it), and drop an echoed `Current:` source line when a `Translation:` line follows it, instead of leaking either into the transcript (#38)
 - fix(translation): `EntityMasker` masks `-c`/`-h`-style single-letter flags and flags with no preceding space (common in space-less CJK ASR output) without mistaking a negative number for one; masks `~/`, `./`, `../` single-segment paths and `__dunder__` identifiers; trims trailing sentence punctuation off masked URLs/paths (#38)
 - perf(translation): precompile `EntityMasker`'s regular expressions once instead of on every `mask`/`restore` call (#38)
+- fix(translation): `EntityMasker` no longer masks "a.m."/"p.m." as a filename (requires a 2+ character basename), masks combined short CLI flags like `-rf`/`-czvf`/`-Wall`, and keeps a balanced parenthesis inside a masked URL (e.g. a Wikipedia link) while still trimming one that only wraps the URL (#38)
+- fix(translation): `cleanOutput` strips a leaked `Translation:`-style label even on a context-free turn, and recognizes the fullwidth Korean `현재：`/`번역：` label variants (#38)
 
 ### Dependencies
 

@@ -25,10 +25,11 @@ public struct EntityMasker: Sendable {
         // something like "a/b" in ordinary prose.
         findMatches(regex: pathRegex, in: text, into: &matches, trimTrailingPunctuation: true)
 
-        // 4. CLI flags: e.g. --verbose, --filter=x, -c, -h. Matched even with
-        // no preceding space — common in space-less ASR transcripts of CJK
-        // speech (e.g. "执行--dry-run选项") — but a short flag must be a
-        // single letter so a negative number like -1 is never masked.
+        // 4. CLI flags: e.g. --verbose, --filter=x, -c, -h, -rf, -czvf, -Wall.
+        // Matched even with no preceding space — common in space-less ASR
+        // transcripts of CJK speech (e.g. "执行--dry-run选项") — but a short
+        // flag's body is letters-only, so a negative number like -1 or -3.14
+        // is never masked.
         findMatches(regex: flagRegex, in: text, into: &matches)
 
         // 5. Code identifiers:
@@ -147,16 +148,23 @@ public struct EntityMasker: Sendable {
     private static let pathRegex = try! NSRegularExpression(
         pattern: #"(?<![a-zA-Z0-9_.~/-])(?:(?:~/|\.{1,2}/)[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)*|/[a-zA-Z0-9_.-]+(?:/[a-zA-Z0-9_.-]+)+)"#
     )
+    // `-[a-zA-Z]+` (one or more *letters*) also covers combined short flags
+    // like `-rf`, `-czvf`, `-Wall` — it still can't match a negative number
+    // (`-1`, `-3.14`) since digits aren't letters.
     private static let flagRegex = try! NSRegularExpression(
-        pattern: #"(?<![a-zA-Z0-9_-])(?:--[a-zA-Z0-9_-]+(?:=[^\s]+)?|-[a-zA-Z](?:=[^\s]+)?)(?![a-zA-Z0-9_-])"#
+        pattern: #"(?<![a-zA-Z0-9_-])(?:--[a-zA-Z0-9_-]+(?:=[^\s]+)?|-[a-zA-Z]+(?:=[^\s]+)?)(?![a-zA-Z0-9_-])"#
     )
     private static let snakeRegex = try! NSRegularExpression(
         pattern: #"(?<![a-zA-Z0-9_])(?:__[a-zA-Z][a-zA-Z0-9]*__|_*[a-zA-Z][a-zA-Z0-9]*(?:_+[a-zA-Z0-9]+)+_*)(?![a-zA-Z0-9_])"#
     )
+    // The basename requires at least 2 characters (`[a-zA-Z_][a-zA-Z0-9_-]+`,
+    // not `*`): `fileExtensions` includes single-letter extensions like `m`
+    // and `h` for Objective-C, and a `*` there would let "10 a.m." or
+    // "8 p.m." match as a filename with basename "a"/"p".
     private static let fileRegex: NSRegularExpression = {
         let extensions = fileExtensions.joined(separator: "|")
         return try! NSRegularExpression(
-            pattern: #"(?<![a-zA-Z0-9_.])[a-zA-Z_][a-zA-Z0-9_-]*\.(?:"# + extensions + #")(?![a-zA-Z0-9_])"#
+            pattern: #"(?<![a-zA-Z0-9_.])[a-zA-Z_][a-zA-Z0-9_-]+\.(?:"# + extensions + #")(?![a-zA-Z0-9_])"#
         )
     }()
     private static let dottedRegex: NSRegularExpression = {
@@ -176,6 +184,13 @@ public struct EntityMasker: Sendable {
     /// rather than part of the entity itself when it trails a URL or path
     /// match — e.g. "visit https://example.com." shouldn't mask the period.
     private static let trailingPunctuation: Set<Character> = [".", ",", ";", ":", "!", "?"]
+    /// Closing brackets that trail a URL/path match only because the whole
+    /// entity sat inside a parenthetical (e.g. "(https://github.com)") — but
+    /// not when the bracket is itself part of the entity (e.g. a Wikipedia
+    /// URL like ".../wiki/Foo_(bar)", where opens and closes balance).
+    private static let trailingCloserToOpener: [Character: Character] = [
+        ")": "(", "]": "[", "）": "（", "】": "【",
+    ]
 
     private static func findMatches(
         regex: NSRegularExpression,
@@ -188,10 +203,21 @@ public struct EntityMasker: Sendable {
         for result in results {
             guard var range = Range(result.range, in: text) else { continue }
             if trimTrailingPunctuation {
-                while range.upperBound > range.lowerBound,
-                      trailingPunctuation.contains(text[text.index(before: range.upperBound)])
-                {
-                    range = range.lowerBound..<text.index(before: range.upperBound)
+                trimLoop: while range.upperBound > range.lowerBound {
+                    let last = text[text.index(before: range.upperBound)]
+                    if trailingPunctuation.contains(last) {
+                        range = range.lowerBound..<text.index(before: range.upperBound)
+                        continue
+                    }
+                    if let opener = trailingCloserToOpener[last] {
+                        let opens = text[range].filter { $0 == opener }.count
+                        let closes = text[range].filter { $0 == last }.count
+                        if closes > opens {
+                            range = range.lowerBound..<text.index(before: range.upperBound)
+                            continue
+                        }
+                    }
+                    break trimLoop
                 }
                 guard !range.isEmpty else { continue }
             }

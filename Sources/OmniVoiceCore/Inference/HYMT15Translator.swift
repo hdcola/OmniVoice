@@ -127,8 +127,8 @@ final class HYMT15Translator: @unchecked Sendable {
 
     /// Labels `formatUserTurn` emits (plus the obvious translations a small
     /// model might echo back instead), matched at the start of a line.
-    private static let currentLabels = ["Current:", "Current：", "当前:", "当前：", "現在:", "現在：", "현재:"]
-    private static let translationLabels = ["Translation:", "Translation：", "翻译:", "翻译：", "译文:", "译文：", "翻訳:", "翻訳：", "번역:"]
+    private static let currentLabels = ["Current:", "Current：", "当前:", "当前：", "現在:", "現在：", "현재:", "현재："]
+    private static let translationLabels = ["Translation:", "Translation：", "翻译:", "翻译：", "译文:", "译文：", "翻訳:", "翻訳：", "번역:", "번역："]
 
     /// Strips markdown fences, quotes, or conversational wrappers if the LLM
     /// output them. `hadContext` means the prompt used `formatUserTurn`'s
@@ -140,6 +140,11 @@ final class HYMT15Translator: @unchecked Sendable {
     /// label — either way, exactly one of the two passes needs to see the
     /// fence delimiters to remove them, and running the same idempotent step
     /// twice is a no-op when there's nothing left to strip.
+    ///
+    /// A leading `Translation:`-style label is stripped unconditionally, not
+    /// just when `hadContext` is true: an instruction-tuned model can echo
+    /// that label on a plain zero-shot turn too (no `Current:` in the prompt
+    /// to echo), and it would otherwise reach the transcript verbatim.
     static func cleanOutput(_ text: String, hadContext: Bool = false) -> String {
         var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if hadContext {
@@ -147,7 +152,13 @@ final class HYMT15Translator: @unchecked Sendable {
             cleaned = stripContextEcho(cleaned)
         }
         cleaned = stripMarkdownFence(cleaned)
+        cleaned = stripTranslationLabel(cleaned)
         return stripWrappingQuotes(cleaned)
+    }
+
+    private static func stripTranslationLabel(_ text: String) -> String {
+        guard let label = translationLabels.first(where: text.hasPrefix) else { return text }
+        return String(text.dropFirst(label.count)).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func stripMarkdownFence(_ text: String) -> String {
@@ -178,7 +189,8 @@ final class HYMT15Translator: @unchecked Sendable {
     }
 
     /// Keeps only the text after the last echoed `Current:` label (or `---`
-    /// separator), then drops a leading `Translation:` label.
+    /// separator) — a leading `Translation:` label left behind is stripped
+    /// unconditionally by `cleanOutput`, not here.
     private static func stripContextEcho(_ text: String) -> String {
         var lines = text.components(separatedBy: "\n")
         if let lastLabelled = lines.lastIndex(where: { line in
@@ -200,11 +212,7 @@ final class HYMT15Translator: @unchecked Sendable {
             }
             lines = rest
         }
-        var result = lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-        if let label = translationLabels.first(where: result.hasPrefix) {
-            result = String(result.dropFirst(label.count)).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        return result
+        return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Resolved weights path — mirrors `InProcessTranslator.resolveModelPath`'s
