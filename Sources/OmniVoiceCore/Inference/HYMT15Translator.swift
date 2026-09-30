@@ -285,11 +285,14 @@ final class HYMT15Translator: @unchecked Sendable {
             prompt = retried
         }
 
-        var trimmedSource = maskedSource
-        while LlamaGeneration.tokenCount(of: prompt, vocab: vocab) > budget, trimmedSource.count > 1 {
-            let dropCount = max(1, trimmedSource.count / 8)
-            trimmedSource.removeFirst(min(dropCount, trimmedSource.count - 1))
-            let retriedUserText = Self.formatUserTurn(currentSource: trimmedSource, history: [])
+        var rawSource = sourceText
+        var activeVerbatim = verbatim
+        while LlamaGeneration.tokenCount(of: prompt, vocab: vocab) > budget, rawSource.count > 1 {
+            let dropCount = max(1, rawSource.count / 8)
+            rawSource.removeFirst(min(dropCount, rawSource.count - 1))
+            let (newMasked, newVerbatim) = EntityMasker.mask(rawSource)
+            activeVerbatim = newVerbatim
+            let retriedUserText = Self.formatUserTurn(currentSource: newMasked, history: [])
             guard let retried = LlamaGeneration.applyChatTemplate(
                 model: model, systemPrompt: systemPrompt, userText: retriedUserText
             ) else { return }
@@ -304,10 +307,10 @@ final class HYMT15Translator: @unchecked Sendable {
             samplerForStep: { _ in sampler }
         )
         let cleaned = Self.cleanOutput(rawOutput)
-        let output = EntityMasker.restore(translation: cleaned, verbatim: verbatim)
+        let output = EntityMasker.restore(translation: cleaned, verbatim: activeVerbatim)
 
         guard !output.isEmpty else { return }
-        appendHistoryLocked(source: sourceText, translation: output)
+        appendHistoryLocked(source: rawSource, translation: output)
         onCommit?(output)
     }
 

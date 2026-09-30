@@ -50,6 +50,32 @@ import Testing
 
     @Test func handlesMismatchedOrOutOfRangePlaceholdersGracefully() {
         let restored = EntityMasker.restore(translation: "结果是 ⟦99⟧ 还有 ⟦abc⟧", verbatim: ["test"])
-        #expect(restored == "结果是 ⟦99⟧ 还有 ⟦abc⟧")
+        #expect(restored == "结果是 99 还有 abc")
+    }
+
+    @Test func masksAndRestoresRepeatedIdenticalEntities() {
+        let input = "Use model_path here and model_path there."
+        let (masked, verbatim) = EntityMasker.mask(input)
+        #expect(masked == "Use ⟦0⟧ here and ⟦1⟧ there.")
+        #expect(verbatim == ["model_path", "model_path"])
+
+        let translated = "在这里使用 ⟦0⟧，并在那里使用 ⟦1⟧。"
+        let restored = EntityMasker.restore(translation: translated, verbatim: verbatim)
+        #expect(restored == "在这里使用 model_path，并在那里使用 model_path。")
+    }
+
+    @Test func masksRepeatedIdentifiersInChineseContext() {
+        let input = "调用parse_args并传入parse_args参数"
+        let (masked, verbatim) = EntityMasker.mask(input)
+        #expect(masked == "调用⟦0⟧并传入⟦1⟧参数")
+        #expect(verbatim == ["parse_args", "parse_args"])
+
+        let restored = EntityMasker.restore(translation: masked, verbatim: verbatim)
+        #expect(restored == input)
+    }
+
+    @Test func cleansDanglingOrBrokenBracketsGracefully() {
+        let restored = EntityMasker.restore(translation: "结果 ⟦0⟧ 和 broken 0⟧ 以及 ⟦unclosed", verbatim: ["valid_token"])
+        #expect(restored == "结果 valid_token 和 broken 0 以及 unclosed")
     }
 }

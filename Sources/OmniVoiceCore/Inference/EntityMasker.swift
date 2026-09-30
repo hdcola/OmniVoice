@@ -32,21 +32,19 @@ public struct EntityMasker: Sendable {
         }
 
         // 5. Code identifiers:
-        // - snake_case (e.g. parse_args, model_path)
-        // - camelCase / PascalCase (e.g. swiftVersion, OmniVoiceCore)
-        // - dotted properties (e.g. config.modelPath, file.swift)
-        let words = text.split(omittingEmptySubsequences: true) { char in
-            char.isWhitespace || "，。！？；：、“”‘’()[]{}<>".contains(char)
+        // - snake_case (e.g. parse_args, model_path, MAX_BUFFER_SIZE)
+        if let snakeRegex = try? NSRegularExpression(pattern: #"(?<![a-zA-Z0-9])[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)+(?![a-zA-Z0-9])"#) {
+            findMatches(regex: snakeRegex, in: text, into: &matches)
         }
 
-        for word in words {
-            let candidate = String(word).trimmingCharacters(in: CharacterSet(charactersIn: ",.;:!?\"'"))
-            guard candidate.count >= 2 else { continue }
-            if isCodeIdentifier(candidate) {
-                if let range = text.range(of: candidate) {
-                    matches.append((range, candidate))
-                }
-            }
+        // - dotted properties / filenames (e.g. config.modelPath, file.swift)
+        if let dottedRegex = try? NSRegularExpression(pattern: #"(?<![a-zA-Z0-9])[a-zA-Z0-9]+\.[a-zA-Z]+(?![a-zA-Z0-9])"#) {
+            findMatches(regex: dottedRegex, in: text, into: &matches)
+        }
+
+        // - camelCase / PascalCase (e.g. swiftVersion, OmniVoiceCore)
+        if let camelRegex = try? NSRegularExpression(pattern: #"(?<![a-zA-Z0-9])[a-zA-Z0-9]*[a-z][A-Z][a-zA-Z0-9]*(?![a-zA-Z0-9])"#) {
+            findMatches(regex: camelRegex, in: text, into: &matches)
         }
 
         // Deduplicate and resolve overlapping ranges (keep the longest span)
@@ -86,8 +84,9 @@ public struct EntityMasker: Sendable {
     }
 
     /// Restores `⟦n⟧` placeholders in the translation back to their original verbatim values.
+    /// Also sanitizes any unclosed or dangling placeholder bracket remnants.
     public static func restore(translation: String, verbatim: [String]) -> String {
-        guard !verbatim.isEmpty, translation.contains("⟦") else { return translation }
+        guard !verbatim.isEmpty, (translation.contains("⟦") || translation.contains("⟧")) else { return translation }
 
         var result = ""
         var rest = Substring(translation)
@@ -103,6 +102,13 @@ public struct EntityMasker: Sendable {
             rest = rest[rest.index(after: close)...]
         }
         result += rest
+
+        // Clean up any remaining dangling ⟦ or ⟧ without matching pairs
+        if result.contains("⟦") || result.contains("⟧") {
+            result = result.replacingOccurrences(of: "⟦", with: "")
+            result = result.replacingOccurrences(of: "⟧", with: "")
+        }
+
         return result
     }
 
@@ -118,27 +124,5 @@ public struct EntityMasker: Sendable {
                 matches.append((range, String(text[range])))
             }
         }
-    }
-
-    private static func isCodeIdentifier(_ word: String) -> Bool {
-        guard word.contains(where: \.isLetter) else { return false }
-
-        // snake_case: e.g. parse_args, model_path
-        if word.contains("_"), !word.hasPrefix("_"), !word.hasSuffix("_") {
-            return true
-        }
-
-        // dotted identifiers: e.g. file.swift, config.target
-        let parts = word.split(separator: ".")
-        if parts.count == 2, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isLetter) }) {
-            return true
-        }
-
-        // camelCase: lower followed by upper, e.g. parseArgs
-        if zip(word, word.dropFirst()).contains(where: { $0.isLowercase && $1.isUppercase }) {
-            return true
-        }
-
-        return false
     }
 }
