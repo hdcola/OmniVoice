@@ -206,4 +206,14 @@ import Testing
         #expect(masked == "Run with ⟦0⟧ now")
         #expect(verbatim == ["--message=\"hello world\""])
     }
+
+    @Test func masksFlagValuesThatAreURLsOrHostPorts() {
+        let (masked1, verbatim1) = EntityMasker.mask("执行--url=https://github.com选项")
+        #expect(masked1 == "执行⟦0⟧选项")
+        #expect(verbatim1 == ["--url=https://github.com"])
+
+        let (masked2, verbatim2) = EntityMasker.mask("Connect with --addr=127.0.0.1:8080 now")
+        #expect(masked2 == "Connect with ⟦0⟧ now")
+        #expect(verbatim2 == ["--addr=127.0.0.1:8080"])
+    }
 }

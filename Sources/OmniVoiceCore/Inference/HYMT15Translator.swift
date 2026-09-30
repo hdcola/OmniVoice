@@ -151,13 +151,19 @@ final class HYMT15Translator: @unchecked Sendable {
             cleaned = stripMarkdownFence(cleaned)
             cleaned = stripContextEcho(cleaned)
         }
-        cleaned = stripMarkdownFence(cleaned)
-        cleaned = stripTranslationLabel(cleaned)
-        // A label can precede the fence rather than sit inside it
-        // (`Translation: ```zh\n你好\n```), so re-check for one now that the
-        // label's gone — idempotent no-op when there wasn't one.
-        cleaned = stripMarkdownFence(cleaned)
-        return stripWrappingQuotes(cleaned)
+        // A markdown fence, a leaked "Translation:" label, and wrapping
+        // quotes can nest in any order the model happens to produce
+        // ("Translation: ```zh\n...\n```", "\"Translation: ...\"", a fence
+        // around quotes, ...). Each step is idempotent, so re-running the
+        // full set until nothing changes converges on the fully unwrapped
+        // text regardless of nesting order; bounded since each pass either
+        // shrinks the text or stops.
+        for _ in 0..<3 {
+            let next = stripWrappingQuotes(stripTranslationLabel(stripMarkdownFence(cleaned)))
+            guard next != cleaned else { break }
+            cleaned = next
+        }
+        return cleaned
     }
 
     private static func stripTranslationLabel(_ text: String) -> String {

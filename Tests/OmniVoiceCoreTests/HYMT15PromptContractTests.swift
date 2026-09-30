@@ -114,4 +114,9 @@ import Testing
         let notWrapped = "「你好」他说「再见」"
         #expect(HYMT15Translator.cleanOutput(notWrapped) == notWrapped)
     }
+
+    @Test func cleanOutputStripsLabelHiddenInsideWrappingQuotes() {
+        #expect(HYMT15Translator.cleanOutput("\"Translation: Hello world\"") == "Hello world")
+        #expect(HYMT15Translator.cleanOutput("“翻译：你好”") == "你好")
+    }
 }

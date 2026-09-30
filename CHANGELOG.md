@@ -26,6 +26,7 @@ The format is based on Keep a Changelog.
 - fix(translation): `cleanOutput` strips a leaked `Translation:`-style label even on a context-free turn, and recognizes the fullwidth Korean `현재：`/`번역：` label variants (#38)
 - fix(translation): `EntityMasker`'s CLI-flag value no longer swallows trailing CJK text with no separating space (`--output=foo选项`), and its trailing-punctuation trim now applies to flags too (#38)
 - fix(translation): `cleanOutput` strips a markdown fence that comes after a leaked `Translation:` label, not just one wrapping the whole reply or only the labelled answer; `stripContextEcho` now discards any echoed lines (e.g. a repeated `Source:`) between `Current:` and a following `Translation:` instead of leaking them; and it unwraps CJK corner brackets (`「...」`/`『...』`) the same way it already does ASCII/curly quotes (#38)
+- fix(translation): `cleanOutput` now re-applies fence/label/quote stripping until stable, so a leaked `Translation:` label hidden inside wrapping quotes (`"Translation: Hello world"`) is fully unwrapped instead of surfacing the label; `EntityMasker`'s CLI-flag value now allows `:`, so a flag value that's itself a URL or host:port (`--url=https://...`, `--addr=127.0.0.1:8080`) is masked whole instead of splitting and leaving an unmasked remainder (#38)
 
 ### Dependencies
 

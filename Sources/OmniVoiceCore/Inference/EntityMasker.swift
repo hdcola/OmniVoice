@@ -154,11 +154,16 @@ public struct EntityMasker: Sendable {
     // restricted to common CLI-value characters (or a quoted string) rather
     // than "any non-whitespace" — CJK ASR transcripts have no space after a
     // flag's value, so `--output=foo选项` would otherwise swallow "选项"
-    // into the masked entity too.
+    // into the masked entity too. `:` is included so a value that's itself a
+    // URL or host:port (`--url=https://...`, `--addr=127.0.0.1:8080`) is
+    // captured whole — otherwise it'd split at "https", leaving the
+    // unmasked, untranslated "://..." remainder behind (the url/path
+    // patterns run earlier but lose to this narrower, earlier-starting
+    // match once overlap resolution keeps whichever sorts first).
     private static let flagRegex = try! NSRegularExpression(
         pattern: #"(?<![a-zA-Z0-9_-])(?:--[a-zA-Z0-9_-]+(?:="# + flagValue + #")?|-[a-zA-Z]+(?:="# + flagValue + #")?)(?![a-zA-Z0-9_-])"#
     )
-    private static let flagValue = #"(?:"[^"]+"|'[^']+'|[a-zA-Z0-9_.~/-]+)"#
+    private static let flagValue = #"(?:"[^"]+"|'[^']+'|[a-zA-Z0-9_.~/:-]+)"#
     private static let snakeRegex = try! NSRegularExpression(
         pattern: #"(?<![a-zA-Z0-9_])(?:__[a-zA-Z][a-zA-Z0-9]*__|_*[a-zA-Z][a-zA-Z0-9]*(?:_+[a-zA-Z0-9]+)+_*)(?![a-zA-Z0-9_])"#
     )
