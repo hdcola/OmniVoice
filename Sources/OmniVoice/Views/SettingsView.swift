@@ -117,49 +117,88 @@ struct SettingsView: View {
                 }
             }
 
-            // Problem 2 (round-4 user report) — every other one-shot
-            // translation engine (HY-MT1.5/system translation, i.e. every
-            // `.model`-kind ASR pairing except T3PO) instead exposes the
-            // actual character threshold it reads
-            // (`TranslationConfig.earlyTranslateThreshold`'s doc) as a
-            // plain, directly user-configurable number. Sitting as a bare
-            // `Stepper` wedged between the engine `Picker`s and the memory
-            // console read as an unexplained, out-of-place control; it now
-            // gets its own titled/explained section instead. Same
-            // visibility rule as before — hidden outright (not just
-            // disabled) under T3PO (has its own picker above) or the system
-            // ASR engine (see the doc below for why it's a genuine no-op
-            // there), rather than shown greyed-out with nothing to act on.
-            if session.translationEngineID != "model.t3po", session.transcriptionEngineKind != .system {
-                Section("翻译输出") {
-                    Text(
-                        "缓存的原文达到该字数的一半、且遇到句号/问号/换行等断句点时，会提前把已缓存内容翻译一次；"
-                            + "达到完整阈值后，即使还没遇到断句点也会强制翻译，避免长句迟迟不出字。"
-                            + "数值越低出字越快，但长句越容易被拆成更多段；数值越高单段更完整，但可能等得更久。"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    // Task 1.4 (清理无效参数干扰) — See
-                    // `TranslationConfig.earlyTranslateThreshold`'s doc for
-                    // why this is a genuine no-op under the system ASR
-                    // engine: `SystemTranscriptionProvider` never reports
-                    // committed text via `.appended` mid-utterance — a
-                    // finalized result *is* its segment boundary — so
-                    // `translationProvider.feed(_:)` only ever runs once per
-                    // segment, with the whole utterance already, immediately
-                    // followed by `flush()` in the same call. There's
-                    // nothing "early" left to translate by then.
-                    Stepper(
-                        "长句提前翻译阈值：\(session.translationEarlyTranslateThreshold) 字",
-                        value: $session.translationEarlyTranslateThreshold, in: 20...1000, step: 10
-                    )
-                    .help("达到这个字数就提前翻译一次，不必等整句说完；数值越低出字越快，长句可能被拆得更碎。")
-                }
+            // Round-5 user report — the old bare `Stepper` plus a
+            // three-line explanatory paragraph made this the visually
+            // heaviest control on the tab for what's just one number.
+            // Replaced with a single row (label + numeric `TextField` + "字"
+            // + a "?" that carries the full explanation as a tooltip) so
+            // the row's height no longer depends on how long the
+            // explanation is. The section itself stays present (rather than
+            // appearing/disappearing) so switching engines doesn't also
+            // toggle this whole section in and out — see
+            // `translationOutputContent` for the per-engine applicability
+            // rule that used to gate the section's visibility.
+            Section("翻译输出") {
+                translationOutputContent
             }
 
             memoryConsole
         }
         .padding(20)
+        // Round-5 user report ("切换引擎后界面跳动") — `modelVariantPicker`/
+        // `inlineDownloadSection`/the "翻译提交策略" picker above each
+        // insert or remove a row depending on the selected engine; without
+        // this the `Form` simply snaps to its new height the instant either
+        // `Picker`'s selection changes. Keyed on the two engine IDs (not
+        // every field in `session`) so unrelated changes elsewhere — the
+        // memory console's status dot, say — don't also animate.
+        .animation(.easeInOut(duration: 0.2), value: session.transcriptionEngineID)
+        .animation(.easeInOut(duration: 0.2), value: session.translationEngineID)
+    }
+
+    /// Row shown inside "翻译输出" — the `TextField` when
+    /// `translationEarlyTranslateThreshold` actually does something for the
+    /// current engine pairing, otherwise a short explanation of why not.
+    /// Keeping the section always present but swapping only this row's
+    /// content (rather than the section itself) trims how much of the
+    /// engine-switch layout jump this section contributes — see the
+    /// `.animation` on `engineTab` for the rest.
+    @ViewBuilder
+    private var translationOutputContent: some View {
+        // Same rule as before this was inlined here: hidden outright (not
+        // just disabled) under T3PO (has its own "翻译提交策略" picker
+        // above) or the system ASR engine (a genuine no-op there — see
+        // `TranslationConfig.earlyTranslateThreshold`'s doc:
+        // `SystemTranscriptionProvider` never reports committed text via
+        // `.appended` mid-utterance, so `translationProvider.feed(_:)` only
+        // ever runs once per segment, immediately followed by `flush()` —
+        // there's nothing "early" left to translate by then).
+        if session.translationEngineID != "model.t3po", session.transcriptionEngineKind != .system {
+            HStack {
+                Text("长句提前翻译阈值")
+                Spacer()
+                TextField(
+                    "长句提前翻译阈值",
+                    value: $session.translationEarlyTranslateThreshold,
+                    format: .number
+                )
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 64)
+                // No range clamp here — `RecordingSession
+                // .translationEarlyTranslateThreshold`'s own `didSet`
+                // already clamps to 20...1000 and persists it on every
+                // change, including ones from this field.
+                Text("字")
+                    .foregroundStyle(.secondary)
+                Button {
+                } label: {
+                    Image(systemName: "questionmark.circle")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help(
+                    "缓存的原文达到该字数的一半、且遇到句号/问号/换行等断句点时，会提前把已缓存内容翻译一次；"
+                        + "达到完整阈值后，即使还没遇到断句点也会强制翻译，避免长句迟迟不出字。"
+                        + "数值越低出字越快，但长句越容易被拆成更多段；数值越高单段更完整，但可能等得更久。"
+                )
+            }
+        } else {
+            Text("当前引擎无需设置此项（仅对分段实时输出的翻译引擎有效）。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     /// `isPreloadingModel` alongside `isSessionActive`: switching engines
@@ -339,13 +378,16 @@ struct SettingsView: View {
     /// Docs/UX-SETTINGS-MODEL-MANAGEMENT.md §4.2.2 — same
     /// `session.preloadModel()`/`session.unloadModels()` calls, just a
     /// second, more discoverable entry point for users who keep the panel
-    /// hidden. Only shown once a `.model`-kind engine is actually selected
-    /// for something (`usesOnDeviceModelEngine`) — a `.system`-only
-    /// configuration has nothing to preload/release.
-    @ViewBuilder
+    /// hidden. The section itself stays present even when nothing's
+    /// preload-able (`!usesOnDeviceModelEngine`, a `.system`-only
+    /// configuration) — round-5 user report: this whole section popping in
+    /// and out was one of the two biggest jumps when switching engines, and
+    /// swapping only its interior content (like `translationOutputContent`
+    /// above) keeps the jump to the size of the content difference instead
+    /// of a full section.
     private var memoryConsole: some View {
-        if session.usesOnDeviceModelEngine {
-            Section("引擎运行与显存状态") {
+        Section("引擎运行与显存状态") {
+            if session.usesOnDeviceModelEngine {
                 HStack(spacing: 6) {
                     statusIndicatorDot
                     Text(memoryStatusText)
@@ -372,6 +414,10 @@ struct SettingsView: View {
                     }
                     .disabled(!session.isModelLoaded || session.isSessionActive || session.isPreloadingModel)
                 }
+            } else {
+                Text("当前引擎均为系统内置，无需预加载或释放显存。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }

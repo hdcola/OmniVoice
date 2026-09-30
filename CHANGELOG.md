@@ -9,6 +9,7 @@ The format is based on Keep a Changelog.
 ### Added
 
 ### Changed
+- refactor(settings): replace the "长句提前翻译阈值" `Stepper` + three-line explanatory paragraph with a single labeled numeric `TextField` (full explanation moved to a "?" tooltip); keep the "翻译输出"/"引擎运行与显存状态" sections always present and swap only their interior content per selected engine, and animate the remaining engine-switch layout changes, instead of whole sections popping in and out (round-5 user report)
 
 ### Fixed
 
