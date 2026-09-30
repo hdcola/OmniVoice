@@ -14,7 +14,7 @@ The format is based on Keep a Changelog.
 - feat(translation): `HYMT15Translator.translateText(_:targetLanguage:sourceIsChinese:)` one-shot text translation using HY-MT1.5's own model-card prompt, independent of the streaming transcript path (#40)
 
 ### Changed
-- feat(settings): new "启动时显示悬浮窗" toggle in "语言与悬浮窗" (default on) — turn it off to stop the live-transcript panel opening on every launch; starting a recording still shows it, and the menu bar can open it manually
+- feat(settings): new "启动时显示悬浮窗" toggle in "语言与悬浮窗" (default on) — turn it off to stop the live-transcript panel opening on every launch; starting a recording still shows it, and the menu bar can open it manually (#42)
 - refactor(translation): HY-MT1.5 weights are now shared through a reference-counted `HYMT15ModelPool`, so a HY-MT1.5 recording and the selection panel use one loaded copy instead of two; the panel releases its hold after 5 idle minutes (#40)
 - refactor(settings): replace the "长句提前翻译阈值" `Stepper` + three-line explanatory paragraph with a single labeled numeric `TextField` (full explanation moved to a "?" tooltip); keep the "翻译输出"/"引擎运行与显存状态" sections always present and swap only their interior content per selected engine, and animate the remaining engine-switch layout changes, instead of whole sections popping in and out (round-5 user report)
 
