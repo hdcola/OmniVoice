@@ -7,12 +7,26 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.4.0] - 2026-09-30
+
+### Added
 - feat(translation): add `EntityMasker` to protect technical terms, URLs, paths, CLI flags, and code identifiers from translation distortion using `⟦n⟧` placeholders (#38)
 - feat(translation): add prompt contract (data isolation, zero commentary) and sliding context window to `HYMT15Translator` inspired by Cida (#38)
 
 ### Changed
 - feat(ui): visually differentiate committed transcript text from live tentative/preview text in `FloatingTranscriptView` using inline styled concatenation (#38)
-- chore(ci): add a GitHub Actions workflow that builds `third_party/{audio.cpp,llama.cpp}` (cached by their pinned commits) and runs `swift build` on every push to `main` and every pull request as a compile/link regression gate; `swift test` is deliberately not run in CI yet — every Xcode 26.x on the current macOS runner image crashes compiling this package's Swift Testing suites (a runner-image toolchain bug, tests pass locally on Xcode 27), and XCUITest coverage under `UITests/` also needs a one-time interactive Accessibility-permission grant an unattended runner can't provide
+- chore(ci): add a GitHub Actions workflow that builds `third_party/{audio.cpp,llama.cpp}` (cached by their pinned commits) and runs `swift build` on every push to `main` and every pull request as a compile/link regression gate; `swift test` is deliberately not run in CI yet — every Xcode 26.x on the current macOS runner image crashes compiling this package's Swift Testing suites (a runner-image toolchain bug, tests pass locally on Xcode 27), and XCUITest coverage under `UITests/` also needs a one-time interactive Accessibility-permission grant an unattended runner can't provide (#37)
 
 ### Fixed
 - fix(translation): resolve duplicate identifier masking and safe budget trimming to prevent corrupted placeholders (#38)
@@ -34,6 +48,7 @@ The format is based on Keep a Changelog.
 
 ### Tests
 - test(translation): add unit test suites `EntityMaskerTests` and `HYMT15PromptContractTests` (#38)
+- test(uitests): stand up an xcodegen-generated UITest target for the SPM app with coverage for onboarding, settings, and floating window (#36)
 
 ## [0.3.1] - 2026-09-29
 
