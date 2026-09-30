@@ -13,6 +13,9 @@ struct SettingsView: View {
     @EnvironmentObject private var session: RecordingSession
     @EnvironmentObject private var navigation: SettingsNavigationState
     @EnvironmentObject private var selectionController: SelectionTranslationController
+    /// Read once at launch by `AppDelegate` — flipping it doesn't show/hide
+    /// the panel right now, only decides whether it opens on the next start.
+    @AppStorage(PersistedFloatingPanelKey.showOnLaunch) private var showFloatingPanelOnLaunch = true
     /// Observed directly (not just reached through `session`) so the engine
     /// picker's labels/inline download cards live-update the moment
     /// something is downloaded or deleted in the "模型库管理" tab —
@@ -503,6 +506,8 @@ struct SettingsView: View {
             // with the background, so a panel transparent enough to not
             // block the view behind it also made the text hard to read.
             Section("悬浮窗") {
+                Toggle("启动时显示悬浮窗", isOn: $showFloatingPanelOnLaunch)
+                    .help("关闭后，启动 OmniVoice 时不再自动弹出实时转写悬浮窗；开始录音时仍会自动显示，也可从菜单栏手动打开。")
                 opacitySlider(
                     "背景透明度", value: $session.panelBackgroundOpacity, range: 0.1...1.0
                 )

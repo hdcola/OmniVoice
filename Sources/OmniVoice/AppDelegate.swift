@@ -80,7 +80,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // controls used most often (start/stop, language pickers) alongside
         // the live transcript — `toggleFloatingPanel()`/the panel's own
         // close button still let the user hide it manually.
-        panel.orderFrontRegardless()
+        // — unless turned off in Settings ("启动时显示悬浮窗"), for people
+        // who mostly use selection translation and don't want a transcript
+        // window on every launch; recording start still re-shows it below.
+        if UserDefaults.standard.object(forKey: PersistedFloatingPanelKey.showOnLaunch) as? Bool ?? true {
+            panel.orderFrontRegardless()
+        }
 
         // ...but the user can also hide it (menu toggle or the panel's own
         // close button) and then start a recording from the menu bar's own

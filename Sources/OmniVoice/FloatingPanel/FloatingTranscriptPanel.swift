@@ -319,3 +319,8 @@ final class FloatingTranscriptPanel: NSPanel {
     private static let bottomMargin: CGFloat = 72
 }
 
+enum PersistedFloatingPanelKey {
+    /// Bool, absent means `true` — whether the live-transcript floating panel
+    /// opens automatically at launch.
+    static let showOnLaunch = "org.omnivoice.floatingPanel.showOnLaunch"
+}
