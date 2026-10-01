@@ -1,0 +1,186 @@
+import SwiftUI
+
+// Building blocks for the card-style Settings tabs: each group is a rounded
+// card, each row a title + one-line subtitle on the left and its control on
+// the right. Inspired by SnapTra Translator's settings
+// (https://github.com/yelog/SnapTraTranslator).
+
+/// A rounded card holding one group of rows. Rows are separated by
+/// `SettingsDivider`s that the caller places between them.
+struct SettingsCard<Content: View>: View {
+    var title: String?
+    var icon: String?
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let title {
+                HStack(spacing: 6) {
+                    if let icon {
+                        Image(systemName: icon)
+                    }
+                    Text(title)
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(.quaternary, lineWidth: 0.5)
+            )
+        }
+    }
+}
+
+struct SettingsDivider: View {
+    var body: some View {
+        Divider()
+            .opacity(0.5)
+            .padding(.horizontal, 14)
+    }
+}
+
+/// One row: title (+ optional subtitle) on the left, `trailing` control on
+/// the right. A row's own `.disabled` greys the whole row.
+struct SettingsRow<Trailing: View>: View {
+    let title: String
+    var subtitle: String?
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13))
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 8)
+            trailing
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+}
+
+/// A free-form note inside a card (warnings, "go to the model library"
+/// nudges) — same horizontal inset as `SettingsRow`.
+struct SettingsNote: View {
+    let text: String
+    var tint: Color = .secondary
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11))
+            .foregroundStyle(tint)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+    }
+}
+
+/// Small coloured capsule: "已授权", "未下载", "已就绪"…
+struct StatusPill: View {
+    enum Tone {
+        case good, warning, neutral
+
+        var color: Color {
+            switch self {
+            case .good: return .green
+            case .warning: return .orange
+            case .neutral: return .secondary
+            }
+        }
+    }
+
+    let text: String
+    var tone: Tone = .neutral
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle().fill(tone.color).frame(width: 6, height: 6)
+            Text(text)
+        }
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(tone.color)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(tone.color.opacity(0.12)))
+    }
+}
+
+/// A permission as a card row: icon, name, one-line purpose, and either a
+/// "已授权" pill or a "去授权" button.
+struct PermissionRow: View {
+    let icon: String
+    let title: String
+    let detail: String
+    let isGranted: Bool
+    let open: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundStyle(isGranted ? Color.green : Color.orange)
+                .frame(width: 26)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 13, weight: .medium))
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            if isGranted {
+                StatusPill(text: "已授权", tone: .good)
+            } else {
+                Button("去授权", action: open)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+}
+
+/// Selectable chip for a handful of side-by-side options.
+struct ChipToggle: View {
+    let title: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Button {
+            isOn.toggle()
+        } label: {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(isOn ? Color.accentColor : .primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isOn ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.08))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(isOn ? Color.accentColor.opacity(0.5) : Color.secondary.opacity(0.2), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+}

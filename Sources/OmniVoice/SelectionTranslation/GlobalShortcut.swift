@@ -146,6 +146,13 @@ enum GlobalShortcutAction: String, CaseIterable, Identifiable {
         }
     }
 
+    var subtitle: String {
+        switch self {
+        case .translateSelection: return "翻译任意应用中选中的文字"
+        case .captureText: return "框选屏幕上的文字并翻译"
+        }
+    }
+
     var defaultShortcut: GlobalShortcut {
         switch self {
         case .translateSelection: return .optionA

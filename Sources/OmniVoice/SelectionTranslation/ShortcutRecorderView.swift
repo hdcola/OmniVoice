@@ -13,18 +13,28 @@ struct ShortcutRecorderRow: View {
     @State private var message: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(action.title)
-                Spacer()
+        SettingsRow(title: action.title, subtitle: message ?? action.subtitle) {
+            HStack(spacing: 8) {
                 Button {
                     message = nil
                     isRecording.toggle()
                 } label: {
                     Text(chipText)
-                        .monospaced()
-                        .frame(minWidth: 90)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(isRecording ? Color.accentColor : .primary)
+                        .frame(minWidth: 84)
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(isRecording ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.08))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(isRecording ? Color.accentColor.opacity(0.5) : Color.secondary.opacity(0.2), lineWidth: 1)
+                        )
                 }
+                .buttonStyle(.plain)
                 .background(
                     ShortcutCaptureView(
                         isRecording: $isRecording,
@@ -32,15 +42,14 @@ struct ShortcutRecorderRow: View {
                         onInvalidPress: { message = "快捷键需要包含 ⌘、⌥ 或 ⌃" }
                     )
                 )
-                Button("恢复默认") {
+                Button {
                     message = controller.setShortcut(action.defaultShortcut, for: action)
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
                 }
+                .buttonStyle(.borderless)
+                .help("恢复默认")
                 .disabled(controller.shortcuts[action] == action.defaultShortcut)
-            }
-            if let message {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.red)
             }
         }
         .onChange(of: isRecording) { _, recording in

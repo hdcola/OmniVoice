@@ -7,8 +7,10 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(settings): card-style settings building blocks (`SettingsCard`, `SettingsRow`, `StatusPill`, `PermissionRow`, `ChipToggle`) modelled on SnapTra Translator's settings, as the first step of a settings redesign
 
 ### Changed
+- refactor(settings): redesign the "快捷翻译" tab with cards — permissions first with "已授权" pills, shortcut rows with a keycap-style recorder and a reset icon, language and engine rows with one-line subtitles; the tab now scrolls instead of using a grouped `Form`
 
 ### Fixed
 
