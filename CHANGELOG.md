@@ -8,10 +8,6 @@ The format is based on Keep a Changelog.
 
 ### Added
 
-- feat(notifications): clicking a model download notification opens Settings → 模型库 (#56)
-
-- feat(notifications): send a system notification when a model download finishes or fails while the app is in the background, with a "完成时发送系统通知" toggle in Settings (#55)
-
 ### Changed
 
 ### Fixed
@@ -21,6 +17,12 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 ### Tests
+
+## [0.5.3] - 2026-10-01
+
+### Added
+- feat(notifications): clicking a model download notification opens Settings → 模型库 (#56)
+- feat(notifications): send a system notification when a model download finishes or fails while the app is in the background, with a "完成时发送系统通知" toggle in Settings (#55)
 
 ## [0.5.2] - 2026-10-01
 
