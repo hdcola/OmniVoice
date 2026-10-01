@@ -341,6 +341,12 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       weights, and one-shot `HYMT15Translator.translateText` — plus floating
       panel toolbar/resize-cursor fixes (PR #41), the 启动时显示悬浮窗 toggle
       (PR #42), and the terminology unification pass (PR #43).
+- [x] **0.5.4 release cut** (2026-10-01, `chore/release-0.5.4`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.5.4,
+      `CFBundleVersion` 12), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.5.4]` section, `README.md`'s version/download-link references
+      bumped to match. Bundles the adjustable 断句停顿时长 / 静音电平阈值
+      sliders for model ASR engines (PR #58).
 - [x] **0.5.3 release cut** (2026-10-01, `chore/release-0.5.3`): version
       bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.5.3,
       `CFBundleVersion` 11), CHANGELOG's `[Unreleased]` cut into a dated
