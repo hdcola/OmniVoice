@@ -422,6 +422,7 @@ struct SettingsView: View {
             inlineDiskSpaceWarning = (variant, warning)
             return
         }
+        SystemNotifier.requestAuthorizationIfNeeded()
         Task {
             do {
                 _ = try await downloadManager.ensureDownloaded(variant)
@@ -430,11 +431,16 @@ struct SettingsView: View {
                 } else {
                     session.translationModelVariantID = variant.id
                 }
+                SystemNotifier.notify(
+                    title: "模型下载完成", body: "「\(variant.displayName)」已下载并自动启用")
             } catch is CancellationError {
                 // The user's own "取消" tap — not a failure worth surfacing.
             } catch {
                 // Task 4.3 — inline on this row, not just `statusMessage`.
                 inlineDownloadFailures[variant.id] = error.localizedDescription
+                SystemNotifier.notify(
+                    title: "模型下载失败",
+                    body: "「\(variant.displayName)」：\(error.localizedDescription)")
             }
         }
     }

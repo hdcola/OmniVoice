@@ -8,7 +8,7 @@ The format is based on Keep a Changelog.
 
 ### Added
 
-- feat(notifications): send a system notification when a model download finishes or fails while the app is in the background, with a "完成时发送系统通知" toggle in Settings (#22)
+- feat(notifications): send a system notification when a model download finishes or fails while the app is in the background, with a "完成时发送系统通知" toggle in Settings (#55)
 
 ### Changed
 

@@ -10,10 +10,10 @@ import UserNotifications
 /// user turned "完成时发送系统通知" off, when the app is frontmost (the UI
 /// already shows the result), or when notification permission is denied.
 @MainActor
-public enum SystemNotifier {
-    public static let enabledKey = "org.hdcola.omnivoice.notifications.enabled"
+enum SystemNotifier {
+    static let enabledKey = "org.hdcola.omnivoice.notifications.enabled"
 
-    public static var isEnabled: Bool {
+    static var isEnabled: Bool {
         get { UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: enabledKey) }
     }
@@ -22,12 +22,15 @@ public enum SystemNotifier {
 
     /// Asks for permission the first time (no-op afterwards). Call when the
     /// user starts something worth notifying about, not at launch.
-    public static func requestAuthorizationIfNeeded() {
+    static func requestAuthorizationIfNeeded() {
         guard isAvailable, isEnabled else { return }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
-    public static func notify(title: String, body: String, force: Bool = false) {
+    /// `force` only skips this type's own foreground check — while the app is
+    /// frontmost macOS still suppresses the banner unless a
+    /// `UNUserNotificationCenterDelegate.willPresent` returns `[.banner, .sound]`.
+    static func notify(title: String, body: String, force: Bool = false) {
         guard isAvailable, isEnabled, force || !NSApp.isActive else { return }
         let content = UNMutableNotificationContent()
         content.title = title
