@@ -556,7 +556,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                     Text("macOS 离线实时双语字幕、转录与快捷翻译")
                         .font(.system(size: 12))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 4)
@@ -591,12 +591,12 @@ struct SettingsView: View {
 
                 Text("系统引擎基于 macOS Speech / Translation 框架；本地引擎基于 audio.cpp（R2T2）与 llama.cpp（T3PO / HY-MT1.5），完全离线运行。")
                     .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 12)
                 Text("Apache License 2.0")
                     .font(.system(size: 11))
-                    .foregroundStyle(.quaternary)
+                    .foregroundStyle(.tertiary)
             }
             .padding(16)
         }

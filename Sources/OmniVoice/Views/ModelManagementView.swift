@@ -2,7 +2,7 @@ import AppKit
 import OmniVoiceCore
 import SwiftUI
 
-/// Dedicated window for downloading/cancelling/deleting a `.model`-kind
+/// "模型库" tab for downloading/cancelling/deleting a `.model`-kind
 /// engine's weights — the single place that actually drives
 /// `ModelDownloadManager`. `SettingsView`'s engine picker links back here
 /// (Task 1.3) whenever a not-yet-downloaded engine is selected; this view
@@ -48,33 +48,24 @@ struct ModelManagementView: View {
     }
 
     var body: some View {
-        // Problem 3a (round-4 user report) — this tab's host window
-        // (`SettingsView`) is a fixed 560×480 `TabView`, and a bare `Form`
-        // doesn't scroll on macOS: with both recommended-bundle cards, every
-        // ASR/translation model variant, and their download status all
-        // rendered, the content routinely exceeds 480pt and the bottom
-        // cards/buttons were simply clipped off, unreachable. Wrapping the
-        // `Form` in a `ScrollView` is the minimal fix — the window itself
-        // stays the fixed size every other tab already assumes, and every
-        // card stays reachable by scrolling instead.
+        // A bare `Form` doesn't scroll on macOS (round-4 user report: with
+        // both recommended bundles and every model variant rendered, the
+        // bottom cards were clipped off, unreachable), so the cards live in
+        // a `ScrollView`.
         ScrollView {
-            Form {
+            VStack(alignment: .leading, spacing: 14) {
                 if let activationBanner {
                     activationBannerView(activationBanner)
                 }
                 bundleSection
-                Section("识别引擎模型") {
-                    ForEach(ProviderCatalog.transcriptionEngines.filter { $0.kind == .model }) { engine in
-                        variantRows(forEngineID: engine.id)
-                    }
+                SettingsCard(title: "识别引擎模型", icon: "waveform") {
+                    modelRows(for: ProviderCatalog.transcriptionEngines)
                 }
-                Section("翻译引擎模型") {
-                    ForEach(ProviderCatalog.translationEngines.filter { $0.kind == .model }) { engine in
-                        variantRows(forEngineID: engine.id)
-                    }
+                SettingsCard(title: "翻译引擎模型", icon: "character.bubble") {
+                    modelRows(for: ProviderCatalog.translationEngines)
                 }
             }
-            .padding(20)
+            .padding(16)
         }
         .alert(
             errorTitle,
@@ -131,33 +122,37 @@ struct ModelManagementView: View {
     }
 
     private func activationBannerView(_ banner: ActivationBanner) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top) {
-                Text("🎉 \(banner.message)")
-                    .font(.callout)
-                Spacer()
-                Button("撤销切换") {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "checkmark.seal.fill")
+                    .foregroundStyle(Color.accentColor)
+                Text(banner.message)
+                    .font(.system(size: 12))
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                PillButton(title: "撤销切换") {
                     banner.undo()
                     activationBanner = nil
                 }
-                .font(.caption)
             }
             if let companion = banner.companionSuggestion {
-                HStack {
-                    Text("💡 \(companion.message)")
-                        .font(.caption)
+                HStack(alignment: .center, spacing: 8) {
+                    Image(systemName: "lightbulb")
                         .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("立即下载 \(companion.variant.displayName)（约 \(companion.variant.approximateSizeMB) MB）") {
+                    Text(companion.message)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
+                    PillButton(title: "下载 \(companion.variant.displayName)（约 \(companion.variant.approximateSizeMB) MB）") {
                         download(companion.variant)
                     }
-                    .font(.caption)
                 }
             }
         }
-        .padding(10)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.accentColor.opacity(0.1)))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.accentColor.opacity(0.3), lineWidth: 0.5))
     }
 
     /// Checks whether `variant`'s owning engine's *category* (ASR vs.
@@ -220,8 +215,9 @@ struct ModelManagementView: View {
     // MARK: - Task 2.3 — Recommended bundles
 
     private var bundleSection: some View {
-        Section("💡 推荐方案快速配置") {
-            ForEach(ProviderCatalog.bundles) { bundle in
+        SettingsCard(title: "推荐方案快速配置", icon: "sparkles") {
+            ForEach(Array(ProviderCatalog.bundles.enumerated()), id: \.element.id) { index, bundle in
+                if index > 0 { SettingsDivider() }
                 bundleCard(for: bundle)
             }
         }
@@ -236,15 +232,17 @@ struct ModelManagementView: View {
     /// This itemized checklist makes that shared state visible per variant,
     /// instead of only a count — see `bundleCard(for:)`.
     private func bundleChecklist(_ status: ModelBundleStatus) -> some View {
-        ForEach(status.variants) { variant in
-            HStack(spacing: 4) {
+        HStack(spacing: 12) {
+            ForEach(status.variants) { variant in
                 let isDownloaded = status.downloadedVariants.contains(variant)
-                Image(systemName: isDownloaded ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isDownloaded ? Color.green : Color.secondary)
-                Text(variant.displayName)
+                HStack(spacing: 4) {
+                    Image(systemName: isDownloaded ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(isDownloaded ? Color.green : Color.secondary)
+                    Text(variant.displayName)
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
             }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
         }
     }
 
@@ -259,45 +257,45 @@ struct ModelManagementView: View {
             downloadManager.isDownloading($0) || pendingBundleDownloads.contains($0.id)
         }
 
-        return VStack(alignment: .leading, spacing: 6) {
-            Text(bundle.displayName).font(.headline)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(bundle.displayName).font(.system(size: 13, weight: .semibold))
+                Spacer(minLength: 8)
+                if status.isFullyDownloaded {
+                    StatusPill(text: "已全部下载", tone: .good)
+                } else {
+                    StatusPill(
+                        text: "已下载 \(status.downloadedVariants.count)/\(status.variants.count)",
+                        tone: status.downloadedVariants.isEmpty ? .neutral : .warning
+                    )
+                }
+            }
             Text(bundle.summary)
-                .font(.caption)
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            // Itemized per variant, not just a count: two bundles share a
+            // variant (both recommended pairings use `r2t2-q8_0`), so a bare
+            // "已下载 X/Y" read as contradictory (round-4 user report).
             bundleChecklist(status)
-            HStack {
-                Text(
-                    status.isFullyDownloaded
-                        ? "状态：已全部下载"
-                        : "状态：已下载 \(status.downloadedVariants.count)/\(status.variants.count)"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                Spacer()
-                if !status.isFullyDownloaded {
-                    Button {
+            if !status.isFullyDownloaded {
+                HStack {
+                    Spacer()
+                    PillButton(
+                        title: status.downloadedVariants.isEmpty
+                            ? "一键配置此方案（约 \(status.remainingSizeMB) MB）"
+                            : "一键下载剩余组件（约 \(status.remainingSizeMB) MB）",
+                        isWorking: isBundleDownloading,
+                        workingTitle: "下载中…"
+                    ) {
                         downloadBundle(bundle)
-                    } label: {
-                        if isBundleDownloading {
-                            HStack(spacing: 4) {
-                                ProgressView().controlSize(.small)
-                                Text("下载中…")
-                            }
-                        } else {
-                            Text(
-                                status.downloadedVariants.isEmpty
-                                    ? "⬇️ 一键配置此方案（约 \(status.remainingSizeMB) MB）"
-                                    : "⬇️ 一键下载剩余组件（约 \(status.remainingSizeMB) MB）"
-                            )
-                        }
                     }
                     .disabled(isBundleDownloading)
                 }
             }
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
     }
 
     private func downloadBundle(_ bundle: ModelBundle) {
@@ -312,32 +310,41 @@ struct ModelManagementView: View {
 
     // MARK: - Rich model cards (Task 2.2)
 
+    /// Every model variant of the given engines, one divider-separated row
+    /// each; engines with no downloadable weights (the `.system` ones) have
+    /// no variants and contribute nothing.
     @ViewBuilder
-    private func variantRows(forEngineID engineID: String) -> some View {
-        ForEach(ProviderCatalog.modelVariants(forEngineID: engineID)) { variant in
+    private func modelRows(for engines: [EngineDescriptor]) -> some View {
+        let variants = engines.filter { $0.kind == .model }
+            .flatMap { ProviderCatalog.modelVariants(forEngineID: $0.id) }
+        ForEach(Array(variants.enumerated()), id: \.element.id) { index, variant in
+            if index > 0 { SettingsDivider() }
             variantCard(for: variant)
         }
     }
 
     @ViewBuilder
     private func variantCard(for variant: ModelVariant) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(variant.displayName).font(.headline)
-                Spacer()
-                actionButton(for: variant)
-            }
-            Text("版本：\(variant.quantization) · 文件大小：约 \(variant.approximateSizeMB) MB · 预计内存占用：约 \(variant.recommendedMemoryGB) GB")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if !variant.summary.isEmpty {
-                Text("优势：\(variant.summary)")
-                    .font(.caption)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(variant.displayName).font(.system(size: 13, weight: .semibold))
+                Text("\(variant.quantization) · 约 \(variant.approximateSizeMB) MB · 内存约 \(variant.recommendedMemoryGB) GB")
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                if !variant.summary.isEmpty {
+                    Text(variant.summary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                statusLine(for: variant)
+                    .padding(.top, 2)
             }
-            statusLine(for: variant)
+            Spacer(minLength: 8)
+            actionButton(for: variant)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
     }
 
     @ViewBuilder
@@ -345,15 +352,11 @@ struct ModelManagementView: View {
         if downloadManager.isDownloading(variant) {
             downloadingStatus(for: variant)
         } else if downloadManager.isDownloaded(variant) {
-            Text("🟢 校验通过，就绪")
-                .font(.caption)
-                .foregroundStyle(.green)
+            StatusPill(text: "校验通过，就绪", tone: .good)
         } else if let message = failedVariants[variant.id] {
             inlineFailureCard(for: variant, message: message)
         } else {
-            Text("约 \(variant.approximateSizeMB) MB · 尚未下载")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            StatusPill(text: "尚未下载", tone: .neutral)
         }
     }
 
@@ -365,15 +368,14 @@ struct ModelManagementView: View {
     /// §4.6.2).
     private func inlineFailureCard(for variant: ModelVariant, message: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("⚠️ 下载中断：\(message)")
-                .font(.caption)
+            Text("下载中断：\(message)")
+                .font(.system(size: 11))
                 .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
             HStack {
-                Button("立即重试") { download(variant) }
-                    .font(.caption)
+                PillButton(title: "立即重试") { download(variant) }
                 if variant.downloadURL != nil {
-                    Button("复制下载链接") { copyDownloadLink(for: variant) }
-                        .font(.caption)
+                    PillButton(title: "复制下载链接") { copyDownloadLink(for: variant) }
                 }
             }
         }
@@ -390,9 +392,8 @@ struct ModelManagementView: View {
     }
 
     /// Task 2.4's speed/ETA readout, rendered next to the determinate
-    /// progress bar — falls back to the old "准备下载…" spinner state before
-    /// the first byte-count callback arrives (see `ModelManagementView`'s
-    /// previous revision for why that gap needs its own state at all).
+    /// progress bar — falls back to the "准备下载…" state before the first
+    /// byte-count callback arrives.
     @ViewBuilder
     private func downloadingStatus(for variant: ModelVariant) -> some View {
         if let fraction = downloadManager.downloadProgress[variant.id] {
@@ -402,17 +403,17 @@ struct ModelManagementView: View {
             // percentage).
             Text("下载中 \(Int((fraction * 100).rounded()))%")
                 .foregroundStyle(.secondary)
-                .font(.caption)
+                .font(.system(size: 11))
             ProgressView(value: fraction)
             if let stats = downloadManager.downloadStats[variant.id] {
                 Text(stats.summaryLine)
-                    .font(.caption2)
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
         } else {
             Text("准备下载…")
                 .foregroundStyle(.secondary)
-                .font(.caption)
+                .font(.system(size: 11))
             // `.linear`, not the default circular spinner — this state
             // flips to the determinate `ProgressView(value:)` above the
             // moment the first byte count arrives, and a spinner-to-bar
@@ -426,21 +427,18 @@ struct ModelManagementView: View {
     @ViewBuilder
     private func actionButton(for variant: ModelVariant) -> some View {
         if downloadManager.isDownloading(variant) {
-            Button("取消") { downloadManager.cancelDownload(for: variant) }
+            PillButton(title: "取消") { downloadManager.cancelDownload(for: variant) }
         } else if downloadManager.isDownloaded(variant) {
-            HStack(spacing: 8) {
-                // Guards against deleting the weights out from under an
-                // active recording/preload — an in-flight `loadModel()`/an
-                // already *loaded* model doesn't re-read the file after
-                // load, but the very next preload/start attempt for this
-                // variant would find nothing there and fail confusingly
-                // rather than with the clear "尚未下载" message a deliberate
-                // re-download produces.
-                Button("删除") { pendingDeletion = variant }
-                    .disabled(session.isSessionActive || session.isPreloadingModel)
-            }
+            // Guards against deleting the weights out from under an active
+            // recording/preload — an in-flight `loadModel()`/an already
+            // *loaded* model doesn't re-read the file after load, but the
+            // very next preload/start attempt for this variant would find
+            // nothing there and fail confusingly rather than with the clear
+            // "尚未下载" message a deliberate re-download produces.
+            PillButton(title: "删除", tint: .red) { pendingDeletion = variant }
+                .disabled(session.isSessionActive || session.isPreloadingModel)
         } else {
-            Button("下载") { download(variant) }
+            PillButton(title: "下载") { download(variant) }
         }
     }
 

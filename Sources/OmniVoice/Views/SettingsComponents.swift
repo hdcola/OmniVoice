@@ -34,9 +34,9 @@ struct SettingsCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                // Light mode: a raised white card on the grey window; dark
-                // mode: a faint lift over the dark window.
-                .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color(nsColor: .controlBackgroundColor))
+                // A faint tint over the window in both modes (the light
+                // window is plain white, so a white card would vanish).
+                .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.04))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -215,18 +215,38 @@ struct PermissionRow: View {
             if isGranted {
                 StatusPill(text: "已授权", tone: .good)
             } else {
-                Button(action: open) {
-                    Text("去授权")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color.accentColor)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.accentColor.opacity(0.15)))
-                }
-                .buttonStyle(.plain)
+                PillButton(title: "去授权", action: open)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+    }
+}
+
+/// Small accent capsule button; `tint: .red` for destructive actions.
+/// `isWorking` swaps the title for a spinner plus `workingTitle`.
+struct PillButton: View {
+    let title: String
+    var tint: Color = .accentColor
+    var isWorking = false
+    var workingTitle = ""
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                if isWorking {
+                    ProgressView().controlSize(.small)
+                }
+                Text(isWorking ? workingTitle : title)
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(tint.opacity(0.15)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }
