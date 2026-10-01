@@ -45,7 +45,25 @@ final class SettingsNavigationState: ObservableObject {
     static let shared = SettingsNavigationState()
 
     /// Set by `MenuBarLabel` once it appears; wraps SwiftUI's `openSettings`.
-    var openSettingsWindow: (() -> Void)?
+    /// A request that arrived before then (a notification click that cold-
+    /// launched the app) runs as soon as it is set.
+    var openSettingsWindow: (() -> Void)? {
+        didSet {
+            if pendingOpenSettings, let open = openSettingsWindow {
+                pendingOpenSettings = false
+                open()
+            }
+        }
+    }
+    private var pendingOpenSettings = false
+
+    func requestOpenSettings() {
+        if let open = openSettingsWindow {
+            open()
+        } else {
+            pendingOpenSettings = true
+        }
+    }
 
     private static let defaultsKey = "org.hdcola.omnivoice.settingsSelectedTab"
 

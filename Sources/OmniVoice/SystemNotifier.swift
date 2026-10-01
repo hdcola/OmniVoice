@@ -72,11 +72,7 @@ private final class NotificationClickHandler: NSObject, UNUserNotificationCenter
         Task { @MainActor in
             NSApp.activate(ignoringOtherApps: true)
             SettingsNavigationState.shared.openModelLibrary()
-            if let open = SettingsNavigationState.shared.openSettingsWindow {
-                open()
-            } else {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            }
+            SettingsNavigationState.shared.requestOpenSettings()
             completionHandler()
         }
     }
