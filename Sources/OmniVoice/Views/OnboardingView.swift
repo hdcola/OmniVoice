@@ -119,7 +119,7 @@ struct OnboardingView: View {
                 .resizable()
                 .frame(width: 64, height: 64)
             Text("欢迎使用 OmniVoice").font(.system(size: 22, weight: .bold))
-            Text("macOS 离线实时双语字幕与转录工具")
+            Text("macOS 离线实时双语字幕、转录与快捷翻译")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
@@ -215,6 +215,15 @@ struct OnboardingView: View {
     }
 
     private func requestMicrophonePermission() {
+        // `requestAccess` only prompts while the status is undetermined; once
+        // the user has denied it, it returns `false` silently, so send them
+        // to the System Settings pane instead (same as the "通用" tab).
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined else {
+            NSWorkspace.shared.open(
+                URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
+            )
+            return
+        }
         AVCaptureDevice.requestAccess(for: .audio) { granted in
             Task { @MainActor in microphoneAuthorized = granted }
         }

@@ -162,7 +162,7 @@ struct SettingsView: View {
                         }
                     }
                     .labelsHidden()
-                .accessibilityLabel("翻译提交策略")
+                    .accessibilityLabel("翻译提交策略")
                     .fixedSize()
                 }
             }

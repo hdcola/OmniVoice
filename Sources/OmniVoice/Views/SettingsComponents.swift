@@ -250,23 +250,17 @@ struct PillButton: View {
 }
 
 /// The one filled call-to-action capsule on a screen (onboarding's
-/// "一键开启并下载").
+/// "一键开启并下载"). The system's prominent style picks a legible label
+/// colour for whatever accent colour the user has chosen — a hand-drawn
+/// white label vanishes on a yellow accent.
 struct PrimaryPillButton: View {
     let title: String
     let action: () -> Void
-    @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(Color.accentColor))
-                .contentShape(Capsule())
-                .opacity(isEnabled ? 1 : 0.4)
-        }
-        .buttonStyle(.plain)
+        Button(title, action: action)
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
     }
 }
