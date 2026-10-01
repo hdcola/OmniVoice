@@ -341,6 +341,14 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       weights, and one-shot `HYMT15Translator.translateText` — plus floating
       panel toolbar/resize-cursor fixes (PR #41), the 启动时显示悬浮窗 toggle
       (PR #42), and the terminology unification pass (PR #43).
+- [x] **0.5.2 release cut** (2026-10-01, `chore/release-0.5.2`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.5.2,
+      `CFBundleVersion` 10), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.5.2]` section, `README.md`'s version/download-link references
+      bumped to match. Bundles launch-at-login and launch-time model
+      preloading (PR #50, closes #46), the `org.omnivoice.*` →
+      `org.hdcola.omnivoice.*` key rename (PR #49; saved settings reset), and
+      the removal of the outdated R2T2 patch notes (PR #53).
 - [x] **0.5.1 release cut** (2026-09-30, `chore/release-0.5.1`): version
       bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.5.1,
       `CFBundleVersion` 9), CHANGELOG's `[Unreleased]` cut into a dated
