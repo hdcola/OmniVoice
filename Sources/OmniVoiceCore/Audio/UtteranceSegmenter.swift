@@ -61,9 +61,11 @@ final class UtteranceSegmenter: @unchecked Sendable {
         lock.unlock()
         let isSilent = Self.rmsDBFS(samples) < thresholdDBFS
         if isSilent {
+            // Nothing left to close until the next speech, so don't keep counting.
+            guard hasSpeechSinceLastBoundary else { return }
             silentSampleCount += samples.count
             let silenceSeconds = Double(silentSampleCount) / sampleRate
-            if hasSpeechSinceLastBoundary && silenceSeconds >= thresholdSeconds {
+            if silenceSeconds >= thresholdSeconds {
                 hasSpeechSinceLastBoundary = false
                 silentSampleCount = 0
                 onUtteranceBoundary?()
