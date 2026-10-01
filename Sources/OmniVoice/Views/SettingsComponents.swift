@@ -231,6 +231,7 @@ struct PillButton: View {
     var isWorking = false
     var workingTitle = ""
     let action: () -> Void
+    @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
         Button(action: action) {
@@ -246,6 +247,7 @@ struct PillButton: View {
             .padding(.vertical, 4)
             .background(Capsule().fill(tint.opacity(0.15)))
             .contentShape(Capsule())
+            .opacity(isEnabled ? 1 : 0.4)
         }
         .buttonStyle(.plain)
     }

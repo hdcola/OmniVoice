@@ -25,19 +25,31 @@ enum SettingsWindowLayout {
 }
 
 /// Hands the hosting `NSWindow` back to SwiftUI so tab switches can animate
-/// its frame.
+/// its frame. Reports from `viewDidMoveToWindow`, i.e. exactly when the view
+/// lands in (or leaves) a window, rather than guessing a run-loop turn.
 private struct SettingsWindowAccessor: NSViewRepresentable {
     @Binding var window: NSWindow?
 
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async { window = view.window }
+    final class CaptureView: NSView {
+        var onWindowChange: ((NSWindow?) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            onWindowChange?(window)
+        }
+    }
+
+    func makeNSView(context: Context) -> CaptureView {
+        let view = CaptureView()
+        // Written on the next turn: the move can happen inside a SwiftUI
+        // update, where mutating state is not allowed.
+        view.onWindowChange = { newWindow in
+            DispatchQueue.main.async { window = newWindow }
+        }
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async { window = nsView.window }
-    }
+    func updateNSView(_ nsView: CaptureView, context: Context) {}
 }
 
 struct SettingsView: View {
@@ -391,9 +403,9 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.red)
                     HStack {
-                        Button("立即重试") { downloadInline(variant) }.font(.caption)
+                        PillButton(title: "立即重试") { downloadInline(variant) }
                         if variant.downloadURL != nil {
-                            Button("复制下载链接") { copyDownloadLink(for: variant) }.font(.caption)
+                            PillButton(title: "复制下载链接") { copyDownloadLink(for: variant) }
                         }
                     }
                 } else {
@@ -404,9 +416,9 @@ struct SettingsView: View {
             }
             Spacer()
             if downloadManager.isDownloading(variant) {
-                Button("取消") { downloadManager.cancelDownload(for: variant) }
+                PillButton(title: "取消") { downloadManager.cancelDownload(for: variant) }
             } else {
-                Button("下载并启用") { downloadInline(variant) }
+                PillButton(title: "下载并启用") { downloadInline(variant) }
             }
         }
         // Task 4.2 — same copy as `ModelManagementView`'s own disk-space
@@ -492,19 +504,16 @@ struct SettingsView: View {
                 SettingsDivider()
                 HStack {
                     Spacer()
-                    Button {
+                    PillButton(
+                        title: "⚡ 预加载到内存",
+                        isWorking: session.isPreloadingModel,
+                        workingTitle: "加载中…"
+                    ) {
                         Task { await session.preloadModel() }
-                    } label: {
-                        HStack(spacing: 5) {
-                            if session.isPreloadingModel {
-                                ProgressView().controlSize(.small)
-                            }
-                            Text(session.isPreloadingModel ? "加载中…" : "⚡ 预加载到内存")
-                        }
                     }
                     .disabled(session.isSessionActive || session.isPreloadingModel || session.isModelLoaded)
 
-                    Button("🧹 释放内存占用") {
+                    PillButton(title: "🧹 释放内存占用") {
                         session.unloadModels()
                     }
                     .disabled(!session.isModelLoaded || session.isSessionActive || session.isPreloadingModel)
