@@ -7,13 +7,13 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(settings): card-style settings building blocks (`SettingsCard`, `SettingsRow`, `StatusPill`, `PermissionRow`, `ChipToggle`) modelled on SnapTra Translator's settings, as the first step of a settings redesign
+- feat(settings): card-style settings building blocks (`SettingsCard`, `SettingsRow`, `StatusPill`, `PermissionRow`, `ChipToggle`) modelled on SnapTra Translator's settings, as the first step of a settings redesign (#47)
 
 ### Changed
-- refactor(settings): merge "语音与引擎", "语言与字幕" and "快捷翻译" into one "通用" tab (3 tabs now: 通用 · 模型库 · 关于) laid out as cards — all system permissions (麦克风 / 屏幕录制 / 辅助功能) at the top with status pills, then 快捷翻译, 实时转录 (识别引擎, 转录翻译引擎, 转录语言, 内存) and 字幕悬浮窗; the engine pickers are now labeled "识别引擎", "转录翻译引擎" and "快捷翻译引擎"
-- refactor(settings): redesign "关于" — centered app icon, name, version and tagline, a GitHub Star card, and a link list (GitHub / 版本发布 / 反馈问题)
-- refactor(settings): SnapTra-style look — pill tab bar at the top instead of the system toolbar tabs, titles inside compact cards, a narrower 520pt window, shortcuts drawn as keycaps and "去授权" as an accent pill
-- refactor(settings): redesign the "快捷翻译" tab with cards — permissions first with "已授权" pills, shortcut rows with a keycap-style recorder and a reset icon, language and engine rows with one-line subtitles; the tab now scrolls instead of using a grouped `Form`
+- refactor(settings): merge "语音与引擎", "语言与字幕" and "快捷翻译" into one "通用" tab (3 tabs now: 通用 · 模型库 · 关于) laid out as cards — all system permissions (麦克风 / 屏幕录制 / 辅助功能) at the top with status pills, then 快捷翻译, 实时转录 (识别引擎, 转录翻译引擎, 转录语言, 内存) and 字幕悬浮窗; the engine pickers are now labeled "识别引擎", "转录翻译引擎" and "快捷翻译引擎" (#47)
+- refactor(settings): redesign "关于" — centered app icon, name, version and tagline, a GitHub Star card, and a link list (GitHub / 版本发布 / 反馈问题) (#47)
+- refactor(settings): SnapTra-style look — pill tab bar at the top instead of the system toolbar tabs, titles inside compact cards, a narrower 520pt window, shortcuts drawn as keycaps and "去授权" as an accent pill (#47)
+- refactor(settings): redesign the "快捷翻译" tab with cards — permissions first with "已授权" pills, shortcut rows with a keycap-style recorder and a reset icon, language and engine rows with one-line subtitles; the tab now scrolls instead of using a grouped `Form` (#47)
 
 ### Fixed
 
