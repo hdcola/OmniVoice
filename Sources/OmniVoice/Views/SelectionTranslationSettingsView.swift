@@ -17,7 +17,7 @@ struct SelectionTranslationSettingsView: View {
     @EnvironmentObject private var session: RecordingSession
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 14) {
             shortcutsCard
             languageCard
             engineCard
@@ -36,7 +36,7 @@ struct SelectionTranslationSettingsView: View {
     }
 
     private var languageCard: some View {
-        SettingsCard(title: "语言", icon: "globe") {
+        SettingsCard(title: "快捷翻译语言", icon: "globe") {
             SettingsRow(title: "我的语言", subtitle: "选中的文字是这种语言时，译成「外语」") {
                 languagePicker("我的语言", selection: $translator.myLanguageCode)
             }
@@ -55,7 +55,7 @@ struct SelectionTranslationSettingsView: View {
     }
 
     private var engineCard: some View {
-        SettingsCard(title: "翻译引擎", icon: "cpu") {
+        SettingsCard(title: "快捷翻译引擎", icon: "cpu") {
             SettingsRow(title: "快捷翻译引擎", subtitle: "两种引擎都在本机运行；HY-MT1.5 闲置 5 分钟后自动释放内存") {
                 Picker("快捷翻译引擎", selection: $translator.engineID) {
                     Text(followRecordingLabel).tag(SelectionTranslationEngine.followRecording)

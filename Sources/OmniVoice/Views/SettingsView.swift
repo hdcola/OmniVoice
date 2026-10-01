@@ -2,8 +2,8 @@ import AppKit
 import OmniVoiceCore
 import SwiftUI
 
-/// Settings window — a `TabView` over three tabs: "通用" (permissions, then
-/// 快捷翻译, 实时转录 and 字幕悬浮窗 as stacked card groups), "模型库" (the
+/// Settings window — a pill-style `SettingsTabBar` over three tabs: "通用"
+/// (permissions, then 快捷翻译, 实时转录 and 字幕悬浮窗 as stacked cards), "模型库" (the
 /// full model catalog — the same content that used to be the standalone
 /// "模型管理" window) and "关于". Data-driven from `ProviderCatalog` rather
 /// than one hand-written `case` per engine, so adding a new community model
@@ -39,44 +39,40 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        TabView(selection: $navigation.selectedTab) {
-            generalTab
-                .tabItem { Label(SettingsTab.general.title, systemImage: SettingsTab.general.systemImage) }
-                .tag(SettingsTab.general)
-            modelsTab
-                .tabItem { Label(SettingsTab.models.title, systemImage: SettingsTab.models.systemImage) }
-                .tag(SettingsTab.models)
-            aboutTab
-                .tabItem { Label(SettingsTab.about.title, systemImage: SettingsTab.about.systemImage) }
-                .tag(SettingsTab.about)
+        VStack(spacing: 0) {
+            SettingsTabBar(selection: $navigation.selectedTab)
+                .padding(.top, 10)
+                .padding(.bottom, 4)
+            switch navigation.selectedTab {
+            case .general: generalTab
+            case .models: modelsTab
+            case .about: aboutTab
+            }
         }
-        .frame(width: 560, height: 580)
+        .frame(width: 520, height: 620)
     }
 
     // MARK: - Tab 1: 通用
 
     private var generalTab: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 14) {
                 PermissionsSettingsCard(controller: selectionController)
 
-                SettingsSectionHeader("快捷翻译")
                 SelectionTranslationSettingsView(
                     controller: selectionController,
                     translator: selectionController.translator,
                     downloadManager: downloadManager
                 )
 
-                SettingsSectionHeader("实时转录")
                 transcriptionEngineCard
                 translationEngineCard
                 transcriptionLanguageCard
                 memoryConsole
 
-                SettingsSectionHeader("字幕悬浮窗")
                 panelCard
             }
-            .padding(20)
+            .padding(16)
             // `modelVariantPicker`/`inlineDownloadSection`/the "翻译提交策略"
             // row each insert or remove a row depending on the selected
             // engine; without this the card simply snaps to its new height
@@ -504,7 +500,7 @@ struct SettingsView: View {
     /// background, so a panel transparent enough to not block the view
     /// behind it also made the text hard to read.
     private var panelCard: some View {
-        SettingsCard {
+        SettingsCard(title: "字幕悬浮窗", icon: "macwindow") {
             SettingsRow(
                 title: "启动时显示字幕悬浮窗",
                 subtitle: "关闭后启动时不再自动弹出；开始转录时仍会显示，也可从菜单栏打开"

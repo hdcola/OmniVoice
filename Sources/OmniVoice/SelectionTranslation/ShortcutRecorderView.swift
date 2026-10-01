@@ -19,20 +19,25 @@ struct ShortcutRecorderRow: View {
                     message = nil
                     isRecording.toggle()
                 } label: {
-                    Text(chipText)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(isRecording ? Color.accentColor : .primary)
-                        .frame(minWidth: 84)
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(isRecording ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.08))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .strokeBorder(isRecording ? Color.accentColor.opacity(0.5) : Color.secondary.opacity(0.2), lineWidth: 1)
-                        )
+                    Group {
+                        if !isRecording, let shortcut = controller.shortcuts[action] {
+                            KeycapRow(text: shortcut.displayText)
+                        } else {
+                            Text(chipText)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(isRecording ? Color.accentColor : .secondary)
+                                .padding(.vertical, 4)
+                                .padding(.horizontal, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                        .fill(isRecording ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.08))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                        .strokeBorder(isRecording ? Color.accentColor.opacity(0.5) : Color.primary.opacity(0.2), lineWidth: 0.5)
+                                )
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
                 .background(

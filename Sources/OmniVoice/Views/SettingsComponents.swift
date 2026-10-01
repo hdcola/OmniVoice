@@ -5,15 +5,16 @@ import SwiftUI
 // the right. Inspired by SnapTra Translator's settings
 // (https://github.com/yelog/SnapTraTranslator).
 
-/// A rounded card holding one group of rows. Rows are separated by
-/// `SettingsDivider`s that the caller places between them.
+/// A rounded card holding one group of rows, with its title (and icon) as
+/// the first line inside the card. Rows are separated by `SettingsDivider`s
+/// that the caller places between them.
 struct SettingsCard<Content: View>: View {
     var title: String?
     var icon: String?
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 0) {
             if let title {
                 HStack(spacing: 6) {
                     if let icon {
@@ -23,20 +24,74 @@ struct SettingsCard<Content: View>: View {
                 }
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .padding(.bottom, 2)
             }
-            VStack(alignment: .leading, spacing: 0) {
-                content
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
+        )
+    }
+}
+
+/// Pill-style tab switcher shown at the top of the Settings window.
+struct SettingsTabBar: View {
+    @Binding var selection: SettingsTab
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(SettingsTab.allCases) { tab in
+                Button {
+                    selection = tab
+                } label: {
+                    Text(tab.title)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(selection == tab ? Color.primary : .secondary)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(selection == tab ? Color.primary.opacity(0.14) : .clear))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selection == tab ? .isSelected : [])
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(.quaternary, lineWidth: 0.5)
-            )
+        }
+        .padding(3)
+        .background(Capsule().fill(Color.primary.opacity(0.06)))
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+        .animation(.easeInOut(duration: 0.15), value: selection)
+    }
+}
+
+/// A shortcut drawn as one keycap per glyph ("⌥" "A").
+struct KeycapRow: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(Array(text.enumerated()), id: \.offset) { _, character in
+                Text(String(character))
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .frame(minWidth: 16)
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(Color.primary.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5)
+                    )
+            }
         }
     }
 }
@@ -149,9 +204,9 @@ struct PermissionRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 18))
+                .font(.system(size: 17))
                 .foregroundStyle(isGranted ? Color.green : Color.orange)
-                .frame(width: 26)
+                .frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(size: 13, weight: .medium))
                 Text(detail)
@@ -163,7 +218,15 @@ struct PermissionRow: View {
             if isGranted {
                 StatusPill(text: "已授权", tone: .good)
             } else {
-                Button("去授权", action: open)
+                Button(action: open) {
+                    Text("去授权")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 14)
