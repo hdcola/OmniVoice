@@ -11,6 +11,7 @@ import UserNotifications
 /// already shows the result), or when notification permission is denied.
 @MainActor
 enum SystemNotifier {
+    static let modelDownloadCategory = "model_download"
     static let enabledKey = "org.hdcola.omnivoice.notifications.enabled"
 
     static var isEnabled: Bool {
@@ -47,6 +48,8 @@ enum SystemNotifier {
         content.title = title
         content.body = body
         content.sound = .default
+        content.categoryIdentifier = modelDownloadCategory
+        content.userInfo = ["route": "models"]
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { _ in }
     }
@@ -58,6 +61,14 @@ private final class NotificationClickHandler: NSObject, UNUserNotificationCenter
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
+        // Dismissing the banner (or a future custom action) must not pull the
+        // app forward; only a click on the banner itself routes anywhere.
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+            response.notification.request.content.userInfo["route"] as? String == "models"
+        else {
+            completionHandler()
+            return
+        }
         Task { @MainActor in
             NSApp.activate(ignoringOtherApps: true)
             SettingsNavigationState.shared.openModelLibrary()
