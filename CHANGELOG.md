@@ -12,6 +12,7 @@ The format is based on Keep a Changelog.
 ### Changed
 - refactor(settings): merge "语音与引擎", "语言与字幕" and "快捷翻译" into one "通用" tab (tabs are now 通用 · 模型库 · 关于) — all system permissions (麦克风 / 屏幕录制 / 辅助功能) at the top, then 快捷翻译, 实时转录 (识别引擎, 转录翻译引擎, 转录语言, 内存) and 字幕悬浮窗; the engine pickers are now labeled "识别引擎", "转录翻译引擎" and "快捷翻译引擎" (#47)
 - refactor(settings): restyle "模型库" to match — recommended bundles and every model variant as divider-separated rows inside cards, status pills instead of emoji, accent capsule buttons (下载 / 取消 / 删除 / 一键下载); download, activation and failure behavior is unchanged (#47)
+- fix(settings): "转录语言" rows now match the other cards (title and subtitle left, picker right-aligned); the target-language warning moves into a glyph with the same "一键切换为系统翻译" popover as the floating panel (#47)
 - fix(settings): cards use a faint tint in light mode (a white card disappeared on the white window) and the "关于" footer text is darker (#47)
 - feat(settings): each tab has its own window height — "通用" and "模型库" stay tall and scroll, "关于" shrinks to fit — and switching tabs animates the window, keeping its top edge in place (#47)
 - refactor(settings): redesign "关于" — centered app icon, name, version and tagline, a GitHub Star card, and a link list (GitHub / 版本发布 / 反馈问题) (#47)

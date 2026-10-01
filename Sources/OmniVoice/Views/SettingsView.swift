@@ -143,7 +143,7 @@ struct SettingsView: View {
 
     private var transcriptionEngineCard: some View {
         SettingsCard(title: "识别引擎 (ASR)", icon: "waveform") {
-            SettingsRow(title: "识别引擎") {
+            SettingsRow(title: "引擎") {
                 Picker("识别引擎", selection: $session.transcriptionEngineID) {
                     // Every catalog engine is always listed, downloaded or
                     // not; an undownloaded `.model` engine is labeled rather
@@ -173,7 +173,7 @@ struct SettingsView: View {
 
     private var translationEngineCard: some View {
         SettingsCard(title: "转录翻译引擎", icon: "character.bubble") {
-            SettingsRow(title: "转录翻译引擎") {
+            SettingsRow(title: "引擎") {
                 Picker("转录翻译引擎", selection: $session.translationEngineID) {
                     ForEach(ProviderCatalog.translationEngines) { engine in
                         Text(engineLabel(for: engine)).tag(engine.id)
@@ -263,25 +263,31 @@ struct SettingsView: View {
 
     private var transcriptionLanguageCard: some View {
         SettingsCard(title: "转录语言", icon: "globe") {
-            SourceLanguagePicker(
-                sourceLanguageCode: $session.sourceLanguageCode,
-                transcriptionEngineKind: session.transcriptionEngineKind
-            )
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            SettingsRow(title: "源语言", subtitle: "正在说的语言") {
+                SourceLanguagePicker(
+                    sourceLanguageCode: $session.sourceLanguageCode,
+                    transcriptionEngineKind: session.transcriptionEngineKind
+                )
+                .labelsHidden()
+            }
             SettingsDivider()
-            TargetLanguagePicker(
-                targetLanguageCode: $session.targetLanguageCode,
-                translationEngineID: session.translationEngineID,
-                onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
-                // Belt-and-suspenders alongside this card's own
-                // `.disabled(isBusy)` (Review Round 1 Must-Fix 1) — keeps
-                // the button's own guard/caption correct even if this
-                // picker is ever reused outside a `.disabled` ancestor.
-                isSessionActive: session.isSessionActive
-            )
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            SettingsRow(title: "目标语言", subtitle: "字幕要翻译成的语言") {
+                // Compact: the picker plus a warning glyph whose popover
+                // carries the "一键切换为系统翻译" action, so the row keeps
+                // the same shape as every other row in the card.
+                TargetLanguagePicker(
+                    targetLanguageCode: $session.targetLanguageCode,
+                    translationEngineID: session.translationEngineID,
+                    onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
+                    // Belt-and-suspenders alongside this card's own
+                    // `.disabled(isBusy)` (Review Round 1 Must-Fix 1) — keeps
+                    // the button's own guard/caption correct even if this
+                    // picker is ever reused outside a `.disabled` ancestor.
+                    isSessionActive: session.isSessionActive,
+                    isCompact: true
+                )
+                .labelsHidden()
+            }
         }
         .disabled(isBusy)
     }
