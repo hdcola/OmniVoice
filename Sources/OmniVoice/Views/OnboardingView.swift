@@ -73,6 +73,14 @@ struct OnboardingView: View {
     /// closed this window by the time that failure would have surfaced had
     /// no way to find out the "后台下载中" promise never actually started.
     @State private var diskSpaceWarningMessage: String?
+    /// Applied only on finish (not when toggled), so skipping the wizard
+    /// leaves the login item and launch preload untouched.
+    @State private var launchAtLogin = false
+    @State private var preloadMode = LaunchPreloadMode.all
+    /// Once the user picks a preload mode themselves, switching run modes
+    /// stops overriding it with that mode's default.
+    @State private var preloadModeEdited = false
+    @StateObject private var loginItem = LaunchAtLoginController()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -81,6 +89,15 @@ struct OnboardingView: View {
                     header
                     permissionsCard
                     modeCard
+                    LaunchOptionsCard(
+                        title: "3 · 启动偏好",
+                        launchAtLogin: $launchAtLogin,
+                        preloadMode: Binding(
+                            get: { preloadMode },
+                            set: { preloadMode = $0; preloadModeEdited = true }
+                        ),
+                        preloadAvailable: selectedMode != .lightweight
+                    )
                 }
                 .padding(16)
             }
@@ -88,6 +105,10 @@ struct OnboardingView: View {
             actionBar
         }
         .frame(width: 520)
+        .onChange(of: selectedMode) { _, mode in
+            guard !preloadModeEdited else { return }
+            preloadMode = Self.defaultPreloadMode(for: mode)
+        }
         // None of these post a notification this app can observe cheaply,
         // and the user grants them in System Settings while this window is
         // open — polling once a second keeps the rows honest.
@@ -283,8 +304,23 @@ struct OnboardingView: View {
         if startDownload {
             guard startBundleDownload() else { return }
         }
+        // The lightweight mode has nothing to load, whatever the picker said.
+        UserDefaults.standard.set(
+            (selectedMode == .lightweight ? LaunchPreloadMode.off : preloadMode).rawValue,
+            forKey: PersistedLaunchKey.preloadMode
+        )
+        if launchAtLogin { loginItem.setEnabled(true) }
         UserDefaults.standard.set(true, forKey: PersistedOnboardingKey.hasCompletedOnboarding)
         onFinished()
+    }
+
+    /// 均衡 mode targets 8GB machines, so it only keeps the translator warm.
+    private static func defaultPreloadMode(for mode: Mode) -> LaunchPreloadMode {
+        switch mode {
+        case .lightweight: return .off
+        case .balanced: return .translationOnly
+        case .offlineModel: return .all
+        }
     }
 
     /// Which recommended bundle `.balanced`/`.offlineModel` each kick off —
@@ -327,6 +363,7 @@ struct OnboardingView: View {
                 do {
                     _ = try await downloadManager.ensureDownloaded(variant)
                     activateIfStillSystemEngine(variant)
+                    preloadOnceBundleIsReady(bundle)
                 } catch {
                     // Best-effort background download — a failure here still
                     // leaves this variant's own inline retry card reachable
@@ -338,6 +375,18 @@ struct OnboardingView: View {
         }
         session.statusMessage = "模型正在后台下载中，下载完成后将自动为您无缝启用"
         return true
+    }
+
+    /// Launch-time preloading couldn't run at launch (the models weren't
+    /// downloaded yet), so do it as soon as the whole bundle has landed and
+    /// its engines are active — earlier, a half-downloaded bundle would
+    /// preload the system engine and then be discarded on the engine switch.
+    private func preloadOnceBundleIsReady(_ bundle: ModelBundle) {
+        guard bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty,
+            let scope = LaunchPreloadMode.stored.scope,
+            session.usesOnDeviceModelEngine
+        else { return }
+        Task { await session.preloadModel(scope: scope) }
     }
 
     /// Mirrors `ModelManagementView.autoActivateIfSystemEngineStillSelected(_:)`

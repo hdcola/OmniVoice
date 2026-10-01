@@ -730,4 +730,34 @@ struct RecordingSessionSettingsTests {
 
         #expect(session.lines[0].translation == "Hello, world.")
     }
+
+    /// `.translationOnly` leaves the recognizer unloaded, so `isModelLoaded`
+    /// (which `start()` reads as "both providers loaded") must stay false.
+    @Test func translationOnlyPreloadDoesNotMarkFullPairLoaded() async {
+        let session = RecordingSession()
+        await session.preloadModel(scope: .translationOnly)
+        #expect(session.isTranslationModelLoaded)
+        #expect(!session.isModelLoaded)
+        #expect(session.loadedTranslationOnlyIDs?.engine == session.translationEngineID)
+    }
+
+    /// A later `.all` preload adopts the translation-only load and completes
+    /// the pair; `unloadModels()` clears whichever state is held.
+    @Test func fullPreloadAfterTranslationOnlyCompletesPair() async {
+        let session = RecordingSession()
+        await session.preloadModel(scope: .translationOnly)
+        await session.preloadModel(scope: .all)
+        #expect(session.isModelLoaded)
+        #expect(session.loadedTranslationOnlyIDs == nil)
+        session.unloadModels()
+        #expect(!session.isTranslationModelLoaded)
+    }
+
+    @Test func unloadClearsTranslationOnlyLoad() async {
+        let session = RecordingSession()
+        await session.preloadModel(scope: .translationOnly)
+        session.unloadModels()
+        #expect(!session.isTranslationModelLoaded)
+        #expect(session.loadedTranslationOnlyIDs == nil)
+    }
 }

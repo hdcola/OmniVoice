@@ -100,6 +100,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             }
 
         presentOnboardingIfNeeded()
+        preloadModelsOnLaunchIfNeeded()
+    }
+
+    /// "启动时加载模型" — skipped while onboarding is still showing (its
+    /// model downloads may not have finished; `OnboardingView` triggers the
+    /// load itself once they do) and when the selected engines aren't
+    /// on-device ones. Runs in a background `Task` so launch isn't blocked by
+    /// a multi-second weight load.
+    private func preloadModelsOnLaunchIfNeeded() {
+        guard onboardingWindow == nil, let scope = LaunchPreloadMode.stored.scope,
+            session.usesOnDeviceModelEngine
+        else { return }
+        Task { [session] in await session.preloadModel(scope: scope) }
     }
 
     /// Task 4.1 — shown exactly once, on the very first launch (see
