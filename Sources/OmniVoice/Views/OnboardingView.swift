@@ -380,12 +380,19 @@ struct OnboardingView: View {
         }
 
         SystemNotifier.requestAuthorizationIfNeeded()
+        // Two variants finishing back to back can each see the bundle as
+        // complete by the time their task resumes; notify only once.
+        final class Flag { var notified = false }
+        let completionNotice = Flag()
         for variant in variants {
             Task {
                 do {
                     _ = try await downloadManager.ensureDownloaded(variant)
                     activateIfStillSystemEngine(variant)
-                    if bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty {
+                    if !completionNotice.notified,
+                        bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty
+                    {
+                        completionNotice.notified = true
                         SystemNotifier.notify(
                             title: "模型下载完成",
                             body: "「\(bundle.displayName)」已下载并自动启用")
