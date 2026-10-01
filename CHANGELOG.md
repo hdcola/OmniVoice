@@ -15,7 +15,7 @@ The format is based on Keep a Changelog.
 - feat(translation): `HYMT15Translator.translateText(_:targetLanguage:sourceIsChinese:)` one-shot text translation using HY-MT1.5's own model-card prompt, independent of the streaming transcript path (#40)
 
 ### Changed
-- refactor(ui): unify naming — "字幕悬浮窗" (live transcript) vs "翻译面板", "快捷翻译" (formerly "选词翻译") covering "划词翻译" (⌥A) and "截图翻译" (⌥S), "模型库", "转录记录", "系统翻译", "内存" (was 显存), "跟随转录设置"; settings tab "语言与悬浮窗" is now "语言与字幕"; see Docs/GLOSSARY.md
+- refactor(ui): unify naming — "字幕悬浮窗" (live transcript) vs "翻译面板", "快捷翻译" (formerly "选词翻译") covering "划词翻译" (⌥A) and "截图翻译" (⌥S), "模型库", "转录记录", "系统翻译", "内存" (was 显存), "跟随转录设置"; settings tab "语言与悬浮窗" is now "语言与字幕"; see Docs/GLOSSARY.md (#43)
 - refactor(translation): HY-MT1.5 weights are now shared through a reference-counted `HYMT15ModelPool`, so a HY-MT1.5 recording and the selection panel use one loaded copy instead of two; the panel releases its hold after 5 idle minutes (#40)
 - refactor(settings): replace the "长句提前翻译阈值" `Stepper` + three-line explanatory paragraph with a single labeled numeric `TextField` (full explanation moved to a "?" tooltip); keep the "翻译输出"/"引擎运行与显存状态" sections always present and swap only their interior content per selected engine, and animate the remaining engine-switch layout changes, instead of whole sections popping in and out (round-5 user report)
 
@@ -26,7 +26,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
-- docs(glossary): add Docs/GLOSSARY.md naming rules; refresh README and RELEASE_TESTING terminology
+- docs(glossary): add Docs/GLOSSARY.md naming rules; refresh README and RELEASE_TESTING terminology (#43)
 - docs(readme): document ⌥A selection translation and ⌥S screenshot translation (#40)
 
 ### Tests
