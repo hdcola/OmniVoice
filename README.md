@@ -7,9 +7,9 @@ device quick translate (快捷翻译): select text in any app (划词翻译, ⌥
 frame part of the screen (截图翻译, ⌥S) and translate it in a translation
 panel (翻译面板).
 
-**Current version: 0.5.0 — internal test build.**
+**Current version: 0.5.1 — internal test build.**
 
-### [⬇ Download OmniVoice 0.5.0 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.5.0/OmniVoice-0.5.0.dmg)
+### [⬇ Download OmniVoice 0.5.1 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.5.1/OmniVoice-0.5.1.dmg)
 
 Or install via [Homebrew](https://brew.sh):
 

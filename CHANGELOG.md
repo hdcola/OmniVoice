@@ -7,6 +7,20 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.5.1] - 2026-09-30
+
+### Added
 - feat(settings): card-style Settings modelled on SnapTra Translator — a pill tab bar (⌘1–⌘3) instead of the system toolbar tabs, compact cards with their titles inside, shortcuts drawn as keycaps, "已授权" / "去授权" status pills, and a narrower 520pt window that stays the same size on every tab (#47)
 
 ### Changed
@@ -21,13 +35,9 @@ The format is based on Keep a Changelog.
 - fix(settings): cards use a faint tint in light mode (a white card disappeared on the white window) and the "关于" footer text is darker (#47)
 - fix(onboarding): the microphone and system-audio rows' "去授权" now open System Settings once access has been denied, instead of silently doing nothing (#47)
 
-### Dependencies
-
 ### Documentation
 - docs(readme): point the Quick Translate settings location at Settings → 通用 (#47)
 - docs(readme): re-introduce the app in the README intro and PROGRESS's "What this is" in terms of quick translate (划词翻译 ⌥A / 截图翻译 ⌥S into the 翻译面板), not just the speech caption panel (#45)
-
-### Tests
 
 ## [0.5.0] - 2026-09-30
 
