@@ -189,6 +189,7 @@ struct MenuBarLabel: View {
     /// attached to, so it needs its own explicit instance the same way
     /// `downloadManager` already does.
     @ObservedObject private var session: RecordingSession
+    @Environment(\.openSettings) private var openSettings
 
     init(modelDownloadManager: ModelDownloadManager, session: RecordingSession) {
         self.downloadManager = modelDownloadManager
@@ -196,6 +197,17 @@ struct MenuBarLabel: View {
     }
 
     var body: some View {
+        icon
+            // This label is alive for the whole app lifetime (the menu
+            // content is not), so it hands the SwiftUI-only `openSettings`
+            // action to code with no environment — notification clicks.
+            .onAppear {
+                SettingsNavigationState.shared.openSettingsWindow = { openSettings() }
+            }
+    }
+
+    @ViewBuilder
+    private var icon: some View {
         // Recording state wins over the download readout — otherwise a
         // download kicked off before starting to record would keep showing
         // a percentage instead of the one indicator that actually answers

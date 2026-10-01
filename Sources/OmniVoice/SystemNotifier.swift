@@ -11,11 +11,23 @@ import UserNotifications
 /// already shows the result), or when notification permission is denied.
 @MainActor
 enum SystemNotifier {
+    static let modelDownloadCategory = "model_download"
     static let enabledKey = "org.hdcola.omnivoice.notifications.enabled"
 
     static var isEnabled: Bool {
         get { UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: enabledKey) }
+    }
+
+    /// Retained here because `UNUserNotificationCenter.delegate` is weak.
+    private static let clickHandler = NotificationClickHandler()
+
+    /// Routes a click on a download notification to Settings → 模型库. Call
+    /// once at launch; the app is an `LSUIElement`, so without this a click
+    /// would activate the process but show nothing.
+    static func installClickHandler() {
+        guard isAvailable else { return }
+        UNUserNotificationCenter.current().delegate = clickHandler
     }
 
     private static var isAvailable: Bool { Bundle.main.bundleIdentifier != nil && Bundle.main.bundleURL.pathExtension == "app" }
@@ -36,7 +48,32 @@ enum SystemNotifier {
         content.title = title
         content.body = body
         content.sound = .default
+        content.categoryIdentifier = modelDownloadCategory
+        content.userInfo = ["route": "models"]
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { _ in }
+    }
+}
+
+private final class NotificationClickHandler: NSObject, UNUserNotificationCenterDelegate {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        // Dismissing the banner (or a future custom action) must not pull the
+        // app forward; only a click on the banner itself routes anywhere.
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+            response.notification.request.content.userInfo["route"] as? String == "models"
+        else {
+            completionHandler()
+            return
+        }
+        Task { @MainActor in
+            NSApp.activate(ignoringOtherApps: true)
+            SettingsNavigationState.shared.openModelLibrary()
+            SettingsNavigationState.shared.requestOpenSettings()
+            completionHandler()
+        }
     }
 }

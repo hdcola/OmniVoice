@@ -39,6 +39,32 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 /// clicks go through the one source of truth.
 @MainActor
 final class SettingsNavigationState: ObservableObject {
+    /// The one instance `OmniVoiceApp` injects — also reachable from
+    /// `AppDelegate`-side code (notification clicks) that has no SwiftUI
+    /// environment to read it from.
+    static let shared = SettingsNavigationState()
+
+    /// Set by `MenuBarLabel` once it appears; wraps SwiftUI's `openSettings`.
+    /// A request that arrived before then (a notification click that cold-
+    /// launched the app) runs as soon as it is set.
+    var openSettingsWindow: (() -> Void)? {
+        didSet {
+            if pendingOpenSettings, let open = openSettingsWindow {
+                pendingOpenSettings = false
+                open()
+            }
+        }
+    }
+    private var pendingOpenSettings = false
+
+    func requestOpenSettings() {
+        if let open = openSettingsWindow {
+            open()
+        } else {
+            pendingOpenSettings = true
+        }
+    }
+
     private static let defaultsKey = "org.hdcola.omnivoice.settingsSelectedTab"
 
     /// Restored from `UserDefaults` at launch, then persisted on every
