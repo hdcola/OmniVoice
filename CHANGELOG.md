@@ -15,6 +15,7 @@ The format is based on Keep a Changelog.
 - refactor(settings): the "通用" tab's inline model downloads and memory console buttons use the same accent capsule as "模型库", and a disabled capsule now dims (#47)
 - fix(settings): "转录语言" rows now match the other cards (title and subtitle left, picker right-aligned); the target-language warning moves into a glyph with the same "一键切换为系统翻译" popover as the floating panel (#47)
 - fix(settings): cards use a faint tint in light mode (a white card disappeared on the white window) and the "关于" footer text is darker (#47)
+- refactor(onboarding): restyle the first-launch window like Settings — app icon header, permission cards with status pills (refreshed live while the window is open), the three run modes as a vertical radio list with size notes instead of a horizontally scrolling card row, and an action bar pinned below the content; window is 520pt wide (#47)
 - refactor(settings): redesign "关于" — centered app icon, name, version and tagline, a GitHub Star card, and a link list (GitHub / 版本发布 / 反馈问题) (#47)
 
 ### Fixed

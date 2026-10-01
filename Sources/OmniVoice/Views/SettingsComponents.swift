@@ -248,3 +248,25 @@ struct PillButton: View {
         .buttonStyle(.plain)
     }
 }
+
+/// The one filled call-to-action capsule on a screen (onboarding's
+/// "一键开启并下载").
+struct PrimaryPillButton: View {
+    let title: String
+    let action: () -> Void
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(Color.accentColor))
+                .contentShape(Capsule())
+                .opacity(isEnabled ? 1 : 0.4)
+        }
+        .buttonStyle(.plain)
+    }
+}
