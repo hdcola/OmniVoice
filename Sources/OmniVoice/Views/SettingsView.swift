@@ -561,63 +561,72 @@ struct SettingsView: View {
     private static let repositoryURL = URL(string: "https://github.com/hdcola/OmniVoice")!
 
     private var aboutTab: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                VStack(spacing: 6) {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable()
-                        .frame(width: 84, height: 84)
-                    Text("OmniVoice").font(.system(size: 24, weight: .bold))
-                    Text("v\(appVersionString)")
-                        .font(.system(size: 13, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Text("macOS 离线实时双语字幕、转录与快捷翻译")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.top, 8)
-                .padding(.bottom, 4)
-
-                Link(destination: Self.repositoryURL) {
-                    VStack(spacing: 3) {
-                        Text("⭐ 在 GitHub 点个 Star").font(.system(size: 14, weight: .semibold))
-                        Text("如果 OmniVoice 对你有帮助，在 GitHub 点个 ⭐ 吧！")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.yellow.opacity(0.1))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(Color.yellow.opacity(0.35), lineWidth: 0.5)
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                }
-                .buttonStyle(.plain)
-
-                SettingsCard {
-                    aboutLink("GitHub", icon: "chevron.left.forwardslash.chevron.right", url: Self.repositoryURL)
-                    SettingsDivider()
-                    aboutLink("版本发布", icon: "shippingbox", url: Self.repositoryURL.appendingPathComponent("releases"))
-                    SettingsDivider()
-                    aboutLink("反馈问题", icon: "exclamationmark.bubble", url: Self.repositoryURL.appendingPathComponent("issues"))
-                }
-
-                Text("系统引擎基于 macOS Speech / Translation 框架；本地引擎基于 audio.cpp（R2T2）与 llama.cpp（T3PO / HY-MT1.5），完全离线运行。")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 12)
-                Text("Apache License 2.0")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+        // The content is vertically centered in the window; `minHeight`
+        // keeps it that way while still letting a short window scroll.
+        GeometryReader { proxy in
+            ScrollView {
+                aboutContent
+                    .frame(maxWidth: .infinity, minHeight: proxy.size.height)
             }
-            .padding(16)
         }
+    }
+
+    private var aboutContent: some View {
+        VStack(spacing: 14) {
+            VStack(spacing: 6) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 84, height: 84)
+                Text("OmniVoice").font(.system(size: 24, weight: .bold))
+                Text("v\(appVersionString)")
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Text("macOS 离线实时双语字幕、转录与快捷翻译")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+
+            Link(destination: Self.repositoryURL) {
+                VStack(spacing: 3) {
+                    Text("⭐ 在 GitHub 点个 Star").font(.system(size: 14, weight: .semibold))
+                    Text("如果 OmniVoice 对你有帮助，在 GitHub 点个 ⭐ 吧！")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.yellow.opacity(0.1))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(Color.yellow.opacity(0.35), lineWidth: 0.5)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
+            SettingsCard {
+                aboutLink("GitHub", icon: "chevron.left.forwardslash.chevron.right", url: Self.repositoryURL)
+                SettingsDivider()
+                aboutLink("版本发布", icon: "shippingbox", url: Self.repositoryURL.appendingPathComponent("releases"))
+                SettingsDivider()
+                aboutLink("反馈问题", icon: "exclamationmark.bubble", url: Self.repositoryURL.appendingPathComponent("issues"))
+            }
+
+            Text("系统引擎基于 macOS Speech / Translation 框架；本地引擎基于 audio.cpp（R2T2）与 llama.cpp（T3PO / HY-MT1.5），完全离线运行。")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 12)
+            Text("Apache License 2.0")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(16)
     }
 
     private func aboutLink(_ title: String, icon: String, url: URL) -> some View {
