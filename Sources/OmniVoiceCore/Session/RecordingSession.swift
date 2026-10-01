@@ -58,9 +58,10 @@ public final class RecordingSession: ObservableObject {
     /// providers; `start()`/`preloadModel(scope: .all)` instead adopt this
     /// translation provider and load only the recognizer.
     @Published public private(set) var loadedTranslationOnlyIDs: (engine: String, variant: String?)?
-    /// True when the translation model is resident — as part of a full load
-    /// (`isModelLoaded`) or a translation-only one.
-    public var isTranslationModelLoaded: Bool { isModelLoaded || loadedTranslationOnlyIDs != nil }
+    /// True when any model is resident — a full load (`isModelLoaded`) or a
+    /// translation-only one. Both include the translator, so this is also
+    /// "the translation model is loaded".
+    public var hasLoadedModels: Bool { isModelLoaded || loadedTranslationOnlyIDs != nil }
     /// True across the whole `start()`→`stop()` lifecycle, not just while
     /// actually recording — use this (not `isRunning` alone) to gate any
     /// control whose value is only read once, at the top of `start()`
@@ -502,8 +503,11 @@ public final class RecordingSession: ObservableObject {
     /// should never be left pointing at an undownloaded model to begin with.
     /// A no-op for a `.system`-kind selection (nothing to fall back from) or
     /// a `.model`-kind selection that still has something downloaded.
-    public func fallBackToSystemEngineIfModelUnavailable() {
-        if transcriptionEngineKind == .model, !hasDownloadedModelVariant(engineID: transcriptionEngineID),
+    public func fallBackToSystemEngineIfModelUnavailable(includingTranscription: Bool = true) {
+        // `includingTranscription: false` is for a translation-only preload:
+        // a recognizer whose model isn't downloaded yet must keep its
+        // selection rather than be reset to the system engine as a side effect.
+        if includingTranscription, transcriptionEngineKind == .model, !hasDownloadedModelVariant(engineID: transcriptionEngineID),
             let systemEngine = ProviderCatalog.transcriptionEngines.first(where: { $0.kind == .system }) {
             transcriptionEngineID = systemEngine.id
         }
@@ -646,7 +650,7 @@ public final class RecordingSession: ObservableObject {
         // doc), but re-checking here means a race (a deletion landing between
         // this call being queued and actually running) still resolves to
         // "use the system engine" instead of the "尚未下载" failure below.
-        fallBackToSystemEngineIfModelUnavailable()
+        fallBackToSystemEngineIfModelUnavailable(includingTranscription: scope == .all)
 
         let transcriptionModelPath: URL?
         if scope == .all {
@@ -712,6 +716,7 @@ public final class RecordingSession: ObservableObject {
         } catch {
             statusMessage = "翻译引擎预加载失败: \(error.localizedDescription)"
             translation.unload()
+            loadedTranslationOnlyIDs = nil
             // `transcription.loadModel()` was never even called at this
             // point, so it holds no C resources to release yet — but
             // `transcriptionProvider` is about to be nil'd (dropping this

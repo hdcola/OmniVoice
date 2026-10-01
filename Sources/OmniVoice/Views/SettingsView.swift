@@ -472,7 +472,7 @@ struct SettingsView: View {
                     PillButton(title: "🧹 释放内存占用") {
                         session.unloadModels()
                     }
-                    .disabled(!session.isTranslationModelLoaded || session.isSessionActive || session.isPreloadingModel)
+                    .disabled(!session.hasLoadedModels || session.isSessionActive || session.isPreloadingModel)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
@@ -484,13 +484,13 @@ struct SettingsView: View {
 
     private var memoryStatusTone: StatusPill.Tone {
         if session.isPreloadingModel { return .warning }
-        return session.isTranslationModelLoaded ? .good : .neutral
+        return session.hasLoadedModels ? .good : .neutral
     }
 
     private var memoryStatusText: String {
         if session.isPreloadingModel { return "正在加载中…" }
         if session.isModelLoaded { return "已载入内存（就绪）" }
-        return session.isTranslationModelLoaded ? "仅翻译模型已载入" : "空闲（未载入内存）"
+        return session.hasLoadedModels ? "仅翻译模型已载入" : "空闲（未载入内存）"
     }
 
     // MARK: - 启动
@@ -503,7 +503,9 @@ struct SettingsView: View {
             loginError: loginItem.lastError,
             preloadAvailable: session.usesOnDeviceModelEngine,
             memoryNote: session.translationEngineKind == .model
-                ? "仅翻译约 \(translationMemoryGB) GB；翻译和识别约 \(estimatedMemoryGB) GB"
+                ? (session.transcriptionEngineKind == .model
+                    ? "仅翻译约 \(translationMemoryGB) GB；翻译和识别约 \(estimatedMemoryGB) GB"
+                    : "翻译模型约 \(translationMemoryGB) GB；识别为系统引擎，无需加载")
                 : "翻译为系统引擎，「仅翻译模型」不会加载任何内容；识别模型约 \(estimatedMemoryGB) GB",
             translationOnlyAvailable: session.translationEngineKind == .model,
             onOpenLoginItems: { loginItem.openLoginItemsSettings() }

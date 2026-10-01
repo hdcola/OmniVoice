@@ -736,7 +736,7 @@ struct RecordingSessionSettingsTests {
     @Test func translationOnlyPreloadDoesNotMarkFullPairLoaded() async {
         let session = RecordingSession()
         await session.preloadModel(scope: .translationOnly)
-        #expect(session.isTranslationModelLoaded)
+        #expect(session.hasLoadedModels)
         #expect(!session.isModelLoaded)
         #expect(session.loadedTranslationOnlyIDs?.engine == session.translationEngineID)
     }
@@ -750,14 +750,14 @@ struct RecordingSessionSettingsTests {
         #expect(session.isModelLoaded)
         #expect(session.loadedTranslationOnlyIDs == nil)
         session.unloadModels()
-        #expect(!session.isTranslationModelLoaded)
+        #expect(!session.hasLoadedModels)
     }
 
     @Test func unloadClearsTranslationOnlyLoad() async {
         let session = RecordingSession()
         await session.preloadModel(scope: .translationOnly)
         session.unloadModels()
-        #expect(!session.isTranslationModelLoaded)
+        #expect(!session.hasLoadedModels)
         #expect(session.loadedTranslationOnlyIDs == nil)
     }
 
@@ -769,6 +769,15 @@ struct RecordingSessionSettingsTests {
         #expect(session.loadedTranslationOnlyIDs != nil)
         session.translationEngineID = "model.hymt15"
         #expect(session.loadedTranslationOnlyIDs == nil)
-        #expect(!session.isTranslationModelLoaded)
+        #expect(!session.hasLoadedModels)
+    }
+
+    /// A translation-only preload must not reset an undownloaded `.model`
+    /// recognizer to the system engine as a side effect.
+    @Test func translationOnlyPreloadKeepsUndownloadedRecognizerSelection() async {
+        let session = RecordingSession(modelDownloadManager: ModelDownloadManager(cacheDirectory: makeEmptyTempCacheDirectory()))
+        session.transcriptionEngineID = "model.r2t2"
+        await session.preloadModel(scope: .translationOnly)
+        #expect(session.transcriptionEngineID == "model.r2t2")
     }
 }

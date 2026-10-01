@@ -105,6 +105,7 @@ struct OnboardingView: View {
             actionBar
         }
         .frame(width: 520)
+        .onAppear { launchAtLogin = loginItem.isEnabled }
         .onChange(of: selectedMode) { _, mode in
             guard !preloadModeEdited else { return }
             preloadMode = Self.defaultPreloadMode(for: mode)
@@ -223,7 +224,7 @@ struct OnboardingView: View {
 
     private var actionBar: some View {
         HStack {
-            Button("跳过向导") { finish(startDownload: false) }
+            Button("跳过向导") { skip() }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -300,12 +301,20 @@ struct OnboardingView: View {
     /// do), and `finish(startDownload:)` only marks completion/closes the
     /// window when that's `true` — a disk-space failure instead leaves the
     /// window open with its alert visible and the wizard retriable.
+    /// Marks onboarding done without touching the login item or the launch
+    /// preload setting, as `launchAtLogin`'s doc promises.
+    private func skip() {
+        UserDefaults.standard.set(true, forKey: PersistedOnboardingKey.hasCompletedOnboarding)
+        onFinished()
+    }
+
     private func finish(startDownload: Bool) {
         if startDownload {
             guard startBundleDownload() else { return }
         }
         persistLaunchOptions()
-        if launchAtLogin { loginItem.setEnabled(true) }
+        // Both directions, so a re-run wizard can also turn it off.
+        if launchAtLogin != loginItem.isEnabled { loginItem.setEnabled(launchAtLogin) }
         UserDefaults.standard.set(true, forKey: PersistedOnboardingKey.hasCompletedOnboarding)
         onFinished()
     }

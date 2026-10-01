@@ -7,8 +7,8 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(launch): new "启动" card in Settings → 通用 and the first-launch window — "开机时自动启动" (macOS login item) and "启动时加载模型" (不加载 / 仅翻译模型 / 翻译和识别模型); onboarding defaults the choice to the run mode picked (均衡 → 仅翻译, 高精 → 全部) and starts loading once the downloads finish (#46)
-- feat(session): `preloadModel(scope:)` can load just the translation engine; a later recording adopts it and loads only the recognizer, and the memory status reads "仅翻译模型已载入" (#46)
+- feat(launch): new "启动" card in Settings → 通用 and the first-launch window — "开机时自动启动" (macOS login item) and "启动时加载模型" (不加载 / 仅翻译模型 / 翻译和识别模型); onboarding defaults the choice to the run mode picked (均衡 → 仅翻译, 高精 → 全部) and starts loading once the downloads finish (#50)
+- feat(session): `preloadModel(scope:)` can load just the translation engine; a later recording adopts it and loads only the recognizer, and the memory status reads "仅翻译模型已载入" (#50)
 
 ### Changed
 - refactor(settings): rename the `org.omnivoice.*` UserDefaults keys and dispatch queue labels to `org.hdcola.omnivoice.*`; previously saved settings (engines, languages, shortcuts, panel layout, onboarding state) are not migrated and reset to defaults
