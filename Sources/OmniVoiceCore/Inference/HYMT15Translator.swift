@@ -65,7 +65,7 @@ final class HYMT15Translator: @unchecked Sendable {
     /// reasoning as `InProcessTranslator.tuning`'s doc.
     private var earlyTranslateThreshold = 150
 
-    private let queue = DispatchQueue(label: "org.omnivoice.inprocess.hymt15")
+    private let queue = DispatchQueue(label: "org.hdcola.omnivoice.inprocess.hymt15")
 
     private var model: OpaquePointer?
     private var ctx: OpaquePointer?

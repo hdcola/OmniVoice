@@ -367,5 +367,5 @@ struct OnboardingView: View {
 /// kept separate from that enum since onboarding is purely an `OmniVoice`-
 /// module UI concern, not something `RecordingSession` itself needs to know.
 enum PersistedOnboardingKey {
-    static let hasCompletedOnboarding = "org.omnivoice.hasCompletedOnboarding"
+    static let hasCompletedOnboarding = "org.hdcola.omnivoice.hasCompletedOnboarding"
 }

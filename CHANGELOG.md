@@ -9,6 +9,7 @@ The format is based on Keep a Changelog.
 ### Added
 
 ### Changed
+- refactor(settings): rename the `org.omnivoice.*` UserDefaults keys and dispatch queue labels to `org.hdcola.omnivoice.*`; previously saved settings (engines, languages, shortcuts, panel layout, onboarding state) are not migrated and reset to defaults
 
 ### Fixed
 

@@ -23,7 +23,7 @@ final class MicrophoneCapture: NSObject {
     private let deviceID: String?
     private var session: AVCaptureSession?
     private var output: AVCaptureAudioDataOutput?
-    private let queue = DispatchQueue(label: "org.omnivoice.mic")
+    private let queue = DispatchQueue(label: "org.hdcola.omnivoice.mic")
     private let converter = PCMConverter(targetSampleRate: 16000, targetChannels: 1)
 
     init(deviceID: String?) {

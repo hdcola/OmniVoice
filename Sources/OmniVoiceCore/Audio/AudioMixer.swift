@@ -23,7 +23,7 @@ final class AudioMixer {
 
     private let includeSystemAudio: Bool
     private let micEnabled: Bool
-    private let queue = DispatchQueue(label: "org.omnivoice.mixer")
+    private let queue = DispatchQueue(label: "org.hdcola.omnivoice.mixer")
     private var systemBuffer: [Float] = []
     private let maxSystemBufferSamples = 16000 * 2 // ~2s of slack at 16kHz
 

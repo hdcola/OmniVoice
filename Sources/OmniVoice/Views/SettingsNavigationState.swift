@@ -39,7 +39,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 /// clicks go through the one source of truth.
 @MainActor
 final class SettingsNavigationState: ObservableObject {
-    private static let defaultsKey = "org.omnivoice.settingsSelectedTab"
+    private static let defaultsKey = "org.hdcola.omnivoice.settingsSelectedTab"
 
     /// Restored from `UserDefaults` at launch, then persisted on every
     /// change — Docs/UX-SETTINGS-MODEL-MANAGEMENT.md §4.1's "默认停留在上次

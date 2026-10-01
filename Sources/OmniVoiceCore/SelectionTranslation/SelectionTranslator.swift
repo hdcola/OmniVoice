@@ -414,9 +414,9 @@ final class SelectionModelBackend: SelectionModelTranslating {
     }
 }
 
-/// Same `org.omnivoice.*` namespacing as `PersistedSettingsKey`.
+/// Same `org.hdcola.omnivoice.*` namespacing as `PersistedSettingsKey`.
 enum PersistedSelectionKey {
-    static let engineID = "org.omnivoice.selection.engineID"
-    static let myLanguageCode = "org.omnivoice.selection.myLanguageCode"
-    static let foreignLanguageCode = "org.omnivoice.selection.foreignLanguageCode"
+    static let engineID = "org.hdcola.omnivoice.selection.engineID"
+    static let myLanguageCode = "org.hdcola.omnivoice.selection.myLanguageCode"
+    static let foreignLanguageCode = "org.hdcola.omnivoice.selection.foreignLanguageCode"
 }

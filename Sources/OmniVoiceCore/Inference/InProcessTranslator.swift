@@ -149,7 +149,7 @@ final class InProcessTranslator: @unchecked Sendable {
     /// same `queue` so the change is ordered relative to pending probes.
     private var tuning = TranslationTuning()
 
-    private let queue = DispatchQueue(label: "org.omnivoice.inprocess.llama")
+    private let queue = DispatchQueue(label: "org.hdcola.omnivoice.inprocess.llama")
 
     private var model: OpaquePointer?
     private var ctx: OpaquePointer?

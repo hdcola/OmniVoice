@@ -22,7 +22,7 @@ final class SystemAudioCapture: NSObject {
 
     private var stream: SCStream?
     private let converter = PCMConverter(targetSampleRate: 16000, targetChannels: 1)
-    private let queue = DispatchQueue(label: "org.omnivoice.systemaudio")
+    private let queue = DispatchQueue(label: "org.hdcola.omnivoice.systemaudio")
 
     @MainActor
     func start() async throws {

@@ -1348,24 +1348,24 @@ public final class RecordingSession: ObservableObject {
     private static let defaults = UserDefaults.standard
 }
 
-/// Namespaced (`org.omnivoice.*`) to avoid colliding with anything else
+/// Namespaced (`org.hdcola.omnivoice.*`) to avoid colliding with anything else
 /// ever written into the app's `UserDefaults` domain. Internal, not
 /// `private`, so `RecordingSessionSettingsTests` can drive
 /// `restorePersistedSettings()`'s self-heal paths through the same
 /// `UserDefaults` keys `RecordingSession` itself reads/writes.
 enum PersistedSettingsKey {
-    static let transcriptionEngineID = "org.omnivoice.transcriptionEngineID"
-    static let translationEngineID = "org.omnivoice.translationEngineID"
-    static let sourceLanguageCode = "org.omnivoice.sourceLanguageCode"
-    static let targetLanguageCode = "org.omnivoice.targetLanguageCode"
-    static let translationCommitEagerness = "org.omnivoice.translationCommitEagerness"
-    static let translationEarlyTranslateThreshold = "org.omnivoice.translationEarlyTranslateThreshold"
-    static let includeSystemAudio = "org.omnivoice.includeSystemAudio"
-    static let selectedDeviceID = "org.omnivoice.selectedDeviceID"
-    static let transcriptionModelVariantID = "org.omnivoice.transcriptionModelVariantID"
-    static let translationModelVariantID = "org.omnivoice.translationModelVariantID"
-    static let panelBackgroundOpacity = "org.omnivoice.panelBackgroundOpacity"
-    static let panelContentOpacity = "org.omnivoice.panelContentOpacity"
-    static let panelDisplayMode = "org.omnivoice.panelDisplayMode"
-    static let panelFontScale = "org.omnivoice.panelFontScale"
+    static let transcriptionEngineID = "org.hdcola.omnivoice.transcriptionEngineID"
+    static let translationEngineID = "org.hdcola.omnivoice.translationEngineID"
+    static let sourceLanguageCode = "org.hdcola.omnivoice.sourceLanguageCode"
+    static let targetLanguageCode = "org.hdcola.omnivoice.targetLanguageCode"
+    static let translationCommitEagerness = "org.hdcola.omnivoice.translationCommitEagerness"
+    static let translationEarlyTranslateThreshold = "org.hdcola.omnivoice.translationEarlyTranslateThreshold"
+    static let includeSystemAudio = "org.hdcola.omnivoice.includeSystemAudio"
+    static let selectedDeviceID = "org.hdcola.omnivoice.selectedDeviceID"
+    static let transcriptionModelVariantID = "org.hdcola.omnivoice.transcriptionModelVariantID"
+    static let translationModelVariantID = "org.hdcola.omnivoice.translationModelVariantID"
+    static let panelBackgroundOpacity = "org.hdcola.omnivoice.panelBackgroundOpacity"
+    static let panelContentOpacity = "org.hdcola.omnivoice.panelContentOpacity"
+    static let panelDisplayMode = "org.hdcola.omnivoice.panelDisplayMode"
+    static let panelFontScale = "org.hdcola.omnivoice.panelFontScale"
 }

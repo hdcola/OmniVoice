@@ -37,7 +37,7 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
     /// annotation these fields would be main-actor-isolated too, and
     /// `nonisolated func push` (which must run on the calling audio thread,
     /// not hop to the main actor per buffer) couldn't touch them at all.
-    private let audioQueue = DispatchQueue(label: "org.omnivoice.systemtranscription.audio")
+    private let audioQueue = DispatchQueue(label: "org.hdcola.omnivoice.systemtranscription.audio")
     private nonisolated(unsafe) var inputContinuation: AsyncStream<AnalyzerInput>.Continuation?
     private nonisolated(unsafe) var analyzerFormat: AVAudioFormat?
     /// Resamples each incoming mixed-audio chunk (mono Float32 at
