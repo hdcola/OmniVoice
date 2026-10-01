@@ -111,7 +111,7 @@ public struct ModelBundle: Identifiable, Hashable, Codable, Sendable {
 public enum ProviderCatalog {
     public static let transcriptionEngines: [EngineDescriptor] = [
         EngineDescriptor(
-            id: "system.speech", displayName: "系统自带 (Speech)", kind: .system,
+            id: "system.speech", displayName: "系统语音识别", kind: .system,
             badge: "系统原生 · 零内存占用",
             summary: "macOS 系统级语音识别，即开即用，无需额外下载。"
         ),

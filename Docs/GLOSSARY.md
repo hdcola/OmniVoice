@@ -16,6 +16,7 @@ intentionally unchanged (renaming them would break persisted settings).
 | Translation engine for transcription | 转录翻译引擎 | — | `ProviderCatalog` |
 | Translation engine for Quick Translate | 快捷翻译引擎（可「跟随转录设置」） | — | `SelectionTranslationEngine` |
 | macOS Translation framework engine | 系统翻译 | System translation | `system.translation` |
+| macOS Speech framework engine | 系统语音识别 | System speech recognition | `system.speech` |
 | Model download/delete UI | 模型库（设置标签页，菜单「模型库…」） | Model Library | `ModelManagementView` |
 | Memory used by loaded models | 内存 | Memory | — |
 | Global key bindings | 快捷键 | Shortcuts | `GlobalShortcut` |
