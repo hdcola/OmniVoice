@@ -15,7 +15,7 @@ import Foundation
 /// is present. Ported from `mac-poc-hybrid`'s
 /// `Audio/UtteranceSegmenter.swift`, plus live-tunable thresholds via
 /// `update(silenceThresholdSeconds:silenceRMSDBFS:)`.
-final class UtteranceSegmenter {
+final class UtteranceSegmenter: @unchecked Sendable {
     var onUtteranceBoundary: (() -> Void)?
 
     private let sampleRate: Double = 16000

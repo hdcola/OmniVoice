@@ -1,8 +1,8 @@
-import XCTest
+import Testing
 
 @testable import OmniVoiceCore
 
-final class UtteranceSegmenterTests: XCTestCase {
+struct UtteranceSegmenterTests {
     private let speech = [Float](repeating: 0.2, count: 1600)  // 0.1s, ~-14 dBFS
     private let quiet = [Float](repeating: 0.001, count: 1600)  // 0.1s, -60 dBFS
 
@@ -14,33 +14,33 @@ final class UtteranceSegmenterTests: XCTestCase {
         return count
     }
 
-    func testDefaultsFireAfterSixTenthsOfASecond() {
-        XCTAssertEqual(boundaries(UtteranceSegmenter(), silentChunks: 5), 0)
-        XCTAssertEqual(boundaries(UtteranceSegmenter(), silentChunks: 6), 1)
+    @Test func defaultsFireAfterSixTenthsOfASecond() {
+        #expect(boundaries(UtteranceSegmenter(), silentChunks: 5) == 0)
+        #expect(boundaries(UtteranceSegmenter(), silentChunks: 6) == 1)
     }
 
-    func testLongerPauseThresholdDelaysBoundary() {
+    @Test func longerPauseThresholdDelaysBoundary() {
         let segmenter = UtteranceSegmenter()
         segmenter.update(silenceThresholdSeconds: 1.5, silenceRMSDBFS: -40)
-        XCTAssertEqual(boundaries(segmenter, silentChunks: 14), 0)
-        XCTAssertEqual(boundaries(segmenter, silentChunks: 15), 1)
+        #expect(boundaries(segmenter, silentChunks: 14) == 0)
+        #expect(boundaries(segmenter, silentChunks: 15) == 1)
     }
 
-    func testUpdateMidStreamTakesEffectImmediately() {
+    @Test func updateMidStreamTakesEffectImmediately() {
         let segmenter = UtteranceSegmenter()
         var count = 0
         segmenter.onUtteranceBoundary = { count += 1 }
         segmenter.submit(speech)
         for _ in 0..<4 { segmenter.submit(quiet) }
-        XCTAssertEqual(count, 0)
+        #expect(count == 0)
         segmenter.update(silenceThresholdSeconds: 0.5, silenceRMSDBFS: -40)
         segmenter.submit(quiet)
-        XCTAssertEqual(count, 1)
+        #expect(count == 1)
     }
 
-    func testLowerDBFSThresholdTreatsQuietAudioAsSpeech() {
+    @Test func lowerDBFSThresholdTreatsQuietAudioAsSpeech() {
         let segmenter = UtteranceSegmenter()
         segmenter.update(silenceThresholdSeconds: 0.6, silenceRMSDBFS: -70)
-        XCTAssertEqual(boundaries(segmenter, silentChunks: 10), 0)
+        #expect(boundaries(segmenter, silentChunks: 10) == 0)
     }
 }
