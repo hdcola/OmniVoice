@@ -25,7 +25,7 @@ struct SelectionTranslationSettingsView: View {
     }
 
     private var shortcutsCard: some View {
-        SettingsCard(title: "快捷键", icon: "keyboard") {
+        SettingsCard(title: "划词与截图快捷键", icon: "keyboard") {
             ForEach(Array(GlobalShortcutAction.allCases.enumerated()), id: \.element.id) { index, action in
                 if index > 0 { SettingsDivider() }
                 ShortcutRecorderRow(controller: controller, action: action)

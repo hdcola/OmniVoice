@@ -12,6 +12,7 @@ struct SettingsCard<Content: View>: View {
     var title: String?
     var icon: String?
     @ViewBuilder var content: Content
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -33,11 +34,13 @@ struct SettingsCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.primary.opacity(0.05))
+                // Light mode: a raised white card on the grey window; dark
+                // mode: a faint lift over the dark window.
+                .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color(nsColor: .controlBackgroundColor))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
+                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.08), lineWidth: 0.5)
         )
     }
 }
@@ -48,7 +51,7 @@ struct SettingsTabBar: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(SettingsTab.allCases) { tab in
+            ForEach(Array(SettingsTab.allCases.enumerated()), id: \.element.id) { index, tab in
                 Button {
                     selection = tab
                 } label: {
@@ -61,6 +64,7 @@ struct SettingsTabBar: View {
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
                 .accessibilityAddTraits(selection == tab ? .isSelected : [])
             }
         }
@@ -71,14 +75,19 @@ struct SettingsTabBar: View {
     }
 }
 
-/// A shortcut drawn as one keycap per glyph ("⌥" "A").
+/// A shortcut drawn as one keycap per space-separated key ("⌥ A" → "⌥" "A";
+/// "⌥ Space" keeps "Space" on one keycap).
 struct KeycapRow: View {
     let text: String
 
+    private var keys: [String] {
+        text.split(separator: " ").map(String.init)
+    }
+
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(Array(text.enumerated()), id: \.offset) { _, character in
-                Text(String(character))
+            ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
+                Text(key)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .frame(minWidth: 16)
                     .padding(.vertical, 4)
@@ -96,20 +105,6 @@ struct KeycapRow: View {
     }
 }
 
-/// Large heading that groups several cards inside one tab.
-struct SettingsSectionHeader: View {
-    let title: String
-
-    init(_ title: String) { self.title = title }
-
-    var body: some View {
-        Text(title)
-            .font(.system(size: 17, weight: .bold))
-            .padding(.top, 8)
-            .padding(.horizontal, 4)
-    }
-}
-
 struct SettingsDivider: View {
     var body: some View {
         Divider()
@@ -123,6 +118,8 @@ struct SettingsDivider: View {
 struct SettingsRow<Trailing: View>: View {
     let title: String
     var subtitle: String?
+    /// `.red` for an error message standing in for the subtitle.
+    var subtitleTint: Color = .secondary
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
@@ -133,7 +130,7 @@ struct SettingsRow<Trailing: View>: View {
                 if let subtitle {
                     Text(subtitle)
                         .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(subtitleTint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -231,33 +228,5 @@ struct PermissionRow: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-    }
-}
-
-/// Selectable chip for a handful of side-by-side options.
-struct ChipToggle: View {
-    let title: String
-    @Binding var isOn: Bool
-
-    var body: some View {
-        Button {
-            isOn.toggle()
-        } label: {
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(isOn ? Color.accentColor : .primary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(isOn ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.08))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(isOn ? Color.accentColor.opacity(0.5) : Color.secondary.opacity(0.2), lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }

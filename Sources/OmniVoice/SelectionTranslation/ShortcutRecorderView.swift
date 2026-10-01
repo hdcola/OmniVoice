@@ -13,7 +13,11 @@ struct ShortcutRecorderRow: View {
     @State private var message: String?
 
     var body: some View {
-        SettingsRow(title: action.title, subtitle: message ?? action.subtitle) {
+        SettingsRow(
+            title: action.title,
+            subtitle: message ?? action.subtitle,
+            subtitleTint: message == nil ? .secondary : .red
+        ) {
             HStack(spacing: 8) {
                 Button {
                     message = nil

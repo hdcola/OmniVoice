@@ -58,7 +58,7 @@ history and open items.
   system Translation framework or HY-MT1.5 — text in "my language" goes to
   your foreign language, everything else comes into "my language". ⏎
   translates, ⇧⏎ inserts a newline, Esc hides. Shortcuts, engine and
-  languages live in Settings → 快捷翻译. Reading the selection needs the
+  languages live in Settings → 通用. Reading the selection needs the
   Accessibility permission (without it, copy and paste into the translation panel);
   ⌥S needs Screen Recording.
 - **History (历史记录)**: past transcripts persisted locally (SwiftData), with
