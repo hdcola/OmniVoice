@@ -80,7 +80,7 @@ struct OnboardingView: View {
                     HStack(spacing: 12) {
                         modeCard(
                             mode: .lightweight, title: "极速轻量模式",
-                            bullets: ["基于 macOS 自带引擎", "零磁盘占用，即开即用", "适合轻度记录与快速尝鲜"]
+                            bullets: ["基于系统语音识别与系统翻译", "零磁盘占用，即开即用", "适合轻度记录与快速尝鲜"]
                         )
                         modeCard(
                             mode: .balanced, title: "均衡低内存模式",

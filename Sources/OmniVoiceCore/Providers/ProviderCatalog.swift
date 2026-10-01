@@ -62,7 +62,7 @@ public struct ModelVariant: Identifiable, Hashable, Codable, Sendable {
     public let summary: String
     /// Approximate unified-memory/VRAM footprint once loaded — distinct from
     /// `approximateSizeMB` (the on-disk download size), which is usually
-    /// close but not identical. Used by the rich model card's "显存需求" line
+    /// close but not identical. Used by the rich model card's "预计内存占用" line
     /// and the "引擎运行与内存状态" console's resource estimate.
     public let recommendedMemoryGB: Int
 
