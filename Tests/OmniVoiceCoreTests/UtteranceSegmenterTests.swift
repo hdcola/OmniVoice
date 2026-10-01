@@ -19,6 +19,10 @@ struct UtteranceSegmenterTests {
         #expect(boundaries(UtteranceSegmenter(), silentChunks: 6) == 1)
     }
 
+    @Test func silenceAfterBoundaryDoesNotTriggerRepeatedBoundaries() {
+        #expect(boundaries(UtteranceSegmenter(), silentChunks: 12) == 1)
+    }
+
     @Test func longerPauseThresholdDelaysBoundary() {
         let segmenter = UtteranceSegmenter()
         segmenter.update(silenceThresholdSeconds: 1.5, silenceRMSDBFS: -40)
