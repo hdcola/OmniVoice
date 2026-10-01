@@ -452,17 +452,23 @@ struct ModelManagementView: View {
             completion?()
             return
         }
+        SystemNotifier.requestAuthorizationIfNeeded()
         Task {
             defer { completion?() }
             do {
                 _ = try await downloadManager.ensureDownloaded(variant)
                 autoActivateIfSystemEngineStillSelected(variant)
+                SystemNotifier.notify(
+                    title: "模型下载完成", body: "「\(variant.displayName)」已下载，可以使用了")
             } catch is CancellationError {
                 // The user's own "取消" tap — not a failure worth an alert.
             } catch {
                 // Task 4.3 — inline on this variant's own card, not a modal
                 // `.alert` (see `inlineFailureCard(for:message:)`'s doc).
                 failedVariants[variant.id] = error.localizedDescription
+                SystemNotifier.notify(
+                    title: "模型下载失败",
+                    body: "「\(variant.displayName)」：\(error.localizedDescription)")
             }
         }
     }

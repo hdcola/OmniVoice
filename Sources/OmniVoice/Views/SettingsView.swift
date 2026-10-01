@@ -39,6 +39,7 @@ struct SettingsView: View {
     @ObservedObject private var downloadManager: ModelDownloadManager
     @StateObject private var loginItem = LaunchAtLoginController()
     @AppStorage(PersistedLaunchKey.preloadMode) private var launchPreloadMode = LaunchPreloadMode.off
+    @AppStorage(SystemNotifier.enabledKey) private var notificationsEnabled = true
     /// Task 4.3 (异常状态内联重试), mirroring `ModelManagementView`'s own —
     /// this tab's inline download row shows its own failure message rather
     /// than a modal `.alert`.
@@ -83,6 +84,7 @@ struct SettingsView: View {
                 memoryConsole
 
                 launchCard
+                notificationCard
 
                 panelCard
             }
@@ -515,6 +517,23 @@ struct SettingsView: View {
         // screen the whole time, so `onAppear` doesn't fire again).
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             loginItem.refresh()
+        }
+    }
+
+    private var notificationCard: some View {
+        SettingsCard(title: "通知", icon: "bell") {
+            SettingsRow(
+                title: "完成时发送系统通知",
+                subtitle: "模型下载完成或失败时，如果 OmniVoice 不在前台，用系统通知提醒"
+            ) {
+                Toggle("完成时发送系统通知", isOn: $notificationsEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .onChange(of: notificationsEnabled) { _, enabled in
+                        if enabled { SystemNotifier.requestAuthorizationIfNeeded() }
+                    }
+            }
         }
     }
 

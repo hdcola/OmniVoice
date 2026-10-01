@@ -379,13 +379,23 @@ struct OnboardingView: View {
             return false
         }
 
+        SystemNotifier.requestAuthorizationIfNeeded()
         for variant in variants {
             Task {
                 do {
                     _ = try await downloadManager.ensureDownloaded(variant)
                     activateIfStillSystemEngine(variant)
+                    if bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty {
+                        SystemNotifier.notify(
+                            title: "模型下载完成",
+                            body: "「\(bundle.displayName)」已下载并自动启用")
+                    }
                     preloadOnceBundleIsReady(bundle)
+                } catch is CancellationError {
                 } catch {
+                    SystemNotifier.notify(
+                        title: "模型下载失败",
+                        body: "「\(variant.displayName)」：\(error.localizedDescription)。可在「设置 → 模型库」重试")
                     // Best-effort background download — a failure here still
                     // leaves this variant's own inline retry card reachable
                     // from "模型库"/"通用" (Task 4.3) once the user
