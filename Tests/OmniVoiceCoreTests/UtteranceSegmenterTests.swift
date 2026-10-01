@@ -22,7 +22,20 @@ final class UtteranceSegmenterTests: XCTestCase {
     func testLongerPauseThresholdDelaysBoundary() {
         let segmenter = UtteranceSegmenter()
         segmenter.update(silenceThresholdSeconds: 1.5, silenceRMSDBFS: -40)
-        XCTAssertEqual(boundaries(segmenter, silentChunks: 10), 0)
+        XCTAssertEqual(boundaries(segmenter, silentChunks: 14), 0)
+        XCTAssertEqual(boundaries(segmenter, silentChunks: 15), 1)
+    }
+
+    func testUpdateMidStreamTakesEffectImmediately() {
+        let segmenter = UtteranceSegmenter()
+        var count = 0
+        segmenter.onUtteranceBoundary = { count += 1 }
+        segmenter.submit(speech)
+        for _ in 0..<4 { segmenter.submit(quiet) }
+        XCTAssertEqual(count, 0)
+        segmenter.update(silenceThresholdSeconds: 0.5, silenceRMSDBFS: -40)
+        segmenter.submit(quiet)
+        XCTAssertEqual(count, 1)
     }
 
     func testLowerDBFSThresholdTreatsQuietAudioAsSpeech() {

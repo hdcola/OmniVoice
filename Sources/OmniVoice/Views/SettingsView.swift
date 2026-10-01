@@ -131,7 +131,7 @@ struct SettingsView: View {
             // engine's download button/progress renders right here.
             inlineDownloadSection(forEngineID: session.transcriptionEngineID)
             // Only `.model` engines act on the pause boundary (system ASR
-            // produces its own), so the VAD tuning is hidden for them.
+            // produces its own), so the VAD tuning is hidden for system engines.
             if session.transcriptionEngineKind == .model {
                 SettingsDivider()
                 SettingsRow(

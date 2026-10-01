@@ -12,8 +12,9 @@ import Foundation
 ///
 /// Must be fed **mic-only** samples, before any system-audio mixing —
 /// feeding the mixed stream would defeat detection whenever background audio
-/// is present. Ported unchanged from `mac-poc-hybrid`'s
-/// `Audio/UtteranceSegmenter.swift`.
+/// is present. Ported from `mac-poc-hybrid`'s
+/// `Audio/UtteranceSegmenter.swift`, plus live-tunable thresholds via
+/// `update(silenceThresholdSeconds:silenceRMSDBFS:)`.
 final class UtteranceSegmenter {
     var onUtteranceBoundary: (() -> Void)?
 

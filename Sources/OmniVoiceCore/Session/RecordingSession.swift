@@ -499,10 +499,13 @@ public final class RecordingSession: ObservableObject {
             )
         }
         if defaults.object(forKey: PersistedSettingsKey.vadSilenceSeconds) != nil {
-            vadSilenceSeconds = defaults.double(forKey: PersistedSettingsKey.vadSilenceSeconds)
+            // `init` assignments skip `didSet`, so clamp here too.
+            let raw = defaults.double(forKey: PersistedSettingsKey.vadSilenceSeconds)
+            vadSilenceSeconds = min(max(raw, 0.3), 3.0)
         }
         if defaults.object(forKey: PersistedSettingsKey.vadSilenceDBFS) != nil {
-            vadSilenceDBFS = defaults.double(forKey: PersistedSettingsKey.vadSilenceDBFS)
+            let raw = defaults.double(forKey: PersistedSettingsKey.vadSilenceDBFS)
+            vadSilenceDBFS = min(max(raw, -70), -20)
         }
         selectedDeviceID = defaults.string(forKey: PersistedSettingsKey.selectedDeviceID)
         transcriptionModelVariantID = defaults.string(forKey: PersistedSettingsKey.transcriptionModelVariantID)

@@ -668,6 +668,53 @@ struct RecordingSessionSettingsTests {
         #expect(session.translationEarlyTranslateThreshold == 1000)
     }
 
+    @Test func vadSilenceDefaultsMatchTheirDocumentedValues() {
+        let session = RecordingSession()
+        #expect(session.vadSilenceSeconds == 0.6)
+        #expect(session.vadSilenceDBFS == -40)
+    }
+
+    @Test func vadSilenceSettingsAreRestoredFromPersistedValue() {
+        withPersisted([
+            PersistedSettingsKey.vadSilenceSeconds: 1.2,
+            PersistedSettingsKey.vadSilenceDBFS: -55.0,
+        ]) {
+            let session = RecordingSession()
+            #expect(session.vadSilenceSeconds == 1.2)
+            #expect(session.vadSilenceDBFS == -55)
+        }
+    }
+
+    @Test func vadSilenceSettingsRestoredOutOfRangeAreClamped() {
+        withPersisted([
+            PersistedSettingsKey.vadSilenceSeconds: 0.0,
+            PersistedSettingsKey.vadSilenceDBFS: 10.0,
+        ]) {
+            let session = RecordingSession()
+            #expect(session.vadSilenceSeconds == 0.3)
+            #expect(session.vadSilenceDBFS == -20)
+        }
+    }
+
+    @Test func vadSilenceSettingsClampToTheirRangeAndPersist() {
+        defer {
+            defaults.removeObject(forKey: PersistedSettingsKey.vadSilenceSeconds)
+            defaults.removeObject(forKey: PersistedSettingsKey.vadSilenceDBFS)
+        }
+        let session = RecordingSession()
+        session.vadSilenceSeconds = 10
+        session.vadSilenceDBFS = -100
+        #expect(session.vadSilenceSeconds == 3.0)
+        #expect(session.vadSilenceDBFS == -70)
+        #expect(defaults.double(forKey: PersistedSettingsKey.vadSilenceSeconds) == 3.0)
+        #expect(defaults.double(forKey: PersistedSettingsKey.vadSilenceDBFS) == -70)
+
+        session.vadSilenceSeconds = 0
+        session.vadSilenceDBFS = 0
+        #expect(session.vadSilenceSeconds == 0.3)
+        #expect(session.vadSilenceDBFS == -20)
+    }
+
     @Test func refreshDevicesAlwaysOffersANoMicOption() {
         let session = RecordingSession()
         session.refreshDevices()
