@@ -253,7 +253,7 @@ public final class SelectionTranslator: ObservableObject {
             return
         }
         guard let modelURL = modelURLProvider() else {
-            phase = .failed("HY-MT1.5 模型尚未下载。请在「设置 → 模型库管理」中下载，或改用系统翻译。")
+            phase = .failed("HY-MT1.5 模型尚未下载。请在「设置 → 模型库」中下载，或改用系统翻译。")
             return
         }
         let target = ModelLanguageMapping.hyMT15TargetLanguage(forCode: job.targetCode)

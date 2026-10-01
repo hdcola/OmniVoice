@@ -18,7 +18,7 @@ struct MenuBarContentView: View {
     /// Same instance `SettingsView`/`ModelManagementView` observe — see
     /// `SettingsView`'s own `downloadManager` doc for why this is passed in
     /// explicitly rather than defaulted to `.shared`. Only used here to show
-    /// download progress on the "模型管理…" row (see `modelManagementLabel`)
+    /// download progress on the "模型库…" row (see `modelManagementLabel`)
     /// so a download started in that window stays visible after it's closed,
     /// without needing that window open at all.
     @ObservedObject private var downloadManager: ModelDownloadManager
@@ -46,7 +46,7 @@ struct MenuBarContentView: View {
         // Kept here alongside the floating panel's own start/stop button
         // (not removed in favor of it) — if the user has hidden the panel,
         // this is the only way to start/stop without first digging it back
-        // out via "显示/隐藏悬浮窗" below.
+        // out via "显示/隐藏字幕悬浮窗" below.
         // The `isPreloadingModel` case matters specifically here (unlike the
         // floating panel's own start/stop button, which sits right next to
         // a "预加载模型"/"加载中…" button of its own): if the panel is
@@ -80,7 +80,7 @@ struct MenuBarContentView: View {
         // rather than the button visibly reflecting why.
         .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
 
-        Button("显示/隐藏悬浮窗") {
+        Button("显示/隐藏字幕悬浮窗") {
             appDelegate.toggleFloatingPanel()
         }
 
@@ -135,7 +135,7 @@ struct MenuBarContentView: View {
         }
 
         Button(modelManagementLabel) {
-            // Task 3.4 — "模型管理…" jumps directly to Settings' "模型库管理"
+            // Task 3.4 — "模型库…" jumps directly to Settings' "模型库"
             // tab instead of opening a separate window (see
             // `SettingsNavigationState`'s doc).
             NSApp.activate(ignoringOtherApps: true)
@@ -161,23 +161,23 @@ struct MenuBarContentView: View {
         return "\(title)（\(shortcut.displayText)）"
     }
 
-    /// "模型管理…", plus a live progress readout once a download is running
+    /// "模型库…", plus a live progress readout once a download is running
     /// — without this, closing that window (or never having opened it) left
     /// a multi-GB download with no visible progress anywhere in the app,
     /// easy to mistake for "stuck" (see `MenuBarLabel` for the icon-level
     /// equivalent when the menu itself isn't even open).
     private var modelManagementLabel: String {
         guard let fraction = downloadManager.downloadProgress.values.max() else {
-            return downloadManager.hasActiveDownloads ? "模型管理…（准备下载…）" : "模型管理…"
+            return downloadManager.hasActiveDownloads ? "模型库…（准备下载…）" : "模型库…"
         }
-        return "模型管理…（下载中 \(Int((fraction * 100).rounded()))%）"
+        return "模型库…（下载中 \(Int((fraction * 100).rounded()))%）"
     }
 }
 
 /// The menu bar's own icon — swaps `waveform` for a live download-progress
 /// readout while any model is downloading, so the download stays visible
 /// even with the menu closed (all `MenuBarContentView` itself can do is
-/// annotate its own "模型管理…" row, which is invisible until the menu is
+/// annotate its own "模型库…" row, which is invisible until the menu is
 /// opened). Kept as its own tiny view (rather than inlined into
 /// `OmniVoiceApp`'s `MenuBarExtra` label closure) so it can hold its own
 /// `@ObservedObject` — `OmniVoiceApp` itself isn't a `View` and can't.

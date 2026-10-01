@@ -475,7 +475,7 @@ struct FloatingTranscriptView: View {
     }
 
     /// Live feedback that audio is actually being picked up — without this,
-    /// nothing on the panel changed between "转写中…" with the mic silent vs.
+    /// nothing on the panel changed between "转录中…" with the mic silent vs.
     /// the mic capturing normally, so a misconfigured input device (wrong
     /// mic selected, muted, unplugged) looked identical to a working one
     /// until text failed to show up. Scales with `session.inputLevel`
@@ -487,7 +487,7 @@ struct FloatingTranscriptView: View {
             .foregroundStyle(.red)
             .scaleEffect(1 + CGFloat(session.inputLevel) * 0.5)
             .animation(.easeOut(duration: 0.1), value: session.inputLevel)
-            .accessibilityLabel("正在收音")
+            .accessibilityLabel("正在转录")
     }
 
     private func rebuildConfiguration() {
@@ -797,7 +797,7 @@ private struct PanelCloseButton: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
-        .help("隐藏悬浮窗")
-        .accessibilityLabel("隐藏悬浮窗")
+        .help("隐藏字幕悬浮窗")
+        .accessibilityLabel("隐藏字幕悬浮窗")
     }
 }

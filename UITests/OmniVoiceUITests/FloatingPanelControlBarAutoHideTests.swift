@@ -52,7 +52,7 @@ final class FloatingPanelControlBarAutoHideTests: XCTestCase {
     /// Baseline: chrome (start button, close button) is visible/hittable the
     /// moment the panel appears — `isControlsVisible` defaults to `true`.
     func testControlBarIsVisibleOnLaunch() {
-        let closeButton = app.buttons["隐藏悬浮窗"]
+        let closeButton = app.buttons["隐藏字幕悬浮窗"]
         XCTAssertTrue(closeButton.waitForExistence(timeout: 5))
         XCTAssertTrue(closeButton.isHittable)
     }
@@ -62,7 +62,7 @@ final class FloatingPanelControlBarAutoHideTests: XCTestCase {
     /// close button becomes un-hittable. Hovering back over the panel
     /// immediately re-shows it with no delay.
     func testControlBarHidesAfterMouseLeavesAndDelayElapses() {
-        let closeButton = app.buttons["隐藏悬浮窗"]
+        let closeButton = app.buttons["隐藏字幕悬浮窗"]
         XCTAssertTrue(closeButton.waitForExistence(timeout: 5))
 
         // Establish the "hovering" reference state first — this is also
@@ -99,7 +99,7 @@ final class FloatingPanelControlBarAutoHideTests: XCTestCase {
     /// otherwise-empty background). A window drag would move the panel;
     /// this asserts its frame is unchanged by the click.
     func testClickingAControlDoesNotDragTheWindow() {
-        let closeButton = app.buttons["隐藏悬浮窗"]
+        let closeButton = app.buttons["隐藏字幕悬浮窗"]
         XCTAssertTrue(closeButton.waitForExistence(timeout: 5))
 
         let panelWindow = closeButton.frameContainingWindow(in: app)

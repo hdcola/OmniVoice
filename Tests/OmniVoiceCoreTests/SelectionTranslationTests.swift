@@ -302,7 +302,7 @@ private final class FakeModelBackend: SelectionModelTranslating {
             Issue.record("expected failure, got \(translator.phase)")
             return
         }
-        #expect(message.contains("模型库管理"))
+        #expect(message.contains("模型库"))
     }
 
     @Test func backendErrorSurfacesAsFailure() async {

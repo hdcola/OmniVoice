@@ -137,7 +137,7 @@ struct SelectionTranslationView: View {
 
     private var engineName: String {
         let name = SelectionTranslationEngine.displayName(for: translator.effectiveEngineID)
-        return translator.engineID == SelectionTranslationEngine.followRecording ? "跟随录音 · \(name)" : name
+        return translator.engineID == SelectionTranslationEngine.followRecording ? "跟随转录 · \(name)" : name
     }
 
     /// `LanguageCatalog` name when there is one; otherwise the system's

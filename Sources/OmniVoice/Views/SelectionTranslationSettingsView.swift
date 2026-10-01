@@ -2,17 +2,17 @@ import AppKit
 import OmniVoiceCore
 import SwiftUI
 
-/// Settings' "选词翻译" tab — shortcuts, engine, the two-language direction
+/// Settings' "快捷翻译" tab — shortcuts, engine, the two-language direction
 /// rule (see `SelectionLanguageDirection`), and the two permissions the
 /// feature depends on.
 struct SelectionTranslationSettingsView: View {
     @ObservedObject var controller: SelectionTranslationController
     @ObservedObject var translator: SelectionTranslator
     /// Observed so the HY-MT1.5 option un-greys the moment its weights
-    /// finish downloading in the "模型库管理" tab.
+    /// finish downloading in the "模型库" tab.
     @ObservedObject var downloadManager: ModelDownloadManager
     @EnvironmentObject private var navigation: SettingsNavigationState
-    /// Observed so "跟随录音设置" re-resolves the moment the recording's
+    /// Observed so "跟随转录设置" re-resolves the moment the recording's
     /// translation engine changes in the "语音与引擎" tab.
     @EnvironmentObject private var session: RecordingSession
     @State private var isAccessibilityTrusted = SelectedTextReader.isAccessibilityTrusted
@@ -24,12 +24,12 @@ struct SelectionTranslationSettingsView: View {
                 ForEach(GlobalShortcutAction.allCases) { action in
                     ShortcutRecorderRow(controller: controller, action: action)
                 }
-                Text("在任意应用中选中文字后按「翻译选中文字」，或按「截图翻译」框选屏幕上的文字。面板里 ⏎ 翻译、⇧⏎ 换行、Esc 关闭。")
+                Text("在任意应用中选中文字后按「划词翻译」，或按「截图翻译」框选屏幕上的文字。面板里 ⏎ 翻译、⇧⏎ 换行、Esc 关闭。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Section("翻译引擎") {
+            Section("快捷翻译引擎") {
                 Picker("引擎", selection: $translator.engineID) {
                     Text(followRecordingLabel).tag(SelectionTranslationEngine.followRecording)
                     ForEach(SelectionTranslationEngine.all) { engine in
@@ -38,7 +38,7 @@ struct SelectionTranslationSettingsView: View {
                 }
                 if session.translationEngineID == "model.t3po",
                    translator.engineID == SelectionTranslationEngine.followRecording {
-                    Text("录音使用的 T3PO 专为实时语音设计，不适合整段翻译，选词翻译会改用\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID))。")
+                    Text("转录使用的 T3PO 专为实时语音设计，不适合整段翻译，快捷翻译会改用\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID))。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -47,7 +47,7 @@ struct SelectionTranslationSettingsView: View {
                         Text("HY-MT1.5 模型尚未下载。")
                             .font(.caption)
                             .foregroundStyle(.orange)
-                        Button("前往模型库管理") { navigation.openModelLibrary() }
+                        Button("前往模型库") { navigation.openModelLibrary() }
                             .font(.caption)
                     }
                 }
@@ -102,7 +102,7 @@ struct SelectionTranslationSettingsView: View {
     }
 
     private var followRecordingLabel: String {
-        "跟随录音设置（当前：\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID))）"
+        "跟随转录设置（当前：\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID))）"
     }
 
     private func engineLabel(for engine: EngineDescriptor) -> String {
