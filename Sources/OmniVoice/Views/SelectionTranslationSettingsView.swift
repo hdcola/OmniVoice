@@ -24,7 +24,7 @@ struct SelectionTranslationSettingsView: View {
                 ForEach(GlobalShortcutAction.allCases) { action in
                     ShortcutRecorderRow(controller: controller, action: action)
                 }
-                Text("在任意应用中选中文字后按「划词翻译」，或按「截图翻译」框选屏幕上的文字。面板里 ⏎ 翻译、⇧⏎ 换行、Esc 关闭。")
+                Text("在任意应用中选中文字后按「划词翻译」，或按「截图翻译」框选屏幕上的文字。翻译面板里 ⏎ 翻译、⇧⏎ 换行、Esc 关闭。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -59,7 +59,7 @@ struct SelectionTranslationSettingsView: View {
             Section("语言") {
                 languagePicker("我的语言", selection: $translator.myLanguageCode)
                 languagePicker("外语", selection: $translator.foreignLanguageCode)
-                Text("选中的文字是「我的语言」时译成「外语」，其他语言一律译成「我的语言」。也可以在面板顶部临时换一个目标语言。")
+                Text("选中的文字是「我的语言」时译成「外语」，其他语言一律译成「我的语言」。也可以在翻译面板顶部临时换一个目标语言。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let unsupported = unsupportedLanguageNames {
@@ -72,7 +72,7 @@ struct SelectionTranslationSettingsView: View {
             Section("权限") {
                 permissionRow(
                     "辅助功能", granted: isAccessibilityTrusted,
-                    detail: "用于读取其他应用中选中的文字；未授权时可以复制后在面板里粘贴。",
+                    detail: "用于读取其他应用中选中的文字；未授权时可以复制后在翻译面板里粘贴。",
                     open: controller.openAccessibilitySettings
                 )
                 permissionRow(

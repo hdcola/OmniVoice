@@ -487,7 +487,7 @@ struct FloatingTranscriptView: View {
             .foregroundStyle(.red)
             .scaleEffect(1 + CGFloat(session.inputLevel) * 0.5)
             .animation(.easeOut(duration: 0.1), value: session.inputLevel)
-            .accessibilityLabel("正在转录")
+            .accessibilityLabel("麦克风输入中")
     }
 
     private func rebuildConfiguration() {

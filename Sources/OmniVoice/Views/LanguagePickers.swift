@@ -237,7 +237,7 @@ struct TargetLanguagePicker: View {
 
     private var switchButtonTitle: String {
         isSessionActive
-            ? "一键将翻译引擎切换为「系统翻译」（录制结束后生效）"
+            ? "一键将翻译引擎切换为「系统翻译」（转录结束后生效）"
             : "一键将翻译引擎切换为「系统翻译」"
     }
 
