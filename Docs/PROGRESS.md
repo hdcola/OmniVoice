@@ -327,6 +327,16 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       committed transcript visual styling, PR #38), XCUITest test
       infrastructure and automated UI testing coverage (PR #36), and CI
       build regression workflow (PR #37).
+- [x] **0.5.0 release cut** (2026-09-30, `chore/release-0.5.0`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.5.0,
+      `CFBundleVersion` 8), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.5.0]` section, `README.md`'s version/download-link references
+      bumped to match. Bundles everything merged since `0.4.0`: 选词翻译
+      (PR #40) — ⌥A selection translation and ⌥S screenshot translation in
+      a new 翻译面板 with a 选词翻译 settings tab, shared `HYMT15ModelPool`
+      weights, and one-shot `HYMT15Translator.translateText` — plus floating
+      panel toolbar/resize-cursor fixes (PR #41), the 启动时显示悬浮窗 toggle
+      (PR #42), and the terminology unification pass (PR #43).
 
 ### Code review findings (fixed)
 

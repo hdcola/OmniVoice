@@ -7,6 +7,20 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.5.0] - 2026-09-30
+
+### Added
 - feat(settings): new "启动时显示悬浮窗" toggle in "语言与悬浮窗" (default on) — turn it off to stop the live-transcript panel opening on every launch; starting a recording still shows it, and the menu bar can open it manually (#42)
 - feat(selection): select text in any app and press ⌥A to translate it in a new floating panel — Cida-style: the selection is read via Accessibility (falling back to a synthetic ⌘C that restores the pasteboard), text in "my language" goes to the configured foreign language and everything else comes into "my language", ⏎ translates / ⇧⏎ inserts a newline / Esc hides, and results survive hiding the panel (#40)
 - feat(selection): press ⌥S to frame a region of the screen and translate its text, recognized on-device with Vision (needs Screen Recording permission) (#40)
