@@ -15,6 +15,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(readme): re-introduce the app in the README intro and PROGRESS's "What this is" in terms of quick translate (划词翻译 ⌥A / 截图翻译 ⌥S into the 翻译面板), not just the speech caption panel (#45)
 
 ### Tests
 
