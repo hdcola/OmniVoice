@@ -7,14 +7,24 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(settings): card-style Settings modelled on SnapTra Translator — a pill tab bar (⌘1–⌘3) instead of the system toolbar tabs, compact cards with their titles inside, shortcuts drawn as keycaps, "已授权" / "去授权" status pills, and a narrower 520pt window that stays the same size on every tab (#47)
 
 ### Changed
+- refactor(settings): merge "语音与引擎", "语言与字幕" and "快捷翻译" into one "通用" tab (tabs are now 通用 · 模型库 · 关于) — all system permissions (麦克风 / 屏幕录制 / 辅助功能) at the top, then 快捷翻译, 实时转录 (识别引擎, 转录翻译引擎, 转录语言, 内存) and 字幕悬浮窗; the engine pickers are now labeled "识别引擎", "转录翻译引擎" and "快捷翻译引擎" (#47)
+- refactor(settings): restyle "模型库" to match — recommended bundles and every model variant as divider-separated rows inside cards, status pills instead of emoji, accent capsule buttons (下载 / 取消 / 删除 / 一键下载); download, activation and failure behavior is unchanged (#47)
+- refactor(settings): the "通用" tab's inline model downloads and memory console buttons use the same accent capsule as "模型库", and a disabled capsule now dims (#47)
+- refactor(onboarding): restyle the first-launch window like Settings — app icon header, permission cards with status pills for 麦克风, 系统音频录制 and the newly listed 辅助功能 (refreshed live while the window is open), the three run modes as a vertical radio list with size notes instead of a horizontally scrolling card row, and an action bar pinned below the content; window is 520pt wide (#47)
+- refactor(settings): redesign "关于" — centered app icon, name, version and tagline, a GitHub Star card, and a link list (GitHub / 版本发布 / 反馈问题) (#47)
 
 ### Fixed
+- fix(settings): "转录语言" rows now match the other cards (title and subtitle left, picker right-aligned); the target-language warning moves into a glyph with the same "一键切换为系统翻译" popover as the floating panel (#47)
+- fix(settings): cards use a faint tint in light mode (a white card disappeared on the white window) and the "关于" footer text is darker (#47)
+- fix(onboarding): the microphone and system-audio rows' "去授权" now open System Settings once access has been denied, instead of silently doing nothing (#47)
 
 ### Dependencies
 
 ### Documentation
+- docs(readme): point the Quick Translate settings location at Settings → 通用 (#47)
 - docs(readme): re-introduce the app in the README intro and PROGRESS's "What this is" in terms of quick translate (划词翻译 ⌥A / 截图翻译 ⌥S into the 翻译面板), not just the speech caption panel (#45)
 
 ### Tests

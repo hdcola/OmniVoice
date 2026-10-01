@@ -72,9 +72,14 @@ struct GlobalShortcut: Equatable, Hashable, Codable {
         self.init(keyCode: keyCode, modifiers: modifiers)
     }
 
-    /// Modifier symbols, then the key, e.g. "⌥ A".
+    /// Modifier symbols, then the key, one entry each — e.g. ["⌥", "A"].
+    var displayTokens: [String] {
+        modifiers.symbols + [keyDisplayName]
+    }
+
+    /// `displayTokens` joined by spaces, e.g. "⌥ A".
     var displayText: String {
-        (modifiers.symbols + [keyDisplayName]).joined(separator: " ")
+        displayTokens.joined(separator: " ")
     }
 
     var keyDisplayName: String {
@@ -143,6 +148,13 @@ enum GlobalShortcutAction: String, CaseIterable, Identifiable {
         switch self {
         case .translateSelection: return "划词翻译"
         case .captureText: return "截图翻译"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .translateSelection: return "翻译任意应用中选中的文字"
+        case .captureText: return "框选屏幕上的文字并翻译"
         }
     }
 

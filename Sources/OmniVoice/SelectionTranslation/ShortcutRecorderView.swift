@@ -13,18 +13,37 @@ struct ShortcutRecorderRow: View {
     @State private var message: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(action.title)
-                Spacer()
+        SettingsRow(
+            title: action.title,
+            subtitle: message ?? action.subtitle,
+            subtitleTint: message == nil ? .secondary : .red
+        ) {
+            HStack(spacing: 8) {
                 Button {
                     message = nil
                     isRecording.toggle()
                 } label: {
-                    Text(chipText)
-                        .monospaced()
-                        .frame(minWidth: 90)
+                    Group {
+                        if !isRecording, let shortcut = controller.shortcuts[action] {
+                            KeycapRow(keys: shortcut.displayTokens)
+                        } else {
+                            Text(chipText)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(isRecording ? Color.accentColor : .secondary)
+                                .padding(.vertical, 4)
+                                .padding(.horizontal, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                        .fill(isRecording ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.08))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                        .strokeBorder(isRecording ? Color.accentColor.opacity(0.5) : Color.primary.opacity(0.2), lineWidth: 0.5)
+                                )
+                        }
+                    }
                 }
+                .buttonStyle(.plain)
                 .background(
                     ShortcutCaptureView(
                         isRecording: $isRecording,
@@ -32,15 +51,14 @@ struct ShortcutRecorderRow: View {
                         onInvalidPress: { message = "快捷键需要包含 ⌘、⌥ 或 ⌃" }
                     )
                 )
-                Button("恢复默认") {
+                Button {
                     message = controller.setShortcut(action.defaultShortcut, for: action)
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
                 }
+                .buttonStyle(.borderless)
+                .help("恢复默认")
                 .disabled(controller.shortcuts[action] == action.defaultShortcut)
-            }
-            if let message {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.red)
             }
         }
         .onChange(of: isRecording) { _, recording in
