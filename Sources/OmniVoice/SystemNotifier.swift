@@ -61,9 +61,11 @@ private final class NotificationClickHandler: NSObject, UNUserNotificationCenter
         Task { @MainActor in
             NSApp.activate(ignoringOtherApps: true)
             SettingsNavigationState.shared.openModelLibrary()
-            // `openSettings` is a SwiftUI environment action, unreachable
-            // from here; this is the responder-chain action it wraps.
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            if let open = SettingsNavigationState.shared.openSettingsWindow {
+                open()
+            } else {
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            }
             completionHandler()
         }
     }

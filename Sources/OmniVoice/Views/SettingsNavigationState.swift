@@ -44,6 +44,9 @@ final class SettingsNavigationState: ObservableObject {
     /// environment to read it from.
     static let shared = SettingsNavigationState()
 
+    /// Set by `MenuBarLabel` once it appears; wraps SwiftUI's `openSettings`.
+    var openSettingsWindow: (() -> Void)?
+
     private static let defaultsKey = "org.hdcola.omnivoice.settingsSelectedTab"
 
     /// Restored from `UserDefaults` at launch, then persisted on every
