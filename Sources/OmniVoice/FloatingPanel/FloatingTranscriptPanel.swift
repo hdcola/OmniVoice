@@ -322,5 +322,5 @@ final class FloatingTranscriptPanel: NSPanel {
 enum PersistedFloatingPanelKey {
     /// Bool, absent means `true` — whether the live-transcript floating panel
     /// opens automatically at launch.
-    static let showOnLaunch = "org.omnivoice.floatingPanel.showOnLaunch"
+    static let showOnLaunch = "org.hdcola.omnivoice.floatingPanel.showOnLaunch"
 }

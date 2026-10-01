@@ -116,7 +116,7 @@ final class InProcessTranscriber: @unchecked Sendable {
     /// (`rotateStream()` reuses the existing session as-is).
     var tuning = StreamingTuning()
 
-    private let queue = DispatchQueue(label: "org.omnivoice.inprocess.audiocpp")
+    private let queue = DispatchQueue(label: "org.hdcola.omnivoice.inprocess.audiocpp")
 
     private var registry: OpaquePointer?
     private var model: OpaquePointer?

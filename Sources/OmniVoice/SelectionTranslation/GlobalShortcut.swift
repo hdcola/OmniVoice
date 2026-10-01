@@ -165,5 +165,5 @@ enum GlobalShortcutAction: String, CaseIterable, Identifiable {
         }
     }
 
-    var defaultsKey: String { "org.omnivoice.selection.shortcut.\(rawValue)" }
+    var defaultsKey: String { "org.hdcola.omnivoice.selection.shortcut.\(rawValue)" }
 }
