@@ -145,16 +145,16 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       (`ProviderCatalog.ModelVariant.downloadURL`/`sha256`, still nil
       placeholders) is a separate follow-up, see Open Items #1.
       **T3PO translation verified working end-to-end (mic → live translation
-      → stop, no crash). R2T2 transcription needs the upstream audio.cpp
-      patch in `Patches/audio.cpp/` applied to the `third_party` checkout —
-      unpatched it SIGSEGVs on stop; see "Known gaps" below.**
+      → stop, no crash). R2T2 transcription needs an audio.cpp at or past
+      the pin in `Docs/MODEL_ENGINE_SETUP.md` (the upstream stop-crash fix,
+      0xShug0/audio.cpp#712); older builds SIGSEGV on stop.**
 - [x] **R2T2 stop/rotate crash root-caused and fixed** (2026-09-27): a null
       dereference in audio.cpp's own
       `R2T2ASRSession::build_stream_prefix(final_flush=true)`, reproduced
-      deterministically from the C API with silence alone. Fix lives in
-      `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`
-      and is a required step in `Docs/MODEL_ENGINE_SETUP.md`. Full writeup in
-      "Known gaps" below.
+      deterministically from the C API with silence alone. Originally carried as
+      a local patch; now fixed upstream (0xShug0/audio.cpp#712) and picked up
+      via the pin in `Docs/MODEL_ENGINE_SETUP.md` — see Open Items #1. Full
+      writeup in "Known gaps" below.
 - [x] **Floating panel UX pass: model preload, mic-level feedback, transcript
       auto-scroll** (2026-09-27, PR #10, merged to `main`): a "预加载模型"
       button on the panel's status bar loads a `.model`-kind engine's weights

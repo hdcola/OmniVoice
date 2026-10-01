@@ -18,6 +18,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(repo): drop the R2T2 "requires an upstream audio.cpp patch" notes from `README.md` and the code/progress docs now that the fix is merged upstream and the pinned checkout carries it
 
 ### Tests
 
