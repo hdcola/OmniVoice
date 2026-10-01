@@ -64,6 +64,7 @@ struct SelectionTranslationSettingsView: View {
                     }
                 }
                 .labelsHidden()
+                .accessibilityLabel("快捷翻译引擎")
                 .fixedSize()
             }
             if session.translationEngineID == "model.t3po",
@@ -96,6 +97,7 @@ struct SelectionTranslationSettingsView: View {
             }
         }
         .labelsHidden()
+        .accessibilityLabel(title)
         .fixedSize()
     }
 

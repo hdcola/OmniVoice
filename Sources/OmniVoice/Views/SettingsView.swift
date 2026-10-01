@@ -166,6 +166,7 @@ struct SettingsView: View {
                     }
                 }
                 .labelsHidden()
+                .accessibilityLabel("识别引擎")
                 .fixedSize()
                 .disabled(isBusy)
             }
@@ -192,6 +193,7 @@ struct SettingsView: View {
                     }
                 }
                 .labelsHidden()
+                .accessibilityLabel("转录翻译引擎")
                 .fixedSize()
                 .disabled(isBusy)
             }
@@ -218,6 +220,7 @@ struct SettingsView: View {
                         }
                     }
                     .labelsHidden()
+                .accessibilityLabel("翻译提交策略")
                     .fixedSize()
                 }
             }
@@ -345,6 +348,7 @@ struct SettingsView: View {
                     }
                 }
                 .labelsHidden()
+                .accessibilityLabel("模型")
                 .fixedSize()
             }
         }
