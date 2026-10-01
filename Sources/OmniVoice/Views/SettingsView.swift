@@ -114,6 +114,7 @@ struct SettingsView: View {
             }
             modelVariantPicker(
                 for: session.transcriptionEngineID,
+                accessibilityName: "识别模型",
                 selection: Binding(
                     get: { session.currentTranscriptionModelVariant?.id },
                     set: { session.transcriptionModelVariantID = $0 }
@@ -141,6 +142,7 @@ struct SettingsView: View {
             }
             modelVariantPicker(
                 for: session.translationEngineID,
+                accessibilityName: "转录翻译模型",
                 selection: Binding(
                     get: { session.currentTranslationModelVariant?.id },
                     set: { session.translationModelVariantID = $0 }
@@ -277,7 +279,11 @@ struct SettingsView: View {
     /// for the same reason `engineLabel(for:)` marks its engine-level
     /// equivalent.
     @ViewBuilder
-    private func modelVariantPicker(for engineID: String, selection: Binding<String?>) -> some View {
+    /// `accessibilityName` tells the ASR and translation pickers apart for
+    /// VoiceOver and UI tests (their visible title is the same "模型").
+    private func modelVariantPicker(
+        for engineID: String, accessibilityName: String, selection: Binding<String?>
+    ) -> some View {
         let variants = ProviderCatalog.modelVariants(forEngineID: engineID)
         let selectedID = selection.wrappedValue
         let shown = variants.filter { downloadManager.isDownloaded($0) || $0.id == selectedID }
@@ -290,7 +296,7 @@ struct SettingsView: View {
                     }
                 }
                 .labelsHidden()
-                .accessibilityLabel("模型")
+                .accessibilityLabel(accessibilityName)
                 .fixedSize()
             }
         }

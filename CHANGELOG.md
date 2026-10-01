@@ -19,7 +19,7 @@ The format is based on Keep a Changelog.
 ### Fixed
 - fix(settings): "转录语言" rows now match the other cards (title and subtitle left, picker right-aligned); the target-language warning moves into a glyph with the same "一键切换为系统翻译" popover as the floating panel (#47)
 - fix(settings): cards use a faint tint in light mode (a white card disappeared on the white window) and the "关于" footer text is darker (#47)
-- fix(onboarding): the microphone row's "去授权" now opens System Settings once access has been denied, instead of silently doing nothing (#47)
+- fix(onboarding): the microphone and system-audio rows' "去授权" now open System Settings once access has been denied, instead of silently doing nothing (#47)
 
 ### Dependencies
 

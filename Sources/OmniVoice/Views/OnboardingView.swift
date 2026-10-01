@@ -239,10 +239,15 @@ struct OnboardingView: View {
     }
 
     private func requestScreenRecordingPermission() {
-        // Prompts the system TCC dialog if not yet decided; a no-op if
-        // already granted/denied (same "ask once" semantics `SystemAudioCapture`
-        // relies on elsewhere in the app).
+        // Prompts the system TCC dialog if not yet decided; after a denial
+        // it returns `false` silently (same "ask once" semantics
+        // `SystemAudioCapture` relies on elsewhere), so also open the System
+        // Settings pane — same as the "通用" tab.
         screenRecordingAuthorized = CGRequestScreenCaptureAccess()
+        guard !screenRecordingAuthorized else { return }
+        NSWorkspace.shared.open(
+            URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
+        )
     }
 
     /// Persists the chosen mode/completion to `UserDefaults` — see
