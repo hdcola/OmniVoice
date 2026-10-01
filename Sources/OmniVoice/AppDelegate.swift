@@ -114,7 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         NSApp.activate(ignoringOtherApps: true)
         // Fixed, non-resizable (no `.resizable` style mask): the content
         // scrolls inside this height, with the action row pinned below it.
-        let height = min(590, (NSScreen.main?.visibleFrame.height ?? 800) - 120)
+        let height = min(650, (NSScreen.main?.visibleFrame.height ?? 800) - 120)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 520, height: height),
             styleMask: [.titled, .closable],

@@ -65,6 +65,7 @@ struct OnboardingView: View {
     @State private var selectedMode: Mode = .offlineModel
     @State private var microphoneAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     @State private var screenRecordingAuthorized = CGPreflightScreenCaptureAccess()
+    @State private var accessibilityAuthorized = SelectedTextReader.isAccessibilityTrusted
     /// Review Round 1 Must-Fix 4 (首次启动向导下载大模型后无法自动激活，且缺乏磁盘
     /// 空间检查) — surfaced via `.alert` on this view rather than silently
     /// declining the download the way `try?` around `ensureDownloaded(_:)`
@@ -94,6 +95,7 @@ struct OnboardingView: View {
             while !Task.isCancelled {
                 microphoneAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
                 screenRecordingAuthorized = CGPreflightScreenCaptureAccess()
+                accessibilityAuthorized = SelectedTextReader.isAccessibilityTrusted
                 try? await Task.sleep(for: .seconds(1))
             }
         }
@@ -135,6 +137,11 @@ struct OnboardingView: View {
             PermissionRow(
                 icon: "rectangle.dashed.badge.record", title: "系统音频录制", detail: "捕获会议、网课的声音",
                 isGranted: screenRecordingAuthorized, open: requestScreenRecordingPermission
+            )
+            SettingsDivider()
+            PermissionRow(
+                icon: "figure.wave", title: "辅助功能", detail: "读取其他应用中选中的文字（划词翻译）",
+                isGranted: accessibilityAuthorized, open: requestAccessibilityPermission
             )
         }
     }
@@ -211,6 +218,15 @@ struct OnboardingView: View {
         AVCaptureDevice.requestAccess(for: .audio) { granted in
             Task { @MainActor in microphoneAuthorized = granted }
         }
+    }
+
+    private func requestAccessibilityPermission() {
+        // Shows the system prompt the first time; the System Settings pane
+        // covers a previous denial, which macOS won't prompt about again.
+        SelectedTextReader.requestAccessibilityPermission()
+        NSWorkspace.shared.open(
+            URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        )
     }
 
     private func requestScreenRecordingPermission() {
