@@ -7,6 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(settings): "断句停顿时长" (0.3–3.0s, default 0.6) and "静音电平阈值" (-70…-20 dB, default -40) sliders under 识别引擎 for model ASR engines, applied live mid-recording, to tune how easily speech is split into utterances (#58)
 
 ### Changed
 
@@ -17,6 +18,7 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 ### Tests
+- test(audio): cover `UtteranceSegmenter` default timing and the live-tunable pause/level thresholds (#58)
 
 ## [0.5.3] - 2026-10-01
 

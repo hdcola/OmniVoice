@@ -307,6 +307,36 @@ public final class RecordingSession: ObservableObject {
         }
     }
 
+    /// Pause length (seconds) after speech before `UtteranceSegmenter` closes
+    /// an utterance. Applies live, mid-recording. Clamped like
+    /// `translationEarlyTranslateThreshold`.
+    @Published public var vadSilenceSeconds: Double = UtteranceSegmenter.defaultSilenceSeconds {
+        didSet {
+            let clamped = min(max(vadSilenceSeconds, 0.3), 3.0)
+            if clamped != vadSilenceSeconds { vadSilenceSeconds = clamped }
+            Self.defaults.set(clamped, forKey: PersistedSettingsKey.vadSilenceSeconds)
+            applyVADSettings()
+        }
+    }
+
+    /// RMS level (dBFS) below which mic input counts as silence for
+    /// `UtteranceSegmenter`. Applies live, mid-recording.
+    @Published public var vadSilenceDBFS: Double = UtteranceSegmenter.defaultSilenceDBFS {
+        didSet {
+            let clamped = min(max(vadSilenceDBFS, -70), -20)
+            if clamped != vadSilenceDBFS { vadSilenceDBFS = clamped }
+            Self.defaults.set(clamped, forKey: PersistedSettingsKey.vadSilenceDBFS)
+            applyVADSettings()
+        }
+    }
+
+    private func applyVADSettings() {
+        vadSegmenter?.update(
+            silenceThresholdSeconds: vadSilenceSeconds,
+            silenceRMSDBFS: Float(vadSilenceDBFS)
+        )
+    }
+
     /// Nil only if `transcriptionEngineID` somehow doesn't match any known
     /// engine (shouldn't happen — it's only ever set from
     /// `ProviderCatalog.transcriptionEngines`).
@@ -467,6 +497,15 @@ public final class RecordingSession: ObservableObject {
             translationEarlyTranslateThreshold = defaults.integer(
                 forKey: PersistedSettingsKey.translationEarlyTranslateThreshold
             )
+        }
+        if defaults.object(forKey: PersistedSettingsKey.vadSilenceSeconds) != nil {
+            // `init` assignments skip `didSet`, so clamp here too.
+            let raw = defaults.double(forKey: PersistedSettingsKey.vadSilenceSeconds)
+            vadSilenceSeconds = min(max(raw, 0.3), 3.0)
+        }
+        if defaults.object(forKey: PersistedSettingsKey.vadSilenceDBFS) != nil {
+            let raw = defaults.double(forKey: PersistedSettingsKey.vadSilenceDBFS)
+            vadSilenceDBFS = min(max(raw, -70), -20)
         }
         selectedDeviceID = defaults.string(forKey: PersistedSettingsKey.selectedDeviceID)
         transcriptionModelVariantID = defaults.string(forKey: PersistedSettingsKey.transcriptionModelVariantID)
@@ -1091,7 +1130,10 @@ public final class RecordingSession: ObservableObject {
         loadedTranslationOnlyIDs = nil
         isModelLoaded = true
 
-        let segmenter = UtteranceSegmenter()
+        let segmenter = UtteranceSegmenter(
+            silenceThresholdSeconds: vadSilenceSeconds,
+            silenceRMSDBFS: Float(vadSilenceDBFS)
+        )
         segmenter.onUtteranceBoundary = { [weak transcription] in
             transcription?.notifyUtteranceBoundary()
         }
@@ -1434,6 +1476,8 @@ enum PersistedSettingsKey {
     static let targetLanguageCode = "org.hdcola.omnivoice.targetLanguageCode"
     static let translationCommitEagerness = "org.hdcola.omnivoice.translationCommitEagerness"
     static let translationEarlyTranslateThreshold = "org.hdcola.omnivoice.translationEarlyTranslateThreshold"
+    static let vadSilenceSeconds = "org.hdcola.omnivoice.vadSilenceSeconds"
+    static let vadSilenceDBFS = "org.hdcola.omnivoice.vadSilenceDBFS"
     static let includeSystemAudio = "org.hdcola.omnivoice.includeSystemAudio"
     static let selectedDeviceID = "org.hdcola.omnivoice.selectedDeviceID"
     static let transcriptionModelVariantID = "org.hdcola.omnivoice.transcriptionModelVariantID"

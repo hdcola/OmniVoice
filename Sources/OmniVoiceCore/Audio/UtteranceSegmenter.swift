@@ -12,14 +12,21 @@ import Foundation
 ///
 /// Must be fed **mic-only** samples, before any system-audio mixing —
 /// feeding the mixed stream would defeat detection whenever background audio
-/// is present. Ported unchanged from `mac-poc-hybrid`'s
-/// `Audio/UtteranceSegmenter.swift`.
-final class UtteranceSegmenter {
+/// is present. Ported from `mac-poc-hybrid`'s
+/// `Audio/UtteranceSegmenter.swift`, plus live-tunable thresholds via
+/// `update(silenceThresholdSeconds:silenceRMSDBFS:)`.
+final class UtteranceSegmenter: @unchecked Sendable {
     var onUtteranceBoundary: (() -> Void)?
 
     private let sampleRate: Double = 16000
-    private let silenceThresholdSeconds: Double
-    private let silenceRMSDBFS: Float
+    static let defaultSilenceSeconds: Double = 0.6
+    static let defaultSilenceDBFS: Double = -40
+
+    // `submit` runs on the audio thread while the setters run on the main
+    // actor, so the tunables sit behind a lock.
+    private let lock = NSLock()
+    private var silenceThresholdSeconds: Double
+    private var silenceRMSDBFS: Float
     private var silentSampleCount: Int = 0
     private var hasSpeechSinceLastBoundary = false
 
@@ -29,7 +36,18 @@ final class UtteranceSegmenter {
     ///   - silenceRMSDBFS: RMS level (dBFS) below which a chunk counts as
     ///     silence. Typical conversational speech sits well above -30dBFS;
     ///     room noise/silence is usually below -40dBFS.
-    init(silenceThresholdSeconds: Double = 0.6, silenceRMSDBFS: Float = -40) {
+    init(
+        silenceThresholdSeconds: Double = UtteranceSegmenter.defaultSilenceSeconds,
+        silenceRMSDBFS: Float = Float(UtteranceSegmenter.defaultSilenceDBFS)
+    ) {
+        self.silenceThresholdSeconds = silenceThresholdSeconds
+        self.silenceRMSDBFS = silenceRMSDBFS
+    }
+
+    /// Live-updates the tunables; safe to call mid-recording.
+    func update(silenceThresholdSeconds: Double, silenceRMSDBFS: Float) {
+        lock.lock()
+        defer { lock.unlock() }
         self.silenceThresholdSeconds = silenceThresholdSeconds
         self.silenceRMSDBFS = silenceRMSDBFS
     }
@@ -37,11 +55,17 @@ final class UtteranceSegmenter {
     /// Samples are mono Float32 in -1...1 range.
     func submit(_ samples: [Float]) {
         guard !samples.isEmpty else { return }
-        let isSilent = Self.rmsDBFS(samples) < silenceRMSDBFS
+        lock.lock()
+        let thresholdSeconds = silenceThresholdSeconds
+        let thresholdDBFS = silenceRMSDBFS
+        lock.unlock()
+        let isSilent = Self.rmsDBFS(samples) < thresholdDBFS
         if isSilent {
+            // Nothing left to close until the next speech, so don't keep counting.
+            guard hasSpeechSinceLastBoundary else { return }
             silentSampleCount += samples.count
             let silenceSeconds = Double(silentSampleCount) / sampleRate
-            if hasSpeechSinceLastBoundary && silenceSeconds >= silenceThresholdSeconds {
+            if silenceSeconds >= thresholdSeconds {
                 hasSpeechSinceLastBoundary = false
                 silentSampleCount = 0
                 onUtteranceBoundary?()
