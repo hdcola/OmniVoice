@@ -320,15 +320,12 @@ final class InProcessTranscriber: @unchecked Sendable {
     /// the finish result's full transcript beyond what deltas already
     /// reported), or nil if there's nothing new.
     ///
-    /// **Requires the patched audio.cpp**: on an unpatched build,
-    /// `audiocpp_stream_finish` SIGSEGVs the whole process whenever the
-    /// session's decoded text is empty at finish time (a trailing pause, or
-    /// silence) — a null dereference in audio.cpp's own
-    /// `R2T2ASRSession::build_stream_prefix(final_flush:)`, nothing this file
-    /// can guard against from the C API surface. Fixed by
-    /// `Patches/audio.cpp/0001-r2t2-fix-null-deref-on-empty-final-flush.patch`,
-    /// applied as part of `Docs/MODEL_ENGINE_SETUP.md`; see
-    /// `Docs/PROGRESS.md`'s Known gaps section for the root cause.
+    /// Needs an audio.cpp at or past the pin in `Docs/MODEL_ENGINE_SETUP.md`:
+    /// older builds SIGSEGV in `audiocpp_stream_finish` whenever the session's
+    /// decoded text is empty at finish time (a trailing pause, or silence) —
+    /// a null dereference in audio.cpp's own
+    /// `R2T2ASRSession::build_stream_prefix(final_flush:)`, fixed upstream in
+    /// 0xShug0/audio.cpp#712. See `Patches/audio.cpp/README.md`.
     private func finishLocked() -> String? {
         guard let session else { return nil }
         var result: OpaquePointer?
