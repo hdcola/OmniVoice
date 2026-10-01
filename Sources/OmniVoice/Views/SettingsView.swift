@@ -37,6 +37,8 @@ struct SettingsView: View {
     /// the wrong manager for any `RecordingSession` constructed with a
     /// non-`shared` one (a test, an eventual SwiftUI preview).
     @ObservedObject private var downloadManager: ModelDownloadManager
+    @StateObject private var loginItem = LaunchAtLoginController()
+    @AppStorage(PersistedLaunchKey.preloadMode) private var launchPreloadMode = LaunchPreloadMode.off
     /// Task 4.3 (异常状态内联重试), mirroring `ModelManagementView`'s own —
     /// this tab's inline download row shows its own failure message rather
     /// than a modal `.alert`.
@@ -79,6 +81,8 @@ struct SettingsView: View {
                 translationEngineCard
                 transcriptionLanguageCard
                 memoryConsole
+
+                launchCard
 
                 panelCard
             }
@@ -468,7 +472,7 @@ struct SettingsView: View {
                     PillButton(title: "🧹 释放内存占用") {
                         session.unloadModels()
                     }
-                    .disabled(!session.isModelLoaded || session.isSessionActive || session.isPreloadingModel)
+                    .disabled(!session.hasLoadedModels || session.isSessionActive || session.isPreloadingModel)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
@@ -480,12 +484,45 @@ struct SettingsView: View {
 
     private var memoryStatusTone: StatusPill.Tone {
         if session.isPreloadingModel { return .warning }
-        return session.isModelLoaded ? .good : .neutral
+        return session.hasLoadedModels ? .good : .neutral
     }
 
     private var memoryStatusText: String {
         if session.isPreloadingModel { return "正在加载中…" }
-        return session.isModelLoaded ? "已载入内存（就绪）" : "空闲（未载入内存）"
+        if session.isModelLoaded { return "已载入内存（就绪）" }
+        return session.hasLoadedModels ? "仅翻译模型已载入" : "空闲（未载入内存）"
+    }
+
+    // MARK: - 启动
+
+    private var launchCard: some View {
+        LaunchOptionsCard(
+            launchAtLogin: Binding(get: { loginItem.isEnabled }, set: { loginItem.setEnabled($0) }),
+            preloadMode: $launchPreloadMode,
+            needsLoginApproval: loginItem.needsApproval,
+            loginError: loginItem.lastError,
+            preloadAvailable: session.usesOnDeviceModelEngine,
+            memoryNote: session.translationEngineKind == .model
+                ? (session.transcriptionEngineKind == .model
+                    ? "仅翻译约 \(translationMemoryGB) GB；翻译和识别约 \(estimatedMemoryGB) GB"
+                    : "翻译模型约 \(translationMemoryGB) GB；识别为系统引擎，无需加载")
+                : "翻译为系统引擎，「仅翻译模型」不会加载任何内容；识别模型约 \(estimatedMemoryGB) GB",
+            translationOnlyAvailable: session.translationEngineKind == .model,
+            onOpenLoginItems: { loginItem.openLoginItemsSettings() }
+        )
+        .onAppear { loginItem.refresh() }
+        // Coming back from System Settings → 登录项 (this view stays on
+        // screen the whole time, so `onAppear` doesn't fire again).
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            loginItem.refresh()
+        }
+    }
+
+    private var translationMemoryGB: Int {
+        guard session.translationEngineKind == .model,
+            let variant = session.currentTranslationModelVariant
+        else { return 0 }
+        return variant.recommendedMemoryGB
     }
 
     /// Sum of `recommendedMemoryGB` for every currently-selected `.model`

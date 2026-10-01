@@ -73,6 +73,14 @@ struct OnboardingView: View {
     /// closed this window by the time that failure would have surfaced had
     /// no way to find out the "后台下载中" promise never actually started.
     @State private var diskSpaceWarningMessage: String?
+    /// Applied only on finish (not when toggled), so skipping the wizard
+    /// leaves the login item and launch preload untouched.
+    @State private var launchAtLogin = false
+    @State private var preloadMode = LaunchPreloadMode.all
+    /// Once the user picks a preload mode themselves, switching run modes
+    /// stops overriding it with that mode's default.
+    @State private var preloadModeEdited = false
+    @StateObject private var loginItem = LaunchAtLoginController()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -81,6 +89,15 @@ struct OnboardingView: View {
                     header
                     permissionsCard
                     modeCard
+                    LaunchOptionsCard(
+                        title: "3 · 启动偏好",
+                        launchAtLogin: $launchAtLogin,
+                        preloadMode: Binding(
+                            get: { preloadMode },
+                            set: { preloadMode = $0; preloadModeEdited = true }
+                        ),
+                        preloadAvailable: selectedMode != .lightweight
+                    )
                 }
                 .padding(16)
             }
@@ -88,6 +105,11 @@ struct OnboardingView: View {
             actionBar
         }
         .frame(width: 520)
+        .onAppear { launchAtLogin = loginItem.isEnabled }
+        .onChange(of: selectedMode) { _, mode in
+            guard !preloadModeEdited else { return }
+            preloadMode = Self.defaultPreloadMode(for: mode)
+        }
         // None of these post a notification this app can observe cheaply,
         // and the user grants them in System Settings while this window is
         // open — polling once a second keeps the rows honest.
@@ -202,7 +224,7 @@ struct OnboardingView: View {
 
     private var actionBar: some View {
         HStack {
-            Button("跳过向导") { finish(startDownload: false) }
+            Button("跳过向导") { skip() }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -279,12 +301,39 @@ struct OnboardingView: View {
     /// do), and `finish(startDownload:)` only marks completion/closes the
     /// window when that's `true` — a disk-space failure instead leaves the
     /// window open with its alert visible and the wizard retriable.
+    /// Marks onboarding done without touching the login item or the launch
+    /// preload setting, as `launchAtLogin`'s doc promises.
+    private func skip() {
+        UserDefaults.standard.set(true, forKey: PersistedOnboardingKey.hasCompletedOnboarding)
+        onFinished()
+    }
+
     private func finish(startDownload: Bool) {
         if startDownload {
             guard startBundleDownload() else { return }
         }
+        persistLaunchOptions()
+        // Both directions, so a re-run wizard can also turn it off.
+        if launchAtLogin != loginItem.isEnabled { loginItem.setEnabled(launchAtLogin) }
         UserDefaults.standard.set(true, forKey: PersistedOnboardingKey.hasCompletedOnboarding)
         onFinished()
+    }
+
+    /// The lightweight mode has nothing to load, whatever the picker said.
+    private func persistLaunchOptions() {
+        UserDefaults.standard.set(
+            (selectedMode == .lightweight ? LaunchPreloadMode.off : preloadMode).rawValue,
+            forKey: PersistedLaunchKey.preloadMode
+        )
+    }
+
+    /// 均衡 mode targets 8GB machines, so it only keeps the translator warm.
+    private static func defaultPreloadMode(for mode: Mode) -> LaunchPreloadMode {
+        switch mode {
+        case .lightweight: return .off
+        case .balanced: return .translationOnly
+        case .offlineModel: return .all
+        }
     }
 
     /// Which recommended bundle `.balanced`/`.offlineModel` each kick off —
@@ -309,7 +358,15 @@ struct OnboardingView: View {
             return true
         }
         let variants = bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants
-        guard !variants.isEmpty else { return true }
+        guard !variants.isEmpty else {
+            // Already downloaded (a re-run wizard): nothing will finish later
+            // to activate/preload, so do it now. The launch preload setting
+            // is written in `finish(startDownload:)` right after this
+            // returns, so hand it over via the same defaults key first.
+            persistLaunchOptions()
+            preloadOnceBundleIsReady(bundle)
+            return true
+        }
 
         // Task 4.2 — one preflight check against the *combined* remaining
         // size, not each variant checked individually as it starts (which
@@ -327,6 +384,7 @@ struct OnboardingView: View {
                 do {
                     _ = try await downloadManager.ensureDownloaded(variant)
                     activateIfStillSystemEngine(variant)
+                    preloadOnceBundleIsReady(bundle)
                 } catch {
                     // Best-effort background download — a failure here still
                     // leaves this variant's own inline retry card reachable
@@ -338,6 +396,23 @@ struct OnboardingView: View {
         }
         session.statusMessage = "模型正在后台下载中，下载完成后将自动为您无缝启用"
         return true
+    }
+
+    /// Launch-time preloading couldn't run at launch (the models weren't
+    /// downloaded yet), so do it as soon as the whole bundle has landed and
+    /// its engines are active — earlier, a half-downloaded bundle would
+    /// preload the system engine and then be discarded on the engine switch.
+    private func preloadOnceBundleIsReady(_ bundle: ModelBundle) {
+        guard bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty else { return }
+        // Activate every variant first: with two downloads finishing together,
+        // the first finisher would otherwise preload while the second
+        // variant's engine is still the system one, then have that load
+        // discarded when the second activates.
+        for variant in bundle.variantIDs.compactMap(ProviderCatalog.variant(forID:)) {
+            activateIfStillSystemEngine(variant)
+        }
+        guard let scope = LaunchPreloadMode.stored.effectiveScope(for: session) else { return }
+        Task { await session.preloadModel(scope: scope) }
     }
 
     /// Mirrors `ModelManagementView.autoActivateIfSystemEngineStillSelected(_:)`

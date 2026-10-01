@@ -479,9 +479,10 @@ struct ModelManagementView: View {
             // (and `start()`'s `reusingLoaded` happily reusing it) while
             // Settings/Model Management both show "未下载" — unload it too
             // so every view of the state agrees.
-            if session.isModelLoaded
-                && (session.currentTranscriptionModelVariant?.id == variant.id
-                    || session.currentTranslationModelVariant?.id == variant.id)
+            // A translation-only load (`hasLoadedModels` without
+            // `isModelLoaded`) holds just the translator's weights.
+            if (session.hasLoadedModels && session.currentTranslationModelVariant?.id == variant.id)
+                || (session.isModelLoaded && session.currentTranscriptionModelVariant?.id == variant.id)
             {
                 session.unloadModels()
             }

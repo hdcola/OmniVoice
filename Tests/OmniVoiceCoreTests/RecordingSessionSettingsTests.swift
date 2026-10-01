@@ -730,4 +730,54 @@ struct RecordingSessionSettingsTests {
 
         #expect(session.lines[0].translation == "Hello, world.")
     }
+
+    /// `.translationOnly` leaves the recognizer unloaded, so `isModelLoaded`
+    /// (which `start()` reads as "both providers loaded") must stay false.
+    @Test func translationOnlyPreloadDoesNotMarkFullPairLoaded() async {
+        let session = RecordingSession()
+        await session.preloadModel(scope: .translationOnly)
+        #expect(session.hasLoadedModels)
+        #expect(!session.isModelLoaded)
+        #expect(session.loadedTranslationOnlyIDs?.engine == session.translationEngineID)
+    }
+
+    /// A later `.all` preload adopts the translation-only load and completes
+    /// the pair; `unloadModels()` clears whichever state is held.
+    @Test func fullPreloadAfterTranslationOnlyCompletesPair() async {
+        let session = RecordingSession()
+        await session.preloadModel(scope: .translationOnly)
+        await session.preloadModel(scope: .all)
+        #expect(session.isModelLoaded)
+        #expect(session.loadedTranslationOnlyIDs == nil)
+        session.unloadModels()
+        #expect(!session.hasLoadedModels)
+    }
+
+    @Test func unloadClearsTranslationOnlyLoad() async {
+        let session = RecordingSession()
+        await session.preloadModel(scope: .translationOnly)
+        session.unloadModels()
+        #expect(!session.hasLoadedModels)
+        #expect(session.loadedTranslationOnlyIDs == nil)
+    }
+
+    /// Switching the translation engine after a translation-only load must
+    /// drop that load instead of leaving the old translator resident.
+    @Test func switchingTranslationEngineDiscardsTranslationOnlyLoad() async {
+        let session = RecordingSession()
+        await session.preloadModel(scope: .translationOnly)
+        #expect(session.loadedTranslationOnlyIDs != nil)
+        session.translationEngineID = "model.hymt15"
+        #expect(session.loadedTranslationOnlyIDs == nil)
+        #expect(!session.hasLoadedModels)
+    }
+
+    /// A translation-only preload must not reset an undownloaded `.model`
+    /// recognizer to the system engine as a side effect.
+    @Test func translationOnlyPreloadKeepsUndownloadedRecognizerSelection() async {
+        let session = RecordingSession(modelDownloadManager: ModelDownloadManager(cacheDirectory: makeEmptyTempCacheDirectory()))
+        session.transcriptionEngineID = "model.r2t2"
+        await session.preloadModel(scope: .translationOnly)
+        #expect(session.transcriptionEngineID == "model.r2t2")
+    }
 }

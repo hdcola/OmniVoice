@@ -51,6 +51,17 @@ public final class RecordingSession: ObservableObject {
     /// the engine selection changes (`discardLoadedModelsIfStale()`) or the
     /// app is about to quit (`unloadModelsBeforeQuit()`).
     @Published public var isModelLoaded = false
+    /// Set by `preloadModel(scope: .translationOnly)` — only the translation
+    /// provider is loaded (for a user who wants the translator warm at
+    /// launch but not the much larger recognizer). `isModelLoaded` stays
+    /// `false` in that state, since `start()`'s full-pair reuse requires both
+    /// providers; `start()`/`preloadModel(scope: .all)` instead adopt this
+    /// translation provider and load only the recognizer.
+    @Published public private(set) var loadedTranslationOnlyIDs: (engine: String, variant: String?)?
+    /// True when any model is resident — a full load (`isModelLoaded`) or a
+    /// translation-only one. Both include the translator, so this is also
+    /// "the translation model is loaded".
+    public var hasLoadedModels: Bool { isModelLoaded || loadedTranslationOnlyIDs != nil }
     /// True across the whole `start()`→`stop()` lifecycle, not just while
     /// actually recording — use this (not `isRunning` alone) to gate any
     /// control whose value is only read once, at the top of `start()`
@@ -492,8 +503,11 @@ public final class RecordingSession: ObservableObject {
     /// should never be left pointing at an undownloaded model to begin with.
     /// A no-op for a `.system`-kind selection (nothing to fall back from) or
     /// a `.model`-kind selection that still has something downloaded.
-    public func fallBackToSystemEngineIfModelUnavailable() {
-        if transcriptionEngineKind == .model, !hasDownloadedModelVariant(engineID: transcriptionEngineID),
+    public func fallBackToSystemEngineIfModelUnavailable(includingTranscription: Bool = true) {
+        // `includingTranscription: false` is for a translation-only preload:
+        // a recognizer whose model isn't downloaded yet must keep its
+        // selection rather than be reset to the system engine as a side effect.
+        if includingTranscription, transcriptionEngineKind == .model, !hasDownloadedModelVariant(engineID: transcriptionEngineID),
             let systemEngine = ProviderCatalog.transcriptionEngines.first(where: { $0.kind == .system }) {
             transcriptionEngineID = systemEngine.id
         }
@@ -618,8 +632,16 @@ public final class RecordingSession: ObservableObject {
     /// `translationProvider` for `start()` to adopt directly (skipping its
     /// own `loadModel()` calls) as long as the engine selection hasn't
     /// changed since — see `loadedEngineIDs`.
-    public func preloadModel() async {
+    public enum PreloadScope: Sendable {
+        /// Only the translation engine — see `loadedTranslationOnlyIDs`.
+        case translationOnly
+        /// Both engines (the original `preloadModel()` behavior).
+        case all
+    }
+
+    public func preloadModel(scope: PreloadScope = .all) async {
         guard !isSessionActive, !isPreloadingModel, !isModelLoaded else { return }
+        if scope == .translationOnly, loadedTranslationOnlyIDs != nil { return }
         isPreloadingModel = true
         defer { isPreloadingModel = false }
 
@@ -628,16 +650,20 @@ public final class RecordingSession: ObservableObject {
         // doc), but re-checking here means a race (a deletion landing between
         // this call being queued and actually running) still resolves to
         // "use the system engine" instead of the "尚未下载" failure below.
-        fallBackToSystemEngineIfModelUnavailable()
+        fallBackToSystemEngineIfModelUnavailable(includingTranscription: scope == .all)
 
         let transcriptionModelPath: URL?
-        do {
-            transcriptionModelPath = try resolveModelPath(
-                kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant
-            )
-        } catch {
-            statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「设置 → 模型库」中下载"
-            return
+        if scope == .all {
+            do {
+                transcriptionModelPath = try resolveModelPath(
+                    kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant
+                )
+            } catch {
+                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「设置 → 模型库」中下载"
+                return
+            }
+        } else {
+            transcriptionModelPath = nil
         }
         let translationModelPath: URL?
         do {
@@ -649,8 +675,29 @@ public final class RecordingSession: ObservableObject {
             return
         }
 
+        // A translation-only load left by an earlier call is adopted as is
+        // (the `.all` call then only loads the recognizer).
+        let adoptedTranslation = translationOnlyLoadMatchesSelection ? translationProvider : nil
+        let translation = adoptedTranslation
+            ?? Self.makeTranslationProvider(engineID: translationEngineID, modelPath: translationModelPath)
+
+        if scope == .translationOnly {
+            translationProvider = translation
+            statusMessage = "预加载翻译引擎中…"
+            do {
+                try await translation.loadModel()
+            } catch {
+                statusMessage = "翻译引擎预加载失败: \(error.localizedDescription)"
+                translation.unload()
+                translationProvider = nil
+                return
+            }
+            loadedTranslationOnlyIDs = (translationEngineID, currentTranslationModelVariant?.id)
+            statusMessage = "翻译模型已预加载"
+            return
+        }
+
         let transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID, modelPath: transcriptionModelPath)
-        let translation = Self.makeTranslationProvider(engineID: translationEngineID, modelPath: translationModelPath)
         // Wired into the ivars immediately — *before* either `loadModel()`
         // call below resolves, not after both succeed. `unloadModelsBeforeQuit()`
         // reads these same ivars, and it needs something to reach even if
@@ -663,10 +710,13 @@ public final class RecordingSession: ObservableObject {
 
         statusMessage = "预加载翻译引擎中…"
         do {
-            try await translation.loadModel()
+            if adoptedTranslation == nil {
+                try await translation.loadModel()
+            }
         } catch {
             statusMessage = "翻译引擎预加载失败: \(error.localizedDescription)"
             translation.unload()
+            loadedTranslationOnlyIDs = nil
             // `transcription.loadModel()` was never even called at this
             // point, so it holds no C resources to release yet — but
             // `transcriptionProvider` is about to be nil'd (dropping this
@@ -690,15 +740,24 @@ public final class RecordingSession: ObservableObject {
             transcription.unload()
             transcriptionProvider = nil
             translationProvider = nil
+            loadedTranslationOnlyIDs = nil
             return
         }
 
+        loadedTranslationOnlyIDs = nil
         loadedEngineIDs = (
             transcriptionEngineID, currentTranscriptionModelVariant?.id,
             translationEngineID, currentTranslationModelVariant?.id
         )
         isModelLoaded = true
         statusMessage = "模型已预加载"
+    }
+
+    private var translationOnlyLoadMatchesSelection: Bool {
+        guard let loaded = loadedTranslationOnlyIDs else { return false }
+        return loaded.engine == translationEngineID
+            && loaded.variant == currentTranslationModelVariant?.id
+            && translationProvider != nil
     }
 
     /// Unloads and discards a load left over from before an engine switch —
@@ -710,6 +769,12 @@ public final class RecordingSession: ObservableObject {
     /// would otherwise just leak a loaded model that's no longer reachable
     /// through `preloadModel()`'s `isModelLoaded` guard.
     private func discardLoadedModelsIfStale() {
+        if loadedTranslationOnlyIDs != nil, !translationOnlyLoadMatchesSelection {
+            translationProvider?.unload()
+            translationProvider = nil
+            loadedTranslationOnlyIDs = nil
+            if statusMessage == "翻译模型已预加载" { statusMessage = "未启动" }
+        }
         guard let loaded = loadedEngineIDs else { return }
         // Re-assigning the *same* engine ID (or the same variant ID) a
         // Picker already has selected still fires this `didSet` — without
@@ -729,6 +794,7 @@ public final class RecordingSession: ObservableObject {
         transcriptionProvider = nil
         translationProvider = nil
         loadedEngineIDs = nil
+        loadedTranslationOnlyIDs = nil
         isModelLoaded = false
         // Only when it's still showing what `preloadModel()` last set it to
         // — never stomps a message from something else entirely unrelated
@@ -795,8 +861,9 @@ public final class RecordingSession: ObservableObject {
         transcriptionProvider = nil
         translationProvider = nil
         loadedEngineIDs = nil
+        loadedTranslationOnlyIDs = nil
         isModelLoaded = false
-        if statusMessage == "模型已预加载" {
+        if statusMessage == "模型已预加载" || statusMessage == "翻译模型已预加载" {
             statusMessage = "未启动"
         }
     }
@@ -876,6 +943,9 @@ public final class RecordingSession: ObservableObject {
             && loadedEngineIDs?.translationVariant == currentTranslationModelVariant?.id
             && transcriptionProvider != nil
             && translationProvider != nil
+        // A translation-only preload (see `loadedTranslationOnlyIDs`) is
+        // adopted too, short of a full pair: only the recognizer then loads.
+        let adoptedTranslation = reusingLoaded ? nil : (translationOnlyLoadMatchesSelection ? translationProvider : nil)
         let transcription: TranscriptionProvider
         let translation: TranslationProvider
         if reusingLoaded, let loadedTranscription = transcriptionProvider, let loadedTranslation = translationProvider {
@@ -906,7 +976,8 @@ public final class RecordingSession: ObservableObject {
                 return
             }
             transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID, modelPath: transcriptionModelPath)
-            translation = Self.makeTranslationProvider(engineID: translationEngineID, modelPath: translationModelPath)
+            translation = adoptedTranslation
+                ?? Self.makeTranslationProvider(engineID: translationEngineID, modelPath: translationModelPath)
         }
         transcriptionProvider = transcription
         translationProvider = translation
@@ -943,7 +1014,7 @@ public final class RecordingSession: ObservableObject {
 
         statusMessage = reusingLoaded ? "启动翻译引擎中…" : "加载翻译引擎中…"
         do {
-            if !reusingLoaded {
+            if !reusingLoaded, adoptedTranslation == nil {
                 try await translation.loadModel()
             }
             try await translation.start(config: TranslationConfig(
@@ -976,6 +1047,7 @@ public final class RecordingSession: ObservableObject {
                 // just nil-ing the providers above would read as "模型已就绪"
                 // while nothing is actually loaded.
                 loadedEngineIDs = nil
+                loadedTranslationOnlyIDs = nil
                 isModelLoaded = false
             }
             return
@@ -1002,6 +1074,7 @@ public final class RecordingSession: ObservableObject {
                 translationProvider = nil
                 // Same defensive reset as the translation catch above.
                 loadedEngineIDs = nil
+                loadedTranslationOnlyIDs = nil
                 isModelLoaded = false
             }
             return
@@ -1015,6 +1088,7 @@ public final class RecordingSession: ObservableObject {
             transcriptionEngineID, currentTranscriptionModelVariant?.id,
             translationEngineID, currentTranslationModelVariant?.id
         )
+        loadedTranslationOnlyIDs = nil
         isModelLoaded = true
 
         let segmenter = UtteranceSegmenter()
