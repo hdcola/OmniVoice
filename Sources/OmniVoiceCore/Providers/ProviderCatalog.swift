@@ -62,8 +62,8 @@ public struct ModelVariant: Identifiable, Hashable, Codable, Sendable {
     public let summary: String
     /// Approximate unified-memory/VRAM footprint once loaded — distinct from
     /// `approximateSizeMB` (the on-disk download size), which is usually
-    /// close but not identical. Used by the rich model card's "显存需求" line
-    /// and the "引擎运行与显存状态" console's resource estimate.
+    /// close but not identical. Used by the rich model card's "预计内存占用" line
+    /// and the "引擎运行与内存状态" console's resource estimate.
     public let recommendedMemoryGB: Int
 
     public init(
@@ -111,7 +111,7 @@ public struct ModelBundle: Identifiable, Hashable, Codable, Sendable {
 public enum ProviderCatalog {
     public static let transcriptionEngines: [EngineDescriptor] = [
         EngineDescriptor(
-            id: "system.speech", displayName: "系统自带 (Speech)", kind: .system,
+            id: "system.speech", displayName: "系统语音识别", kind: .system,
             badge: "系统原生 · 零内存占用",
             summary: "macOS 系统级语音识别，即开即用，无需额外下载。"
         ),
@@ -124,7 +124,7 @@ public enum ProviderCatalog {
 
     public static let translationEngines: [EngineDescriptor] = [
         EngineDescriptor(
-            id: "system.translation", displayName: "系统自带 (Translation)", kind: .system,
+            id: "system.translation", displayName: "系统翻译", kind: .system,
             badge: "系统原生 · 整句翻译",
             summary: "macOS 内置翻译，按句子标点翻译，不支持实时打字机预览。"
         ),

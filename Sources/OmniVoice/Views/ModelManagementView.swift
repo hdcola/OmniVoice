@@ -327,7 +327,7 @@ struct ModelManagementView: View {
                 Spacer()
                 actionButton(for: variant)
             }
-            Text("版本：\(variant.quantization) · 文件大小：约 \(variant.approximateSizeMB) MB · 预计显存/内存占用：约 \(variant.recommendedMemoryGB) GB")
+            Text("版本：\(variant.quantization) · 文件大小：约 \(variant.approximateSizeMB) MB · 预计内存占用：约 \(variant.recommendedMemoryGB) GB")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if !variant.summary.isEmpty {

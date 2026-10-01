@@ -59,8 +59,8 @@ final class SettingsDisabledStateTests: XCTestCase {
     }
 
     /// Once an on-device engine is selected but nothing is downloaded/loaded
-    /// yet (`isModelLoaded == false`, `isBusy == false`): "⚡ 预加载到显存" must
-    /// be enabled (there's something to preload) and "🧹 释放显存占用" must be
+    /// yet (`isModelLoaded == false`, `isBusy == false`): "⚡ 预加载到内存" must
+    /// be enabled (there's something to preload) and "🧹 释放内存占用" must be
     /// disabled (`!isModelLoaded` — nothing loaded yet to release).
     func testMemoryConsolePreloadEnabledReleaseDisabledWhenNothingIsLoaded() {
         let enginePicker = app.popUpButtons["引擎"].firstMatch
@@ -68,8 +68,8 @@ final class SettingsDisabledStateTests: XCTestCase {
         enginePicker.click()
         app.menuItems["R2T2 离线大模型（未下载 · 点击配置）"].click()
 
-        let preloadButton = app.buttons["⚡ 预加载到显存"]
-        let releaseButton = app.buttons["🧹 释放显存占用"]
+        let preloadButton = app.buttons["⚡ 预加载到内存"]
+        let releaseButton = app.buttons["🧹 释放内存占用"]
         XCTAssertTrue(preloadButton.waitForExistence(timeout: 5))
         XCTAssertTrue(releaseButton.waitForExistence(timeout: 5))
         XCTAssertTrue(preloadButton.isEnabled, "preload should be enabled — nothing loaded yet, and nothing else busy")

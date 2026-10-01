@@ -51,7 +51,7 @@ final class CrossSurfaceModelStateSyncTests: XCTestCase {
         r2t2MenuItem.click()
 
         // Settings' own console.
-        let settingsPreloadButton = app.buttons["⚡ 预加载到显存"]
+        let settingsPreloadButton = app.buttons["⚡ 预加载到内存"]
         XCTAssertTrue(settingsPreloadButton.waitForExistence(timeout: 5), "Settings memory console should appear once an on-device engine is selected")
 
         // The floating panel's equivalent, found in the *other* window.
@@ -74,7 +74,7 @@ final class CrossSurfaceModelStateSyncTests: XCTestCase {
         enginePicker.click()
         app.menuItems["R2T2 离线大模型（未下载 · 点击配置）"].click()
 
-        let settingsPreloadButton = app.buttons["⚡ 预加载到显存"]
+        let settingsPreloadButton = app.buttons["⚡ 预加载到内存"]
         let panelPreloadButton = app.buttons["预加载模型"]
         XCTAssertTrue(settingsPreloadButton.waitForExistence(timeout: 5))
         XCTAssertTrue(panelPreloadButton.waitForExistence(timeout: 5))

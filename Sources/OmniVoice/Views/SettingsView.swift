@@ -4,8 +4,8 @@ import SwiftUI
 
 /// Settings window — a `TabView` (Task 3.1) over four tabs: "语音与引擎"
 /// (engine choice, inline model download, the memory/preload console),
-/// "模型库管理" (the full model catalog — the same content that used to be
-/// the standalone "模型管理" window), "语言与悬浮窗" (language pickers + panel
+/// "模型库" (the full model catalog — the same content that used to be
+/// the standalone "模型管理" window), "语言与字幕" (language pickers + panel
 /// opacity), and "关于". Data-driven from `ProviderCatalog` rather than one
 /// hand-written `case` per engine, so adding a new community model
 /// audio.cpp supports later is a catalog change, not a UI change.
@@ -18,7 +18,7 @@ struct SettingsView: View {
     @AppStorage(PersistedFloatingPanelKey.showOnLaunch) private var showFloatingPanelOnLaunch = true
     /// Observed directly (not just reached through `session`) so the engine
     /// picker's labels/inline download cards live-update the moment
-    /// something is downloaded or deleted in the "模型库管理" tab —
+    /// something is downloaded or deleted in the "模型库" tab —
     /// `RecordingSession` no longer triggers downloads itself and doesn't
     /// re-publish on every download tick, only on `statusMessage` changes.
     /// Passed in explicitly (not defaulted to `.shared`) and expected to be
@@ -97,7 +97,7 @@ struct SettingsView: View {
                 inlineDownloadSection(forEngineID: session.transcriptionEngineID)
             }
 
-            Section("翻译引擎") {
+            Section("转录翻译引擎") {
                 Picker("引擎", selection: $session.translationEngineID) {
                     // Same reasoning as the ASR engine `Picker` above.
                     ForEach(ProviderCatalog.translationEngines) { engine in
@@ -235,7 +235,7 @@ struct SettingsView: View {
     }
 
     /// Lists *downloaded* variants — plus the currently-selected one even if
-    /// it isn't downloaded (deleted via "模型库管理", or a stale/synced
+    /// it isn't downloaded (deleted via "模型库", or a stale/synced
     /// selection), to avoid a blank `Picker` selection; marked "（未下载）"
     /// for the same reason `engineLabel(for:)` marks its engine-level
     /// equivalent.
@@ -261,8 +261,8 @@ struct SettingsView: View {
 
     /// Task 3.2 — an undownloaded `.model` engine that's currently selected
     /// gets an inline download row per catalog variant, right below its
-    /// `Picker`s, instead of only being reachable via "模型库管理". Each row
-    /// mirrors the "模型库管理" tab's own download affordance (percent,
+    /// `Picker`s, instead of only being reachable via "模型库". Each row
+    /// mirrors the "模型库" tab's own download affordance (percent,
     /// progress bar, speed/ETA once available).
     @ViewBuilder
     private func inlineDownloadSection(forEngineID engineID: String) -> some View {
@@ -350,7 +350,7 @@ struct SettingsView: View {
         pasteboard.setString(downloadURL.absoluteString, forType: .string)
     }
 
-    /// Unlike "模型库管理"'s own download button, this one always applies
+    /// Unlike "模型库"'s own download button, this one always applies
     /// the newly-downloaded variant to the engine/variant selection that's
     /// already active on this tab — the whole point of downloading inline
     /// is "I already picked this engine, just get me going", not a second
@@ -397,14 +397,14 @@ struct SettingsView: View {
     /// above) keeps the jump to the size of the content difference instead
     /// of a full section.
     private var memoryConsole: some View {
-        Section("引擎运行与显存状态") {
+        Section("引擎运行与内存状态") {
             if session.usesOnDeviceModelEngine {
                 HStack(spacing: 6) {
                     statusIndicatorDot
                     Text(memoryStatusText)
                         .font(.callout)
                 }
-                Text("预计占用统一内存：约 \(estimatedMemoryGB) GB")
+                Text("预计占用内存：约 \(estimatedMemoryGB) GB")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 HStack {
@@ -415,18 +415,18 @@ struct SettingsView: View {
                             if session.isPreloadingModel {
                                 ProgressView().controlSize(.small)
                             }
-                            Text(session.isPreloadingModel ? "加载中…" : "⚡ 预加载到显存")
+                            Text(session.isPreloadingModel ? "加载中…" : "⚡ 预加载到内存")
                         }
                     }
                     .disabled(session.isSessionActive || session.isPreloadingModel || session.isModelLoaded)
 
-                    Button("🧹 释放显存占用") {
+                    Button("🧹 释放内存占用") {
                         session.unloadModels()
                     }
                     .disabled(!session.isModelLoaded || session.isSessionActive || session.isPreloadingModel)
                 }
             } else {
-                Text("当前引擎均为系统内置，无需预加载或释放显存。")
+                Text("当前引擎均为系统内置，无需预加载或释放内存。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -446,7 +446,7 @@ struct SettingsView: View {
 
     private var memoryStatusText: String {
         if session.isPreloadingModel { return "🟡 正在加载中…" }
-        return session.isModelLoaded ? "🟢 当前模型已加载至显存 (就绪)" : "⚪ 空闲 (未载入显存)"
+        return session.isModelLoaded ? "🟢 当前模型已加载至内存 (就绪)" : "⚪ 空闲 (未载入内存)"
     }
 
     /// Sum of `recommendedMemoryGB` for every currently-selected `.model`
@@ -464,13 +464,13 @@ struct SettingsView: View {
         return total
     }
 
-    // MARK: - Tab 2: 模型库管理
+    // MARK: - Tab 2: 模型库
 
     private var modelsTab: some View {
         ModelManagementView(modelDownloadManager: downloadManager)
     }
 
-    // MARK: - Tab 3: 语言与悬浮窗
+    // MARK: - Tab 3: 语言与字幕
 
     private var languageTab: some View {
         Form {
@@ -505,9 +505,9 @@ struct SettingsView: View {
             // `NSWindow.alphaValue`) faded the transcript text right along
             // with the background, so a panel transparent enough to not
             // block the view behind it also made the text hard to read.
-            Section("悬浮窗") {
-                Toggle("启动时显示悬浮窗", isOn: $showFloatingPanelOnLaunch)
-                    .help("关闭后，启动 OmniVoice 时不再自动弹出实时转写悬浮窗；开始录音时仍会自动显示，也可从菜单栏手动打开。")
+            Section("字幕悬浮窗") {
+                Toggle("启动时显示字幕悬浮窗", isOn: $showFloatingPanelOnLaunch)
+                    .help("关闭后，启动 OmniVoice 时不再自动弹出字幕悬浮窗；开始转录时仍会自动显示，也可从菜单栏手动打开。")
                 opacitySlider(
                     "背景透明度", value: $session.panelBackgroundOpacity, range: 0.1...1.0
                 )

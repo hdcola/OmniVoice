@@ -5,7 +5,7 @@ import SwiftUI
 @main
 struct OmniVoiceApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    /// Task 3.4 — shared between `MenuBarContentView` (whose "模型管理…" row
+    /// Task 3.4 — shared between `MenuBarContentView` (whose "模型库…" row
     /// needs to steer `SettingsView` before that view even exists, since
     /// `Settings { ... }` only constructs its content on first open) and
     /// `SettingsView` itself (whose `TabView` binds directly to
@@ -30,8 +30,8 @@ struct OmniVoiceApp: App {
                 .modelContainerIfAvailable(appDelegate.modelContainer)
         }
 
-        // "模型库管理" now lives as a tab inside `SettingsView` (Task 3.1/3.4)
-        // instead of this standalone `Window` scene — a click on "模型管理…"
+        // "模型库" now lives as a tab inside `SettingsView` (Task 3.1/3.4)
+        // instead of this standalone `Window` scene — a click on "模型库…"
         // opens Settings and switches `settingsNavigation.selectedTab` to
         // `.models` rather than a second window, so there's exactly one
         // place model download/delete state is rendered, not two that could

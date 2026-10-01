@@ -2,7 +2,7 @@
 
 All-in-one real-time speech transcription &amp; translation assistant for
 lectures, meetings, and multilingual conversations — a macOS menu-bar app
-with a floating live-transcript panel.
+with a floating caption panel (字幕悬浮窗).
 
 **Current version: 0.4.0 — internal test build.**
 
@@ -36,29 +36,29 @@ history and open items.
   picked independently per component. **R2T2 needs a one-line upstream patch
   applied to `audio.cpp` before it's safe to use — see
   `Docs/MODEL_ENGINE_SETUP.md`.**
-- **Floating transcript panel**: shown from launch, semi-transparent,
+- **Caption panel (字幕悬浮窗)**: shown from launch (can be turned off in Settings), semi-transparent,
   draggable/resizable, stays on top without stealing focus. Its own control
   bar has start/stop, a source/target language picker, and a close button;
   a status bar surfaces what's going on (or what went wrong).
 - **Menu bar**: start/stop (works even if the panel is hidden), a
-  show/hide toggle for the panel, microphone picker, "include system audio"
+  show/hide toggle for the caption panel, microphone picker, "include system audio"
   toggle (via ScreenCaptureKit — needs Screen Recording permission), links
   to history and settings.
 - **~16 quick-pick languages** (Chinese, English, Japanese, Korean, French,
-  German, Spanish, Italian, Portuguese, and more) shared between the panel
+  German, Spanish, Italian, Portuguese, and more) shared between the caption panel
   and Settings, plus an engine-aware "自动" (auto-detect source) option once
   a local-model ASR engine is available.
-- **Selection translation (⌥A) and screenshot translation (⌥S)**, modeled
+- **Quick Translate (快捷翻译): translate selection (划词翻译, ⌥A) and translate screenshot (截图翻译, ⌥S)**, modeled
   on [Cida](https://github.com/Xuanwo/cida) but fully on-device: select text
   in any app and press ⌥A, or press ⌥S and frame part of the screen (text
-  recognized locally with Vision). A floating panel translates it with the
+  recognized locally with Vision). The translation panel (翻译面板) translates it with the
   system Translation framework or HY-MT1.5 — text in "my language" goes to
   your foreign language, everything else comes into "my language". ⏎
   translates, ⇧⏎ inserts a newline, Esc hides. Shortcuts, engine and
-  languages live in Settings → 选词翻译. Reading the selection needs the
-  Accessibility permission (without it, copy and paste into the panel);
+  languages live in Settings → 快捷翻译. Reading the selection needs the
+  Accessibility permission (without it, copy and paste into the translation panel);
   ⌥S needs Screen Recording.
-- **Session history**: past recordings persisted locally (SwiftData), with
+- **History (历史记录)**: past transcripts persisted locally (SwiftData), with
   a searchable history window and Markdown export.
 - **Settings persistence**: engine choice, language pair, mic device, and
   system-audio inclusion survive quits/relaunches/restarts.

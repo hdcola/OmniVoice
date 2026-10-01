@@ -141,7 +141,7 @@ enum GlobalShortcutAction: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .translateSelection: return "翻译选中文字"
+        case .translateSelection: return "划词翻译"
         case .captureText: return "截图翻译"
         }
     }

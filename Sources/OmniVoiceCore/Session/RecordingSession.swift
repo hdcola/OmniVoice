@@ -636,7 +636,7 @@ public final class RecordingSession: ObservableObject {
                 kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant
             )
         } catch {
-            statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
+            statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「设置 → 模型库」中下载"
             return
         }
         let translationModelPath: URL?
@@ -645,7 +645,7 @@ public final class RecordingSession: ObservableObject {
                 kind: translationEngineKind, variant: currentTranslationModelVariant
             )
         } catch {
-            statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
+            statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「设置 → 模型库」中下载"
             return
         }
 
@@ -893,7 +893,7 @@ public final class RecordingSession: ObservableObject {
                     kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant
                 )
             } catch {
-                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
+                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「设置 → 模型库」中下载"
                 return
             }
             let translationModelPath: URL?
@@ -902,7 +902,7 @@ public final class RecordingSession: ObservableObject {
                     kind: translationEngineKind, variant: currentTranslationModelVariant
                 )
             } catch {
-                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「模型管理」中下载"
+                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「设置 → 模型库」中下载"
                 return
             }
             transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID, modelPath: transcriptionModelPath)
@@ -1094,7 +1094,7 @@ public final class RecordingSession: ObservableObject {
 
         isRunning = true
         if !screenRecordingPermissionNeeded {
-            statusMessage = "转写中…"
+            statusMessage = "转录中…"
         }
 
         elapsedSeconds = 0

@@ -49,7 +49,7 @@ struct SessionListView: View {
                 .contextMenu {
                     Button("重命名…") { beginRename(session) }
                     if session.endedAt != nil {
-                        Button("删除会话…", role: .destructive) { pendingDeletion = session }
+                        Button("删除转录记录…", role: .destructive) { pendingDeletion = session }
                     }
                 }
             }
@@ -69,14 +69,14 @@ struct SessionListView: View {
             }
         } detail: {
             ContentUnavailableView(
-                "选择一个会话",
+                "选择一条转录记录",
                 systemImage: "text.bubble",
-                description: Text("在左侧列表中选择一次录制查看详情")
+                description: Text("在左侧列表中选择一条转录记录查看详情")
             )
         }
         .frame(minWidth: 720, minHeight: 460)
         .confirmationDialog(
-            "删除会话？",
+            "删除转录记录？",
             isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
             titleVisibility: .visible
         ) {
@@ -100,7 +100,7 @@ struct SessionListView: View {
                     // Resetting stale selection after a delete — leaving
                     // `selectedID` pointing at the now-deleted session's
                     // UUID left the detail pane blank instead of resetting to
-                    // the "选择一个会话" placeholder, and a subsequent ⌫ did
+                    // the "选择一条转录记录" placeholder, and a subsequent ⌫ did
                     // nothing since `selectedID` no longer resolved to any
                     // session.
                     if selectedID == session.id {
@@ -114,10 +114,10 @@ struct SessionListView: View {
             Text("删除后无法恢复。")
         }
         .alert(
-            "重命名会话",
+            "重命名转录记录",
             isPresented: Binding(get: { renamingSession != nil }, set: { if !$0 { renamingSession = nil } })
         ) {
-            TextField("会话标题", text: $renameText)
+            TextField("转录记录标题", text: $renameText)
             Button("保存") { commitRename() }
             Button("取消", role: .cancel) { renamingSession = nil }
         }

@@ -27,7 +27,7 @@
     <key>NSMicrophoneUsageDescription</key>
     <string>需要访问麦克风以进行实时语音识别与翻译。</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>选择系统自带识别引擎时，需要使用语音识别以将麦克风/系统音频转写为文字。</string>
+    <string>选择系统语音识别引擎时，需要使用语音识别以将麦克风/系统音频转录为文字。</string>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>

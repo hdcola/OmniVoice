@@ -23,7 +23,7 @@ struct OnboardingView: View {
         /// Problem 1 (round-4 user report) — the middle tier between the
         /// zero-download system engine and the full R2T2+T3PO pairing:
         /// downloads `bundle.lightweight` (R2T2 识别 + HY-MT1.5 翻译，约
-        /// 3.4GB) instead. Reuses the same catalog bundle "模型库管理"'s own
+        /// 3.4GB) instead. Reuses the same catalog bundle "模型库"'s own
         /// "方案 B：轻量低内存方案" card offers, rather than a second,
         /// parallel definition of the same pairing.
         case balanced
@@ -80,7 +80,7 @@ struct OnboardingView: View {
                     HStack(spacing: 12) {
                         modeCard(
                             mode: .lightweight, title: "极速轻量模式",
-                            bullets: ["基于 macOS 自带引擎", "零磁盘占用，即开即用", "适合轻度记录与快速尝鲜"]
+                            bullets: ["基于系统语音识别与系统翻译", "零磁盘占用，即开即用", "适合轻度记录与快速尝鲜"]
                         )
                         modeCard(
                             mode: .balanced, title: "均衡低内存模式",
@@ -260,7 +260,7 @@ struct OnboardingView: View {
                 } catch {
                     // Best-effort background download — a failure here still
                     // leaves this variant's own inline retry card reachable
-                    // from "模型库管理"/"语音与引擎" (Task 4.3) once the user
+                    // from "模型库"/"语音与引擎" (Task 4.3) once the user
                     // opens Settings, so there's no separate error UI to
                     // surface from this already-dismissed onboarding window.
                 }

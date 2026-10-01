@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 /// One of `SettingsView`'s tabs (Task 3.1) — Docs/UX-SETTINGS-MODEL-MANAGEMENT.md
-/// §4.1's "语音与引擎 / 模型库管理 / 语言与字幕 / 关于", plus "选词翻译"
+/// §4.1's "语音与引擎 / 模型库 / 语言与字幕 / 关于", plus "快捷翻译"
 /// (`SelectionTranslationSettingsView`).
 enum SettingsTab: String, CaseIterable, Identifiable {
     case engines
@@ -16,9 +16,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .engines: return "语音与引擎"
-        case .models: return "模型库管理"
-        case .language: return "语言与悬浮窗"
-        case .selection: return "选词翻译"
+        case .models: return "模型库"
+        case .language: return "语言与字幕"
+        case .selection: return "快捷翻译"
         case .about: return "关于"
         }
     }
@@ -35,7 +35,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 }
 
 /// Shared across the app (one instance, injected via `.environmentObject` in
-/// `OmniVoiceApp`) so a click on the menu bar's "模型管理…" — which fires
+/// `OmniVoiceApp`) so a click on the menu bar's "模型库…" — which fires
 /// *before* `SettingsView` even exists, since `Settings { ... }` only
 /// constructs its content on first open — can still steer which tab that
 /// view lands on (Task 3.4). `SettingsView` itself binds its `TabView`'s
@@ -64,8 +64,8 @@ final class SettingsNavigationState: ObservableObject {
         }
     }
 
-    /// "模型管理…" (menu bar and the in-form nudge next to an undownloaded
-    /// engine) — jump straight to the "模型库管理" tab.
+    /// "模型库…" (menu bar and the in-form nudge next to an undownloaded
+    /// engine) — jump straight to the "模型库" tab.
     func openModelLibrary() {
         selectedTab = .models
     }

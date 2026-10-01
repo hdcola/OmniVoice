@@ -65,7 +65,7 @@ struct SourceLanguagePicker: View {
                 .foregroundStyle(.secondary)
                 .help("为什么“自动检测”不可用")
                 .popover(isPresented: $isAutoExplanationPresented) {
-                    Text("macOS 系统自带识别引擎要求指定固定语种。如需自动识别混合语种，请在设置中切换为 R2T2 本地模型。")
+                    Text("macOS 系统语音识别引擎要求指定固定语种。如需自动识别混合语种，请在设置中切换为 R2T2 本地模型。")
                         .font(.callout)
                         .frame(width: 260)
                         .padding()
@@ -89,7 +89,7 @@ struct TargetLanguagePicker: View {
     /// only exists so a hypothetical future caller with nothing to gate by
     /// doesn't have to fabricate one.
     var translationEngineID: String?
-    /// Invoked when the user taps "一键将翻译引擎切换为「系统自带 (Translation)」"
+    /// Invoked when the user taps "一键将翻译引擎切换为「系统翻译」"
     /// in the warning card/popover below. Review Round 1 Must-Fix 1 — this
     /// closure ultimately sets `session.translationEngineID`, whose `didSet`
     /// unconditionally calls `discardLoadedModelsIfStale()`, tearing down
@@ -237,8 +237,8 @@ struct TargetLanguagePicker: View {
 
     private var switchButtonTitle: String {
         isSessionActive
-            ? "一键将翻译引擎切换为「系统自带 (Translation)」（录制结束后生效）"
-            : "一键将翻译引擎切换为「系统自带 (Translation)」"
+            ? "一键将翻译引擎切换为「系统翻译」（转录结束后生效）"
+            : "一键将翻译引擎切换为「系统翻译」"
     }
 
     private var targetDisplayName: String {
