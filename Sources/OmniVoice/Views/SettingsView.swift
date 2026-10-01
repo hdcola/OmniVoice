@@ -130,6 +130,40 @@ struct SettingsView: View {
             // No bouncing to a separate window: an undownloaded `.model`
             // engine's download button/progress renders right here.
             inlineDownloadSection(forEngineID: session.transcriptionEngineID)
+            // Only `.model` engines act on the pause boundary (system ASR
+            // produces its own), so the VAD tuning is hidden for them.
+            if session.transcriptionEngineKind == .model {
+                SettingsDivider()
+                SettingsRow(
+                    title: "断句停顿时长",
+                    subtitle: "说话后静音超过该时长就结束当前句；越长越不易被拆句，但出字更慢"
+                ) {
+                    HStack(spacing: 8) {
+                        Slider(value: $session.vadSilenceSeconds, in: 0.3...3.0, step: 0.1)
+                            .frame(width: 140)
+                            .accessibilityLabel("断句停顿时长")
+                        Text(String(format: "%.1f 秒", session.vadSilenceSeconds))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: 52, alignment: .trailing)
+                    }
+                }
+                SettingsDivider()
+                SettingsRow(
+                    title: "静音电平阈值",
+                    subtitle: "低于该音量视为静音；麦克风音量小、轻声说话时调低（更负）"
+                ) {
+                    HStack(spacing: 8) {
+                        Slider(value: $session.vadSilenceDBFS, in: -70...(-20), step: 1)
+                            .frame(width: 140)
+                            .accessibilityLabel("静音电平阈值")
+                        Text(String(format: "%.0f dB", session.vadSilenceDBFS))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: 52, alignment: .trailing)
+                    }
+                }
+            }
         }
     }
 
