@@ -41,6 +41,20 @@ struct SettingsCard<Content: View>: View {
     }
 }
 
+/// Large heading that groups several cards inside one tab.
+struct SettingsSectionHeader: View {
+    let title: String
+
+    init(_ title: String) { self.title = title }
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 17, weight: .bold))
+            .padding(.top, 8)
+            .padding(.horizontal, 4)
+    }
+}
+
 struct SettingsDivider: View {
     var body: some View {
         Divider()

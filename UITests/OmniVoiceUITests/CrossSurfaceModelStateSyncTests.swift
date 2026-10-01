@@ -38,12 +38,12 @@ final class CrossSurfaceModelStateSyncTests: XCTestCase {
 
     /// Selecting an on-device ASR engine (R2T2, undownloaded on a fresh
     /// install) must surface the preload affordance on BOTH surfaces at
-    /// once — Settings' "语音与引擎" memory console section and the floating
+    /// once — Settings' "通用" memory console section and the floating
     /// panel's status-bar control — never just one of them.
     func testSelectingAnOnDeviceEngineShowsThePreloadControlOnBothSurfaces() {
         openSettings()
 
-        let enginePicker = app.popUpButtons["引擎"].firstMatch
+        let enginePicker = app.popUpButtons["识别引擎"].firstMatch
         XCTAssertTrue(enginePicker.waitForExistence(timeout: 10))
         enginePicker.click()
         let r2t2MenuItem = app.menuItems["R2T2 离线大模型（未下载 · 点击配置）"]
@@ -69,7 +69,7 @@ final class CrossSurfaceModelStateSyncTests: XCTestCase {
     func testFallbackToSystemEngineHidesThePreloadControlOnBothSurfacesTogether() {
         openSettings()
 
-        let enginePicker = app.popUpButtons["引擎"].firstMatch
+        let enginePicker = app.popUpButtons["识别引擎"].firstMatch
         XCTAssertTrue(enginePicker.waitForExistence(timeout: 10))
         enginePicker.click()
         app.menuItems["R2T2 离线大模型（未下载 · 点击配置）"].click()

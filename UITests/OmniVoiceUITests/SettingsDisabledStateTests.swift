@@ -45,13 +45,13 @@ final class SettingsDisabledStateTests: XCTestCase {
     /// would permanently lock the user out of switching engines.
     func testEnginePickersAreEnabledWhenIdle() {
         // `matching(identifier:)` matches only `accessibilityIdentifier`,
-        // which these SwiftUI `Picker("引擎", ...)`s never set (only their
-        // label) — use a label predicate instead, the same way the
-        // single-element subscript `app.popUpButtons["引擎"]` below (and in
+        // which these SwiftUI `Picker`s never set (only their label) — use
+        // a label predicate instead, the same way the single-element
+        // subscript `app.popUpButtons["识别引擎"]` below (and in
         // `CrossSurfaceModelStateSyncTests`) already matches by label, just
-        // as a proper multi-element query since there are two of these
-        // (ASR + translation engine).
-        let enginePickers = app.popUpButtons.matching(NSPredicate(format: "label == %@", "引擎"))
+        // as a proper multi-element query since there are several of these
+        // (ASR, transcription translation and 快捷翻译 engine).
+        let enginePickers = app.popUpButtons.matching(NSPredicate(format: "label ENDSWITH %@", "引擎"))
         XCTAssertTrue(enginePickers.firstMatch.waitForExistence(timeout: 10))
         for index in 0..<enginePickers.count {
             XCTAssertTrue(enginePickers.element(boundBy: index).isEnabled, "engine picker \(index) should be enabled while idle")
@@ -63,7 +63,7 @@ final class SettingsDisabledStateTests: XCTestCase {
     /// be enabled (there's something to preload) and "🧹 释放内存占用" must be
     /// disabled (`!isModelLoaded` — nothing loaded yet to release).
     func testMemoryConsolePreloadEnabledReleaseDisabledWhenNothingIsLoaded() {
-        let enginePicker = app.popUpButtons["引擎"].firstMatch
+        let enginePicker = app.popUpButtons["识别引擎"].firstMatch
         XCTAssertTrue(enginePicker.waitForExistence(timeout: 10))
         enginePicker.click()
         app.menuItems["R2T2 离线大模型（未下载 · 点击配置）"].click()

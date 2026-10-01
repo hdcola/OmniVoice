@@ -2,9 +2,9 @@ import AppKit
 import OmniVoiceCore
 import SwiftUI
 
-/// Settings' "快捷翻译" tab — shortcuts, engine, the two-language direction
-/// rule (see `SelectionLanguageDirection`), and the two permissions the
-/// feature depends on.
+/// The "快捷翻译" cards of Settings' "通用" tab — shortcuts, the two-language
+/// direction rule (see `SelectionLanguageDirection`) and engine. Permissions
+/// live in `PermissionsSettingsCard`.
 struct SelectionTranslationSettingsView: View {
     @ObservedObject var controller: SelectionTranslationController
     @ObservedObject var translator: SelectionTranslator
@@ -13,49 +13,14 @@ struct SelectionTranslationSettingsView: View {
     @ObservedObject var downloadManager: ModelDownloadManager
     @EnvironmentObject private var navigation: SettingsNavigationState
     /// Observed so "跟随转录设置" re-resolves the moment the recording's
-    /// translation engine changes in the "语音与引擎" tab.
+    /// translation engine changes in the "通用" tab.
     @EnvironmentObject private var session: RecordingSession
-    @State private var isAccessibilityTrusted = SelectedTextReader.isAccessibilityTrusted
-    @State private var hasScreenRecordingPermission = ScreenFreezer.hasPermission
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                permissionsCard
-                shortcutsCard
-                languageCard
-                engineCard
-            }
-            .padding(20)
-        }
-        // Neither permission posts a notification this app can observe
-        // cheaply, and the user grants them in System Settings while this
-        // tab is open — polling once a second is what keeps the rows honest.
-        .task {
-            while !Task.isCancelled {
-                isAccessibilityTrusted = SelectedTextReader.isAccessibilityTrusted
-                hasScreenRecordingPermission = ScreenFreezer.hasPermission
-                try? await Task.sleep(for: .seconds(1))
-            }
-        }
-    }
-
-    private var permissionsCard: some View {
-        SettingsCard(title: "权限", icon: "lock.shield") {
-            PermissionRow(
-                icon: "figure.wave", title: "辅助功能", detail: "读取其他应用中选中的文字；未授权时可复制后在面板里粘贴",
-                isGranted: isAccessibilityTrusted,
-                open: controller.openAccessibilitySettings
-            )
-            SettingsDivider()
-            PermissionRow(
-                icon: "rectangle.dashed.badge.record", title: "屏幕录制", detail: "用于截图翻译；截图只在本机识别，不会上传",
-                isGranted: hasScreenRecordingPermission,
-                open: {
-                    ScreenFreezer.requestPermission()
-                    controller.openScreenRecordingSettings()
-                }
-            )
+        VStack(alignment: .leading, spacing: 18) {
+            shortcutsCard
+            languageCard
+            engineCard
         }
     }
 
@@ -91,8 +56,8 @@ struct SelectionTranslationSettingsView: View {
 
     private var engineCard: some View {
         SettingsCard(title: "翻译引擎", icon: "cpu") {
-            SettingsRow(title: "引擎", subtitle: "两种引擎都在本机运行；HY-MT1.5 闲置 5 分钟后自动释放内存") {
-                Picker("引擎", selection: $translator.engineID) {
+            SettingsRow(title: "快捷翻译引擎", subtitle: "两种引擎都在本机运行；HY-MT1.5 闲置 5 分钟后自动释放内存") {
+                Picker("快捷翻译引擎", selection: $translator.engineID) {
                     Text(followRecordingLabel).tag(SelectionTranslationEngine.followRecording)
                     ForEach(SelectionTranslationEngine.all) { engine in
                         Text(engineLabel(for: engine)).tag(engine.id)

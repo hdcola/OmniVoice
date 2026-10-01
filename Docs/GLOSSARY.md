@@ -21,7 +21,7 @@ intentionally unchanged (renaming them would break persisted settings).
 | Memory used by loaded models | 内存 | Memory | — |
 | Global key bindings | 快捷键 | Shortcuts | `GlobalShortcut` |
 | Status-bar icon + menu | 菜单栏 | Menu bar | `MenuBarExtra` |
-| Settings tabs | 语音与引擎 · 模型库 · 语言与字幕 · 快捷翻译 · 关于 | — | `SettingsTab` |
+| Settings tabs | 通用 · 模型库 · 关于 | — | `SettingsTab` |
 
 Rules: never say plain "floating panel" / "悬浮窗" / "面板" without the
 qualifier above; there is no "main window" (the app is menu-bar only);

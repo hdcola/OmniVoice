@@ -260,7 +260,7 @@ struct OnboardingView: View {
                 } catch {
                     // Best-effort background download — a failure here still
                     // leaves this variant's own inline retry card reachable
-                    // from "模型库"/"语音与引擎" (Task 4.3) once the user
+                    // from "模型库"/"通用" (Task 4.3) once the user
                     // opens Settings, so there's no separate error UI to
                     // surface from this already-dismissed onboarding window.
                 }

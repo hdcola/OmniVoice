@@ -2,12 +2,11 @@ import AppKit
 import OmniVoiceCore
 import SwiftUI
 
-/// Settings window — a `TabView` (Task 3.1) over four tabs: "语音与引擎"
-/// (engine choice, inline model download, the memory/preload console),
-/// "模型库" (the full model catalog — the same content that used to be
-/// the standalone "模型管理" window), "语言与字幕" (language pickers + panel
-/// opacity), and "关于". Data-driven from `ProviderCatalog` rather than one
-/// hand-written `case` per engine, so adding a new community model
+/// Settings window — a `TabView` over three tabs: "通用" (permissions, then
+/// 快捷翻译, 实时转录 and 字幕悬浮窗 as stacked card groups), "模型库" (the
+/// full model catalog — the same content that used to be the standalone
+/// "模型管理" window) and "关于". Data-driven from `ProviderCatalog` rather
+/// than one hand-written `case` per engine, so adding a new community model
 /// audio.cpp supports later is a catalog change, not a UI change.
 struct SettingsView: View {
     @EnvironmentObject private var session: RecordingSession
@@ -41,133 +40,136 @@ struct SettingsView: View {
 
     var body: some View {
         TabView(selection: $navigation.selectedTab) {
-            engineTab
-                .tabItem { Label(SettingsTab.engines.title, systemImage: SettingsTab.engines.systemImage) }
-                .tag(SettingsTab.engines)
+            generalTab
+                .tabItem { Label(SettingsTab.general.title, systemImage: SettingsTab.general.systemImage) }
+                .tag(SettingsTab.general)
             modelsTab
                 .tabItem { Label(SettingsTab.models.title, systemImage: SettingsTab.models.systemImage) }
                 .tag(SettingsTab.models)
-            languageTab
-                .tabItem { Label(SettingsTab.language.title, systemImage: SettingsTab.language.systemImage) }
-                .tag(SettingsTab.language)
-            SelectionTranslationSettingsView(
-                controller: selectionController,
-                translator: selectionController.translator,
-                downloadManager: downloadManager
-            )
-                .tabItem { Label(SettingsTab.selection.title, systemImage: SettingsTab.selection.systemImage) }
-                .tag(SettingsTab.selection)
             aboutTab
                 .tabItem { Label(SettingsTab.about.title, systemImage: SettingsTab.about.systemImage) }
                 .tag(SettingsTab.about)
         }
-        // Task 3.1 — fixed 560×480, big enough for the richer engine cards/
-        // memory console without the old 440pt-wide `Form` clipping them.
-        .frame(width: 560, height: 480)
+        .frame(width: 560, height: 580)
     }
 
-    // MARK: - Tab 1: 语音与引擎
+    // MARK: - Tab 1: 通用
 
-    private var engineTab: some View {
-        Form {
-            Section("识别引擎 (ASR)") {
-                Picker("引擎", selection: $session.transcriptionEngineID) {
-                    // Task 1.3 (引擎列表展示全部候选) — every catalog engine
-                    // is always listed, downloaded or not; an undownloaded
-                    // `.model` engine is labeled rather than filtered out
-                    // entirely (see `engineLabel(for:)`), so it stays
-                    // discoverable instead of silently "vanishing" until
-                    // something's downloaded for it.
+    private var generalTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                PermissionsSettingsCard(controller: selectionController)
+
+                SettingsSectionHeader("快捷翻译")
+                SelectionTranslationSettingsView(
+                    controller: selectionController,
+                    translator: selectionController.translator,
+                    downloadManager: downloadManager
+                )
+
+                SettingsSectionHeader("实时转录")
+                transcriptionEngineCard
+                translationEngineCard
+                transcriptionLanguageCard
+                memoryConsole
+
+                SettingsSectionHeader("字幕悬浮窗")
+                panelCard
+            }
+            .padding(20)
+            // `modelVariantPicker`/`inlineDownloadSection`/the "翻译提交策略"
+            // row each insert or remove a row depending on the selected
+            // engine; without this the card simply snaps to its new height
+            // the instant either `Picker`'s selection changes. Keyed on the
+            // two engine IDs (not every field in `session`) so unrelated
+            // changes elsewhere — the memory status pill, say — don't also
+            // animate.
+            .animation(.easeInOut(duration: 0.2), value: session.transcriptionEngineID)
+            .animation(.easeInOut(duration: 0.2), value: session.translationEngineID)
+        }
+    }
+
+    private var transcriptionEngineCard: some View {
+        SettingsCard(title: "识别引擎 (ASR)", icon: "waveform") {
+            SettingsRow(title: "识别引擎") {
+                Picker("识别引擎", selection: $session.transcriptionEngineID) {
+                    // Every catalog engine is always listed, downloaded or
+                    // not; an undownloaded `.model` engine is labeled rather
+                    // than filtered out (see `engineLabel(for:)`), so it
+                    // stays discoverable.
                     ForEach(ProviderCatalog.transcriptionEngines) { engine in
                         Text(engineLabel(for: engine)).tag(engine.id)
                     }
                 }
+                .labelsHidden()
+                .fixedSize()
                 .disabled(isBusy)
-                modelVariantPicker(
-                    for: session.transcriptionEngineID,
-                    selection: Binding(
-                        get: { session.currentTranscriptionModelVariant?.id },
-                        set: { session.transcriptionModelVariantID = $0 }
-                    )
-                )
-                .disabled(isBusy)
-                // Task 3.2 (内联模型下载与状态卡片) — no more bouncing to a
-                // separate window: an undownloaded `.model` engine's
-                // download button/progress renders right here.
-                inlineDownloadSection(forEngineID: session.transcriptionEngineID)
             }
+            modelVariantPicker(
+                for: session.transcriptionEngineID,
+                selection: Binding(
+                    get: { session.currentTranscriptionModelVariant?.id },
+                    set: { session.transcriptionModelVariantID = $0 }
+                )
+            )
+            .disabled(isBusy)
+            // No bouncing to a separate window: an undownloaded `.model`
+            // engine's download button/progress renders right here.
+            inlineDownloadSection(forEngineID: session.transcriptionEngineID)
+        }
+    }
 
-            Section("转录翻译引擎") {
-                Picker("引擎", selection: $session.translationEngineID) {
-                    // Same reasoning as the ASR engine `Picker` above.
+    private var translationEngineCard: some View {
+        SettingsCard(title: "转录翻译引擎", icon: "character.bubble") {
+            SettingsRow(title: "转录翻译引擎") {
+                Picker("转录翻译引擎", selection: $session.translationEngineID) {
                     ForEach(ProviderCatalog.translationEngines) { engine in
                         Text(engineLabel(for: engine)).tag(engine.id)
                     }
                 }
+                .labelsHidden()
+                .fixedSize()
                 .disabled(isBusy)
-                modelVariantPicker(
-                    for: session.translationEngineID,
-                    selection: Binding(
-                        get: { session.currentTranslationModelVariant?.id },
-                        set: { session.translationModelVariantID = $0 }
-                    )
+            }
+            modelVariantPicker(
+                for: session.translationEngineID,
+                selection: Binding(
+                    get: { session.currentTranslationModelVariant?.id },
+                    set: { session.translationModelVariantID = $0 }
                 )
-                .disabled(isBusy)
-                inlineDownloadSection(forEngineID: session.translationEngineID)
-                // T3PO is the only engine with a WAIT/TRANS decision to bias
-                // (see `TranslationCommitEagerness`'s doc), so its picker
-                // stays right here next to the engine choice it biases.
-                // Deliberately *not* `.disabled(isBusy)` — safe to change
-                // mid-recording, same as `targetLanguageCode`'s picker.
-                if session.translationEngineID == "model.t3po" {
+            )
+            .disabled(isBusy)
+            inlineDownloadSection(forEngineID: session.translationEngineID)
+            // T3PO is the only engine with a WAIT/TRANS decision to bias
+            // (see `TranslationCommitEagerness`'s doc), so its picker stays
+            // right here next to the engine choice it biases. Deliberately
+            // *not* `.disabled(isBusy)` — safe to change mid-recording, same
+            // as `targetLanguageCode`'s picker.
+            if session.translationEngineID == "model.t3po" {
+                SettingsDivider()
+                SettingsRow(title: "翻译提交策略") {
                     Picker("翻译提交策略", selection: $session.translationCommitEagerness) {
                         ForEach(TranslationCommitEagerness.allCases, id: \.self) { eagerness in
                             Text(eagerness.displayName).tag(eagerness)
                         }
                     }
+                    .labelsHidden()
+                    .fixedSize()
                 }
             }
-
-            // Round-5 user report — the old bare `Stepper` plus a
-            // three-line explanatory paragraph made this the visually
-            // heaviest control on the tab for what's just one number.
-            // Replaced with a single row (label + numeric `TextField` + "字"
-            // + a "?" that carries the full explanation as a tooltip) so
-            // the row's height no longer depends on how long the
-            // explanation is. The section itself stays present (rather than
-            // appearing/disappearing) so switching engines doesn't also
-            // toggle this whole section in and out — see
-            // `translationOutputContent` for the per-engine applicability
-            // rule that used to gate the section's visibility.
-            Section("翻译输出") {
-                translationOutputContent
-            }
-
-            memoryConsole
+            SettingsDivider()
+            translationOutputContent
         }
-        .padding(20)
-        // Round-5 user report ("切换引擎后界面跳动") — `modelVariantPicker`/
-        // `inlineDownloadSection`/the "翻译提交策略" picker above each
-        // insert or remove a row depending on the selected engine; without
-        // this the `Form` simply snaps to its new height the instant either
-        // `Picker`'s selection changes. Keyed on the two engine IDs (not
-        // every field in `session`) so unrelated changes elsewhere — the
-        // memory console's status dot, say — don't also animate.
-        .animation(.easeInOut(duration: 0.2), value: session.transcriptionEngineID)
-        .animation(.easeInOut(duration: 0.2), value: session.translationEngineID)
     }
 
-    /// Row shown inside "翻译输出" — the `TextField` when
-    /// `translationEarlyTranslateThreshold` actually does something for the
-    /// current engine pairing, otherwise a short explanation of why not.
-    /// Keeping the section always present but swapping only this row's
-    /// content (rather than the section itself) trims how much of the
-    /// engine-switch layout jump this section contributes — see the
-    /// `.animation` on `engineTab` for the rest.
+    /// Row shown at the bottom of the translation card — the `TextField`
+    /// when `translationEarlyTranslateThreshold` actually does something for
+    /// the current engine pairing, otherwise a short explanation of why not.
+    /// The card stays present (only this row's content swaps) so switching
+    /// engines doesn't toggle a whole group in and out.
     @ViewBuilder
     private var translationOutputContent: some View {
-        // Same rule as before this was inlined here: hidden outright (not
-        // just disabled) under T3PO (has its own "翻译提交策略" picker
+        // Hidden outright under T3PO (has its own "翻译提交策略" picker
         // above) or the system ASR engine (a genuine no-op there — see
         // `TranslationConfig.earlyTranslateThreshold`'s doc:
         // `SystemTranscriptionProvider` never reports committed text via
@@ -175,41 +177,61 @@ struct SettingsView: View {
         // ever runs once per segment, immediately followed by `flush()` —
         // there's nothing "early" left to translate by then).
         if session.translationEngineID != "model.t3po", session.transcriptionEngineKind != .system {
-            HStack {
-                Text("长句提前翻译阈值")
-                Spacer()
-                TextField(
-                    "长句提前翻译阈值",
-                    value: $session.translationEarlyTranslateThreshold,
-                    format: .number
-                )
-                .labelsHidden()
-                .textFieldStyle(.roundedBorder)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 64)
-                // No range clamp here — `RecordingSession
-                // .translationEarlyTranslateThreshold`'s own `didSet`
-                // already clamps to 20...1000 and persists it on every
-                // change, including ones from this field.
-                Text("字")
-                    .foregroundStyle(.secondary)
-                Button {
-                } label: {
+            SettingsRow(
+                title: "长句提前翻译阈值",
+                subtitle: "数值越低出字越快，但长句更容易被拆成多段"
+            ) {
+                HStack(spacing: 6) {
+                    // No range clamp here — `RecordingSession
+                    // .translationEarlyTranslateThreshold`'s own `didSet`
+                    // already clamps to 20...1000 and persists it.
+                    TextField(
+                        "长句提前翻译阈值",
+                        value: $session.translationEarlyTranslateThreshold,
+                        format: .number
+                    )
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 64)
+                    Text("字").foregroundStyle(.secondary)
                     Image(systemName: "questionmark.circle")
+                        .foregroundStyle(.secondary)
+                        .help(
+                            "缓存的原文达到该字数的一半、且遇到句号/问号/换行等断句点时，会提前把已缓存内容翻译一次；"
+                                + "达到完整阈值后，即使还没遇到断句点也会强制翻译，避免长句迟迟不出字。"
+                                + "数值越低出字越快，但长句越容易被拆成更多段；数值越高单段更完整，但可能等得更久。"
+                        )
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help(
-                    "缓存的原文达到该字数的一半、且遇到句号/问号/换行等断句点时，会提前把已缓存内容翻译一次；"
-                        + "达到完整阈值后，即使还没遇到断句点也会强制翻译，避免长句迟迟不出字。"
-                        + "数值越低出字越快，但长句越容易被拆成更多段；数值越高单段更完整，但可能等得更久。"
-                )
             }
         } else {
-            Text("当前引擎无需设置此项（仅对分段实时输出的翻译引擎有效）。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            SettingsNote(text: "当前引擎无需设置长句提前翻译阈值（仅对分段实时输出的翻译引擎有效）。")
         }
+    }
+
+    private var transcriptionLanguageCard: some View {
+        SettingsCard(title: "转录语言", icon: "globe") {
+            SourceLanguagePicker(
+                sourceLanguageCode: $session.sourceLanguageCode,
+                transcriptionEngineKind: session.transcriptionEngineKind
+            )
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            SettingsDivider()
+            TargetLanguagePicker(
+                targetLanguageCode: $session.targetLanguageCode,
+                translationEngineID: session.translationEngineID,
+                onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
+                // Belt-and-suspenders alongside this card's own
+                // `.disabled(isBusy)` (Review Round 1 Must-Fix 1) — keeps
+                // the button's own guard/caption correct even if this
+                // picker is ever reused outside a `.disabled` ancestor.
+                isSessionActive: session.isSessionActive
+            )
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+        }
+        .disabled(isBusy)
     }
 
     /// `isPreloadingModel` alongside `isSessionActive`: switching engines
@@ -245,10 +267,15 @@ struct SettingsView: View {
         let selectedID = selection.wrappedValue
         let shown = variants.filter { downloadManager.isDownloaded($0) || $0.id == selectedID }
         if !shown.isEmpty {
-            Picker("模型", selection: selection) {
-                ForEach(shown) { variant in
-                    Text(variantLabel(for: variant)).tag(Optional(variant.id))
+            SettingsDivider()
+            SettingsRow(title: "模型") {
+                Picker("模型", selection: selection) {
+                    ForEach(shown) { variant in
+                        Text(variantLabel(for: variant)).tag(Optional(variant.id))
+                    }
                 }
+                .labelsHidden()
+                .fixedSize()
             }
         }
     }
@@ -268,12 +295,14 @@ struct SettingsView: View {
     private func inlineDownloadSection(forEngineID engineID: String) -> some View {
         if let engine = (ProviderCatalog.transcriptionEngines + ProviderCatalog.translationEngines)
             .first(where: { $0.id == engineID }), engine.kind == .model, !hasDownloadedVariant(engine) {
-            VStack(alignment: .leading, spacing: 6) {
+            SettingsDivider()
+            VStack(alignment: .leading, spacing: 10) {
                 ForEach(ProviderCatalog.modelVariants(forEngineID: engineID)) { variant in
                     inlineDownloadRow(for: variant)
                 }
             }
-            .padding(.top, 2)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
         }
     }
 
@@ -300,7 +329,7 @@ struct SettingsView: View {
                         ProgressView().progressViewStyle(.linear)
                     }
                 } else if let message = inlineDownloadFailures[variant.id] {
-                    Text("⚠️ 下载中断：\(message)")
+                    Text("下载中断：\(message)")
                         .font(.caption)
                         .foregroundStyle(.red)
                     HStack {
@@ -319,7 +348,7 @@ struct SettingsView: View {
             if downloadManager.isDownloading(variant) {
                 Button("取消") { downloadManager.cancelDownload(for: variant) }
             } else {
-                Button("⬇️ 一键下载并启用") { downloadInline(variant) }
+                Button("下载并启用") { downloadInline(variant) }
             }
         }
         // Task 4.2 — same copy as `ModelManagementView`'s own disk-space
@@ -397,17 +426,14 @@ struct SettingsView: View {
     /// above) keeps the jump to the size of the content difference instead
     /// of a full section.
     private var memoryConsole: some View {
-        Section("引擎运行与内存状态") {
+        SettingsCard(title: "引擎运行与内存状态", icon: "memorychip") {
             if session.usesOnDeviceModelEngine {
-                HStack(spacing: 6) {
-                    statusIndicatorDot
-                    Text(memoryStatusText)
-                        .font(.callout)
+                SettingsRow(title: "模型状态", subtitle: "预计占用内存：约 \(estimatedMemoryGB) GB") {
+                    StatusPill(text: memoryStatusText, tone: memoryStatusTone)
                 }
-                Text("预计占用内存：约 \(estimatedMemoryGB) GB")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                SettingsDivider()
                 HStack {
+                    Spacer()
                     Button {
                         Task { await session.preloadModel() }
                     } label: {
@@ -425,28 +451,22 @@ struct SettingsView: View {
                     }
                     .disabled(!session.isModelLoaded || session.isSessionActive || session.isPreloadingModel)
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
             } else {
-                Text("当前引擎均为系统内置，无需预加载或释放内存。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                SettingsNote(text: "当前引擎均为系统内置，无需预加载或释放内存。")
             }
         }
     }
 
-    private var statusIndicatorDot: some View {
-        Circle()
-            .fill(statusIndicatorColor)
-            .frame(width: 10, height: 10)
-    }
-
-    private var statusIndicatorColor: Color {
-        if session.isPreloadingModel { return .yellow }
-        return session.isModelLoaded ? .green : .gray
+    private var memoryStatusTone: StatusPill.Tone {
+        if session.isPreloadingModel { return .warning }
+        return session.isModelLoaded ? .good : .neutral
     }
 
     private var memoryStatusText: String {
-        if session.isPreloadingModel { return "🟡 正在加载中…" }
-        return session.isModelLoaded ? "🟢 当前模型已加载至内存 (就绪)" : "⚪ 空闲 (未载入内存)"
+        if session.isPreloadingModel { return "正在加载中…" }
+        return session.isModelLoaded ? "已载入内存（就绪）" : "空闲（未载入内存）"
     }
 
     /// Sum of `recommendedMemoryGB` for every currently-selected `.model`
@@ -470,97 +490,83 @@ struct SettingsView: View {
         ModelManagementView(modelDownloadManager: downloadManager)
     }
 
-    // MARK: - Tab 3: 语言与字幕
+    // MARK: - 字幕悬浮窗
 
-    private var languageTab: some View {
-        Form {
-            Section("语言") {
-                SourceLanguagePicker(
-                    sourceLanguageCode: $session.sourceLanguageCode,
-                    transcriptionEngineKind: session.transcriptionEngineKind
-                )
-                TargetLanguagePicker(
-                    targetLanguageCode: $session.targetLanguageCode,
-                    translationEngineID: session.translationEngineID,
-                    onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
-                    // Belt-and-suspenders alongside this whole `Section`'s
-                    // own `.disabled(isBusy)` below (Review Round 1
-                    // Must-Fix 1) — keeps the button's own guard/caption
-                    // correct even if this picker is ever reused outside
-                    // a `.disabled` ancestor.
-                    isSessionActive: session.isSessionActive
-                )
-            }
-            .disabled(isBusy)
-
-            // Deliberately outside the `.disabled(isBusy)` section above —
-            // these only ever touch `FloatingTranscriptView`'s own SwiftUI
-            // opacity (see `panelBackgroundOpacity`/`panelContentOpacity`'s
-            // docs), never anything `start()` reads once at setup time, so
-            // there's no race to guard against; adjusting either while
-            // recording (to see through the panel at whatever's behind it,
-            // without losing legibility) is exactly when they're most
-            // useful. Two separate sliders, not one — a single shared value
-            // (an earlier version of this had exactly that, driving
-            // `NSWindow.alphaValue`) faded the transcript text right along
-            // with the background, so a panel transparent enough to not
-            // block the view behind it also made the text hard to read.
-            Section("字幕悬浮窗") {
+    /// Deliberately outside any `.disabled(isBusy)` — these only ever touch
+    /// `FloatingTranscriptView`'s own SwiftUI opacity (see
+    /// `panelBackgroundOpacity`/`panelContentOpacity`'s docs), never
+    /// anything `start()` reads once at setup time, so there's no race to
+    /// guard against; adjusting either while recording (to see through the
+    /// panel at whatever's behind it, without losing legibility) is exactly
+    /// when they're most useful. Two separate sliders, not one — a single
+    /// shared value (an earlier version of this had exactly that, driving
+    /// `NSWindow.alphaValue`) faded the transcript text right along with the
+    /// background, so a panel transparent enough to not block the view
+    /// behind it also made the text hard to read.
+    private var panelCard: some View {
+        SettingsCard {
+            SettingsRow(
+                title: "启动时显示字幕悬浮窗",
+                subtitle: "关闭后启动时不再自动弹出；开始转录时仍会显示，也可从菜单栏打开"
+            ) {
                 Toggle("启动时显示字幕悬浮窗", isOn: $showFloatingPanelOnLaunch)
-                    .help("关闭后，启动 OmniVoice 时不再自动弹出字幕悬浮窗；开始转录时仍会自动显示，也可从菜单栏手动打开。")
-                opacitySlider(
-                    "背景透明度", value: $session.panelBackgroundOpacity, range: 0.1...1.0
-                )
-                // "内容透明度", not "文字透明度" — `panelContentOpacity`
-                // fades the whole panel content stack (buttons/pickers/
-                // dividers/status bar too), not just the transcript text.
-                opacitySlider(
-                    "内容透明度", value: $session.panelContentOpacity, range: 0.4...1.0
-                )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
             }
+            SettingsDivider()
+            opacitySlider("背景透明度", value: $session.panelBackgroundOpacity, range: 0.1...1.0)
+            SettingsDivider()
+            // "内容透明度", not "文字透明度" — `panelContentOpacity` fades the
+            // whole panel content stack (buttons/pickers/dividers/status bar
+            // too), not just the transcript text.
+            opacitySlider("内容透明度", value: $session.panelContentOpacity, range: 0.4...1.0)
         }
-        .padding(20)
     }
 
     private func opacitySlider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
-        HStack {
-            Text(label)
-            Slider(value: value, in: range)
-            // `.rounded()`, not a bare `Int(...)` truncation — a `Slider`'s
-            // underlying `Double` can land a hair under a "clean" percentage
-            // from binary floating-point rounding (e.g. 0.29999999999999994
-            // for what's visually 0.3), which truncation reads as 29% —
-            // jittery/off-by-one against where the thumb actually looks.
-            Text("\(Int((value.wrappedValue * 100).rounded()))%")
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-                .frame(width: 40, alignment: .trailing)
+        SettingsRow(title: label) {
+            HStack(spacing: 8) {
+                Slider(value: value, in: range)
+                    .frame(width: 180)
+                // `.rounded()`, not a bare `Int(...)` truncation — a
+                // `Slider`'s underlying `Double` can land a hair under a
+                // "clean" percentage from binary floating-point rounding
+                // (e.g. 0.29999999999999994 for what's visually 0.3), which
+                // truncation reads as 29% — jittery/off-by-one against where
+                // the thumb actually looks.
+                Text("\(Int((value.wrappedValue * 100).rounded()))%")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .frame(width: 40, alignment: .trailing)
+            }
         }
     }
 
-    // MARK: - Tab 4: 关于
+    // MARK: - Tab 3: 关于
 
     private var aboutTab: some View {
-        Form {
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("OmniVoice").font(.title2.bold())
-                    Text("macOS 离线实时双语字幕与转录工具")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                    Text("版本 \(appVersionString)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(spacing: 18) {
+                SettingsCard {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("OmniVoice").font(.title2.bold())
+                        Text("macOS 离线实时双语字幕与转录工具")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Text("版本 \(appVersionString)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
                 }
-                .padding(.vertical, 4)
+                SettingsCard(title: "引擎", icon: "cpu") {
+                    SettingsNote(text: "系统引擎基于 macOS Speech / Translation 框架；本地引擎基于 audio.cpp（R2T2）与 llama.cpp（T3PO / HY-MT1.5），完全离线运行。")
+                }
             }
-            Section("引擎") {
-                Text("系统引擎基于 macOS Speech / Translation 框架；本地引擎基于 audio.cpp（R2T2）与 llama.cpp（T3PO / HY-MT1.5），完全离线运行。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            .padding(20)
         }
-        .padding(20)
     }
 
     private var appVersionString: String {
