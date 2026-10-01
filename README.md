@@ -2,7 +2,10 @@
 
 All-in-one real-time speech transcription &amp; translation assistant for
 lectures, meetings, and multilingual conversations — a macOS menu-bar app
-with a floating caption panel (字幕悬浮窗).
+with a floating caption panel (字幕悬浮窗) for live transcripts, and on-
+device quick translate (快捷翻译): select text in any app (划词翻译, ⌥A) or
+frame part of the screen (截图翻译, ⌥S) and translate it in a translation
+panel (翻译面板).
 
 **Current version: 0.5.0 — internal test build.**
 

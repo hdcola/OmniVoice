@@ -12,7 +12,11 @@ multilingual meetings and lectures — pick a transcription/translation
 "provider" (a system framework or an in-process model), record, and browse/
 search/export past sessions afterward. A floating semi-transparent panel
 shows the live transcript while the user is doing something else (in a
-meeting, on a call).
+meeting, on a call). Quick translate (快捷翻译) covers the text side: select
+anything in any app (划词翻译, ⌥A) or frame part of the screen (截图翻译,
+⌥S) and a second panel (翻译面板) translates it fully on-device — the
+system Translation framework or HY-MT1.5, independent of the recording
+pipeline (PR #40).
 
 Reference implementation for the engine plumbing: `../mac-poc-hybrid` (a
 sibling POC repo, not part of this repo) — see its README for the four
