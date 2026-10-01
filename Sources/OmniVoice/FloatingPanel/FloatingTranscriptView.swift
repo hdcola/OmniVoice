@@ -402,11 +402,13 @@ struct FloatingTranscriptView: View {
     @ViewBuilder
     private var modelStatusControl: some View {
         if session.usesOnDeviceModelEngine {
-            if session.isModelLoaded {
+            if session.hasLoadedModels {
                 HStack(spacing: 4) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text("模型已就绪")
+                    // A translation-only launch preload leaves the recognizer
+                    // unloaded (`start()` loads it); still releasable here.
+                    Text(session.isModelLoaded ? "模型已就绪" : "翻译模型已就绪")
                     // A `.model`-kind engine otherwise only ever unloads on
                     // an engine switch or app quit (see `isModelLoaded`'s
                     // doc) — this is the escape hatch for reclaiming that
