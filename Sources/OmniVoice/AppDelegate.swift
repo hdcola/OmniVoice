@@ -60,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         session.refreshDevices()
+        SystemNotifier.installClickHandler()
 
         let panel = FloatingTranscriptPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 280))
         panel.contentView = DraggableHostingView(

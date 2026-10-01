@@ -18,6 +18,17 @@ enum SystemNotifier {
         set { UserDefaults.standard.set(newValue, forKey: enabledKey) }
     }
 
+    /// Retained here because `UNUserNotificationCenter.delegate` is weak.
+    private static let clickHandler = NotificationClickHandler()
+
+    /// Routes a click on a download notification to Settings → 模型库. Call
+    /// once at launch; the app is an `LSUIElement`, so without this a click
+    /// would activate the process but show nothing.
+    static func installClickHandler() {
+        guard isAvailable else { return }
+        UNUserNotificationCenter.current().delegate = clickHandler
+    }
+
     private static var isAvailable: Bool { Bundle.main.bundleIdentifier != nil && Bundle.main.bundleURL.pathExtension == "app" }
 
     /// Asks for permission the first time (no-op afterwards). Call when the
@@ -38,5 +49,22 @@ enum SystemNotifier {
         content.sound = .default
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { _ in }
+    }
+}
+
+private final class NotificationClickHandler: NSObject, UNUserNotificationCenterDelegate {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        Task { @MainActor in
+            NSApp.activate(ignoringOtherApps: true)
+            SettingsNavigationState.shared.openModelLibrary()
+            // `openSettings` is a SwiftUI environment action, unreachable
+            // from here; this is the responder-chain action it wraps.
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            completionHandler()
+        }
     }
 }

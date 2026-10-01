@@ -10,7 +10,7 @@ struct OmniVoiceApp: App {
     /// `Settings { ... }` only constructs its content on first open) and
     /// `SettingsView` itself (whose `TabView` binds directly to
     /// `selectedTab`). See `SettingsNavigationState`'s own doc.
-    @StateObject private var settingsNavigation = SettingsNavigationState()
+    private let settingsNavigation = SettingsNavigationState.shared
 
     var body: some Scene {
         MenuBarExtra {
