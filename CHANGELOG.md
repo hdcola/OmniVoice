@@ -7,6 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(build): `Scripts/build_app.sh` honors `SIGN_IDENTITY` to sign with a fixed code-signing certificate (default stays ad-hoc), so macOS keeps mic/speech/screen-recording permissions across updates
 
 ### Changed
 
@@ -15,6 +16,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(repo): add `Docs/SIGNING.md` explaining why permissions reset after upgrades and how to create and back up a stable signing certificate
 
 ### Tests
 
