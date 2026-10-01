@@ -8,6 +8,38 @@ import SwiftUI
 /// "模型管理" window) and "关于". Data-driven from `ProviderCatalog` rather
 /// than one hand-written `case` per engine, so adding a new community model
 /// audio.cpp supports later is a catalog change, not a UI change.
+/// Fixed width, per-tab height: the long "通用" and "模型库" scroll inside
+/// a tall window (capped to the screen), while "关于" fits its content.
+enum SettingsWindowLayout {
+    static let width: CGFloat = 520
+
+    static func height(for tab: SettingsTab) -> CGFloat {
+        switch tab {
+        case .general, .models:
+            let screen = NSScreen.main?.visibleFrame.height ?? 800
+            return min(620, screen - 120)
+        case .about:
+            return 500
+        }
+    }
+}
+
+/// Hands the hosting `NSWindow` back to SwiftUI so tab switches can animate
+/// its frame.
+private struct SettingsWindowAccessor: NSViewRepresentable {
+    @Binding var window: NSWindow?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { window = view.window }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { window = nsView.window }
+    }
+}
+
 struct SettingsView: View {
     @EnvironmentObject private var session: RecordingSession
     @EnvironmentObject private var navigation: SettingsNavigationState
@@ -32,6 +64,7 @@ struct SettingsView: View {
     /// than a modal `.alert`.
     @State private var inlineDownloadFailures: [String: String] = [:]
     /// Task 4.2 (下载前磁盘空间可视化预检) for the inline row.
+    @State private var window: NSWindow?
     @State private var inlineDiskSpaceWarning: (variant: ModelVariant, error: ModelDownloadError)?
 
     init(modelDownloadManager: ModelDownloadManager) {
@@ -49,7 +82,30 @@ struct SettingsView: View {
             case .about: aboutTab
             }
         }
-        .frame(width: 520, height: 620)
+        .frame(width: SettingsWindowLayout.width, height: SettingsWindowLayout.height(for: navigation.selectedTab))
+        .background(SettingsWindowAccessor(window: $window))
+        .onChange(of: navigation.selectedTab) { _, tab in
+            resizeWindow(for: tab)
+        }
+    }
+
+    /// Animates the window to the new tab's height, keeping its top edge
+    /// where it is (the content's own `.frame` above already holds the new
+    /// size, so the window only ever catches up to it).
+    private func resizeWindow(for tab: SettingsTab) {
+        guard let window else { return }
+        let content = NSRect(
+            x: 0, y: 0,
+            width: SettingsWindowLayout.width, height: SettingsWindowLayout.height(for: tab)
+        )
+        var target = window.frameRect(forContentRect: content)
+        target.origin.x = window.frame.minX
+        target.origin.y = window.frame.maxY - target.height
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.24
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            window.animator().setFrame(target, display: true)
+        }
     }
 
     // MARK: - Tab 1: 通用
