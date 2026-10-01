@@ -33,8 +33,8 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 /// `OmniVoiceApp`) so a click on the menu bar's "模型库…" — which fires
 /// *before* `SettingsView` even exists, since `Settings { ... }` only
 /// constructs its content on first open — can still steer which tab that
-/// view lands on (Task 3.4). `SettingsView` itself binds its `TabView`'s
-/// `selection` straight to `selectedTab`, rather than keeping its own
+/// view lands on (Task 3.4). `SettingsView`'s `SettingsTabBar` binds
+/// straight to `selectedTab`, rather than keeping its own
 /// duplicate `@State`, so both this external trigger and the user's own tab
 /// clicks go through the one source of truth.
 @MainActor

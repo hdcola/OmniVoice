@@ -25,7 +25,7 @@ struct ShortcutRecorderRow: View {
                 } label: {
                     Group {
                         if !isRecording, let shortcut = controller.shortcuts[action] {
-                            KeycapRow(text: shortcut.displayText)
+                            KeycapRow(keys: shortcut.displayTokens)
                         } else {
                             Text(chipText)
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))

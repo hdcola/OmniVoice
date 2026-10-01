@@ -72,9 +72,14 @@ struct GlobalShortcut: Equatable, Hashable, Codable {
         self.init(keyCode: keyCode, modifiers: modifiers)
     }
 
-    /// Modifier symbols, then the key, e.g. "⌥ A".
+    /// Modifier symbols, then the key, one entry each — e.g. ["⌥", "A"].
+    var displayTokens: [String] {
+        modifiers.symbols + [keyDisplayName]
+    }
+
+    /// `displayTokens` joined by spaces, e.g. "⌥ A".
     var displayText: String {
-        (modifiers.symbols + [keyDisplayName]).joined(separator: " ")
+        displayTokens.joined(separator: " ")
     }
 
     var keyDisplayName: String {

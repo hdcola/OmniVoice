@@ -75,14 +75,10 @@ struct SettingsTabBar: View {
     }
 }
 
-/// A shortcut drawn as one keycap per space-separated key ("⌥ A" → "⌥" "A";
-/// "⌥ Space" keeps "Space" on one keycap).
+/// A shortcut drawn as one keycap per token (["⌥", "A"]; "Space" or
+/// "Key 42" stay on a single keycap).
 struct KeycapRow: View {
-    let text: String
-
-    private var keys: [String] {
-        text.split(separator: " ").map(String.init)
-    }
+    let keys: [String]
 
     var body: some View {
         HStack(spacing: 4) {

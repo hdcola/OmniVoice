@@ -56,7 +56,7 @@ struct SelectionTranslationSettingsView: View {
 
     private var engineCard: some View {
         SettingsCard(title: "快捷翻译引擎", icon: "cpu") {
-            SettingsRow(title: "快捷翻译引擎", subtitle: "两种引擎都在本机运行；HY-MT1.5 闲置 5 分钟后自动释放内存") {
+            SettingsRow(title: "引擎", subtitle: "两种引擎都在本机运行；HY-MT1.5 闲置 5 分钟后自动释放内存") {
                 Picker("快捷翻译引擎", selection: $translator.engineID) {
                     Text(followRecordingLabel).tag(SelectionTranslationEngine.followRecording)
                     ForEach(SelectionTranslationEngine.all) { engine in
@@ -75,7 +75,7 @@ struct SelectionTranslationSettingsView: View {
             if translator.effectiveEngineID == SelectionTranslationEngine.hymt15, !translator.isModelEngineAvailable {
                 SettingsDivider()
                 SettingsRow(title: "HY-MT1.5 模型尚未下载") {
-                    Button("前往模型库") { navigation.openModelLibrary() }
+                    PillButton(title: "前往模型库") { navigation.openModelLibrary() }
                 }
             }
         }
