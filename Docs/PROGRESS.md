@@ -341,6 +341,16 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       weights, and one-shot `HYMT15Translator.translateText` — plus floating
       panel toolbar/resize-cursor fixes (PR #41), the 启动时显示悬浮窗 toggle
       (PR #42), and the terminology unification pass (PR #43).
+- [x] **0.5.1 release cut** (2026-09-30, `chore/release-0.5.1`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.5.1,
+      `CFBundleVersion` 9), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.5.1]` section, `README.md`'s version/download-link references
+      bumped to match. Bundles the settings/onboarding UI redesign (PR
+      #47): card-style Settings with a pill tab bar, the three engine/
+      language/quick-translate tabs merged into one "通用" tab (3 tabs now),
+      all permissions (麦克风 / 屏幕录制 / 辅助功能) together at the top, a
+      restyled "模型库" and "关于", and a restyled first-launch window that
+      now also asks for Accessibility.
 
 ### Code review findings (fixed)
 
