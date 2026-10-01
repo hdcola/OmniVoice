@@ -760,4 +760,15 @@ struct RecordingSessionSettingsTests {
         #expect(!session.isTranslationModelLoaded)
         #expect(session.loadedTranslationOnlyIDs == nil)
     }
+
+    /// Switching the translation engine after a translation-only load must
+    /// drop that load instead of leaving the old translator resident.
+    @Test func switchingTranslationEngineDiscardsTranslationOnlyLoad() async {
+        let session = RecordingSession()
+        await session.preloadModel(scope: .translationOnly)
+        #expect(session.loadedTranslationOnlyIDs != nil)
+        session.translationEngineID = "model.hymt15"
+        #expect(session.loadedTranslationOnlyIDs == nil)
+        #expect(!session.isTranslationModelLoaded)
+    }
 }

@@ -304,14 +304,18 @@ struct OnboardingView: View {
         if startDownload {
             guard startBundleDownload() else { return }
         }
-        // The lightweight mode has nothing to load, whatever the picker said.
+        persistLaunchOptions()
+        if launchAtLogin { loginItem.setEnabled(true) }
+        UserDefaults.standard.set(true, forKey: PersistedOnboardingKey.hasCompletedOnboarding)
+        onFinished()
+    }
+
+    /// The lightweight mode has nothing to load, whatever the picker said.
+    private func persistLaunchOptions() {
         UserDefaults.standard.set(
             (selectedMode == .lightweight ? LaunchPreloadMode.off : preloadMode).rawValue,
             forKey: PersistedLaunchKey.preloadMode
         )
-        if launchAtLogin { loginItem.setEnabled(true) }
-        UserDefaults.standard.set(true, forKey: PersistedOnboardingKey.hasCompletedOnboarding)
-        onFinished()
     }
 
     /// 均衡 mode targets 8GB machines, so it only keeps the translator warm.
@@ -345,7 +349,15 @@ struct OnboardingView: View {
             return true
         }
         let variants = bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants
-        guard !variants.isEmpty else { return true }
+        guard !variants.isEmpty else {
+            // Already downloaded (a re-run wizard): nothing will finish later
+            // to activate/preload, so do it now. The launch preload setting
+            // is written in `finish(startDownload:)` right after this
+            // returns, so hand it over via the same defaults key first.
+            persistLaunchOptions()
+            preloadOnceBundleIsReady(bundle)
+            return true
+        }
 
         // Task 4.2 — one preflight check against the *combined* remaining
         // size, not each variant checked individually as it starts (which
@@ -382,10 +394,15 @@ struct OnboardingView: View {
     /// its engines are active — earlier, a half-downloaded bundle would
     /// preload the system engine and then be discarded on the engine switch.
     private func preloadOnceBundleIsReady(_ bundle: ModelBundle) {
-        guard bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty,
-            let scope = LaunchPreloadMode.stored.scope,
-            session.usesOnDeviceModelEngine
-        else { return }
+        guard bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty else { return }
+        // Activate every variant first: with two downloads finishing together,
+        // the first finisher would otherwise preload while the second
+        // variant's engine is still the system one, then have that load
+        // discarded when the second activates.
+        for variant in bundle.variantIDs.compactMap(ProviderCatalog.variant(forID:)) {
+            activateIfStillSystemEngine(variant)
+        }
+        guard let scope = LaunchPreloadMode.stored.effectiveScope(for: session) else { return }
         Task { await session.preloadModel(scope: scope) }
     }
 

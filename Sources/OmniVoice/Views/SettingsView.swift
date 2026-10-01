@@ -502,10 +502,18 @@ struct SettingsView: View {
             needsLoginApproval: loginItem.needsApproval,
             loginError: loginItem.lastError,
             preloadAvailable: session.usesOnDeviceModelEngine,
-            memoryNote: "仅翻译约 \(translationMemoryGB) GB；翻译和识别约 \(estimatedMemoryGB) GB",
+            memoryNote: session.translationEngineKind == .model
+                ? "仅翻译约 \(translationMemoryGB) GB；翻译和识别约 \(estimatedMemoryGB) GB"
+                : "翻译为系统引擎，「仅翻译模型」不会加载任何内容；识别模型约 \(estimatedMemoryGB) GB",
+            translationOnlyAvailable: session.translationEngineKind == .model,
             onOpenLoginItems: { loginItem.openLoginItemsSettings() }
         )
         .onAppear { loginItem.refresh() }
+        // Coming back from System Settings → 登录项 (this view stays on
+        // screen the whole time, so `onAppear` doesn't fire again).
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            loginItem.refresh()
+        }
     }
 
     private var translationMemoryGB: Int {

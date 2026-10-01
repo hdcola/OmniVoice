@@ -109,8 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// on-device ones. Runs in a background `Task` so launch isn't blocked by
     /// a multi-second weight load.
     private func preloadModelsOnLaunchIfNeeded() {
-        guard onboardingWindow == nil, let scope = LaunchPreloadMode.stored.scope,
-            session.usesOnDeviceModelEngine
+        guard onboardingWindow == nil, let scope = LaunchPreloadMode.stored.effectiveScope(for: session)
         else { return }
         Task { [session] in await session.preloadModel(scope: scope) }
     }

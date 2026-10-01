@@ -14,6 +14,9 @@ struct LaunchOptionsCard: View {
     /// False when both engines are system ones, so there's nothing to load.
     var preloadAvailable = true
     var memoryNote: String?
+    /// False when the translator is a system engine — "仅翻译模型" would
+    /// then load nothing, so it's left out of the choices.
+    var translationOnlyAvailable = true
     var onOpenLoginItems: () -> Void = {}
 
     var body: some View {
@@ -41,7 +44,9 @@ struct LaunchOptionsCard: View {
                     : "当前引擎均为系统内置，无需加载"
             ) {
                 Picker("启动时加载模型", selection: $preloadMode) {
-                    ForEach(LaunchPreloadMode.allCases) { mode in
+                    ForEach(LaunchPreloadMode.allCases.filter {
+                        $0 != .translationOnly || translationOnlyAvailable || preloadMode == .translationOnly
+                    }) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }

@@ -31,6 +31,16 @@ enum LaunchPreloadMode: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The scope worth running for `session`'s current engines — nil when
+    /// nothing would actually load: off, only system engines selected, or
+    /// "仅翻译模型" while the translator is a system engine.
+    @MainActor
+    func effectiveScope(for session: RecordingSession) -> RecordingSession.PreloadScope? {
+        guard let scope, session.usesOnDeviceModelEngine else { return nil }
+        if scope == .translationOnly, session.translationEngineKind != .model { return nil }
+        return scope
+    }
+
     static var stored: LaunchPreloadMode {
         UserDefaults.standard.string(forKey: PersistedLaunchKey.preloadMode)
             .flatMap(LaunchPreloadMode.init(rawValue:)) ?? .off
