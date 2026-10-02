@@ -339,3 +339,61 @@ struct LocaleMatchingTests {
         #expect(match("fr-FR") == nil)
     }
 }
+
+@Suite("DictationKeyTracker")
+struct DictationKeyTrackerTests {
+    private typealias Event = DictationKeyTracker.Event
+
+    private func trigger(_ tracker: inout DictationKeyTracker, held: Bool, only: Bool = true) -> Event? {
+        tracker.flagsChanged(isTriggerKey: true, triggerFlagHeld: held, onlyTriggerModifierHeld: only)
+    }
+
+    private func other(_ tracker: inout DictationKeyTracker, flagHeld: Bool) -> Event? {
+        tracker.flagsChanged(isTriggerKey: false, triggerFlagHeld: flagHeld, onlyTriggerModifierHeld: false)
+    }
+
+    @Test("a plain press and release")
+    func pressRelease() {
+        var tracker = DictationKeyTracker()
+        #expect(trigger(&tracker, held: true) == .down)
+        #expect(trigger(&tracker, held: false) == .up)
+    }
+
+    @Test("releasing the trigger while the other copy of the modifier is held still releases it")
+    func leftAndRightCopies() {
+        var tracker = DictationKeyTracker()
+        #expect(trigger(&tracker, held: true) == .down)
+        // The left copy joins: the flag stays set, the dictation is a chord.
+        #expect(other(&tracker, flagHeld: true) == .otherKey)
+        // The right copy comes up but the flag is still set by the left one.
+        #expect(trigger(&tracker, held: true) == .up)
+        #expect(other(&tracker, flagHeld: false) == nil)
+        // Not stuck: the next press works.
+        #expect(trigger(&tracker, held: true) == .down)
+    }
+
+    @Test("a trigger pressed with another modifier already held is a chord")
+    func chord() {
+        var tracker = DictationKeyTracker()
+        #expect(trigger(&tracker, held: true, only: false) == nil)
+        #expect(trigger(&tracker, held: false, only: false) == nil)
+        #expect(trigger(&tracker, held: true) == .down)
+    }
+
+    @Test("a release that was never seen is noticed when the modifier is up")
+    func missedRelease() {
+        var tracker = DictationKeyTracker()
+        _ = trigger(&tracker, held: true)
+        #expect(other(&tracker, flagHeld: false) == .up)
+        #expect(trigger(&tracker, held: true) == .down)
+    }
+
+    @Test("another key while held is a chord; Esc is always Esc; idle keys are ignored")
+    func keys() {
+        var tracker = DictationKeyTracker()
+        #expect(tracker.keyDown(isEscape: false) == nil)
+        #expect(tracker.keyDown(isEscape: true) == .escape)
+        _ = trigger(&tracker, held: true)
+        #expect(tracker.keyDown(isEscape: false) == .otherKey)
+    }
+}

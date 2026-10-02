@@ -12,6 +12,7 @@ The format is based on Keep a Changelog.
 ### Changed
 
 ### Fixed
+- fix(dictation): holding the left and right copy of the trigger modifier together (both ⌥) and releasing them no longer leaves voice input unable to trigger again; a missed key release is recovered from, and turning voice input off or changing its key/mode also cancels the pending time-limit timer (#74)
 - fix(dictation): a system locale such as zh-Hans-CN (used when the recognition language is 自动 or unset and no local model is loaded) now maps to the recognizer's supported zh-CN instead of failing with 不支持此语言环境; the same lookup applies to 实时转录's system engine, and variants like en-AU fall back to en-US, while a Simplified-Chinese region the recognizer doesn't list (zh-Hans-SG) still gets zh-CN rather than the Traditional zh-TW (#74)
 - fix(dictation): segments no longer gain a stray space before punctuation or between Chinese words when the engine pads the end of the previous one, and ’ » ” attach to the word before them (#74)
 

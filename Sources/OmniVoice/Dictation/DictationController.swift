@@ -300,6 +300,8 @@ final class DictationController: ObservableObject {
     }
 
     private func cancelActiveDictation() {
+        maxDurationTask?.cancel()
+        maxDurationTask = nil
         machine.reset()
         dismissNotice()
         guard dictation.isActive else { return }

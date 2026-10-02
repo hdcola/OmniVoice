@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import OmniVoiceCore
 
 /// The single modifier key that triggers dictation. A bare modifier never
 /// types anything on its own, so it can double as a push-to-talk key without
@@ -55,7 +56,7 @@ final class DictationKeyMonitor {
     /// other access is on the main actor.
     private nonisolated(unsafe) var globalMonitor: Any?
     private nonisolated(unsafe) var localMonitor: Any?
-    private var isDown = false
+    private var tracker = DictationKeyTracker()
 
     deinit {
         if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
@@ -81,35 +82,30 @@ final class DictationKeyMonitor {
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
         globalMonitor = nil
         localMonitor = nil
-        isDown = false
+        tracker.reset()
     }
 
     private func handle(_ event: NSEvent) {
+        let result: DictationKeyTracker.Event?
         switch event.type {
-        case .keyDown where event.keyCode == UInt16(kVK_Escape):
-            onEscape?()
         case .keyDown:
-            // ⌥ + a letter types a special character, ⌘ + a letter is a
-            // shortcut: the trigger was a modifier there, not a request.
-            if isDown { onOtherKey?() }
-        case .flagsChanged where event.keyCode == triggerKey.keyCode:
-            let flags = event.modifierFlags.intersection(Self.allModifiers)
-            if flags.contains(triggerKey.flag) {
-                // Another modifier already held (⌘⌥…) makes this a chord.
-                guard !isDown, flags == triggerKey.flag else { return }
-                isDown = true
-                onKeyDown?(event.timestamp)
-            } else if isDown {
-                isDown = false
-                onKeyUp?(event.timestamp)
-            }
+            result = tracker.keyDown(isEscape: event.keyCode == UInt16(kVK_Escape))
         case .flagsChanged:
-            // A different modifier joining the trigger turns it into a chord.
-            if isDown, event.modifierFlags.intersection(Self.allModifiers).contains(triggerKey.flag) {
-                onOtherKey?()
-            }
+            let flags = event.modifierFlags.intersection(Self.allModifiers)
+            result = tracker.flagsChanged(
+                isTriggerKey: event.keyCode == triggerKey.keyCode,
+                triggerFlagHeld: flags.contains(triggerKey.flag),
+                onlyTriggerModifierHeld: flags == triggerKey.flag
+            )
         default:
-            break
+            result = nil
+        }
+        switch result {
+        case .down: onKeyDown?(event.timestamp)
+        case .up: onKeyUp?(event.timestamp)
+        case .otherKey: onOtherKey?()
+        case .escape: onEscape?()
+        case nil: break
         }
     }
 }
