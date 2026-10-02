@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import CoreGraphics
 import OmniVoiceCore
 
@@ -49,11 +50,20 @@ final class DoubleCopyMonitor {
         detector.reset()
     }
 
+    /// The "c" of ⌘C. On a layout whose letters aren't Latin (Russian, ...)
+    /// the key's character isn't "c", so the physical C key counts there; on
+    /// a Latin layout the character decides, which keeps Dvorak right.
+    private static func isCopyKey(_ event: NSEvent) -> Bool {
+        guard let characters = event.charactersIgnoringModifiers, !characters.isEmpty else { return false }
+        if characters.lowercased() == "c" { return true }
+        return !characters.allSatisfy(\.isASCII) && event.keyCode == UInt16(kVK_ANSI_C)
+    }
+
     private func handle(_ event: NSEvent) {
         guard
             !event.isARepeat,
             event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-            event.charactersIgnoringModifiers?.lowercased() == "c"
+            Self.isCopyKey(event)
         else {
             return
         }

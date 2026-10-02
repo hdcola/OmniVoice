@@ -39,6 +39,10 @@ final class SelectionTranslationController: ObservableObject {
     @Published var isDoubleCopyEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isDoubleCopyEnabled, forKey: Self.doubleCopyDefaultsKey)
+            // Only the user switching it on asks for the permission: launch
+            // never shows the "receive keystrokes from any application"
+            // prompt out of the blue (onboarding and Settings list it).
+            if isDoubleCopyEnabled, !DoubleCopyMonitor.hasPermission { DoubleCopyMonitor.requestPermission() }
             updateDoubleCopyMonitor()
         }
     }
@@ -173,7 +177,6 @@ final class SelectionTranslationController: ObservableObject {
 
     private func updateDoubleCopyMonitor() {
         if isDoubleCopyEnabled {
-            if !DoubleCopyMonitor.hasPermission { DoubleCopyMonitor.requestPermission() }
             doubleCopyMonitor?.start()
         } else {
             doubleCopyMonitor?.stop()

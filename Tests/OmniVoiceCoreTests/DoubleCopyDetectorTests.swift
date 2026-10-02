@@ -35,6 +35,11 @@ struct DoubleCopyDetectorTests {
         #expect(fires([10, 10.2, 10.4, 10.6]) == [false, true, false, true])
     }
 
+    @Test("a bounce under the minimum gap is ignored and the pair still completes")
+    func bounce() {
+        #expect(fires([10, 10.02, 10.2]) == [false, false, true])
+    }
+
     @Test("reset forgets the previous press")
     func reset() {
         var detector = DoubleCopyDetector(interval: 0.35)

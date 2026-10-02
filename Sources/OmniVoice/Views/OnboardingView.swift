@@ -66,6 +66,7 @@ struct OnboardingView: View {
     @State private var microphoneAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     @State private var screenRecordingAuthorized = CGPreflightScreenCaptureAccess()
     @State private var accessibilityAuthorized = SelectedTextReader.isAccessibilityTrusted
+    @State private var inputMonitoringAuthorized = DoubleCopyMonitor.hasPermission
     /// Review Round 1 Must-Fix 4 (首次启动向导下载大模型后无法自动激活，且缺乏磁盘
     /// 空间检查) — surfaced via `.alert` on this view rather than silently
     /// declining the download the way `try?` around `ensureDownloaded(_:)`
@@ -118,6 +119,7 @@ struct OnboardingView: View {
                 microphoneAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
                 screenRecordingAuthorized = CGPreflightScreenCaptureAccess()
                 accessibilityAuthorized = SelectedTextReader.isAccessibilityTrusted
+                inputMonitoringAuthorized = DoubleCopyMonitor.hasPermission
                 try? await Task.sleep(for: .seconds(1))
             }
         }
@@ -164,6 +166,11 @@ struct OnboardingView: View {
             PermissionRow(
                 icon: "figure.wave", title: "辅助功能", detail: "读取其他应用中选中的文字（划词翻译）",
                 isGranted: accessibilityAuthorized, open: requestAccessibilityPermission
+            )
+            SettingsDivider()
+            PermissionRow(
+                icon: "keyboard", title: "输入监控", detail: "识别连按两次 ⌘C 划词翻译；只检测这个组合，不记录其他按键",
+                isGranted: inputMonitoringAuthorized, open: requestInputMonitoringPermission
             )
         }
     }
@@ -257,6 +264,13 @@ struct OnboardingView: View {
         SelectedTextReader.requestAccessibilityPermission()
         NSWorkspace.shared.open(
             URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        )
+    }
+
+    private func requestInputMonitoringPermission() {
+        DoubleCopyMonitor.requestPermission()
+        NSWorkspace.shared.open(
+            URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
         )
     }
 
