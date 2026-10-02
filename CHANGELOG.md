@@ -7,7 +7,6 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(build): `Scripts/build_app.sh` signs with the `OmniVoice Dev Signing` certificate when it is in the keychain (override with `SIGN_IDENTITY`, `-` forces ad-hoc; falls back to ad-hoc without it), so macOS keeps mic/speech/screen-recording permissions across updates (#60)
 
 ### Changed
 
@@ -16,9 +15,16 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
-- docs(repo): add `Docs/SIGNING.md` explaining why permissions reset after upgrades and how to create and back up a stable signing certificate (#60)
 
 ### Tests
+
+## [0.5.5] - 2026-10-01
+
+### Added
+- feat(build): `Scripts/build_app.sh` signs with the `OmniVoice Dev Signing` certificate when it is in the keychain (override with `SIGN_IDENTITY`, `-` forces ad-hoc; falls back to ad-hoc without it), so macOS keeps mic/speech/screen-recording permissions across updates (#60)
+
+### Documentation
+- docs(repo): add `Docs/SIGNING.md` explaining why permissions reset after upgrades and how to create and back up a stable signing certificate (#60)
 
 ## [0.5.4] - 2026-10-01
 
