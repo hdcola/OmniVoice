@@ -12,6 +12,7 @@ The format is based on Keep a Changelog.
 ### Changed
 
 ### Fixed
+- fix(models): deleting the selected model variant (e.g. R2T2 Q4_K_M, or HY-MT1.5 Q8_0) while another variant of the same engine is still downloaded now switches the selection to the downloaded one, instead of leaving it on the deleted file and failing with "尚未下载" on the next preload/recording (#66)
 - fix(models): the "搭配 R2T2 识别引擎" nudge shown after downloading a translation model now checks whether *any* R2T2 precision is downloaded, not just Q8_0 — so a user who picked R2T2 Q4_K_M or F16 is no longer pushed to download a 2.3GB Q8_0 on top (#64)
 
 ### Dependencies
@@ -19,6 +20,7 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 ### Tests
+- test(models): cover `ProviderCatalog.replacementVariantID` and the session-level variant reselection after a delete / at launch (#66)
 - test(models): add `R2T2VariantCatalogTests` pinning the R2T2 variant list/default order, that each has a SHA-256 + `.gguf` HF URL, size/memory ordering, and that the bundles keep Q8_0 (#64)
 
 ## [0.5.6] - 2026-10-02

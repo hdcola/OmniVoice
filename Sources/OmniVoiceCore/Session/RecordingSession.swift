@@ -567,6 +567,30 @@ public final class RecordingSession: ObservableObject {
             let systemEngine = ProviderCatalog.translationEngines.first(where: { $0.kind == .system }) {
             translationEngineID = systemEngine.id
         }
+        reselectDownloadedVariantIfSelectedOneIsMissing(includingTranscription: includingTranscription)
+    }
+
+    /// Deleting the *selected* variant while another one of the same engine
+    /// stays downloaded leaves the engine-level check above satisfied (no
+    /// fallback to `.system`) while the variant selection still points at the
+    /// deleted file — `preloadModel()`/`start()` would then report "尚未下载"
+    /// instead of just using what's on disk. Moves the selection to the
+    /// first downloaded variant of that engine instead. Only touches an
+    /// engine that's still `.model`-kind, and honors `includingTranscription`
+    /// the same way the fallback above does.
+    private func reselectDownloadedVariantIfSelectedOneIsMissing(includingTranscription: Bool) {
+        if includingTranscription, transcriptionEngineKind == .model,
+            let id = ProviderCatalog.replacementVariantID(
+                forEngineID: transcriptionEngineID, selectedID: transcriptionModelVariantID,
+                isDownloaded: modelDownloadManager.isDownloaded) {
+            transcriptionModelVariantID = id
+        }
+        if translationEngineKind == .model,
+            let id = ProviderCatalog.replacementVariantID(
+                forEngineID: translationEngineID, selectedID: translationModelVariantID,
+                isDownloaded: modelDownloadManager.isDownloaded) {
+            translationModelVariantID = id
+        }
     }
 
     /// Whether *any* variant of `engineID` is downloaded — deliberately not
@@ -576,11 +600,9 @@ public final class RecordingSession: ObservableObject {
     /// engine, they won't: deleting the *selected* variant while a different
     /// one for the same engine stays downloaded would leave this reading
     /// `true` (no fallback to `.system`) while `currentTranscriptionModelVariant`/
-    /// `currentTranslationModelVariant` still point at the deleted one.
-    /// `validateAndNormalizeModelVariantSelections()` would need its own
-    /// "selected variant not downloaded ⇒ fall back to another downloaded
-    /// variant of the same engine" case added alongside this one at that
-    /// point — not needed while single-variant-per-engine holds.
+    /// `currentTranslationModelVariant` still point at the deleted one —
+    /// `reselectDownloadedVariantIfSelectedOneIsMissing(includingTranscription:)`
+    /// covers that case.
     private func hasDownloadedModelVariant(engineID: String) -> Bool {
         ProviderCatalog.modelVariants(forEngineID: engineID).contains { modelDownloadManager.isDownloaded($0) }
     }
