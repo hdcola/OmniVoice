@@ -35,6 +35,9 @@ public struct DoubleCopyDetector: Sendable {
     /// instead of firing again.
     public mutating func registerCopy(at time: TimeInterval) -> Bool {
         if let lastEvent, time >= lastEvent, time - lastEvent < minimumInterval {
+            // Sliding window: a train of bounces never lets a later pulse
+            // pass as a deliberate press.
+            self.lastEvent = time
             return false
         }
         lastEvent = time

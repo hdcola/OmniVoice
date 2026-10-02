@@ -74,6 +74,8 @@ final class DoubleCopyMonitor {
             event.modifierFlags.intersection(Self.relevantModifiers) == .command,
             Self.isCopyKey(event)
         else {
+            // Any other key between two ⌘C presses breaks the sequence.
+            detector.reset()
             return
         }
         // Two copies in different applications are not a double.

@@ -191,15 +191,16 @@ final class SelectionTranslationController: ObservableObject {
         guard !isCapturing, !isReadingSelection else { return }
         isReadingSelection = true
         Task { @MainActor in
+            defer { isReadingSelection = false }
             try? await Task.sleep(for: DoubleCopyMonitor.copySettleDelay)
             let text = PasteboardSelectionCopier.copiedText(on: .general)
-            isReadingSelection = false
             guard let text else { return }
             notice = nil
             translator.load(text)
             // Unlike ⌥A this never toggles: a panel that is already up (maybe
             // half behind another window) comes to the front with the new text.
             if panel.isVisible {
+                panel.moveToActiveScreenIfElsewhere()
                 panel.makeKeyAndOrderFront(nil)
                 sourceFocusRequest += 1
             } else {
