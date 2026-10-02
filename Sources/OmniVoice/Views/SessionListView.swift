@@ -32,7 +32,7 @@ struct SessionListView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
-                ForEach(groupedSessions, id: \.title) { group in
+                ForEach(groupedSessions) { group in
                     Section(group.title) {
                         ForEach(group.sessions) { session in
                             row(for: session)
@@ -70,14 +70,13 @@ struct SessionListView: View {
             // Detail is driven straight from the selection: a `NavigationLink`
             // inside a multi-selection `List` doesn't reliably fire on the
             // first click.
-            if selection.count == 1, let id = selection.first,
-                let session = sessions.first(where: { $0.id == id })
-            {
+            let visibleSelection = selectedSessions
+            if visibleSelection.count == 1, let session = visibleSelection.first {
                 SessionDetailView(session: session)
                     .id(session.id)
-            } else if selection.count > 1 {
+            } else if visibleSelection.count > 1 {
                 ContentUnavailableView(
-                    "已选择 \(selection.count) 条记录",
+                    "已选择 \(visibleSelection.count) 条记录",
                     systemImage: "checkmark.circle",
                     description: Text("按 ⌫ 或使用工具栏“管理”菜单批量删除")
                 )
@@ -158,8 +157,10 @@ struct SessionListView: View {
         return session.startedAt < cutoff && isDeletable(session)
     }
 
+    /// Selected *and currently visible*: a selection made before typing a
+    /// search must not let ⌫ delete rows the filter is now hiding.
     private var selectedSessions: [RecordingSessionRecord] {
-        sessions.filter { selection.contains($0.id) }
+        filteredSessions.filter { selection.contains($0.id) }
     }
 
     private var selectedDeletable: [RecordingSessionRecord] {
@@ -212,7 +213,10 @@ struct SessionListView: View {
         selection.subtract(ids)
     }
 
-    private struct SessionGroup {
+    private struct SessionGroup: Identifiable {
+        /// Position, not `title` — a non-monotonic `startedAt` (clock change,
+        /// future timestamp) could produce two groups with the same title.
+        let id: Int
         let title: String
         var sessions: [RecordingSessionRecord]
     }
@@ -225,7 +229,7 @@ struct SessionListView: View {
             if let last = groups.indices.last, groups[last].title == title {
                 groups[last].sessions.append(session)
             } else {
-                groups.append(SessionGroup(title: title, sessions: [session]))
+                groups.append(SessionGroup(id: groups.count, title: title, sessions: [session]))
             }
         }
         return groups
@@ -336,8 +340,9 @@ struct SessionListView: View {
         return formatter
     }()
 
-    /// "14:30" (today/yesterday, shown under their section header) / "9月20日" (this year, no year) / a full
-    /// dated string once the year itself is no longer implied.
+    /// "14:30" (today/yesterday, shown under their section header) /
+    /// "周三 14:30" (this week) / "9月20日 14:30" (this year) / "2025年9月20日 14:30"
+    /// once the year itself is no longer implied.
     private static func relativeTimeLabel(for date: Date) -> String {
         let calendar = Calendar.current
         // The sidebar's 今天/昨天 section headers already name the day, so

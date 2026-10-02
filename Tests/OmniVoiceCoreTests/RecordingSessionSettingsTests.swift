@@ -827,4 +827,10 @@ struct RecordingSessionSettingsTests {
         await session.preloadModel(scope: .translationOnly)
         #expect(session.transcriptionEngineID == "model.r2t2")
     }
+
+    /// The deletion gate in the history window keys off this; with nothing
+    /// recording there must be no protected record.
+    @Test func liveSessionIDIsNilWhenIdle() {
+        #expect(RecordingSession().liveSessionID == nil)
+    }
 }
