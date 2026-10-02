@@ -31,6 +31,16 @@ struct SelectionTranslationSettingsView: View {
                 ShortcutRecorderRow(controller: controller, action: action)
             }
             SettingsDivider()
+            SettingsRow(
+                title: "连按两次 ⌘C 翻译",
+                subtitle: "在其他应用里选中文字后快速按两下 ⌘C，直接翻译刚复制的内容；需要「输入监控」权限"
+            ) {
+                Toggle("连按两次 ⌘C 翻译", isOn: $controller.isDoubleCopyEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+            SettingsDivider()
             SettingsNote(text: "翻译面板里 ⏎ 翻译、⇧⏎ 换行、Esc 关闭。")
         }
     }

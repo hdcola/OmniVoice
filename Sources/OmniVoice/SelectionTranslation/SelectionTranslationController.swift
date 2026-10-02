@@ -34,7 +34,19 @@ final class SelectionTranslationController: ObservableObject {
         didSet { hotKeys.values.forEach { $0.setSuspended(isRecordingShortcut) } }
     }
 
+    /// Whether pressing ⌘C twice in quick succession translates the copied
+    /// text. On by default; Settings can switch it off.
+    @Published var isDoubleCopyEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isDoubleCopyEnabled, forKey: Self.doubleCopyDefaultsKey)
+            updateDoubleCopyMonitor()
+        }
+    }
+
+    static let doubleCopyDefaultsKey = "doubleCopyTranslateEnabled"
+
     private let panel = SelectionTranslationPanel()
+    private var doubleCopyMonitor: DoubleCopyMonitor?
     private var hotKeys: [GlobalShortcutAction: GlobalHotKey] = [:]
     private var isReadingSelection = false
     private var isCapturing = false
@@ -42,6 +54,7 @@ final class SelectionTranslationController: ObservableObject {
 
     init(translator: SelectionTranslator) {
         self.translator = translator
+        isDoubleCopyEnabled = UserDefaults.standard.object(forKey: Self.doubleCopyDefaultsKey) as? Bool ?? true
         panel.contentView = NSHostingView(rootView: SelectionTranslationView(controller: self, translator: translator))
         panel.positionOnActiveScreen()
         resignKeyObserver = NotificationCenter.default.addObserver(
@@ -59,6 +72,9 @@ final class SelectionTranslationController: ObservableObject {
             // does nothing.
             if let registered = hotKey?.shortcut { shortcuts[action] = registered }
         }
+
+        doubleCopyMonitor = DoubleCopyMonitor { [weak self] in self?.translateCopiedText() }
+        updateDoubleCopyMonitor()
     }
 
     deinit {
@@ -155,6 +171,32 @@ final class SelectionTranslationController: ObservableObject {
         }
     }
 
+    private func updateDoubleCopyMonitor() {
+        if isDoubleCopyEnabled {
+            if !DoubleCopyMonitor.hasPermission { DoubleCopyMonitor.requestPermission() }
+            doubleCopyMonitor?.start()
+        } else {
+            doubleCopyMonitor?.stop()
+        }
+    }
+
+    /// ⌘C ⌘C: the application has just copied the selection, so the text is
+    /// on the pasteboard — read it, leave the pasteboard alone (the user
+    /// asked for that copy), and show the panel translating it.
+    private func translateCopiedText() {
+        guard !isCapturing, !isReadingSelection else { return }
+        isReadingSelection = true
+        Task { @MainActor in
+            try? await Task.sleep(for: DoubleCopyMonitor.copySettleDelay)
+            let text = PasteboardSelectionCopier.copiedText(on: .general)
+            isReadingSelection = false
+            guard let text else { return }
+            notice = nil
+            translator.load(text)
+            showPanel()
+        }
+    }
+
     /// ⌥S: freezes the screen under the pointer, lets the user frame some
     /// text, recognizes it on-device, and shows the panel translating it.
     private func captureAndTranslate() {
@@ -202,6 +244,11 @@ final class SelectionTranslationController: ObservableObject {
     func openAccessibilitySettings() {
         SelectedTextReader.requestAccessibilityPermission()
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+    }
+
+    func openInputMonitoringSettings() {
+        DoubleCopyMonitor.requestPermission()
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!)
     }
 
     func openScreenRecordingSettings() {

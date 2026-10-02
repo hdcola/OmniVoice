@@ -218,7 +218,7 @@ struct PasteboardSelectionCopier {
 
     /// Only text counts: files copied in Finder also carry their names as
     /// text, and an image is not a selection to translate.
-    private static func copiedText(on pasteboard: NSPasteboard) -> String? {
+    static func copiedText(on pasteboard: NSPasteboard) -> String? {
         let copiesFiles = pasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
         guard !copiesFiles else { return nil }
         return SelectedTextReader.normalized(pasteboard.string(forType: .string))
