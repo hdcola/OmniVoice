@@ -62,11 +62,18 @@ final class DictationController: ObservableObject {
     private var errorObserver: AnyCancellable?
     private let languageCode: () -> String?
     private let deviceID: () -> String?
+    private let isLocalRecognizerLoaded: () -> Bool
 
     /// `languageCode`/`deviceID` are read at the moment a dictation starts,
     /// so it follows whatever 转录 is set to in Settings.
-    init(dictation: DictationSession, languageCode: @escaping () -> String?, deviceID: @escaping () -> String?) {
+    init(
+        dictation: DictationSession,
+        languageCode: @escaping () -> String?,
+        deviceID: @escaping () -> String?,
+        isLocalRecognizerLoaded: @escaping () -> Bool
+    ) {
         self.dictation = dictation
+        self.isLocalRecognizerLoaded = isLocalRecognizerLoaded
         self.languageCode = languageCode
         self.deviceID = deviceID
         let defaults = UserDefaults.standard
@@ -197,11 +204,15 @@ final class DictationController: ObservableObject {
     /// Gets the slow first-use work out of the way while the user is still in
     /// Settings (or at launch): the system recognizer's language assets, which
     /// are also what a dictation falls back to when no local model is loaded.
+    /// Skipped while a loaded local model is there to borrow — dictation
+    /// won't touch the system recognizer then, so downloading its assets
+    /// would be wasted.
     /// The microphone is deliberately not opened — that would flash the
     /// system's recording indicator for nothing. A failure here is left for
     /// the first dictation to report.
     private func warmUp() {
         warmupTask?.cancel()
+        guard !isLocalRecognizerLoaded() else { return }
         let code = languageCode() ?? Locale.current.identifier(.bcp47)
         warmupTask = Task { [weak self] in
             do {

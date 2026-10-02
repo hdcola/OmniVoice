@@ -1327,6 +1327,16 @@ public final class RecordingSession: ObservableObject {
     /// for it, since the recognizer streams one session at a time.
     private var isRecognizerLentToDictation = false
 
+    /// An on-device recognizer matching the current engine and variant
+    /// selection is loaded — whether or not something is using it right now.
+    public var hasLoadedLocalRecognizer: Bool {
+        transcriptionEngineKind == .model
+            && isModelLoaded
+            && loadedEngineIDs?.transcription == transcriptionEngineID
+            && loadedEngineIDs?.transcriptionVariant == currentTranscriptionModelVariant?.id
+            && transcriptionProvider != nil
+    }
+
     /// The loaded on-device recognizer, for one dictation to stream through —
     /// so voice input gets the model's accuracy without loading a second
     /// copy of its weights. `nil` (the caller falls back to the system
@@ -1335,10 +1345,7 @@ public final class RecordingSession: ObservableObject {
     /// Pair every non-nil result with `returnRecognizerFromDictation()`.
     public func lendRecognizerToDictation() -> DictationRecognizerLease? {
         guard
-            transcriptionEngineKind == .model, !isSessionActive, !isPreloadingModel, !isRecognizerLentToDictation,
-            isModelLoaded,
-            loadedEngineIDs?.transcription == transcriptionEngineID,
-            loadedEngineIDs?.transcriptionVariant == currentTranscriptionModelVariant?.id,
+            hasLoadedLocalRecognizer, !isSessionActive, !isPreloadingModel, !isRecognizerLentToDictation,
             let provider = transcriptionProvider
         else { return nil }
         isRecognizerLentToDictation = true

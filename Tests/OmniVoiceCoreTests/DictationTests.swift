@@ -238,6 +238,19 @@ struct DictationRecognizerLeaseTests {
         defaults.removeObject(forKey: PersistedSettingsKey.transcriptionModelVariantID)
     }
 
+    @Test("hasLoadedLocalRecognizer is true only for a matching loaded model")
+    func hasLoadedLocalRecognizer() {
+        defer { cleanUp() }
+        let session = makeSessionWithLoadedRecognizer()
+        #expect(session.hasLoadedLocalRecognizer)
+        session.loadedEngineIDs = (
+            "model.r2t2", "some-old-variant-id",
+            session.translationEngineID, session.currentTranslationModelVariant?.id
+        )
+        #expect(!session.hasLoadedLocalRecognizer)
+        #expect(!RecordingSession().hasLoadedLocalRecognizer)
+    }
+
     @Test("a loaded recognizer is lent once and available again once returned")
     func lendAndReturn() {
         defer { cleanUp() }

@@ -64,7 +64,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
                 returnRecognizer: { [weak session] in session?.returnRecognizerFromDictation() }
             ),
             languageCode: { [weak session] in session?.sourceLanguageCode },
-            deviceID: { [weak session] in session?.selectedDeviceID }
+            deviceID: { [weak session] in session?.selectedDeviceID },
+            isLocalRecognizerLoaded: { [weak session] in session?.hasLoadedLocalRecognizer ?? false }
         )
         super.init()
     }
