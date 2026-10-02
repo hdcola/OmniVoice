@@ -156,12 +156,29 @@ struct RecordingSessionSettingsTests {
         defer {
             defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)
             defaults.removeObject(forKey: PersistedSettingsKey.sourceLanguageCode)
+            for key in Self.languageKeys { defaults.removeObject(forKey: key) }
         }
+        for key in Self.languageKeys { defaults.removeObject(forKey: key) }
         let session = RecordingSession()
         session.transcriptionEngineID = "model.r2t2"
         session.sourceLanguageCode = "ru-RU"
         session.transcriptionEngineID = "system.speech"
         #expect(session.sourceLanguageCode == "en-US")
+    }
+
+    @Test func swapIsRefusedWhenTheSystemRecognizerCannotHearTheOtherSide() {
+        withPersisted([
+            PersistedSettingsKey.transcriptionEngineID: "system.speech",
+            PersistedSettingsKey.sourceLanguageCode: "en-US",
+            PersistedSettingsKey.targetLanguageCode: "ru-RU",
+        ]) {
+            let session = RecordingSession()
+            #expect(session.languages.myLanguageCode == "ru-RU")
+            #expect(session.sourceLanguageCode == "en-US")
+            #expect(!session.canSwapTranscriptionDirection)
+            session.swapTranscriptionDirection()
+            #expect(session.sourceLanguageCode == "en-US")
+        }
     }
 
     @Test func includeSystemAudioIsRestoredFromPersistedValue() {

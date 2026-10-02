@@ -275,7 +275,23 @@ public final class RecordingSession: ObservableObject {
 
     /// The ⇄ button's gate: not while a recording is in progress (the
     /// source is fixed at `start()`), and not while the source is "自动".
-    public var canSwapTranscriptionDirection: Bool { !isSessionActive && languages.canSwapDirection }
+    /// On the system recognizer it is also refused when the other side's
+    /// language can't be recognized there (e.g. 俄语 as 我的语言).
+    public var canSwapTranscriptionDirection: Bool {
+        guard !isSessionActive, languages.canSwapDirection else { return false }
+        guard transcriptionEngineKind == .system else { return true }
+        let nextSource = languages.transcriptionDirection == .listenForeign
+            ? languages.myLanguageCode
+            : (languages.foreignLanguageAutoDetect ? nil : languages.foreignLanguageCode)
+        return !Self.isUnsupportedForSystemASR(nextSource)
+    }
+
+    /// nil ("自动") is unsupported; a code outside `LanguageCatalog` (a
+    /// custom locale) is left to the system recognizer to accept or reject.
+    static func isUnsupportedForSystemASR(_ code: String?) -> Bool {
+        guard let code else { return true }
+        return LanguageCatalog.common.first { $0.code == code }?.supportsSystemASRSource == false
+    }
 
     public func swapTranscriptionDirection() {
         guard canSwapTranscriptionDirection else { return }
@@ -312,17 +328,11 @@ public final class RecordingSession: ObservableObject {
     static func resolveDictationLanguage(
         choice: DictationLanguageChoice, mine: String, foreign: String, isModelEngine: Bool
     ) -> String? {
-        let code: String
-        switch choice {
-        case .mine: code = mine
-        case .foreign: code = foreign
-        case .auto: return isModelEngine ? nil : mine
-        }
+        if choice == .auto && isModelEngine { return nil }
+        let code = choice == .foreign ? foreign : mine
         // The system recognizer can't take every language the catalog lists
         // (see `LanguageOption.supportsSystemASRSource`).
-        if !isModelEngine, LanguageCatalog.common.first(where: { $0.code == code })?.supportsSystemASRSource == false {
-            return nil
-        }
+        if !isModelEngine && isUnsupportedForSystemASR(code) { return nil }
         return code
     }
 
@@ -698,11 +708,7 @@ public final class RecordingSession: ObservableObject {
     /// doc).
     private func validateAndNormalizeSourceLanguage() {
         guard transcriptionEngineKind == .system else { return }
-        func isUnsupported(_ code: String?) -> Bool {
-            code.map { code in
-                LanguageCatalog.common.first { $0.code == code }?.supportsSystemASRSource == false
-            } ?? true
-        }
+        let isUnsupported = Self.isUnsupportedForSystemASR
         guard isUnsupported(languages.sourceLanguageCode) else { return }
         // The user's own language can't be recognized here: listen to the
         // foreign one instead (and drop "自动"), then repair that side too.

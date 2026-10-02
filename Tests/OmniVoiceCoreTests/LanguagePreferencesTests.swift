@@ -22,6 +22,12 @@ struct LanguageSettingsMigrationTests {
         #expect(result.dictation == .foreign)
     }
 
+    @Test func voiceInputStartsOnMyLanguageWhenItWasNeverUsed() {
+        var settings = legacy()
+        settings.dictationEverEnabled = false
+        #expect(LanguageSettingsMigration.migrate(settings).dictation == .mine)
+    }
+
     @Test func recordingLanguagesAreInferredWhenQuickTranslateWasNeverCustomized() {
         let result = LanguageSettingsMigration.migrate(legacy(source: "ja-JP", target: "en-US"))
         #expect(result.mine == "en-US")
@@ -76,6 +82,7 @@ struct LanguagePreferencesTests {
         let languages = LanguagePreferences(defaults: Self.makeDefaults())
         #expect(languages.sourceLanguageCode == "en-US")
         #expect(languages.targetLanguageCode == "zh-CN")
+        #expect(languages.dictationLanguage == .mine)
     }
 
     @Test func migratesOldKeysOnceAndLeavesThemInPlace() {
@@ -142,5 +149,7 @@ struct LanguagePreferencesTests {
         #expect(Session.resolveDictationLanguage(choice: .auto, mine: "zh-CN", foreign: "en-US", isModelEngine: false) == "zh-CN")
         // Russian isn't a system-recognizer source language.
         #expect(Session.resolveDictationLanguage(choice: .foreign, mine: "zh-CN", foreign: "ru-RU", isModelEngine: false) == nil)
+        #expect(Session.resolveDictationLanguage(choice: .auto, mine: "ru-RU", foreign: "en-US", isModelEngine: false) == nil)
+        #expect(Session.resolveDictationLanguage(choice: .auto, mine: "ru-RU", foreign: "en-US", isModelEngine: true) == nil)
     }
 }

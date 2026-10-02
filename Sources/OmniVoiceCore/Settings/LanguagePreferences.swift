@@ -33,6 +33,9 @@ struct LegacyLanguageSettings: Equatable {
     var quickMine: String?
     var quickForeign: String?
     var isModelEngine: Bool
+    /// Voice input has been switched on at some point. Only then is there a
+    /// language it "used" worth keeping; otherwise it starts on 我的语言.
+    var dictationEverEnabled: Bool = true
 }
 
 struct MigratedLanguageSettings: Equatable {
@@ -82,7 +85,9 @@ enum LanguageSettingsMigration {
         }
 
         let dictation: DictationLanguageChoice
-        if let source = legacy.source {
+        if !legacy.dictationEverEnabled && legacy.source != nil {
+            dictation = .mine
+        } else if let source = legacy.source {
             dictation = SelectionLanguageDirection.isSameLanguage(source, mine)
                 && !SelectionLanguageDirection.isSameLanguage(source, foreign) ? .mine : .foreign
         } else {
@@ -108,6 +113,8 @@ enum PersistedLanguageKey {
     static let transcriptionDirection = "org.hdcola.omnivoice.transcriptionDirection"
     static let foreignLanguageAutoDetect = "org.hdcola.omnivoice.foreignLanguageAutoDetect"
     static let dictationLanguage = "org.hdcola.omnivoice.dictationLanguage"
+    /// `DictationController.enabledKey` (app target) — only its presence is read.
+    static let legacyDictationEnabled = "org.hdcola.omnivoice.dictation.enabled"
 }
 
 /// The one place the user's languages live: "我的语言" and "外语", plus
@@ -265,7 +272,8 @@ public final class LanguagePreferences: ObservableObject {
             target: storedTarget.isEmpty ? LanguageSettingsMigration.defaultMine : storedTarget,
             quickMine: inCatalog(defaults.string(forKey: PersistedSelectionKey.myLanguageCode)),
             quickForeign: inCatalog(defaults.string(forKey: PersistedSelectionKey.foreignLanguageCode)),
-            isModelEngine: ProviderCatalog.transcriptionEngines.first { $0.id == engineID }?.kind == .model
+            isModelEngine: ProviderCatalog.transcriptionEngines.first { $0.id == engineID }?.kind == .model,
+            dictationEverEnabled: defaults.object(forKey: PersistedLanguageKey.legacyDictationEnabled) != nil
         )
     }
 }
