@@ -41,7 +41,7 @@ final class DictationController: ObservableObject {
     /// Something the HUD should tell the user instead of listening.
     @Published private(set) var notice: String?
 
-    let dictation = DictationSession()
+    let dictation: DictationSession
 
     private let monitor = DictationKeyMonitor()
     private var machine: DictationTriggerMachine
@@ -53,7 +53,8 @@ final class DictationController: ObservableObject {
 
     /// `languageCode`/`deviceID` are read at the moment a dictation starts,
     /// so it follows whatever 转录 is set to in Settings.
-    init(languageCode: @escaping () -> String?, deviceID: @escaping () -> String?) {
+    init(dictation: DictationSession, languageCode: @escaping () -> String?, deviceID: @escaping () -> String?) {
+        self.dictation = dictation
         self.languageCode = languageCode
         self.deviceID = deviceID
         let defaults = UserDefaults.standard

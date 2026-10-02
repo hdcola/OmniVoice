@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import OmniVoiceCore
 
@@ -116,5 +117,45 @@ struct DictationTriggerMachineTests {
         _ = machine.keyUp(at: 10.1)
         machine.reset()
         #expect(machine.keyDown(at: 20) == .start)
+    }
+}
+
+@MainActor
+@Suite(.serialized)
+struct DictationRecognizerLendingTests {
+    private let defaults = UserDefaults.standard
+
+    @Test("a system engine has nothing to lend")
+    func systemEngineLendsNothing() {
+        let session = RecordingSession()
+        session.transcriptionEngineID = "system.speech"
+        #expect(session.lendRecognizerToDictation() == nil)
+    }
+
+    @Test("a model engine that isn't loaded yet lends nothing")
+    func unloadedModelLendsNothing() {
+        defer {
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionModelVariantID)
+        }
+        let session = RecordingSession()
+        session.transcriptionEngineID = "model.r2t2"
+        #expect(session.lendRecognizerToDictation() == nil)
+    }
+
+    @Test("a load recorded for another variant is not lent")
+    func staleLoadLendsNothing() {
+        defer {
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionModelVariantID)
+        }
+        let session = RecordingSession()
+        session.transcriptionEngineID = "model.r2t2"
+        session.isModelLoaded = true
+        session.loadedEngineIDs = (
+            "model.r2t2", "some-old-variant-id",
+            session.translationEngineID, session.currentTranslationModelVariant?.id
+        )
+        #expect(session.lendRecognizerToDictation() == nil)
     }
 }

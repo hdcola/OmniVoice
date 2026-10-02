@@ -76,7 +76,7 @@ struct DictationHUDView: View {
         if controller.notice != nil { return "听写" }
         switch dictation.state {
         case .idle, .starting: return "准备中…"
-        case .listening: return "正在听写…"
+        case .listening: return dictation.isUsingLocalModel ? "正在听写 · 本地模型" : "正在听写 · 系统识别"
         case .finishing: return "识别中…"
         }
     }

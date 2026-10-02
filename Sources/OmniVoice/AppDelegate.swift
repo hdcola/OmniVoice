@@ -57,6 +57,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             )
         )
         dictationController = DictationController(
+            // Voice input borrows the loaded on-device recognizer when
+            // there is one (see `RecordingSession.lendRecognizerToDictation()`).
+            dictation: DictationSession(
+                borrowRecognizer: { [weak session] in session?.lendRecognizerToDictation() },
+                returnRecognizer: { [weak session] in session?.returnRecognizerFromDictation() }
+            ),
             languageCode: { [weak session] in session?.sourceLanguageCode },
             deviceID: { [weak session] in session?.selectedDeviceID }
         )
