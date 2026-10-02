@@ -341,6 +341,13 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       weights, and one-shot `HYMT15Translator.translateText` — plus floating
       panel toolbar/resize-cursor fixes (PR #41), the 启动时显示悬浮窗 toggle
       (PR #42), and the terminology unification pass (PR #43).
+- [x] **0.5.5 release cut** (2026-10-01, `chore/release-0.5.5`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.5.5,
+      `CFBundleVersion` 13), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.5.5]` section, `README.md`'s version/download-link references
+      bumped to match. First release signed with the stable
+      `OmniVoice Dev Signing` certificate instead of ad-hoc, so macOS keeps
+      permissions across updates from here on (PR #60, `Docs/SIGNING.md`).
 - [x] **0.5.4 release cut** (2026-10-01, `chore/release-0.5.4`): version
       bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.5.4,
       `CFBundleVersion` 12), CHANGELOG's `[Unreleased]` cut into a dated
