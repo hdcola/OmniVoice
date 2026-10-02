@@ -5,6 +5,7 @@ import OmniVoiceCore
 /// `PermissionsSettingsCard`.
 struct DictationSettingsView: View {
     @ObservedObject var controller: DictationController
+    @EnvironmentObject private var session: RecordingSession
 
     var body: some View {
         SettingsCard(title: "语音输入", icon: "waveform.badge.mic") {
@@ -42,6 +43,23 @@ struct DictationSettingsView: View {
             .disabled(!controller.isEnabled || controller.dictation.isActive)
             SettingsDivider()
             SettingsRow(
+                title: "听写语言",
+                subtitle: "按哪种语言识别；自动检测只在本地识别模型已加载时可用"
+            ) {
+                Picker("听写语言", selection: Binding(get: { session.languages.dictationLanguage }, set: { session.languages.dictationLanguage = $0 })) {
+                    Text("我的语言（\(languageName(session.languages.myLanguageCode))）").tag(DictationLanguageChoice.mine)
+                    Text("外语（\(languageName(session.languages.foreignLanguageCode))）").tag(DictationLanguageChoice.foreign)
+                    Text(session.transcriptionEngineKind == .model ? "自动检测" : "自动检测（需本地模型）")
+                        .tag(DictationLanguageChoice.auto)
+                        .disabled(session.transcriptionEngineKind != .model)
+                }
+                .labelsHidden()
+                .accessibilityLabel("听写语言")
+                .fixedSize()
+            }
+            .disabled(!controller.isEnabled)
+            SettingsDivider()
+            SettingsRow(
                 title: "单次最长时长",
                 subtitle: "到时自动结束并输入已识别的内容，防止忘记结束时麦克风一直开着；说长段内容可以调长"
             ) {
@@ -60,7 +78,11 @@ struct DictationSettingsView: View {
                 SettingsNote(text: warmup)
             }
             SettingsDivider()
-            SettingsNote(text: "识别引擎、语言和麦克风跟随「实时转录」的设置：选了本地模型且已加载（可开启「启动时加载模型」），就直接复用它，否则用系统语音识别；录制字幕期间也用系统识别。按 Esc 可取消；输入时会借用剪贴板，随后自动恢复。")
+            SettingsNote(text: "识别引擎和麦克风跟随「实时转录」的设置：选了本地模型且已加载（可开启「启动时加载模型」），就直接复用它，否则用系统语音识别；录制字幕期间也用系统识别。按 Esc 可取消；输入时会借用剪贴板，随后自动恢复。")
         }
+    }
+
+    private func languageName(_ code: String) -> String {
+        LanguageCatalog.common.first { $0.code == code }?.displayName ?? code
     }
 }

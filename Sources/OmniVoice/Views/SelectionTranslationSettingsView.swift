@@ -3,7 +3,8 @@ import OmniVoiceCore
 import SwiftUI
 
 /// The "快捷翻译" cards of Settings' "通用" tab — shortcuts, the two-language
-/// direction rule (see `SelectionLanguageDirection`) and engine. Permissions
+/// direction rule (see `SelectionLanguageDirection`; the languages are set in
+/// the "语言" card) and engine. Permissions
 /// live in `PermissionsSettingsCard`.
 struct SelectionTranslationSettingsView: View {
     @ObservedObject var controller: SelectionTranslationController
@@ -19,7 +20,7 @@ struct SelectionTranslationSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             shortcutsCard
-            languageCard
+            languageNote
             engineCard
         }
     }
@@ -45,17 +46,12 @@ struct SelectionTranslationSettingsView: View {
         }
     }
 
-    private var languageCard: some View {
-        SettingsCard(title: "快捷翻译语言", icon: "globe") {
-            SettingsRow(title: "我的语言", subtitle: "选中的文字是这种语言时，译成「外语」") {
-                languagePicker("我的语言", selection: $translator.myLanguageCode)
-            }
-            SettingsDivider()
-            SettingsRow(title: "外语", subtitle: "其他语言一律译成「我的语言」") {
-                languagePicker("外语", selection: $translator.foreignLanguageCode)
-            }
-            if let unsupported = unsupportedLanguageNames {
-                SettingsDivider()
+    /// 我的语言 / 外语 live in the "语言" card above (shared with the
+    /// recording and voice input); only the engine-specific caveat stays.
+    @ViewBuilder
+    private var languageNote: some View {
+        if let unsupported = unsupportedLanguageNames {
+            SettingsCard(title: "快捷翻译语言", icon: "globe") {
                 SettingsNote(
                     text: "HY-MT1.5 暂时只能译成中文、英语、日语或韩语，译成\(unsupported)时会报错，可改用系统翻译。",
                     tint: .orange
@@ -98,17 +94,6 @@ struct SelectionTranslationSettingsView: View {
     private func engineLabel(for engine: EngineDescriptor) -> String {
         engine.id == SelectionTranslationEngine.hymt15 && !translator.isModelEngineAvailable
             ? "\(engine.displayName)（未下载）" : engine.displayName
-    }
-
-    private func languagePicker(_ title: String, selection: Binding<String>) -> some View {
-        Picker(title, selection: selection) {
-            ForEach(LanguageCatalog.common) { option in
-                Text(option.displayName).tag(option.code)
-            }
-        }
-        .labelsHidden()
-        .accessibilityLabel(title)
-        .fixedSize()
     }
 
     private var unsupportedLanguageNames: String? {
