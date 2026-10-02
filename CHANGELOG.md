@@ -7,7 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(build): `Scripts/build_app.sh` honors `SIGN_IDENTITY` to sign with a fixed code-signing certificate (default stays ad-hoc), so macOS keeps mic/speech/screen-recording permissions across updates
+- feat(build): `Scripts/build_app.sh` signs with the `OmniVoice Dev Signing` certificate when it is in the keychain (override with `SIGN_IDENTITY`, `-` forces ad-hoc; falls back to ad-hoc without it), so macOS keeps mic/speech/screen-recording permissions across updates
 
 ### Changed
 

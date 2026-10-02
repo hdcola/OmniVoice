@@ -17,7 +17,8 @@ first launch, exactly as with the ad-hoc build.
 ## One-time setup (on the release build machine)
 
 1. Keychain Access → Certificate Assistant → Create a Certificate…
-   - Name: `OmniVoice Dev Signing` (any name works; pass it as `SIGN_IDENTITY`)
+   - Name: `OmniVoice Dev Signing` (the name `build_app.sh` looks for by default;
+     any other name works if you pass it as `SIGN_IDENTITY`)
    - Identity Type: Self Signed Root
    - Certificate Type: Code Signing
    - Check "Let me override defaults", and set validity to 3650 days
@@ -31,11 +32,19 @@ first launch, exactly as with the ad-hoc build.
 ## Building
 
 ```bash
-SIGN_IDENTITY="OmniVoice Dev Signing" ./Scripts/build_app.sh
+./Scripts/build_app.sh
 ./Scripts/build_dmg.sh
 ```
 
-Without `SIGN_IDENTITY` the script falls back to ad-hoc signing. Always use the
+`build_app.sh` picks the signing identity in this order, and prints which one
+it used:
+
+1. `SIGN_IDENTITY`, if set. `SIGN_IDENTITY=-` forces ad-hoc signing; a name that
+   is not in the keychain is an error.
+2. The `OmniVoice Dev Signing` certificate, if it exists in the keychain.
+3. Ad-hoc signing (e.g. contributors without the certificate).
+
+Check the `==> codesigning with ...` line before releasing, and always use the
 same certificate for every release.
 
 ## Notes
