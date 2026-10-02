@@ -7,8 +7,10 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(history): multi-select (⌘/Shift-click, ⌘A) with batch delete via ⌫, context menu or the toolbar menu; "delete records older than 30/90 days" cleanup; in-progress recordings are always skipped
 
 ### Changed
+- feat(history): history sidebar (min width 340) groups by 今天/昨天/本周/本月/month, shows the first utterance instead of a default date title, and condenses duration · languages · count into one line; sidebar width is now bounded
 
 ### Fixed
 
@@ -17,6 +19,7 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 ### Tests
+- test(history): cover display-title fallback
 
 ## [0.5.5] - 2026-10-01
 

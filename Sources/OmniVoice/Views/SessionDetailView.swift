@@ -42,7 +42,7 @@ struct SessionDetailView: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .navigationTitle(session.title)
+        .navigationTitle(session.displayTitle())
         .toolbar {
             ToolbarItem {
                 Button("复制全文") { copyToClipboard(Self.plainText(for: session)) }
