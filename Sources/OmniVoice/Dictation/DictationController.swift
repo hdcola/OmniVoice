@@ -60,6 +60,7 @@ final class DictationController: ObservableObject {
     /// borrowed until it is put back, so the next one waits its turn.
     private var isInserting = false
     private var errorObserver: AnyCancellable?
+    private var languageObserver: AnyCancellable?
     private let languageCode: () -> String?
     private let deviceID: () -> String?
     private let isLocalRecognizerLoaded: () -> Bool
@@ -70,7 +71,8 @@ final class DictationController: ObservableObject {
         dictation: DictationSession,
         languageCode: @escaping () -> String?,
         deviceID: @escaping () -> String?,
-        isLocalRecognizerLoaded: @escaping () -> Bool
+        isLocalRecognizerLoaded: @escaping () -> Bool,
+        languageChanges: AnyPublisher<String?, Never>
     ) {
         self.dictation = dictation
         self.isLocalRecognizerLoaded = isLocalRecognizerLoaded
@@ -113,6 +115,17 @@ final class DictationController: ObservableObject {
             .sink { [weak self] message in
                 self?.machine.reset()
                 self?.showNotice(message)
+            }
+        // Picking another recognition language means another set of assets
+        // to have ready. Debounced: a picker can pass through several on
+        // the way to the one the user wants.
+        languageObserver = languageChanges
+            .dropFirst()
+            .removeDuplicates()
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, isEnabled else { return }
+                warmUp()
             }
         updateMonitor()
         if isEnabled { warmUp() }

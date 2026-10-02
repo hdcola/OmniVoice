@@ -65,7 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             ),
             languageCode: { [weak session] in session?.sourceLanguageCode },
             deviceID: { [weak session] in session?.selectedDeviceID },
-            isLocalRecognizerLoaded: { [weak session] in session?.hasLoadedLocalRecognizer ?? false }
+            isLocalRecognizerLoaded: { [weak session] in session?.hasLoadedLocalRecognizer ?? false },
+            languageChanges: session.$sourceLanguageCode.eraseToAnyPublisher()
         )
         super.init()
     }
