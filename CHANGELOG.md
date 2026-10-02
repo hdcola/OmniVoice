@@ -7,6 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(models): R2T2 now offers three precisions to choose from in 设置/模型库 — Q4_K_M (1.1GB, ~1.8GB peak memory; community quantization, not an official NetEase release) for low-memory Macs, Q8_0 (default, ~3.1GB peak) and F16 (3.8GB, ~4.7GB peak) for the best quality on high-memory Macs. Both new files were downloaded, checksum-verified and run end-to-end against audio.cpp, transcribing English and Chinese test speech identically to Q8_0. The recommended bundles still use Q8_0
 
 ### Changed
 
@@ -17,6 +18,7 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 ### Tests
+- test(models): add `R2T2VariantCatalogTests` pinning the R2T2 variant list/default order, that each has a SHA-256 + `.gguf` HF URL, size/memory ordering, and that the bundles keep Q8_0
 
 ## [0.5.6] - 2026-10-02
 

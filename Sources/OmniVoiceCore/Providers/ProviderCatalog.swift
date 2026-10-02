@@ -157,6 +157,38 @@ public enum ProviderCatalog {
             summary: "针对中英文混合演讲、专业会议优化，支持多语种自动判别与断句标点补全。",
             recommendedMemoryGB: 3
         ),
+        // Smaller/faster R2T2 — a community Q4_K_M quantization (Q4_K with
+        // Q6_K MLP-down and Q2_K embeddings, BF16 audio tower) by
+        // NairoDorian, the one `audio.cpp`'s own docs/model spec list as
+        // `confucius4_r2t2_q4_k_m`. NetEase's official Q4_K_M GGUF is *not*
+        // usable here: it's llama.cpp-layout (`qwen3vl` + a separate `clip`
+        // mmproj file), while audio.cpp's loader needs one self-contained
+        // `audiocpp`-layout file. Not an official NetEase release — a
+        // third-party derivative under the same model license. Size/hash
+        // from `GET /api/models/Nairod785/Confucius4-R2T2-Q4_K_M-GGUF?blobs=true`.
+        ModelVariant(
+            id: "r2t2-q4_k_m", engineID: "model.r2t2", displayName: "R2T2 (Q4_K_M)",
+            quantization: "Q4_K_M", approximateSizeMB: 1132,
+            downloadURL: URL(
+                string: "https://huggingface.co/Nairod785/Confucius4-R2T2-Q4_K_M-GGUF/resolve/main/r2t2-q4_k_m.gguf"
+            )!,
+            sha256: "d740d6636f2ea2f3736800c3c88a6e22ecb6c0f26c567fe22b0572ae9c2c4ec8",
+            summary: "社区量化版（非官方发布）：体积约为 Q8_0 的一半，运行时峰值内存约 1.8GB，解码更快，适合内存紧张的设备；精度略低于 Q8_0。",
+            recommendedMemoryGB: 2
+        ),
+        // Same publisher/repo as `r2t2-q8_0`; sha256 verified against HF's
+        // LFS metadata (`?blobs=true`) and the `resolve/main`
+        // `X-Linked-ETag`.
+        ModelVariant(
+            id: "r2t2-f16", engineID: "model.r2t2", displayName: "R2T2 (F16)",
+            quantization: "F16", approximateSizeMB: 3902,
+            downloadURL: URL(
+                string: "https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf/resolve/main/r2t2-f16.gguf"
+            )!,
+            sha256: "d1b531ceaf5640d98352d3a9180238d99d36d393e160afd4692031077e7bae2c",
+            summary: "未量化的完整精度版本，质量最高；运行时峰值内存约 4.7GB（Q8_0 约 3.1GB），适合内存充裕的设备。",
+            recommendedMemoryGB: 5
+        ),
         ModelVariant(
             id: "t3po-q5_k_m", engineID: "model.t3po", displayName: "T3PO (Q5_K_M)",
             quantization: "Q5_K_M", approximateSizeMB: 10021,
