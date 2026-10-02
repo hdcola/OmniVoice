@@ -24,6 +24,7 @@ enum PersistedWhatsNewKey {
 struct WhatsNewView: View {
     let entries: [WhatsNewEntry]
     @ObservedObject var selectionController: SelectionTranslationController
+    @ObservedObject var dictationController: DictationController
     let onDismiss: () -> Void
     let onRerunOnboarding: () -> Void
     @State private var hasInputMonitoring = DoubleCopyMonitor.hasPermission
@@ -105,6 +106,19 @@ struct WhatsNewView: View {
                 StatusPill(text: "已开启", tone: .good)
             } else {
                 // Switched on, but without the permission it hears nothing.
+                PillButton(title: "需要授权输入监控", tint: .orange) {
+                    selectionController.openInputMonitoringSettings()
+                }
+            }
+        case .enableDictation:
+            if !dictationController.isEnabled {
+                PillButton(title: entry.actionTitle ?? "开启") {
+                    dictationController.isEnabled = true
+                }
+            } else if hasInputMonitoring {
+                StatusPill(text: "已开启", tone: .good)
+            } else {
+                // Same as ⌘C ⌘C: the trigger key is never heard without it.
                 PillButton(title: "需要授权输入监控", tint: .orange) {
                     selectionController.openInputMonitoringSettings()
                 }

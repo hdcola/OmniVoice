@@ -7,6 +7,7 @@ public struct WhatsNewEntry: Equatable, Sendable, Identifiable {
     /// What the entry's button does; the app maps each case to a real action.
     public enum Action: Equatable, Sendable {
         case enableDoubleCopyTranslate
+        case enableDictation
         case rerunOnboarding
     }
 
@@ -35,6 +36,16 @@ public struct WhatsNewEntry: Equatable, Sendable, Identifiable {
 /// nothing.
 public enum WhatsNewCatalog {
     public static let entries: [WhatsNewEntry] = [
+        WhatsNewEntry(
+            revision: 2,
+            title: "语音输入（可选）",
+            bullets: [
+                "在任何应用里按住右 ⌥ Option 说话，松开后文字自动输入到光标处；也可以改成按一下开始、再按一下结束，按 Esc 取消。",
+                "默认关闭。开启后需要「输入监控」「辅助功能」和麦克风权限；实时转录用本地模型且已加载时，会直接复用它。",
+            ],
+            actionTitle: "开启",
+            action: .enableDictation
+        ),
         WhatsNewEntry(
             revision: 1,
             title: "连按两次 ⌘C 翻译（可选）",

@@ -174,6 +174,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         let hosting = NSHostingController(
             rootView: WhatsNewView(
                 entries: entries, selectionController: selectionController,
+                dictationController: dictationController,
                 onDismiss: { [weak self] in self?.whatsNewWindow?.close() },
                 onRerunOnboarding: { [weak self] in self?.showOnboarding() }
             )
