@@ -22,7 +22,7 @@ import SwiftUI
 /// exactly once, at launch, regardless of what the user does with the menu —
 /// removes that fragility.
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, ObservableObject {
     @Published private(set) var session: RecordingSession
     private let sessionStore: SessionStore?
     private(set) var floatingPanel: FloatingTranscriptPanel?
@@ -124,6 +124,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// receive keyboard focus/dismiss correctly.
     private func presentOnboardingIfNeeded() {
         guard !UserDefaults.standard.bool(forKey: PersistedOnboardingKey.hasCompletedOnboarding) else { return }
+        showOnboarding()
+    }
+
+    /// Settings' "重新运行引导": opens the wizard again whatever
+    /// `hasCompletedOnboarding` says (finishing it just sets the flag again).
+    /// A wizard that is already open is brought to the front instead of
+    /// stacking a second one.
+    func showOnboarding() {
+        // Cleared when the window closes (see below), so a non-nil window is
+        // open — possibly hidden with the whole app, where `isVisible` is false.
+        if let onboardingWindow {
+            NSApp.activate(ignoringOtherApps: true)
+            onboardingWindow.makeKeyAndOrderFront(nil)
+            return
+        }
         NSApp.activate(ignoringOtherApps: true)
         // Fixed, non-resizable (no `.resizable` style mask): the content
         // scrolls inside this height, with the action row pinned below it.
@@ -147,7 +162,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             )
         )
         onboardingWindow = window
+        // The title bar's close button / ⌘W only hide the window, so without
+        // `windowWillClose(_:)` the wizard (and its permission polling) would
+        // live on.
+        window.delegate = self
         window.makeKeyAndOrderFront(nil)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        if (notification.object as? NSWindow) === onboardingWindow {
+            onboardingWindow = nil
+        }
     }
 
     func toggleFloatingPanel() {

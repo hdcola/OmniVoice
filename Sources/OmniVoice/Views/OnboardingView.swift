@@ -13,13 +13,31 @@ import SwiftUI
 /// with the same cards/capsules as Settings (`SettingsComponents`); the
 /// action row is pinned below the scrolling content.
 struct OnboardingView: View {
-    let session: RecordingSession
+    /// Observed so a recording that starts while the wizard is open locks the
+    /// run mode (see `isModeLocked`).
+    @ObservedObject var session: RecordingSession
     let downloadManager: ModelDownloadManager
     @ObservedObject var selectionController: SelectionTranslationController
     /// Called once the user picks either bottom button — the host (see
     /// `AppDelegate`) is responsible for closing/releasing the window
     /// itself; this view has no window handle of its own to close.
     let onFinished: () -> Void
+
+    init(
+        session: RecordingSession, downloadManager: ModelDownloadManager,
+        selectionController: SelectionTranslationController, onFinished: @escaping () -> Void
+    ) {
+        self.session = session
+        self.downloadManager = downloadManager
+        self.selectionController = selectionController
+        self.onFinished = onFinished
+        // Decided here, not in `onAppear`, so the first frame already shows
+        // the right card and button label.
+        let isRerun = UserDefaults.standard.bool(forKey: PersistedOnboardingKey.hasCompletedOnboarding)
+        _isRerun = State(initialValue: isRerun)
+        _selectedMode = State(initialValue: isRerun ? Self.mode(of: session) : .offlineModel)
+        _preloadMode = State(initialValue: isRerun ? LaunchPreloadMode.stored : .all)
+    }
 
     private enum Mode {
         case lightweight
@@ -63,7 +81,12 @@ struct OnboardingView: View {
         ),
     ]
 
-    @State private var selectedMode: Mode = .offlineModel
+    @State private var selectedMode: Mode
+    /// Opened again from Settings → 新手引导 (the wizard was completed before).
+    @State private var isRerun: Bool
+    /// A re-run only touches the engines/downloads once the user has clicked a
+    /// run mode: the pre-selected card is just a reading of the current setup.
+    @State private var modeChosen = false
     @State private var microphoneAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     @State private var screenRecordingAuthorized = CGPreflightScreenCaptureAccess()
     @State private var accessibilityAuthorized = SelectedTextReader.isAccessibilityTrusted
@@ -78,7 +101,7 @@ struct OnboardingView: View {
     /// Applied only on finish (not when toggled), so skipping the wizard
     /// leaves the login item and launch preload untouched.
     @State private var launchAtLogin = false
-    @State private var preloadMode = LaunchPreloadMode.all
+    @State private var preloadMode: LaunchPreloadMode
     /// Once the user picks a preload mode themselves, switching run modes
     /// stops overriding it with that mode's default.
     @State private var preloadModeEdited = false
@@ -107,7 +130,9 @@ struct OnboardingView: View {
             actionBar
         }
         .frame(width: 520)
-        .onAppear { launchAtLogin = loginItem.isEnabled }
+        .onAppear {
+            launchAtLogin = loginItem.isEnabled
+        }
         .onChange(of: selectedMode) { _, mode in
             guard !preloadModeEdited else { return }
             preloadMode = Self.defaultPreloadMode(for: mode)
@@ -196,13 +221,19 @@ struct OnboardingView: View {
                 if index > 0 { SettingsDivider() }
                 modeRow(option)
             }
+            if isModeLocked {
+                SettingsDivider()
+                SettingsNote(text: "录音或模型加载进行中，暂时无法更换运行模式；完成后再试。", tint: .orange)
+            }
         }
+        .disabled(isModeLocked)
     }
 
     private func modeRow(_ option: ModeOption) -> some View {
         let isSelected = selectedMode == option.mode
         return Button {
             selectedMode = option.mode
+            modeChosen = true
         } label: {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
@@ -244,15 +275,50 @@ struct OnboardingView: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
+    /// The run mode the user's current engines amount to, so a re-run doesn't
+    /// default to (and download) the big bundle for someone on a lighter one.
+    /// An in-between setup (local R2T2 recognition with system translation)
+    /// reads as lightweight: the nearest of the three presets that downloads
+    /// nothing, rather than offering the 12 GB bundle. It is only a reading —
+    /// nothing is changed until the user clicks a mode (`modeChosen`).
+    private static func mode(of session: RecordingSession) -> Mode {
+        if session.translationEngineID == "model.hymt15" { return .balanced }
+        if session.translationEngineKind == .model { return .offlineModel }
+        return .lightweight
+    }
+
+    /// First run, or a re-run where the user picked a mode: the mode section
+    /// takes effect. A re-run that left it alone only reviews permissions and
+    /// startup options.
+    private var appliesMode: Bool { !isRerun || modeChosen }
+
+    /// Engines can't be swapped mid-recording or while a model preloads
+    /// (Settings refuses both), so a re-run's mode choice is frozen then —
+    /// otherwise 完成 would close the wizard having silently changed nothing.
+    private var isModeLocked: Bool { isRerun && isSessionBusy }
+
+    private var isSessionBusy: Bool { session.isSessionActive || session.isPreloadingModel }
+
+    /// Whether the primary button would start any download: not for the
+    /// lightweight mode, nor when the chosen bundle is already on disk.
+    private var willDownload: Bool {
+        guard appliesMode, let bundleID = selectedBundleID,
+            let bundle = ProviderCatalog.bundles.first(where: { $0.id == bundleID })
+        else { return false }
+        return !bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty
+    }
+
     private var actionBar: some View {
         HStack {
-            Button("跳过向导") { skip() }
+            // A re-run has nothing to skip: this just closes the wizard.
+            Button(isRerun ? "取消" : "跳过向导") { skip() }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             Spacer()
-            PrimaryPillButton(title: "一键开启并下载") {
-                finish(startDownload: selectedMode != .lightweight)
+            PrimaryPillButton(title: willDownload ? "一键开启并下载" : "完成") {
+                finish(startDownload: appliesMode && selectedMode != .lightweight)
             }
+            .disabled(isModeLocked && modeChosen)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -338,8 +404,15 @@ struct OnboardingView: View {
     }
 
     private func finish(startDownload: Bool) {
+        // A re-run is the user choosing a mode on purpose, so it replaces the
+        // engines in use; a first run only upgrades engines that are still
+        // the system ones. Clicking the lightweight card is explicit even when
+        // it was already pre-selected, so it can finish the move to system
+        // engines from an in-between setup.
+        let replacingEngines = isRerun
+        if selectedMode == .lightweight, modeChosen { switchToSystemEngines() }
         if startDownload {
-            guard startBundleDownload() else { return }
+            guard startBundleDownload(replacingEngines: replacingEngines) else { return }
         }
         persistLaunchOptions()
         // Both directions, so a re-run wizard can also turn it off.
@@ -351,7 +424,7 @@ struct OnboardingView: View {
     /// The lightweight mode has nothing to load, whatever the picker said.
     private func persistLaunchOptions() {
         UserDefaults.standard.set(
-            (selectedMode == .lightweight ? LaunchPreloadMode.off : preloadMode).rawValue,
+            (selectedMode == .lightweight && appliesMode ? LaunchPreloadMode.off : preloadMode).rawValue,
             forKey: PersistedLaunchKey.preloadMode
         )
     }
@@ -380,7 +453,7 @@ struct OnboardingView: View {
     /// failed and `diskSpaceWarningMessage` was set instead — see
     /// `finish(startDownload:)`'s doc for why that distinction is what
     /// keeps this window (and its alert) open on failure.
-    private func startBundleDownload() -> Bool {
+    private func startBundleDownload(replacingEngines: Bool) -> Bool {
         guard let bundleID = selectedBundleID,
             let bundle = ProviderCatalog.bundles.first(where: { $0.id == bundleID })
         else {
@@ -393,7 +466,7 @@ struct OnboardingView: View {
             // is written in `finish(startDownload:)` right after this
             // returns, so hand it over via the same defaults key first.
             persistLaunchOptions()
-            preloadOnceBundleIsReady(bundle)
+            preloadOnceBundleIsReady(bundle, replacingEngines: replacingEngines)
             return true
         }
 
@@ -417,7 +490,7 @@ struct OnboardingView: View {
             Task {
                 do {
                     _ = try await downloadManager.ensureDownloaded(variant)
-                    activateIfStillSystemEngine(variant)
+                    activate(variant, replacingEngines: replacingEngines)
                     if !completionNotice.notified,
                         bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty
                     {
@@ -426,7 +499,7 @@ struct OnboardingView: View {
                             title: "模型下载完成",
                             body: "「\(bundle.displayName)」已下载并自动启用")
                     }
-                    preloadOnceBundleIsReady(bundle)
+                    preloadOnceBundleIsReady(bundle, replacingEngines: replacingEngines)
                 } catch is CancellationError {
                 } catch {
                     SystemNotifier.notify(
@@ -448,14 +521,14 @@ struct OnboardingView: View {
     /// downloaded yet), so do it as soon as the whole bundle has landed and
     /// its engines are active — earlier, a half-downloaded bundle would
     /// preload the system engine and then be discarded on the engine switch.
-    private func preloadOnceBundleIsReady(_ bundle: ModelBundle) {
+    private func preloadOnceBundleIsReady(_ bundle: ModelBundle, replacingEngines: Bool) {
         guard bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty else { return }
         // Activate every variant first: with two downloads finishing together,
         // the first finisher would otherwise preload while the second
         // variant's engine is still the system one, then have that load
         // discarded when the second activates.
         for variant in bundle.variantIDs.compactMap(ProviderCatalog.variant(forID:)) {
-            activateIfStillSystemEngine(variant)
+            activate(variant, replacingEngines: replacingEngines)
         }
         guard let scope = LaunchPreloadMode.stored.effectiveScope(for: session) else { return }
         Task { await session.preloadModel(scope: scope) }
@@ -470,16 +543,36 @@ struct OnboardingView: View {
     /// easily span a recording started on the system engine in the
     /// meantime, and switching engines mid-recording would tear down the
     /// live provider that recording is still feeding.
-    private func activateIfStillSystemEngine(_ variant: ModelVariant) {
-        guard !session.isSessionActive else { return }
+    /// Switches the recognition/translation engine to `variant`'s. First run
+    /// (`replacingEngines` false): only an engine still on the system one,
+    /// so a choice made while the download ran isn't undone. Re-run: the
+    /// wizard's mode wins — but an engine already on `variant`'s keeps the
+    /// precision the user picked (R2T2 Q4_K_M/F16), and nothing changes
+    /// while a session is recording.
+    private func activate(_ variant: ModelVariant, replacingEngines: Bool) {
+        guard !isSessionBusy else { return }
         if ProviderCatalog.transcriptionEngines.contains(where: { $0.id == variant.engineID }) {
-            guard session.transcriptionEngineKind == .system else { return }
+            guard replacingEngines ? session.transcriptionEngineID != variant.engineID : session.transcriptionEngineKind == .system
+            else { return }
             session.transcriptionEngineID = variant.engineID
             session.transcriptionModelVariantID = variant.id
         } else if ProviderCatalog.translationEngines.contains(where: { $0.id == variant.engineID }) {
-            guard session.translationEngineKind == .system else { return }
+            guard replacingEngines ? session.translationEngineID != variant.engineID : session.translationEngineKind == .system
+            else { return }
             session.translationEngineID = variant.engineID
             session.translationModelVariantID = variant.id
+        }
+    }
+
+    /// Re-running the wizard on the lightweight mode: back to the system
+    /// engines.
+    private func switchToSystemEngines() {
+        guard !isSessionBusy else { return }
+        if let engine = ProviderCatalog.transcriptionEngines.first(where: { $0.kind == .system }) {
+            session.transcriptionEngineID = engine.id
+        }
+        if let engine = ProviderCatalog.translationEngines.first(where: { $0.kind == .system }) {
+            session.translationEngineID = engine.id
         }
     }
 }

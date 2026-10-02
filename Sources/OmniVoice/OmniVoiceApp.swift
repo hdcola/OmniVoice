@@ -41,6 +41,7 @@ struct OmniVoiceApp: App {
                 .environmentObject(appDelegate.session)
                 .environmentObject(settingsNavigation)
                 .environmentObject(appDelegate.selectionController)
+                .environmentObject(appDelegate)
         }
     }
 }
