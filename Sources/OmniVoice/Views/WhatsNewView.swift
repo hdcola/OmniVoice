@@ -25,6 +25,8 @@ struct WhatsNewView: View {
     let entries: [WhatsNewEntry]
     @ObservedObject var selectionController: SelectionTranslationController
     let onDismiss: () -> Void
+    let onRerunOnboarding: () -> Void
+    @State private var hasInputMonitoring = DoubleCopyMonitor.hasPermission
 
     var body: some View {
         VStack(spacing: 0) {
@@ -48,6 +50,12 @@ struct WhatsNewView: View {
                 Spacer()
                 PrimaryPillButton(title: "知道了", action: onDismiss)
                     .keyboardShortcut(.defaultAction)
+                // A button takes one shortcut, so Esc rides on an invisible one.
+                Button("关闭", action: onDismiss)
+                    .keyboardShortcut(.cancelAction)
+                    .opacity(0)
+                    .frame(width: 0, height: 0)
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -55,6 +63,14 @@ struct WhatsNewView: View {
         // Fixed height: a hosting controller would otherwise size the window
         // to the (collapsed) scroll view.
         .frame(width: 460, height: 440)
+        // The user grants Input Monitoring in System Settings while this
+        // window is open — poll like the permission rows do.
+        .task {
+            while !Task.isCancelled {
+                hasInputMonitoring = DoubleCopyMonitor.hasPermission
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
     }
 
     private func entryCard(_ entry: WhatsNewEntry) -> some View {
@@ -81,12 +97,22 @@ struct WhatsNewView: View {
     private func actionControl(for entry: WhatsNewEntry) -> some View {
         switch entry.action {
         case .enableDoubleCopyTranslate:
-            if selectionController.isDoubleCopyEnabled {
-                StatusPill(text: "已开启", tone: .good)
-            } else {
+            if !selectionController.isDoubleCopyEnabled {
                 PillButton(title: entry.actionTitle ?? "开启") {
                     selectionController.isDoubleCopyEnabled = true
                 }
+            } else if hasInputMonitoring {
+                StatusPill(text: "已开启", tone: .good)
+            } else {
+                // Switched on, but without the permission it hears nothing.
+                PillButton(title: "需要授权输入监控", tint: .orange) {
+                    selectionController.openInputMonitoringSettings()
+                }
+            }
+        case .rerunOnboarding:
+            PillButton(title: entry.actionTitle ?? "重新运行") {
+                onDismiss()
+                onRerunOnboarding()
             }
         case nil:
             EmptyView()

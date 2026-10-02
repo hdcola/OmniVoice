@@ -7,6 +7,7 @@ public struct WhatsNewEntry: Equatable, Sendable, Identifiable {
     /// What the entry's button does; the app maps each case to a real action.
     public enum Action: Equatable, Sendable {
         case enableDoubleCopyTranslate
+        case rerunOnboarding
     }
 
     /// The `WhatsNewCatalog.latestRevision` value that first included this
@@ -49,7 +50,9 @@ public enum WhatsNewCatalog {
             title: "可以重新运行新手引导",
             bullets: [
                 "在「设置 › 通用 › 新手引导」里点「重新运行」，随时回头调整权限和运行模式。",
-            ]
+            ],
+            actionTitle: "重新运行",
+            action: .rerunOnboarding
         ),
     ]
 

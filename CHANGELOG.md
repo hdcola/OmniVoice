@@ -7,7 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(onboarding): after an update that adds something worth opting into, the app shows a small 新功能 window once — for existing users it introduces 连按两次 ⌘C 翻译 (with a button to turn it on) and the re-runnable 新手引导; first runs and later releases without a new entry show nothing. New notes are added in `WhatsNewCatalog`
+- feat(onboarding): after an update that adds something worth opting into, the app shows a small 新功能 window once — for existing users it introduces 连按两次 ⌘C 翻译 (with a button to turn it on) and the re-runnable 新手引导; first runs and later releases without a new entry show nothing. New notes are added in `WhatsNewCatalog`; the notes carry 开启 / 重新运行 buttons, show 需要授权输入监控 when ⌘C ⌘C is on without the permission, and Esc closes the window (#70)
 - feat(onboarding): 设置/通用 now has a 新手引导 card with a "重新运行" button that reopens the first-run wizard (permissions, run mode, optional ⌘C ⌘C translation) — for users who skipped it or want to revisit it after an update; clicking a run mode there now actually switches the engines (a re-run that leaves the mode alone changes no engines and downloads nothing) (lightweight → system engines, 高精/均衡 → that bundle's models); the button is disabled while recording and the button reads 完成 when nothing needs downloading (#69)
 - feat(selection): pressing ⌘C twice in quick succession (within 0.35 s) in another app now translates the copied text in the quick-translate panel — it reads the pasteboard the app just filled, so it works on pages where ⌥A can't read the selection. Off by default (opt-in): turn it on in the first-run wizard or 设置/通用 › 划词与截图快捷键. Needs the Input Monitoring permission, which is only requested when you switch the option on, never silently at launch. Text a password manager marks as concealed/transient is never sent to the translator, Caps Lock doesn't stop the shortcut, any other key pressed between the two ⌘C presses cancels the pair, and a panel already open on another screen moves to the screen you are working on (#68)
 - feat(models): R2T2 now offers three precisions to choose from in 设置/模型库 — Q4_K_M (1.1GB, ~1.8GB peak memory; community quantization, not an official NetEase release) for low-memory Macs, Q8_0 (default, ~3.1GB peak) and F16 (3.8GB, ~4.7GB peak) for the best quality on high-memory Macs. Both new files were downloaded, checksum-verified and run end-to-end against audio.cpp, transcribing English and Chinese test speech identically to Q8_0. The recommended bundles still use Q8_0 (#64)
@@ -24,7 +24,7 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 ### Tests
-- test(onboarding): add `WhatsNewTests` covering which what's-new entries show for a first run, a never-seen update, partly seen and fully seen users
+- test(onboarding): add `WhatsNewTests` covering which what's-new entries show for a first run, a never-seen update, partly seen and fully seen users (#70)
 - test(selection): add `DoubleCopyDetectorTests` covering the ⌘C ⌘C timing window, consumed pairs, reset and a backwards clock and key bounce, including a bounce right after a completed double and a continuous train of bounces (#68)
 - test(models): cover `ProviderCatalog.replacementVariantID` and the session-level variant reselection after a delete / at launch (#66)
 - test(models): add `R2T2VariantCatalogTests` pinning the R2T2 variant list/default order, that each has a SHA-256 + `.gguf` HF URL, size/memory ordering, and that the bundles keep Q8_0 (#64)

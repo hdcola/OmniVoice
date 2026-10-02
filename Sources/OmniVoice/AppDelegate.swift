@@ -147,7 +147,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         let hosting = NSHostingController(
             rootView: WhatsNewView(
                 entries: entries, selectionController: selectionController,
-                onDismiss: { [weak self] in self?.whatsNewWindow?.close() }
+                onDismiss: { [weak self] in self?.whatsNewWindow?.close() },
+                onRerunOnboarding: { [weak self] in self?.showOnboarding() }
             )
         )
         let window = NSWindow(contentViewController: hosting)
