@@ -303,7 +303,7 @@ struct DictationRecognizerLeaseTests {
 
 @Suite("SystemTranscriptionProvider.matchLocale")
 struct LocaleMatchingTests {
-    private let supported = ["en-US", "zh-CN", "zh-TW", "zh-HK", "ja-JP"].map { Locale(identifier: $0) }
+    private let supported = ["en-US", "zh-TW", "zh-HK", "zh-CN", "ja-JP"].map { Locale(identifier: $0) }
 
     private func match(_ identifier: String) -> String? {
         SystemTranscriptionProvider.matchLocale(Locale(identifier: identifier), in: supported)?.identifier(.bcp47)
@@ -319,6 +319,14 @@ struct LocaleMatchingTests {
         #expect(match("zh-Hans-CN") == "zh-CN")
         #expect(match("zh-Hant-TW") == "zh-TW")
         #expect(match("zh_Hans_CN") == "zh-CN")
+    }
+
+    @Test("an unlisted region keeps the writing system rather than taking the first Chinese listed")
+    func scriptKept() {
+        #expect(match("zh-Hans-SG") == "zh-CN")
+        #expect(match("zh-Hans-US") == "zh-CN")
+        #expect(match("zh-Hant-US") == "zh-TW")
+        #expect(match("zh") == "zh-CN")
     }
 
     @Test("an unlisted region falls back to the same language")

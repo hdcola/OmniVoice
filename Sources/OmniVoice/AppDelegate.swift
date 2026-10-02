@@ -128,9 +128,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     /// on-device ones. Runs in a background `Task` so launch isn't blocked by
     /// a multi-second weight load.
     private func preloadModelsOnLaunchIfNeeded() {
-        guard onboardingWindow == nil, let scope = LaunchPreloadMode.stored.effectiveScope(for: session)
-        else { return }
-        Task { [session] in await session.preloadModel(scope: scope) }
+        guard onboardingWindow == nil, let scope = LaunchPreloadMode.stored.effectiveScope(for: session) else {
+            dictationController.warmUpIfEnabled()
+            return
+        }
+        // Voice input's own warm-up waits for this: a model loaded here is
+        // what it borrows, and then needs no system assets.
+        Task { [session, dictationController] in
+            await session.preloadModel(scope: scope)
+            dictationController.warmUpIfEnabled()
+        }
     }
 
     /// Task 4.1 — shown exactly once, on the very first launch (see

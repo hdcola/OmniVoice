@@ -194,12 +194,23 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
 
     /// Picks which of `supported` serves `requested`: the same BCP-47 tag,
     /// else the same language and region (the system's own "zh-Hans-CN" is
-    /// listed as "zh-CN"), else the same language alone (en-AU → en-US).
+    /// listed as "zh-CN"), else the same language and writing system (a
+    /// Singapore Chinese "zh-Hans-SG" gets Simplified zh-CN, not the
+    /// Traditional zh-TW that happens to be listed first), else the same
+    /// language alone (en-AU → en-US).
     nonisolated static func matchLocale(_ requested: Locale, in supported: [Locale]) -> Locale? {
         let language = requested.language.languageCode
+        let script = likelyScript(of: requested)
         return supported.first { $0.identifier(.bcp47) == requested.identifier(.bcp47) }
             ?? supported.first { $0.language.languageCode == language && $0.region == requested.region }
+            ?? supported.first { $0.language.languageCode == language && likelyScript(of: $0) == script }
             ?? supported.first { $0.language.languageCode == language }
+    }
+
+    /// The writing system a locale implies — "zh-CN" has no script of its
+    /// own in its tag, but is Simplified (Hans) once likely subtags are added.
+    private nonisolated static func likelyScript(of locale: Locale) -> Locale.Script? {
+        Locale.Language(identifier: locale.language.maximalIdentifier).script
     }
 
     private static func ensureModelInstalled(

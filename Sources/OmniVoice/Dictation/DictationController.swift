@@ -128,7 +128,6 @@ final class DictationController: ObservableObject {
                 warmUp()
             }
         updateMonitor()
-        if isEnabled { warmUp() }
     }
 
     var hasInputMonitoringPermission: Bool { DoubleCopyMonitor.hasPermission }
@@ -144,10 +143,9 @@ final class DictationController: ObservableObject {
         case .finish:
             Task { await finish() }
         case .cancel:
-            Task {
-                await dictation.cancel()
-                hideHUD()
-            }
+            // Gone at once; a slow start is torn down behind it.
+            hideHUD()
+            Task { await dictation.cancel() }
         }
     }
 
@@ -223,6 +221,12 @@ final class DictationController: ObservableObject {
     /// The microphone is deliberately not opened — that would flash the
     /// system's recording indicator for nothing. A failure here is left for
     /// the first dictation to report.
+    /// The launch-time warm-up, run once `AppDelegate` knows whether the
+    /// launch preload gave dictation a local model to borrow.
+    func warmUpIfEnabled() {
+        if isEnabled { warmUp() }
+    }
+
     private func warmUp() {
         warmupTask?.cancel()
         guard !isLocalRecognizerLoaded() else { return }

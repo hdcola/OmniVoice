@@ -137,8 +137,10 @@ public final class DictationSession: ObservableObject {
         }
         let transcript = transcript
         provider.onEvent = { [weak self] event in
-            let text = transcript.apply(event)
-            Task { @MainActor in self?.previewText = text }
+            _ = transcript.apply(event)
+            // Read the text when this runs, not when the event arrived, so a
+            // late-running update can't put an older hypothesis back.
+            Task { @MainActor in self?.previewText = transcript.text }
         }
         do {
             try await provider.start(config: config)
