@@ -113,6 +113,7 @@ struct OnboardingView: View {
             // already chosen instead of overwriting it with the run mode's
             // default.
             if UserDefaults.standard.bool(forKey: PersistedOnboardingKey.hasCompletedOnboarding) {
+                selectedMode = currentMode
                 preloadMode = LaunchPreloadMode.stored
                 preloadModeEdited = true
             }
@@ -253,13 +254,30 @@ struct OnboardingView: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
+    /// The run mode the user's current engines amount to, so a re-run doesn't
+    /// default to (and download) the big bundle for someone on a lighter one.
+    private var currentMode: Mode {
+        if session.translationEngineID == "model.hymt15" { return .balanced }
+        if session.translationEngineKind == .model { return .offlineModel }
+        return .lightweight
+    }
+
+    /// Whether the primary button would start any download: not for the
+    /// lightweight mode, nor when the chosen bundle is already on disk.
+    private var willDownload: Bool {
+        guard let bundleID = selectedBundleID,
+            let bundle = ProviderCatalog.bundles.first(where: { $0.id == bundleID })
+        else { return false }
+        return !bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty
+    }
+
     private var actionBar: some View {
         HStack {
             Button("跳过向导") { skip() }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             Spacer()
-            PrimaryPillButton(title: "一键开启并下载") {
+            PrimaryPillButton(title: willDownload ? "一键开启并下载" : "完成") {
                 finish(startDownload: selectedMode != .lightweight)
             }
         }

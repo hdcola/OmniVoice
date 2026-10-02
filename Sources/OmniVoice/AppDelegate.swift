@@ -160,6 +160,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             )
         )
         onboardingWindow = window
+        // The title bar's close button / ⌘W only hide the window, so without
+        // this the wizard (and its permission polling) would live on.
+        var closeObserver: NSObjectProtocol?
+        closeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: window, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.onboardingWindow = nil
+                if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
+            }
+        }
         window.makeKeyAndOrderFront(nil)
     }
 
