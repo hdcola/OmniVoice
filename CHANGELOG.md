@@ -7,6 +7,20 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.5.6] - 2026-10-02
+
+### Added
 - feat(history): multi-select (⌘/Shift-click, ⌘A) with batch delete via ⌫, context menu or the toolbar menu; "delete records older than 30/90 days" cleanup; in-progress recordings are always skipped (#62)
 
 ### Changed
