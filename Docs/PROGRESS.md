@@ -341,6 +341,17 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       weights, and one-shot `HYMT15Translator.translateText` — plus floating
       panel toolbar/resize-cursor fixes (PR #41), the 启动时显示悬浮窗 toggle
       (PR #42), and the terminology unification pass (PR #43).
+- [x] **0.5.7 release cut** (2026-10-02, `chore/release-0.5.7`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.5.7,
+      `CFBundleVersion` 15), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.5.7]` section, `README.md`'s version/download-link references
+      bumped to match. Quick translate: ⌘C ⌘C translates the copied text
+      (opt-in, Input Monitoring; PR #68) and ⌥A falls back to ⌘C when the
+      Accessibility read times out (PR #67); the first-run wizard can be
+      re-run from Settings (PR #69); a one-time 新功能 window after an
+      update, also reachable from 设置/关于 (PRs #70, #72); R2T2 precision
+      choices (PR #64) and variant reselection after a delete (PR #66);
+      `Docs/RELEASING.md` (PR #71).
 - [x] **0.5.6 release cut** (2026-10-02, `chore/release-0.5.6`): version
       bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.5.6,
       `CFBundleVersion` 14), CHANGELOG's `[Unreleased]` cut into a dated

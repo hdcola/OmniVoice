@@ -7,6 +7,20 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.5.7] - 2026-10-02
+
+### Added
 - feat(settings): 设置/关于 has a 查看新功能 row that reopens the what's-new window with every note, for users who dismissed it or updated past several versions (#72)
 - feat(onboarding): after an update that adds something worth opting into, the app shows a small 新功能 window once — for existing users it introduces 连按两次 ⌘C 翻译 (with a button to turn it on) and the re-runnable 新手引导; first runs and later releases without a new entry show nothing. New notes are added in `WhatsNewCatalog`; the notes carry 开启 / 重新运行 buttons, show 需要授权输入监控 when ⌘C ⌘C is on without the permission, and Esc closes the window (#70)
 - feat(onboarding): 设置/通用 now has a 新手引导 card with a "重新运行" button that reopens the first-run wizard (permissions, run mode, optional ⌘C ⌘C translation) — for users who skipped it or want to revisit it after an update; clicking a run mode there now actually switches the engines (a re-run that leaves the mode alone changes no engines and downloads nothing) (lightweight → system engines, 高精/均衡 → that bundle's models); the button is disabled while recording and the button reads 完成 when nothing needs downloading (#69)
