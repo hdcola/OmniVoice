@@ -223,7 +223,7 @@ struct OnboardingView: View {
             }
             if isModeLocked {
                 SettingsDivider()
-                SettingsNote(text: "录音进行中，暂时无法更换运行模式；停止录音后再试。", tint: .orange)
+                SettingsNote(text: "录音或模型加载进行中，暂时无法更换运行模式；完成后再试。", tint: .orange)
             }
         }
         .disabled(isModeLocked)
@@ -292,10 +292,12 @@ struct OnboardingView: View {
     /// startup options.
     private var appliesMode: Bool { !isRerun || modeChosen }
 
-    /// Engines can't be swapped mid-recording (Settings refuses it too), so a
-    /// re-run's mode choice is frozen while a session runs — otherwise 完成
-    /// would close the wizard having silently changed nothing.
-    private var isModeLocked: Bool { isRerun && session.isSessionActive }
+    /// Engines can't be swapped mid-recording or while a model preloads
+    /// (Settings refuses both), so a re-run's mode choice is frozen then —
+    /// otherwise 完成 would close the wizard having silently changed nothing.
+    private var isModeLocked: Bool { isRerun && isSessionBusy }
+
+    private var isSessionBusy: Bool { session.isSessionActive || session.isPreloadingModel }
 
     /// Whether the primary button would start any download: not for the
     /// lightweight mode, nor when the chosen bundle is already on disk.
@@ -308,7 +310,8 @@ struct OnboardingView: View {
 
     private var actionBar: some View {
         HStack {
-            Button("跳过向导") { skip() }
+            // A re-run has nothing to skip: this just closes the wizard.
+            Button(isRerun ? "取消" : "跳过向导") { skip() }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -547,7 +550,7 @@ struct OnboardingView: View {
     /// precision the user picked (R2T2 Q4_K_M/F16), and nothing changes
     /// while a session is recording.
     private func activate(_ variant: ModelVariant, replacingEngines: Bool) {
-        guard !session.isSessionActive else { return }
+        guard !isSessionBusy else { return }
         if ProviderCatalog.transcriptionEngines.contains(where: { $0.id == variant.engineID }) {
             guard replacingEngines ? session.transcriptionEngineID != variant.engineID : session.transcriptionEngineKind == .system
             else { return }
@@ -564,7 +567,7 @@ struct OnboardingView: View {
     /// Re-running the wizard on the lightweight mode: back to the system
     /// engines.
     private func switchToSystemEngines() {
-        guard !session.isSessionActive else { return }
+        guard !isSessionBusy else { return }
         if let engine = ProviderCatalog.transcriptionEngines.first(where: { $0.kind == .system }) {
             session.transcriptionEngineID = engine.id
         }

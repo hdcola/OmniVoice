@@ -22,7 +22,7 @@ import SwiftUI
 /// exactly once, at launch, regardless of what the user does with the menu —
 /// removes that fragility.
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, ObservableObject {
     @Published private(set) var session: RecordingSession
     private let sessionStore: SessionStore?
     private(set) var floatingPanel: FloatingTranscriptPanel?
@@ -163,20 +163,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         )
         onboardingWindow = window
         // The title bar's close button / ⌘W only hide the window, so without
-        // this the wizard (and its permission polling) would live on.
-        var closeObserver: NSObjectProtocol?
-        closeObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.willCloseNotification, object: window, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.onboardingWindow = nil
-                if let observer = closeObserver {
-                    NotificationCenter.default.removeObserver(observer)
-                    closeObserver = nil
-                }
-            }
-        }
+        // `windowWillClose(_:)` the wizard (and its permission polling) would
+        // live on.
+        window.delegate = self
         window.makeKeyAndOrderFront(nil)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        if (notification.object as? NSWindow) === onboardingWindow {
+            onboardingWindow = nil
+        }
     }
 
     func toggleFloatingPanel() {
