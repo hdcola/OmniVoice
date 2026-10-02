@@ -30,6 +30,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     /// Task 4.1 (首次启动向导) — kept alive only for as long as the window
     /// itself is open; released once the user finishes/skips it.
     private var onboardingWindow: NSWindow?
+    /// The once-per-update "what's new" window, kept only while it is open.
+    private var whatsNewWindow: NSWindow?
     /// ⌥A/⌥S selection translation — constructed here (not lazily) for the
     /// same reason as `session`: its global hot keys must work from launch,
     /// before any menu or window has been opened.
@@ -101,6 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             }
 
         presentOnboardingIfNeeded()
+        presentWhatsNewIfNeeded()
         preloadModelsOnLaunchIfNeeded()
     }
 
@@ -125,6 +128,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     private func presentOnboardingIfNeeded() {
         guard !UserDefaults.standard.bool(forKey: PersistedOnboardingKey.hasCompletedOnboarding) else { return }
         showOnboarding()
+    }
+
+    /// After an update that added something worth opting into
+    /// (`WhatsNewCatalog`): one small window, once. A first run is marked as
+    /// up to date instead — the wizard already covers everything.
+    private func presentWhatsNewIfNeeded() {
+        let completed = UserDefaults.standard.bool(forKey: PersistedOnboardingKey.hasCompletedOnboarding)
+        guard completed else {
+            PersistedWhatsNewKey.markSeen()
+            return
+        }
+        let entries = WhatsNewCatalog.entriesToShow(
+            hasCompletedOnboarding: completed, lastSeenRevision: PersistedWhatsNewKey.lastSeen
+        )
+        guard !entries.isEmpty else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        let hosting = NSHostingController(
+            rootView: WhatsNewView(
+                entries: entries, selectionController: selectionController,
+                onDismiss: { [weak self] in self?.whatsNewWindow?.close() },
+                onRerunOnboarding: { [weak self] in self?.showOnboarding() }
+            )
+        )
+        let window = NSWindow(contentViewController: hosting)
+        window.styleMask = [.titled, .closable]
+        window.title = "新功能"
+        window.isReleasedWhenClosed = false
+        window.center()
+        window.delegate = self
+        whatsNewWindow = window
+        window.makeKeyAndOrderFront(nil)
     }
 
     /// Settings' "重新运行引导": opens the wizard again whatever
@@ -170,8 +204,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     }
 
     func windowWillClose(_ notification: Notification) {
-        if (notification.object as? NSWindow) === onboardingWindow {
+        let closing = notification.object as? NSWindow
+        if closing === onboardingWindow {
             onboardingWindow = nil
+        } else if closing === whatsNewWindow {
+            // Any way of closing it counts as seen, so it doesn't nag.
+            PersistedWhatsNewKey.markSeen()
+            whatsNewWindow = nil
         }
     }
 
