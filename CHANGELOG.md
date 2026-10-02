@@ -7,7 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(selection): pressing ⌘C twice in quick succession (within 0.35 s) in another app now translates the copied text in the quick-translate panel — it reads the pasteboard the app just filled, so it works on pages where ⌥A can't read the selection. Off by default (opt-in): turn it on in the first-run wizard or 设置/通用 › 划词与截图快捷键. Needs the Input Monitoring permission, which is only requested when you switch the option on, never silently at launch (#68)
+- feat(selection): pressing ⌘C twice in quick succession (within 0.35 s) in another app now translates the copied text in the quick-translate panel — it reads the pasteboard the app just filled, so it works on pages where ⌥A can't read the selection. Off by default (opt-in): turn it on in the first-run wizard or 设置/通用 › 划词与截图快捷键. Needs the Input Monitoring permission, which is only requested when you switch the option on, never silently at launch. Text a password manager marks as concealed/transient is never sent to the translator, and Caps Lock doesn't stop the shortcut (#68)
 - feat(models): R2T2 now offers three precisions to choose from in 设置/模型库 — Q4_K_M (1.1GB, ~1.8GB peak memory; community quantization, not an official NetEase release) for low-memory Macs, Q8_0 (default, ~3.1GB peak) and F16 (3.8GB, ~4.7GB peak) for the best quality on high-memory Macs. Both new files were downloaded, checksum-verified and run end-to-end against audio.cpp, transcribing English and Chinese test speech identically to Q8_0. The recommended bundles still use Q8_0 (#64)
 
 ### Changed
@@ -22,7 +22,7 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 ### Tests
-- test(selection): add `DoubleCopyDetectorTests` covering the ⌘C ⌘C timing window, consumed pairs, reset and a backwards clock and key bounce (#68)
+- test(selection): add `DoubleCopyDetectorTests` covering the ⌘C ⌘C timing window, consumed pairs, reset and a backwards clock and key bounce, including a bounce right after a completed double (#68)
 - test(models): cover `ProviderCatalog.replacementVariantID` and the session-level variant reselection after a delete / at launch (#66)
 - test(models): add `R2T2VariantCatalogTests` pinning the R2T2 variant list/default order, that each has a SHA-256 + `.gguf` HF URL, size/memory ordering, and that the bundles keep Q8_0 (#64)
 

@@ -40,6 +40,11 @@ struct DoubleCopyDetectorTests {
         #expect(fires([10, 10.02, 10.2]) == [false, false, true])
     }
 
+    @Test("a bounce right after a double does not start a new pair")
+    func bounceAfterDouble() {
+        #expect(fires([10, 10.2, 10.22, 10.45]) == [false, true, false, false])
+    }
+
     @Test("reset forgets the previous press")
     func reset() {
         var detector = DoubleCopyDetector(interval: 0.35)

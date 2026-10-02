@@ -13,7 +13,12 @@ public struct DoubleCopyDetector: Sendable {
 
     public let interval: TimeInterval
     public let minimumInterval: TimeInterval
-    private var lastCopy: TimeInterval?
+    /// The first press of a possible pair.
+    private var candidate: TimeInterval?
+    /// The latest press of any kind, for bounce filtering. Kept apart from
+    /// `candidate` so a bounce right after a completed double can't become
+    /// the first press of a new pair.
+    private var lastEvent: TimeInterval?
 
     public init(
         interval: TimeInterval = DoubleCopyDetector.defaultInterval,
@@ -24,25 +29,27 @@ public struct DoubleCopyDetector: Sendable {
     }
 
     /// `time` is any monotonic clock in seconds. Returns true when this press
-    /// follows the previous one within `interval` (and no sooner than
-    /// `minimumInterval`; a bounce is dropped without disturbing the pair); a double consumes both
-    /// presses, so a third quick press starts a new pair instead of firing
-    /// again.
+    /// follows the previous one within `interval`. A press under
+    /// `minimumInterval` after the previous one is a bounce and is dropped; a
+    /// double consumes both presses, so a third quick press starts a new pair
+    /// instead of firing again.
     public mutating func registerCopy(at time: TimeInterval) -> Bool {
-        if let lastCopy, time >= lastCopy, time - lastCopy < minimumInterval {
+        if let lastEvent, time >= lastEvent, time - lastEvent < minimumInterval {
             return false
         }
-        if let lastCopy, time >= lastCopy, time - lastCopy <= interval {
-            self.lastCopy = nil
+        lastEvent = time
+        if let candidate, time >= candidate, time - candidate <= interval {
+            self.candidate = nil
             return true
         }
-        lastCopy = time
+        candidate = time
         return false
     }
 
     /// Forgets the previous press, e.g. when the user switches application
     /// between two copies.
     public mutating func reset() {
-        lastCopy = nil
+        candidate = nil
+        lastEvent = nil
     }
 }

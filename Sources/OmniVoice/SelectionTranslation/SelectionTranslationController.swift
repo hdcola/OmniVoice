@@ -197,7 +197,14 @@ final class SelectionTranslationController: ObservableObject {
             guard let text else { return }
             notice = nil
             translator.load(text)
-            showPanel()
+            // Unlike ⌥A this never toggles: a panel that is already up (maybe
+            // half behind another window) comes to the front with the new text.
+            if panel.isVisible {
+                panel.makeKeyAndOrderFront(nil)
+                sourceFocusRequest += 1
+            } else {
+                showPanel()
+            }
         }
     }
 

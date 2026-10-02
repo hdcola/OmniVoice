@@ -17,6 +17,9 @@ final class DoubleCopyMonitor {
     /// pasteboard is read.
     static let copySettleDelay: Duration = .milliseconds(120)
 
+    /// Caps Lock, Fn and the numeric-pad flag don't change what ⌘C means.
+    private static let relevantModifiers: NSEvent.ModifierFlags = [.command, .shift, .control, .option]
+
     static var hasPermission: Bool { CGPreflightListenEventAccess() }
 
     /// Shows the system's Input Monitoring prompt (macOS shows it once).
@@ -25,12 +28,18 @@ final class DoubleCopyMonitor {
     }
 
     private var detector = DoubleCopyDetector()
-    private var monitor: Any?
+    /// `nonisolated(unsafe)` only so `deinit` can unregister it; every other
+    /// access is on the main actor.
+    private nonisolated(unsafe) var monitor: Any?
     private var lastFrontmostProcess: pid_t?
     private let onDoubleCopy: @MainActor () -> Void
 
     init(onDoubleCopy: @escaping @MainActor () -> Void) {
         self.onDoubleCopy = onDoubleCopy
+    }
+
+    deinit {
+        if let monitor { NSEvent.removeMonitor(monitor) }
     }
 
     var isRunning: Bool { monitor != nil }
@@ -62,7 +71,7 @@ final class DoubleCopyMonitor {
     private func handle(_ event: NSEvent) {
         guard
             !event.isARepeat,
-            event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+            event.modifierFlags.intersection(Self.relevantModifiers) == .command,
             Self.isCopyKey(event)
         else {
             return
