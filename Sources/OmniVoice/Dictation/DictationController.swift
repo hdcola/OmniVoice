@@ -28,6 +28,8 @@ final class DictationController: ObservableObject {
         didSet {
             UserDefaults.standard.set(triggerKey.rawValue, forKey: Self.triggerKeyKey)
             monitor.triggerKey = triggerKey
+            // The key a running dictation is waiting on just changed.
+            cancelActiveDictation()
         }
     }
 
@@ -35,6 +37,7 @@ final class DictationController: ObservableObject {
         didSet {
             UserDefaults.standard.set(mode.rawValue, forKey: Self.modeKey)
             machine.mode = mode
+            cancelActiveDictation()
         }
     }
 
@@ -189,7 +192,19 @@ final class DictationController: ObservableObject {
             monitor.start()
         } else {
             monitor.stop()
-            machine.reset()
+            // Nothing can end a dictation once the monitor is gone — no
+            // trigger key, no Esc — so end it here rather than leave the
+            // microphone and the HUD up.
+            cancelActiveDictation()
+        }
+    }
+
+    private func cancelActiveDictation() {
+        machine.reset()
+        guard dictation.isActive else { return }
+        Task {
+            await dictation.cancel()
+            hideHUD()
         }
     }
 

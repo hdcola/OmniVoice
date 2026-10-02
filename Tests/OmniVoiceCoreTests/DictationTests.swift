@@ -47,6 +47,17 @@ struct DictationTextAssemblerTests {
         #expect(assembler.text == "打开Safari")
     }
 
+    @Test("a segment that starts with closing punctuation attaches to the word before it")
+    func punctuationAttaches() {
+        #expect(assemble([.segmentClosed(finalAppend: "Hello"), .segmentClosed(finalAppend: ", world")]).text == "Hello, world")
+        #expect(assemble([.segmentClosed(finalAppend: "Hello"), .segmentClosed(finalAppend: ".")]).text == "Hello.")
+    }
+
+    @Test("an opening bracket still gets its space")
+    func openingBracketKeepsSpace() {
+        #expect(assemble([.segmentClosed(finalAppend: "see"), .segmentClosed(finalAppend: "(note)")]).text == "see (note)")
+    }
+
     @Test("Korean segments keep the space between words")
     func koreanJoin() {
         let assembler = assemble([.segmentClosed(finalAppend: "안녕하세요"), .segmentClosed(finalAppend: "반갑습니다")])

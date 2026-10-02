@@ -47,9 +47,15 @@ public struct DictationTextAssembler: Equatable, Sendable {
         let second = second.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let last = first.last else { return second }
         guard let next = second.first else { return first }
-        if last.isWhitespace || isSpaceless(last) || isSpaceless(next) { return first + second }
+        if last.isWhitespace || isSpaceless(last) || isSpaceless(next) || closingPunctuation.contains(next) {
+            return first + second
+        }
         return first + " " + second
     }
+
+    /// Punctuation that attaches to the word before it ("Hello" + ", world").
+    /// Opening brackets and quotes are not here: they take the space.
+    private static let closingPunctuation: Set<Character> = [",", ".", ";", ":", "!", "?", ")", "]", "}", "…", "%"]
 
     /// Chinese and Japanese run words together; Korean (Hangul) separates
     /// them with spaces like Latin text, so it is deliberately not here.

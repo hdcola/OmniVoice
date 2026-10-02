@@ -71,6 +71,7 @@ public final class DictationSession: ObservableObject {
         errorMessage = nil
         microphonePermissionNeeded = false
         previewText = ""
+        isUsingLocalModel = false
         transcript = DictationTranscript()
         startTask = Task { await self.setUp(languageCode: languageCode, deviceID: deviceID) }
     }

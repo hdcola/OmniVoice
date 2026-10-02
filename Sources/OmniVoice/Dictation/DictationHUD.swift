@@ -42,7 +42,8 @@ struct DictationHUDView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            icon
+            // Fixed size so swapping icons doesn't shift the text.
+            icon.frame(width: 22, height: 22)
             VStack(alignment: .leading, spacing: 2) {
                 Text(headline)
                     .font(.system(size: 12, weight: .semibold))
