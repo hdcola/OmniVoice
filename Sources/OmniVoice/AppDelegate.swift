@@ -143,7 +143,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             hasCompletedOnboarding: completed, lastSeenRevision: PersistedWhatsNewKey.lastSeen
         )
         guard !entries.isEmpty else { return }
+        showWhatsNew(entries)
+    }
+
+    /// Settings' "查看新功能": every note in the catalog, whatever the user
+    /// has already seen.
+    func showAllWhatsNew() {
+        showWhatsNew(WhatsNewCatalog.allEntriesNewestFirst)
+    }
+
+    private func showWhatsNew(_ entries: [WhatsNewEntry]) {
         NSApp.activate(ignoringOtherApps: true)
+        if let whatsNewWindow {
+            whatsNewWindow.makeKeyAndOrderFront(nil)
+            return
+        }
         let hosting = NSHostingController(
             rootView: WhatsNewView(
                 entries: entries, selectionController: selectionController,

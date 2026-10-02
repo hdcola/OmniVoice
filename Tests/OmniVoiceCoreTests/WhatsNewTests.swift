@@ -34,6 +34,13 @@ struct WhatsNewTests {
         #expect(shown.isEmpty)
     }
 
+    @Test("the full list holds every catalog entry, newest first")
+    func allEntries() {
+        let all = WhatsNewCatalog.allEntriesNewestFirst
+        #expect(all.count == WhatsNewCatalog.entries.count)
+        #expect(all.map(\.revision) == all.map(\.revision).sorted(by: >))
+    }
+
     @Test("the latest revision is the highest entry revision")
     func latest() {
         #expect(WhatsNewCatalog.latestRevision == WhatsNewCatalog.entries.map(\.revision).max())
