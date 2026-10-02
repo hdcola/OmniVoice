@@ -7,6 +7,20 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.6.0] - 2026-10-02
+
+### Added
 - feat(dictation): 语音输入 — hold the right ⌥ Option key (or right ⌘ / ⌃, or tap to start and tap again to stop) in any app, speak, and the recognized text is typed at the cursor. Uses on-device system speech recognition with the language and microphone from 实时转录; a small bubble shows what it hears while you speak, and during a slow first start says what it is doing (准备识别引擎 / 下载语言识别资源 / 启动麦克风). Turning voice input on (and launching with it on, or switching the recognition language) also pre-installs the system recognizer's language assets in the background, so the first dictation doesn't wait on the download (skipped while a local model is loaded and will be borrowed instead; at launch it waits for the 启动时加载模型 preload to finish before deciding); 设置 shows the progress note meanwhile. Text goes in by pasting (the clipboard is saved and put back afterwards, and marked transient so clipboard managers skip it); with no Accessibility permission or in a secure field it stays on the clipboard with a notice. Taps under 0.3 s and ⌥ used as a modifier for another key are ignored, Esc cancels a dictation in either mode (even one still starting up), and one still running past its time limit ends by itself and types what it heard, so a lost key release can't leave the microphone open — 2 minutes by default, adjustable (1 / 2 / 5 / 10 minutes or no limit) in 设置/通用 › 语音输入 › 单次最长时长 for dictating long prompts. When 实时转录 uses a local model (R2T2) that is already loaded (e.g. via 启动时加载模型), voice input borrows that same recognizer instead of loading a second copy — more accurate, and the HUD says 本地模型 or 系统识别; with no model loaded, or while a recording is running, it uses system recognition. The 新功能 window introduces it to existing users, with a 开启 button. Off by default — turn it on in 设置/通用 › 语音输入, which asks for Input Monitoring, Accessibility and the microphone (#74)
 
 ### Changed

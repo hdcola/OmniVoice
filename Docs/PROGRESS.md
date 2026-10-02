@@ -341,6 +341,14 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       weights, and one-shot `HYMT15Translator.translateText` — plus floating
       panel toolbar/resize-cursor fixes (PR #41), the 启动时显示悬浮窗 toggle
       (PR #42), and the terminology unification pass (PR #43).
+- [x] **0.6.0 release cut** (2026-10-02, `chore/release-0.6.0`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.6.0,
+      `CFBundleVersion` 16), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.6.0]` section, `README.md`'s version/download-link references
+      bumped to match and a 语音输入 bullet added. Voice input (PR #74):
+      push-to-talk dictation into the focused app with system recognition or
+      the loaded R2T2 model borrowed from `RecordingSession`; opt-in, with a
+      what's-new entry (`WhatsNewCatalog` revision 2).
 - [x] **0.5.7 release cut** (2026-10-02, `chore/release-0.5.7`): version
       bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.5.7,
       `CFBundleVersion` 15), CHANGELOG's `[Unreleased]` cut into a dated
