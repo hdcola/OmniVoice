@@ -878,7 +878,7 @@ public final class RecordingSession: ObservableObject {
     /// closing out here, not the live capture.
     public func finalizeActiveSessionBeforeQuit() {
         guard let sessionStore, let activeSessionRecord else { return }
-        sessionStore.endSession(activeSessionRecord)
+        sessionStore.finish(activeSessionRecord)
         try? sessionStore.save()
         self.activeSessionRecord = nil
     }
@@ -1271,7 +1271,7 @@ public final class RecordingSession: ObservableObject {
         await translationProvider?.stop()
 
         if let sessionStore, let activeSessionRecord {
-            sessionStore.endSession(activeSessionRecord)
+            sessionStore.finish(activeSessionRecord)
             try? sessionStore.save()
         }
         activeSessionRecord = nil

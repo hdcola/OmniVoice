@@ -27,6 +27,8 @@ struct SessionListView: View {
     @State private var pendingDeletion: [RecordingSessionRecord] = []
     /// Non-empty while the "clean up old records" confirmation is on screen.
     @State private var pendingCleanupDays: Int?
+    /// True while the "delete 0-utterance records" confirmation is on screen.
+    @State private var pendingEmptyCleanup = false
     /// Non-nil while the rename alert is on screen.
     @State private var renamingSession: RecordingSessionRecord?
     @State private var renameText: String = ""
@@ -55,6 +57,8 @@ struct SessionListView: View {
                         }
                         .disabled(selectedDeletable.isEmpty)
                         Divider()
+                        Button("清理空记录（0 句）…") { pendingEmptyCleanup = true }
+                            .disabled(emptySessions.isEmpty)
                         Button("删除 30 天前的记录…") { pendingCleanupDays = 30 }
                             .disabled(staleSessions(olderThanDays: 30).isEmpty)
                         Button("删除 90 天前的记录…") { pendingCleanupDays = 90 }
@@ -101,6 +105,16 @@ struct SessionListView: View {
             Text("删除后无法恢复。录制中的记录不会被删除。")
         }
         .confirmationDialog(
+            "清理 \(emptySessions.count) 条空记录？",
+            isPresented: $pendingEmptyCleanup,
+            titleVisibility: .visible
+        ) {
+            Button("删除", role: .destructive) { performDeletion(emptySessions) }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("这些记录没有任何转录内容，删除后无法恢复。")
+        }
+        .confirmationDialog(
             "删除 \(pendingCleanupDays ?? 0) 天前的记录？",
             isPresented: Binding(get: { pendingCleanupDays != nil }, set: { if !$0 { pendingCleanupDays = nil } }),
             titleVisibility: .visible,
@@ -119,6 +133,12 @@ struct SessionListView: View {
             Button("保存") { commitRename() }
             Button("取消", role: .cancel) { renamingSession = nil }
         }
+    }
+
+    /// Records with no utterances — leftovers from before empty recordings
+    /// stopped being saved.
+    private var emptySessions: [RecordingSessionRecord] {
+        sessions.filter { $0.utterances.isEmpty && isDeletable($0) }
     }
 
     /// Finished sessions that started more than `days` days ago.

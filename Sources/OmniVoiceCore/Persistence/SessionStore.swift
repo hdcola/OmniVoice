@@ -52,6 +52,20 @@ public final class SessionStore {
         session.endedAt = date
     }
 
+    /// Closes out a finished recording. A session that captured no
+    /// utterances (started and stopped without anything transcribed) isn't
+    /// worth a history entry, so it's deleted instead. Returns whether the
+    /// session was kept. Caller still needs to `save()`.
+    @discardableResult
+    public func finish(_ session: RecordingSessionRecord, at date: Date = .now) -> Bool {
+        guard !session.utterances.isEmpty else {
+            context.delete(session)
+            return false
+        }
+        endSession(session, at: date)
+        return true
+    }
+
     public func delete(_ session: RecordingSessionRecord) {
         context.delete(session)
     }
