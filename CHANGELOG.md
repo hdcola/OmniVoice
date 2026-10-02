@@ -12,6 +12,8 @@ The format is based on Keep a Changelog.
 ### Changed
 
 ### Fixed
+- fix(dictation): a system locale such as zh-Hans-CN (used when the recognition language is 自动 or unset and no local model is loaded) now maps to the recognizer's supported zh-CN instead of failing with 不支持此语言环境; the same lookup applies to 实时转录's system engine, and variants like en-AU fall back to en-US (#74)
+- fix(dictation): segments no longer gain a stray space before punctuation or between Chinese words when the engine pads the end of the previous one, and ’ » ” attach to the word before them (#74)
 
 ### Dependencies
 

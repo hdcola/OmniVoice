@@ -57,7 +57,7 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
     /// time, so the first `start(config:)` for it doesn't wait on the
     /// download. A no-op once they are installed.
     public static func prepareAssets(languageCode: String, onInstalling: (() -> Void)? = nil) async throws {
-        let locale = Locale(identifier: languageCode)
+        let locale = try await resolveSupportedLocale(Locale(identifier: languageCode))
         let transcriber = SpeechTranscriber(
             locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults], attributeOptions: []
         )
@@ -77,7 +77,7 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
             // unlike a `.model` provider, there is no auto-detect option here.
             throw ProviderError.localeNotSupported
         }
-        let locale = Locale(identifier: languageCode)
+        let locale = try await Self.resolveSupportedLocale(Locale(identifier: languageCode))
 
         let transcriber = SpeechTranscriber(
             locale: locale,
@@ -184,13 +184,27 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
         transcriber = nil
     }
 
+    /// The supported locale `requested` stands for — see `matchLocale(_:in:)`.
+    private static func resolveSupportedLocale(_ requested: Locale) async throws -> Locale {
+        guard let match = matchLocale(requested, in: Array(await SpeechTranscriber.supportedLocales)) else {
+            throw ProviderError.localeNotSupported
+        }
+        return match
+    }
+
+    /// Picks which of `supported` serves `requested`: the same BCP-47 tag,
+    /// else the same language and region (the system's own "zh-Hans-CN" is
+    /// listed as "zh-CN"), else the same language alone (en-AU → en-US).
+    nonisolated static func matchLocale(_ requested: Locale, in supported: [Locale]) -> Locale? {
+        let language = requested.language.languageCode
+        return supported.first { $0.identifier(.bcp47) == requested.identifier(.bcp47) }
+            ?? supported.first { $0.language.languageCode == language && $0.region == requested.region }
+            ?? supported.first { $0.language.languageCode == language }
+    }
+
     private static func ensureModelInstalled(
         for transcriber: SpeechTranscriber, locale: Locale, onInstalling: (() -> Void)?
     ) async throws {
-        let supported = await SpeechTranscriber.supportedLocales
-        guard supported.contains(where: { $0.identifier(.bcp47) == locale.identifier(.bcp47) }) else {
-            throw ProviderError.localeNotSupported
-        }
         let installed = await SpeechTranscriber.installedLocales
         guard !installed.contains(where: { $0.identifier(.bcp47) == locale.identifier(.bcp47) }) else { return }
         if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {

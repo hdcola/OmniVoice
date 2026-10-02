@@ -44,18 +44,21 @@ public struct DictationTextAssembler: Equatable, Sendable {
     /// space-delimited scripts ("hello" + "world"), never next to CJK text
     /// or existing whitespace.
     static func join(_ first: String, _ second: String) -> String {
+        // The engine's own padding at the seams is not part of the speech.
+        let first = first.trimmingCharacters(in: .whitespacesAndNewlines)
         let second = second.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let last = first.last else { return second }
         guard let next = second.first else { return first }
-        if last.isWhitespace || isSpaceless(last) || isSpaceless(next) || closingPunctuation.contains(next) {
+        if isSpaceless(last) || isSpaceless(next) || closingPunctuation.contains(next) {
             return first + second
         }
         return first + " " + second
     }
 
     /// Punctuation that attaches to the word before it ("Hello" + ", world").
-    /// Opening brackets and quotes are not here: they take the space.
-    private static let closingPunctuation: Set<Character> = [",", ".", ";", ":", "!", "?", ")", "]", "}", "”", "…", "%"]
+    /// Opening brackets and quotes are not here: they take the space (and
+    /// neither is the ASCII ' — it opens a quote as often as it closes one).
+    private static let closingPunctuation: Set<Character> = [",", ".", ";", ":", "!", "?", ")", "]", "}", "”", "’", "»", "…", "%"]
 
     /// Chinese and Japanese run words together; Korean (Hangul) separates
     /// them with spaces like Latin text, so it is deliberately not here.

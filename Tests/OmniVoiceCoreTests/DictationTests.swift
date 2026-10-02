@@ -54,6 +54,17 @@ struct DictationTextAssemblerTests {
         #expect(assemble([.segmentClosed(finalAppend: "“Hello"), .segmentClosed(finalAppend: "”")]).text == "“Hello”")
     }
 
+    @Test("padding the engine put at a seam doesn't leak into the joined text")
+    func seamPaddingIgnored() {
+        #expect(assemble([.segmentClosed(finalAppend: "Hello "), .segmentClosed(finalAppend: ", world")]).text == "Hello, world")
+        #expect(assemble([.segmentClosed(finalAppend: "你好 "), .segmentClosed(finalAppend: "世界")]).text == "你好世界")
+    }
+
+    @Test("a right single quote attaches, so it + ’s stays one word")
+    func apostropheAttaches() {
+        #expect(assemble([.segmentClosed(finalAppend: "it"), .segmentClosed(finalAppend: "’s fine")]).text == "it’s fine")
+    }
+
     @Test("an opening bracket still gets its space")
     func openingBracketKeepsSpace() {
         #expect(assemble([.segmentClosed(finalAppend: "see"), .segmentClosed(finalAppend: "(note)")]).text == "see (note)")
@@ -287,5 +298,36 @@ struct DictationRecognizerLeaseTests {
 
         session.returnRecognizerFromDictation()
         #expect(!session.isModelLoaded)
+    }
+}
+
+@Suite("SystemTranscriptionProvider.matchLocale")
+struct LocaleMatchingTests {
+    private let supported = ["en-US", "zh-CN", "zh-TW", "zh-HK", "ja-JP"].map { Locale(identifier: $0) }
+
+    private func match(_ identifier: String) -> String? {
+        SystemTranscriptionProvider.matchLocale(Locale(identifier: identifier), in: supported)?.identifier(.bcp47)
+    }
+
+    @Test("an exact tag matches itself")
+    func exact() {
+        #expect(match("zh-TW") == "zh-TW")
+    }
+
+    @Test("the system's script-qualified Chinese locale finds the plain region one")
+    func scriptQualified() {
+        #expect(match("zh-Hans-CN") == "zh-CN")
+        #expect(match("zh-Hant-TW") == "zh-TW")
+        #expect(match("zh_Hans_CN") == "zh-CN")
+    }
+
+    @Test("an unlisted region falls back to the same language")
+    func languageOnly() {
+        #expect(match("en-AU") == "en-US")
+    }
+
+    @Test("an unsupported language matches nothing")
+    func unsupported() {
+        #expect(match("fr-FR") == nil)
     }
 }
