@@ -47,6 +47,9 @@ final class DictationController: ObservableObject {
     private var machine: DictationTriggerMachine
     private let hud = DictationHUDPanel()
     private var noticeTask: Task<Void, Never>?
+    /// True while a finished dictation is being pasted — the clipboard is
+    /// borrowed until it is put back, so the next one waits its turn.
+    private var isInserting = false
     private var errorObserver: AnyCancellable?
     private let languageCode: () -> String?
     private let deviceID: () -> String?
@@ -82,6 +85,7 @@ final class DictationController: ObservableObject {
         }
         monitor.onEscape = { [weak self] in
             guard let self else { return }
+            dismissNotice()
             perform(machine.escapePressed())
         }
 
@@ -119,7 +123,7 @@ final class DictationController: ObservableObject {
 
     private func start() {
         // The previous dictation is still being typed out.
-        guard !dictation.isActive else {
+        guard !dictation.isActive, !isInserting else {
             machine.reset()
             return
         }
@@ -142,7 +146,10 @@ final class DictationController: ObservableObject {
             return
         }
         hideHUD()
-        if case .copiedOnly(let reason) = await DictationTextInserter.insert(text) {
+        isInserting = true
+        let outcome = await DictationTextInserter.insert(text)
+        isInserting = false
+        if case .copiedOnly(let reason) = outcome {
             showNotice(reason)
         }
     }
@@ -160,6 +167,14 @@ final class DictationController: ObservableObject {
             self?.notice = nil
             self?.hideHUD()
         }
+    }
+
+    /// Esc closes a notice without waiting out its timer.
+    private func dismissNotice() {
+        guard notice != nil else { return }
+        noticeTask?.cancel()
+        notice = nil
+        hideHUD()
     }
 
     private func hideHUD() {
