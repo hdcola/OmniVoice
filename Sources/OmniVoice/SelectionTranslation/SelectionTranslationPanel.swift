@@ -57,6 +57,14 @@ final class SelectionTranslationPanel: NSPanel {
         setFrameOrigin(origin)
     }
 
+    /// Moves the panel to the pointer's screen only when it is on another one,
+    /// so a panel the user dragged somewhere stays put on the screen they are
+    /// already working on.
+    func moveToActiveScreenIfElsewhere() {
+        if let current = screen, NSMouseInRect(NSEvent.mouseLocation, current.frame, false) { return }
+        positionOnActiveScreen()
+    }
+
     override func cancelOperation(_ sender: Any?) {
         orderOut(nil)
     }

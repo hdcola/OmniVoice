@@ -5,12 +5,13 @@ import SwiftUI
 /// Every system permission the app asks for, in one card at the top of
 /// Settings' "通用" tab: Microphone (live transcription), Screen Recording
 /// (system audio + screenshot translation) and Accessibility (reading the
-/// selection in other apps).
+/// selection in other apps) and Input Monitoring (the ⌘C ⌘C shortcut).
 struct PermissionsSettingsCard: View {
     @ObservedObject var controller: SelectionTranslationController
     @State private var microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
     @State private var isAccessibilityTrusted = SelectedTextReader.isAccessibilityTrusted
     @State private var hasScreenRecordingPermission = ScreenFreezer.hasPermission
+    @State private var hasInputMonitoringPermission = DoubleCopyMonitor.hasPermission
 
     var body: some View {
         SettingsCard(title: "权限", icon: "lock.shield") {
@@ -36,6 +37,13 @@ struct PermissionsSettingsCard: View {
                 isGranted: isAccessibilityTrusted,
                 open: controller.openAccessibilitySettings
             )
+            SettingsDivider()
+            PermissionRow(
+                icon: "keyboard", title: "输入监控",
+                detail: "识别连按两次 ⌘C；只检测这个组合，不记录其他按键",
+                isGranted: hasInputMonitoringPermission,
+                open: controller.openInputMonitoringSettings
+            )
         }
         // None of these post a notification this app can observe cheaply,
         // and the user grants them in System Settings while this tab is
@@ -45,6 +53,7 @@ struct PermissionsSettingsCard: View {
                 microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
                 isAccessibilityTrusted = SelectedTextReader.isAccessibilityTrusted
                 hasScreenRecordingPermission = ScreenFreezer.hasPermission
+                hasInputMonitoringPermission = DoubleCopyMonitor.hasPermission
                 try? await Task.sleep(for: .seconds(1))
             }
         }

@@ -139,6 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         window.contentView = NSHostingView(
             rootView: OnboardingView(
                 session: session, downloadManager: session.modelDownloadManager,
+                selectionController: selectionController,
                 onFinished: { [weak self, weak window] in
                     window?.close()
                     self?.onboardingWindow = nil

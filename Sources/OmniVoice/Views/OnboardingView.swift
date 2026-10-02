@@ -15,6 +15,7 @@ import SwiftUI
 struct OnboardingView: View {
     let session: RecordingSession
     let downloadManager: ModelDownloadManager
+    @ObservedObject var selectionController: SelectionTranslationController
     /// Called once the user picks either bottom button — the host (see
     /// `AppDelegate`) is responsible for closing/releasing the window
     /// itself; this view has no window handle of its own to close.
@@ -66,6 +67,7 @@ struct OnboardingView: View {
     @State private var microphoneAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     @State private var screenRecordingAuthorized = CGPreflightScreenCaptureAccess()
     @State private var accessibilityAuthorized = SelectedTextReader.isAccessibilityTrusted
+    @State private var inputMonitoringAuthorized = DoubleCopyMonitor.hasPermission
     /// Review Round 1 Must-Fix 4 (首次启动向导下载大模型后无法自动激活，且缺乏磁盘
     /// 空间检查) — surfaced via `.alert` on this view rather than silently
     /// declining the download the way `try?` around `ensureDownloaded(_:)`
@@ -118,6 +120,7 @@ struct OnboardingView: View {
                 microphoneAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
                 screenRecordingAuthorized = CGPreflightScreenCaptureAccess()
                 accessibilityAuthorized = SelectedTextReader.isAccessibilityTrusted
+                inputMonitoringAuthorized = DoubleCopyMonitor.hasPermission
                 try? await Task.sleep(for: .seconds(1))
             }
         }
@@ -165,6 +168,25 @@ struct OnboardingView: View {
                 icon: "figure.wave", title: "辅助功能", detail: "读取其他应用中选中的文字（划词翻译）",
                 isGranted: accessibilityAuthorized, open: requestAccessibilityPermission
             )
+            SettingsDivider()
+            // Opt-in: the system's Input Monitoring prompt reads as alarming,
+            // so it only appears once the user asks for this shortcut.
+            SettingsRow(
+                title: "连按两次 ⌘C 翻译（可选）",
+                subtitle: "选中文字后快速按两下 ⌘C 即可翻译；开启后需要授予「输入监控」，之后可在设置里关闭"
+            ) {
+                Toggle("连按两次 ⌘C 翻译", isOn: $selectionController.isDoubleCopyEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+            if selectionController.isDoubleCopyEnabled {
+                SettingsDivider()
+                PermissionRow(
+                    icon: "keyboard", title: "输入监控", detail: "只检测 ⌘C 连按这个组合，不记录其他按键",
+                    isGranted: inputMonitoringAuthorized, open: requestInputMonitoringPermission
+                )
+            }
         }
     }
 
@@ -257,6 +279,13 @@ struct OnboardingView: View {
         SelectedTextReader.requestAccessibilityPermission()
         NSWorkspace.shared.open(
             URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        )
+    }
+
+    private func requestInputMonitoringPermission() {
+        DoubleCopyMonitor.requestPermission()
+        NSWorkspace.shared.open(
+            URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
         )
     }
 
