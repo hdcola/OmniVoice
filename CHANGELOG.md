@@ -22,6 +22,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(release): add `Docs/RELEASING.md` describing how a version is cut, built, tagged, published and bumped in the Homebrew cask, and point to it from `AGENTS.md` (#71)
 
 ### Tests
 - test(onboarding): add `WhatsNewTests` covering which what's-new entries show for a first run, a never-seen update, partly seen and fully seen users (#70)
