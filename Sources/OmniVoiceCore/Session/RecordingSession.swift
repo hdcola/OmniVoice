@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import Foundation
 
 /// Engine-agnostic recording orchestrator — the single place that wires
@@ -244,36 +245,85 @@ public final class RecordingSession: ObservableObject {
             discardLoadedModelsIfStale()
         }
     }
-    /// BCP-47-ish language tags. `sourceLanguageCode` nil means "auto", only
-    /// meaningful for `.model`-kind ASR engines — `.system` (`SpeechTranscriber`)
-    /// requires a concrete one; `start()` fails with `.localeNotSupported`
-    /// if left nil while a system engine is selected. A UI offering "自动"
-    /// should only do so while `transcriptionEngineKind == .model`. Persisted
-    /// (see `PersistedSettingsKey`) using `""` as nil's sentinel, since
-    /// `UserDefaults` can't distinguish "never set" from "explicitly set to
-    /// nil".
-    @Published public var sourceLanguageCode: String? = "en-US" {
-        didSet {
-            Self.defaults.set(sourceLanguageCode ?? "", forKey: PersistedSettingsKey.sourceLanguageCode)
-        }
+    /// The user's languages (my language / foreign language, which way the
+    /// transcript runs, what voice input recognizes) — shared with selection
+    /// translation. `sourceLanguageCode`/`targetLanguageCode` below are
+    /// derived from it.
+    public let languages: LanguagePreferences
+    private var languageObservers: Set<AnyCancellable> = []
+
+    /// BCP-47-ish language tags, derived from `languages`: while listening to
+    /// a foreign language the source is the foreign language and the target
+    /// is the user's own; speaking flips that. `sourceLanguageCode` nil means
+    /// "auto", only meaningful for `.model`-kind ASR engines — `.system`
+    /// (`SpeechTranscriber`) requires a concrete one; `start()` fails with
+    /// `.localeNotSupported` if left nil while a system engine is selected.
+    /// A UI offering "自动" should only do so while `transcriptionEngineKind
+    /// == .model`. Persisted through `LanguagePreferences`.
+    public var sourceLanguageCode: String? {
+        get { languages.sourceLanguageCode }
+        set { languages.sourceLanguageCode = newValue }
     }
-    @Published public var targetLanguageCode: String = "zh-CN" {
-        didSet {
-            Self.defaults.set(targetLanguageCode, forKey: PersistedSettingsKey.targetLanguageCode)
-            // Unlike `sourceLanguageCode`/the engine ID properties, this one
-            // stays editable *while* a recording is running (see
-            // `TargetLanguagePicker`'s doc in `FloatingTranscriptView`) —
-            // for `SystemTranslationProvider`, that already worked via
-            // `.translationTask` rebuilding on every change, but a
-            // `.model`-kind engine like T3PO has no such rebuild hook and
-            // was silently continuing to translate into whatever language
-            // `start(config:)` set until this was added. Safe to call
-            // whether or not a recording is active — `translationProvider`
-            // is nil when stopped, and `updateTargetLanguage(_:)`'s default
-            // no-op is a deliberate no-op for providers with nothing to
-            // retarget (see that method's doc).
-            translationProvider?.updateTargetLanguage(targetLanguageCode)
+    /// Unlike `sourceLanguageCode`/the engine ID properties, this one stays
+    /// editable *while* a recording is running (see `TargetLanguagePicker`'s
+    /// doc in `FloatingTranscriptView`); a change reaches the running
+    /// translation provider through the observer set up in `init`.
+    public var targetLanguageCode: String {
+        get { languages.targetLanguageCode }
+        set { languages.targetLanguageCode = newValue }
+    }
+
+    /// The ⇄ button's gate: not while a recording is in progress (the
+    /// source is fixed at `start()`), and not while the source is "自动".
+    public var canSwapTranscriptionDirection: Bool { !isSessionActive && languages.canSwapDirection }
+
+    public func swapTranscriptionDirection() {
+        guard canSwapTranscriptionDirection else { return }
+        languages.swapDirection()
+    }
+
+    /// The language voice input recognizes — nil means "let the recognizer
+    /// pick" (the on-device model auto-detects; the system recognizer falls
+    /// back to the system locale).
+    public var dictationLanguageCode: String? {
+        Self.resolveDictationLanguage(
+            choice: languages.dictationLanguage, mine: languages.myLanguageCode,
+            foreign: languages.foreignLanguageCode, isModelEngine: transcriptionEngineKind == .model
+        )
+    }
+
+    /// Emits the language voice input would use whenever it changes, so
+    /// the dictation controller can prepare that language's assets.
+    public var dictationLanguageChanges: AnyPublisher<String?, Never> {
+        Publishers.CombineLatest4(
+            languages.$dictationLanguage, languages.$myLanguageCode, languages.$foreignLanguageCode,
+            $transcriptionEngineID
+        )
+        .map { choice, mine, foreign, engineID in
+            Self.resolveDictationLanguage(
+                choice: choice, mine: mine, foreign: foreign,
+                isModelEngine: ProviderCatalog.transcriptionEngines.first { $0.id == engineID }?.kind == .model
+            )
         }
+        .removeDuplicates()
+        .eraseToAnyPublisher()
+    }
+
+    static func resolveDictationLanguage(
+        choice: DictationLanguageChoice, mine: String, foreign: String, isModelEngine: Bool
+    ) -> String? {
+        let code: String
+        switch choice {
+        case .mine: code = mine
+        case .foreign: code = foreign
+        case .auto: return isModelEngine ? nil : mine
+        }
+        // The system recognizer can't take every language the catalog lists
+        // (see `LanguageOption.supportsSystemASRSource`).
+        if !isModelEngine, LanguageCatalog.common.first(where: { $0.code == code })?.supportsSystemASRSource == false {
+            return nil
+        }
+        return code
     }
 
     /// See `TranslationCommitEagerness`'s doc — only `model.t3po` reads this
@@ -450,8 +500,12 @@ public final class RecordingSession: ObservableObject {
     /// `RecordingSession` doesn't assume that.
     private var translationRowIndex = 0
 
-    public init(sessionStore: SessionStore? = nil, modelDownloadManager: ModelDownloadManager? = nil) {
+    public init(
+        sessionStore: SessionStore? = nil, modelDownloadManager: ModelDownloadManager? = nil,
+        languages: LanguagePreferences? = nil
+    ) {
         self.sessionStore = sessionStore
+        self.languages = languages ?? LanguagePreferences()
         // Not a default parameter value (`= .shared`) — evaluating a
         // `@MainActor`-isolated static property as a default argument
         // expression is only diagnosed as a warning under today's Swift
@@ -459,7 +513,25 @@ public final class RecordingSession: ObservableObject {
         // resolving it here, inside this already-`@MainActor` initializer
         // body, avoids depending on that being fixed later.
         self.modelDownloadManager = modelDownloadManager ?? .shared
+        observeLanguages()
         restorePersistedSettings()
+    }
+
+    /// Re-publishes `languages` changes as this object's own (views observe
+    /// `RecordingSession`, not the nested object) and pushes a changed
+    /// target to the running translation provider.
+    private func observeLanguages() {
+        languages.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &languageObservers)
+        Publishers.CombineLatest3(
+            languages.$myLanguageCode, languages.$foreignLanguageCode, languages.$transcriptionDirection
+        )
+        .map { LanguagePreferences.targetCode(mine: $0, foreign: $1, direction: $2) }
+        .removeDuplicates()
+        .dropFirst()
+        .sink { [weak self] target in self?.translationProvider?.updateTargetLanguage(target) }
+        .store(in: &languageObservers)
     }
 
     /// Restores whatever settings were persisted from a previous run —
@@ -471,8 +543,8 @@ public final class RecordingSession: ObservableObject {
     /// property that already has a declared default value, like all of
     /// these, gets its `didSet` called even for an assignment made from
     /// within `init()`) — but `transcriptionEngineID`'s self-heal `didSet`
-    /// runs *before* `sourceLanguageCode` below is restored, so it validates
-    /// against the not-yet-restored (still-default) value and can't catch
+    /// runs *before* the rest of the settings are restored, so it validates
+    /// against the not-yet-restored (still-default) values and can't catch
     /// an invariant violation that only exists after both are restored.
     /// `validateAndNormalizeSourceLanguage()` below re-checks once
     /// everything's loaded, closing that gap.
@@ -491,16 +563,6 @@ public final class RecordingSession: ObservableObject {
         if let value = defaults.string(forKey: PersistedSettingsKey.translationEngineID),
            ProviderCatalog.translationEngines.contains(where: { $0.id == value }) {
             translationEngineID = value
-        }
-        if let value = defaults.string(forKey: PersistedSettingsKey.sourceLanguageCode) {
-            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-            sourceLanguageCode = trimmed.isEmpty ? nil : trimmed
-        }
-        if let value = defaults.string(forKey: PersistedSettingsKey.targetLanguageCode) {
-            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
-                targetLanguageCode = trimmed
-            }
         }
         if defaults.object(forKey: PersistedSettingsKey.includeSystemAudio) != nil {
             includeSystemAudio = defaults.bool(forKey: PersistedSettingsKey.includeSystemAudio)
@@ -636,11 +698,18 @@ public final class RecordingSession: ObservableObject {
     /// doc).
     private func validateAndNormalizeSourceLanguage() {
         guard transcriptionEngineKind == .system else { return }
-        let isUnsupportedForSystemASR = sourceLanguageCode.map { code in
-            LanguageCatalog.common.first { $0.code == code }?.supportsSystemASRSource == false
-        } ?? true
-        if isUnsupportedForSystemASR {
-            sourceLanguageCode = "en-US"
+        func isUnsupported(_ code: String?) -> Bool {
+            code.map { code in
+                LanguageCatalog.common.first { $0.code == code }?.supportsSystemASRSource == false
+            } ?? true
+        }
+        guard isUnsupported(languages.sourceLanguageCode) else { return }
+        // The user's own language can't be recognized here: listen to the
+        // foreign one instead (and drop "自动"), then repair that side too.
+        languages.transcriptionDirection = .listenForeign
+        languages.foreignLanguageAutoDetect = false
+        if isUnsupported(languages.sourceLanguageCode) {
+            languages.foreignLanguageCode = LanguageSettingsMigration.defaultForeign
         }
     }
 

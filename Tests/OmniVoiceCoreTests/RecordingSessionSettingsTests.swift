@@ -13,7 +13,18 @@ import Testing
 struct RecordingSessionSettingsTests {
     private let defaults = UserDefaults.standard
 
+    /// The unified language keys (and the schema version that gates the
+    /// migration from the old source/target keys) — cleared around every
+    /// test so the old keys a test seeds are actually migrated.
+    private static let languageKeys = [
+        PersistedLanguageKey.schemaVersion, PersistedLanguageKey.myLanguageCode,
+        PersistedLanguageKey.foreignLanguageCode, PersistedLanguageKey.transcriptionDirection,
+        PersistedLanguageKey.foreignLanguageAutoDetect, PersistedLanguageKey.dictationLanguage,
+    ]
+
     private func withPersisted(_ values: [String: Any?], _ body: () -> Void) {
+        for key in Self.languageKeys { defaults.removeObject(forKey: key) }
+        defer { for key in Self.languageKeys { defaults.removeObject(forKey: key) } }
         for (key, value) in values {
             if let value {
                 defaults.set(value, forKey: key)
