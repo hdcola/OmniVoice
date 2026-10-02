@@ -145,13 +145,35 @@ for dylib in "$FRAMEWORKS_DIR"/*.dylib; do
   install_name_tool -add_rpath "@loader_path" "$dylib" 2>/dev/null || true
 done
 
-# Ad-hoc signing only — good enough for local TCC prompts (mic/speech/screen
-# recording) to stick to this bundle identity during development. The real
-# release pipeline (signing with a Developer ID cert, notarization, stapling)
-# is a separate, not-yet-written script — see the project's open items on
-# distribution.
-echo "==> ad-hoc codesigning (development only, not a release build)"
-codesign --force --deep --sign - "$APP_BUNDLE"
+# Ad-hoc signing ("-") makes the app identity the binary's cdhash, which
+# changes every build, so macOS (TCC) resets mic/speech/screen-recording
+# permissions on every update. A fixed code-signing certificate keeps the
+# identity stable (see Docs/SIGNING.md). Selection order:
+#   1. SIGN_IDENTITY, if set ("-" forces ad-hoc; a missing cert is an error)
+#   2. the default certificate below, if it exists in the keychain
+#   3. ad-hoc, e.g. for contributors without the certificate
+# This is still not Developer ID signing or notarization — see the project's
+# open items on distribution.
+DEFAULT_SIGN_IDENTITY="OmniVoice Dev Signing"
+has_identity() {
+  security find-identity -p codesigning | grep -qF "\"$1\""
+}
+if [ -n "${SIGN_IDENTITY:-}" ]; then
+  if [ "$SIGN_IDENTITY" != "-" ] && ! has_identity "$SIGN_IDENTITY"; then
+    echo "error: code-signing identity \"$SIGN_IDENTITY\" not found in keychain (see Docs/SIGNING.md)" >&2
+    exit 1
+  fi
+elif has_identity "$DEFAULT_SIGN_IDENTITY"; then
+  SIGN_IDENTITY="$DEFAULT_SIGN_IDENTITY"
+else
+  SIGN_IDENTITY="-"
+fi
+if [ "$SIGN_IDENTITY" = "-" ]; then
+  echo "==> ad-hoc codesigning (permissions reset on every update; see Docs/SIGNING.md)"
+else
+  echo "==> codesigning with \"$SIGN_IDENTITY\""
+fi
+codesign --force --deep --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
 
 echo "==> done: $APP_BUNDLE"
 echo "Run with: open \"$APP_BUNDLE\""

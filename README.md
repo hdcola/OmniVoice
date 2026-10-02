@@ -91,6 +91,7 @@ history and open items.
 swift build             # debug build
 swift test              # unit tests
 ./Scripts/build_app.sh  # packages an ad-hoc-signed .app into build/
+                        # (uses the "OmniVoice Dev Signing" cert if present, see Docs/SIGNING.md)
 ./Scripts/build_dmg.sh  # wraps that .app into an installable .dmg (run build_app.sh first)
 ```
 
