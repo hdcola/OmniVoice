@@ -50,6 +50,11 @@ struct SessionDisplayTitleTests {
         #expect(md.hasPrefix("# Hello world"))
     }
 
+    @Test func exportedMarkdownKeepsALongTitleWhole() {
+        let long = String(repeating: "a", count: 50)
+        #expect(SessionExporter.markdown(for: makeSession(texts: [long])).hasPrefix("# \(long)\n"))
+    }
+
     @Test func customTitleIsKept() {
         #expect(makeSession(title: "周会", texts: ["Hello"]).displayTitle() == "周会")
     }

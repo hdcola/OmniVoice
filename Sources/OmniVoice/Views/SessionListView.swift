@@ -364,7 +364,8 @@ struct SessionListView: View {
     /// "38 分钟" once a full minute has elapsed, else "42 秒" — a session
     /// still in progress (`end == nil`) measures up through `.now`.
     private static func durationLabel(from start: Date, to end: Date?) -> String {
-        let seconds = (end ?? .now).timeIntervalSince(start)
+        // Floored at 0 so a clock adjustment can't produce "-1 秒".
+        let seconds = max(0, (end ?? .now).timeIntervalSince(start))
         if seconds < 60 {
             return "\(Int(seconds.rounded())) 秒"
         }

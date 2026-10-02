@@ -7,7 +7,7 @@ import Foundation
 public enum SessionExporter {
     public static func markdown(for session: RecordingSessionRecord) -> String {
         var lines: [String] = []
-        lines.append("# \(session.displayTitle())")
+        lines.append("# \(session.displayTitle(maxLength: nil))")
         lines.append("")
         lines.append("*\(Self.dateFormatter.string(from: session.startedAt))*")
         lines.append("")
