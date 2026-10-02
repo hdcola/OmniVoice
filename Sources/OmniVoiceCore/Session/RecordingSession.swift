@@ -385,7 +385,9 @@ public final class RecordingSession: ObservableObject {
     /// injected manager still sees a UI that reflects *that* instance's
     /// `downloadProgress`/cached files, not always the real shared one.
     public let modelDownloadManager: ModelDownloadManager
-    private var activeSessionRecord: RecordingSessionRecord?
+    /// `@Published` so `liveSessionID` observers refresh the moment the
+    /// record is created/cleared, independent of SwiftUI's `@Query` updates.
+    @Published private var activeSessionRecord: RecordingSessionRecord?
     /// The persisted record being appended to right now, or nil when nothing
     /// is recording. The history window uses it to protect only that one
     /// record — a record with `endedAt == nil` that is *not* this one is a

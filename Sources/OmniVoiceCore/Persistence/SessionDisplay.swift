@@ -18,9 +18,10 @@ extension RecordingSessionRecord {
     }
 
     /// What the history list shows: a user-chosen title as-is, otherwise the
-    /// first utterance's text (trimmed, capped at `maxLength` characters),
+    /// first utterance's text (trimmed, capped at `maxLength` characters —
+    /// pass nil for the whole sentence, e.g. to pre-fill a rename field),
     /// otherwise the stored default title when nothing was transcribed.
-    public func displayTitle(maxLength: Int = 30) -> String {
+    public func displayTitle(maxLength: Int? = 30) -> String {
         let isDefault = title == Self.defaultTitle(for: startedAt)
         guard isDefault else { return title }
         // First *non-empty* utterance — a leading VAD blip with no text
@@ -35,6 +36,7 @@ extension RecordingSessionRecord {
         guard let first else { return title }
         // Any newline flavor (\n, \r\n, U+2028…) collapses to one space.
         let oneLine = first.components(separatedBy: .newlines).filter { !$0.isEmpty }.joined(separator: " ")
-        return oneLine.count > maxLength ? String(oneLine.prefix(maxLength)) + "…" : oneLine
+        guard let maxLength, oneLine.count > maxLength else { return oneLine }
+        return String(oneLine.prefix(maxLength)) + "…"
     }
 }

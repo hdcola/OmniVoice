@@ -259,7 +259,9 @@ struct SessionListView: View {
     }
 
     private func beginRename(_ session: RecordingSessionRecord) {
-        renameText = session.displayTitle()
+        // Full first sentence, not the truncated list label — saving a
+        // pre-filled "…" would permanently cut the title.
+        renameText = session.displayTitle(maxLength: nil)
         renamingSession = session
     }
 
@@ -325,12 +327,12 @@ struct SessionListView: View {
     }()
     private static let monthDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "M月d日"
+        formatter.dateFormat = "M月d日 HH:mm"
         return formatter
     }()
     private static let yearMonthDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年M月d日"
+        formatter.dateFormat = "yyyy年M月d日 HH:mm"
         return formatter
     }()
 
@@ -353,14 +355,14 @@ struct SessionListView: View {
         return formatter.string(from: date)
     }
 
-    /// "38 分钟" once a full minute has elapsed, else "42 秒" — a session
-    /// still in progress (`end == nil`) measures up through `.now`.
     /// `endedAt`, or — for a record a crash left without one — its last
     /// utterance, so an orphan doesn't show an ever-growing duration.
     private static func endDate(of session: RecordingSessionRecord) -> Date {
         session.endedAt ?? session.utterances.max(by: { $0.createdAt < $1.createdAt })?.createdAt ?? session.startedAt
     }
 
+    /// "38 分钟" once a full minute has elapsed, else "42 秒" — a session
+    /// still in progress (`end == nil`) measures up through `.now`.
     private static func durationLabel(from start: Date, to end: Date?) -> String {
         let seconds = (end ?? .now).timeIntervalSince(start)
         if seconds < 60 {

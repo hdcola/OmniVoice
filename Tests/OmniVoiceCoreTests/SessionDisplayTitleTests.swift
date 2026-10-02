@@ -40,6 +40,16 @@ struct SessionDisplayTitleTests {
         #expect(session.displayTitle() == "b")
     }
 
+    @Test func nilMaxLengthKeepsTheWholeSentence() {
+        let long = String(repeating: "a", count: 50)
+        #expect(makeSession(texts: [long]).displayTitle(maxLength: nil) == long)
+    }
+
+    @Test func exportedMarkdownUsesTheDisplayTitle() {
+        let md = SessionExporter.markdown(for: makeSession(texts: ["Hello world"]))
+        #expect(md.hasPrefix("# Hello world"))
+    }
+
     @Test func customTitleIsKept() {
         #expect(makeSession(title: "周会", texts: ["Hello"]).displayTitle() == "周会")
     }
