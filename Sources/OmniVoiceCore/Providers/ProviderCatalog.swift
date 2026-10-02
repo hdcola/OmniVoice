@@ -254,6 +254,20 @@ public enum ProviderCatalog {
         modelVariants.filter { $0.engineID == engineID }
     }
 
+    /// The variant to suggest downloading for `engineID` as a companion
+    /// pick — the engine's default (first catalog) variant — or `nil` if
+    /// *any* of the engine's variants is already downloaded. Checks the
+    /// whole engine, not just the default: someone who deliberately took
+    /// R2T2 Q4_K_M (low-memory) or F16 already has the engine and shouldn't
+    /// be nudged toward a 2.3GB Q8_0 on top.
+    public static func companionSuggestion(
+        forEngineID engineID: String, isDownloaded: (ModelVariant) -> Bool
+    ) -> ModelVariant? {
+        let variants = modelVariants(forEngineID: engineID)
+        guard !variants.contains(where: isDownloaded) else { return nil }
+        return variants.first
+    }
+
     public static func variant(forID id: String) -> ModelVariant? {
         modelVariants.first { $0.id == id }
     }

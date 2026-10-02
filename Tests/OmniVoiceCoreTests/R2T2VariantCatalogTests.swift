@@ -35,4 +35,16 @@ struct R2T2VariantCatalogTests {
             #expect(r2t2 == ["r2t2-q8_0"], "\(bundle.id)")
         }
     }
+
+    @Test func companionSuggestionOffersDefaultR2T2OnlyWhenNoVariantIsDownloaded() {
+        let none = ProviderCatalog.companionSuggestion(forEngineID: "model.r2t2") { _ in false }
+        #expect(none?.id == "r2t2-q8_0")
+    }
+
+    @Test func companionSuggestionIsSuppressedByAnyDownloadedR2T2Variant() {
+        for id in ["r2t2-q8_0", "r2t2-q4_k_m", "r2t2-f16"] {
+            let suggestion = ProviderCatalog.companionSuggestion(forEngineID: "model.r2t2") { $0.id == id }
+            #expect(suggestion == nil, "\(id) already covers R2T2")
+        }
+    }
 }

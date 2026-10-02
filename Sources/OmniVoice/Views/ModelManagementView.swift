@@ -198,7 +198,7 @@ struct ModelManagementView: View {
     }
 
     /// Just downloaded a translation model (T3PO/HY-MT1.5) but R2T2 isn't
-    /// downloaded yet — surfaces the §4.3.3 "搭配 R2T2 识别引擎可获得最佳实时
+    /// downloaded yet (in *any* precision) — surfaces the §4.3.3 "搭配 R2T2 识别引擎可获得最佳实时
     /// 打字机体验" nudge. `nil` once R2T2 is already downloaded, or for a
     /// transcription-side download (nothing to suggest downward from).
     private func companionSuggestion(forDownloadedTranscription variant: ModelVariant) -> (String, ModelVariant)? {
@@ -206,7 +206,9 @@ struct ModelManagementView: View {
     }
 
     private func companionSuggestion(forDownloadedTranslation variant: ModelVariant) -> (String, ModelVariant)? {
-        guard let r2t2 = ProviderCatalog.variant(forID: "r2t2-q8_0"), !downloadManager.isDownloaded(r2t2) else {
+        guard let r2t2 = ProviderCatalog.companionSuggestion(
+            forEngineID: "model.r2t2", isDownloaded: downloadManager.isDownloaded
+        ) else {
             return nil
         }
         return ("搭配 R2T2 识别引擎可获得最佳实时打字机体验", r2t2)

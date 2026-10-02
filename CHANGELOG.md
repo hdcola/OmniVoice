@@ -12,6 +12,7 @@ The format is based on Keep a Changelog.
 ### Changed
 
 ### Fixed
+- fix(models): the "搭配 R2T2 识别引擎" nudge shown after downloading a translation model now checks whether *any* R2T2 precision is downloaded, not just Q8_0 — so a user who picked R2T2 Q4_K_M or F16 is no longer pushed to download a 2.3GB Q8_0 on top (#64)
 
 ### Dependencies
 
