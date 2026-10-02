@@ -98,6 +98,9 @@ public final class DictationSession: ObservableObject {
 
     /// Stops listening and discards what was heard.
     public func cancel() async {
+        // A start still in progress (downloading, opening the microphone)
+        // gives up at its next checkpoint instead of running to the end.
+        startTask?.cancel()
         await startTask?.value
         startTask = nil
         guard state == .listening else { return }
@@ -146,7 +149,14 @@ public final class DictationSession: ObservableObject {
             try await provider.start(config: config)
         } catch {
             releaseRecognizer(provider)
-            fail("听写启动失败: \(error.localizedDescription)")
+            // Cancelled while starting is the user's own doing, not a failure.
+            if Task.isCancelled { abandonStart() } else { fail("听写启动失败: \(error.localizedDescription)") }
+            return
+        }
+        if Task.isCancelled {
+            await provider.stop()
+            releaseRecognizer(provider)
+            abandonStart()
             return
         }
 
@@ -195,6 +205,13 @@ public final class DictationSession: ObservableObject {
         } else {
             provider.unload()
         }
+    }
+
+    /// Back to idle after a start the user cancelled — nothing to report.
+    private func abandonStart() {
+        statusDetail = nil
+        previewText = ""
+        state = .idle
     }
 
     private func fail(_ message: String) {

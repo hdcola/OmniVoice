@@ -56,6 +56,7 @@ final class DictationController: ObservableObject {
     private let hud = DictationHUDPanel()
     private var noticeTask: Task<Void, Never>?
     private var warmupTask: Task<Void, Never>?
+    private var maxDurationTask: Task<Void, Never>?
     /// True while a finished dictation is being pasted — the clipboard is
     /// borrowed until it is put back, so the next one waits its turn.
     private var isInserting = false
@@ -111,7 +112,6 @@ final class DictationController: ObservableObject {
         // never reaches `finish`, so the failure is what ends it.
         errorObserver = dictation.$errorMessage
             .compactMap { $0 }
-            .receive(on: DispatchQueue.main)
             .sink { [weak self] message in
                 self?.machine.reset()
                 self?.showNotice(message)
@@ -134,7 +134,12 @@ final class DictationController: ObservableObject {
 
     // MARK: - Flow
 
+    /// A dictation is ended on its own after this long, so a lost key-up or a
+    /// toggle left running can't keep the microphone open indefinitely.
+    static let maxDictationDuration: Duration = .seconds(120)
+
     private func perform(_ action: DictationTriggerMachine.Action) {
+        if action == .finish || action == .cancel { maxDurationTask?.cancel() }
         switch action {
         case .none:
             break
@@ -164,6 +169,14 @@ final class DictationController: ObservableObject {
             languageCode: languageCode(),
             deviceID: deviceID == AudioInputDevice.noneID ? nil : deviceID
         )
+        maxDurationTask?.cancel()
+        maxDurationTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.maxDictationDuration)
+            guard !Task.isCancelled, let self else { return }
+            // Same as the user finishing: what was heard is still typed.
+            machine.reset()
+            await finish()
+        }
     }
 
     private func finish() async {
