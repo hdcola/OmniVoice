@@ -25,13 +25,16 @@ extension RecordingSessionRecord {
         guard isDefault else { return title }
         // First *non-empty* utterance — a leading VAD blip with no text
         // shouldn't hide what was actually said afterwards.
+        // Single pass, no sorted copy: this runs per row on every render.
         let first = utterances
-            .sorted(by: { $0.index < $1.index })
             .lazy
-            .map { $0.sourceText.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .first { !$0.isEmpty }
+            .filter { !$0.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .min(by: { $0.index < $1.index })?
+            .sourceText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let first else { return title }
-        let oneLine = first.replacingOccurrences(of: "\n", with: " ")
+        // Any newline flavor (\n, \r\n, U+2028…) collapses to one space.
+        let oneLine = first.components(separatedBy: .newlines).filter { !$0.isEmpty }.joined(separator: " ")
         return oneLine.count > maxLength ? String(oneLine.prefix(maxLength)) + "…" : oneLine
     }
 }

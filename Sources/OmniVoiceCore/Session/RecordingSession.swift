@@ -386,6 +386,14 @@ public final class RecordingSession: ObservableObject {
     /// `downloadProgress`/cached files, not always the real shared one.
     public let modelDownloadManager: ModelDownloadManager
     private var activeSessionRecord: RecordingSessionRecord?
+    /// The persisted record being appended to right now, or nil when nothing
+    /// is recording. The history window uses it to protect only that one
+    /// record — a record with `endedAt == nil` that is *not* this one is a
+    /// leftover from a crash/force-quit and is safe to show and delete.
+    /// Gated on `isRunning` (which is `@Published`) so observers refresh.
+    public var liveSessionID: UUID? {
+        isRunning ? activeSessionRecord?.id : nil
+    }
 
     private var transcriptionProvider: TranscriptionProvider?
     private var translationProvider: TranslationProvider?

@@ -30,6 +30,14 @@ struct SessionDisplayTitleTests {
         #expect(makeSession(texts: ["", "  ", "Real words"]).displayTitle() == "Real words")
     }
 
+    @Test func anyNewlineStyleCollapsesToOneSpace() {
+        #expect(makeSession(texts: ["one\r\ntwo\n\nthree"]).displayTitle() == "one two three")
+    }
+
+    @Test func lowestIndexNonEmptyWinsRegardlessOfStorageOrder() {
+        #expect(makeSession(texts: ["", "b", "c"]).displayTitle() == "b")
+    }
+
     @Test func customTitleIsKept() {
         #expect(makeSession(title: "周会", texts: ["Hello"]).displayTitle() == "周会")
     }

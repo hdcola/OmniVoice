@@ -13,6 +13,8 @@ struct SessionListView: View {
     /// deletes/renames directly through it instead of standing up its own
     /// `SessionStore`/`ModelContainer`.
     @Environment(\.modelContext) private var modelContext
+    /// Tells which record (if any) is being recorded right now.
+    @EnvironmentObject private var recordingSession: RecordingSession
     /// Drives `List(selection:)` below, so `.onDeleteCommand` (the ⌫ key) has
     /// something to act on — `NavigationLink(value:)` and `List(selection:)`
     /// share the same `UUID` values, so picking a row for navigation and
@@ -101,17 +103,13 @@ struct SessionListView: View {
         .confirmationDialog(
             "删除 \(pendingCleanupDays ?? 0) 天前的记录？",
             isPresented: Binding(get: { pendingCleanupDays != nil }, set: { if !$0 { pendingCleanupDays = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button("删除", role: .destructive) {
-                if let days = pendingCleanupDays {
-                    performDeletion(staleSessions(olderThanDays: days))
-                }
-                pendingCleanupDays = nil
-            }
-            Button("取消", role: .cancel) { pendingCleanupDays = nil }
-        } message: {
-            Text("将删除 \(staleSessions(olderThanDays: pendingCleanupDays ?? 0).count) 条开始于 \(pendingCleanupDays ?? 0) 天前的转录记录，无法恢复。")
+            titleVisibility: .visible,
+            presenting: pendingCleanupDays
+        ) { days in
+            Button("删除", role: .destructive) { performDeletion(staleSessions(olderThanDays: days)) }
+            Button("取消", role: .cancel) {}
+        } message: { days in
+            Text("将删除 \(staleSessions(olderThanDays: days).count) 条开始于 \(days) 天前的转录记录，无法恢复。")
         }
         .alert(
             "重命名转录记录",
@@ -126,7 +124,7 @@ struct SessionListView: View {
     /// Finished sessions that started more than `days` days ago.
     private func staleSessions(olderThanDays days: Int) -> [RecordingSessionRecord] {
         let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: .now) ?? .now
-        return sessions.filter { $0.startedAt < cutoff && $0.endedAt != nil }
+        return sessions.filter { $0.startedAt < cutoff && isDeletable($0) }
     }
 
     private var selectedSessions: [RecordingSessionRecord] {
@@ -134,7 +132,7 @@ struct SessionListView: View {
     }
 
     private var selectedDeletable: [RecordingSessionRecord] {
-        selectedSessions.filter { $0.endedAt != nil }
+        selectedSessions.filter(isDeletable)
     }
 
     @ViewBuilder
@@ -143,7 +141,7 @@ struct SessionListView: View {
         // Right-clicking a row inside a multi-selection acts on the whole
         // selection, like Finder; otherwise just that row.
         let targets = selection.contains(session.id) ? selectedSessions : [session]
-        let deletable = targets.filter { $0.endedAt != nil }
+        let deletable = targets.filter(isDeletable)
         if !deletable.isEmpty {
             Button(
                 deletable.count > 1 ? "删除所选 \(deletable.count) 条…" : "删除转录记录…",
@@ -152,18 +150,29 @@ struct SessionListView: View {
         }
     }
 
-    /// Never includes the still-in-progress session (`endedAt == nil`):
+    /// Only the record being recorded right now is protected — not every
+    /// `endedAt == nil` record, since a crash or force-quit leaves those
+    /// behind permanently and they'd otherwise be undeletable.
+    private func isLive(_ session: RecordingSessionRecord) -> Bool {
+        session.id == recordingSession.liveSessionID
+    }
+
+    private func isDeletable(_ session: RecordingSessionRecord) -> Bool {
+        !isLive(session)
+    }
+
+    /// Never includes the live session:
     /// `RecordingSession` holds a live reference to that model object, so
     /// deleting it would make its next append/end mutate a deleted model.
     private func requestDeletion(of targets: [RecordingSessionRecord]) {
-        let deletable = targets.filter { $0.endedAt != nil }
+        let deletable = targets.filter(isDeletable)
         guard !deletable.isEmpty else { return }
         pendingDeletion = deletable
     }
 
     private func performDeletion(_ targets: [RecordingSessionRecord]) {
         defer { pendingDeletion = [] }
-        let deletable = targets.filter { $0.endedAt != nil }
+        let deletable = targets.filter(isDeletable)
         guard !deletable.isEmpty else { return }
         let ids = Set(deletable.map(\.id))
         // Cascade rule on `utterances` removes the child rows.
@@ -209,8 +218,8 @@ struct SessionListView: View {
     private var filteredSessions: [RecordingSessionRecord] {
         guard !searchText.isEmpty else { return sessions }
         return sessions.filter { session in
-            session.displayTitle().localizedCaseInsensitiveContains(searchText)
-                || session.title.localizedCaseInsensitiveContains(searchText)
+            session.title.localizedCaseInsensitiveContains(searchText)
+                || session.displayTitle().localizedCaseInsensitiveContains(searchText)
                 || session.utterances.contains {
                     $0.sourceText.localizedCaseInsensitiveContains(searchText)
                         || $0.translationText.localizedCaseInsensitiveContains(searchText)
@@ -241,7 +250,7 @@ struct SessionListView: View {
     private func row(for session: RecordingSessionRecord) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
-                if session.endedAt == nil {
+                if isLive(session) {
                     Circle().fill(.red).frame(width: 7, height: 7)
                 }
                 Text(session.displayTitle())
@@ -256,7 +265,7 @@ struct SessionListView: View {
             }
             Text(
                 [
-                    session.endedAt == nil ? "录制中" : Self.durationLabel(from: session.startedAt, to: session.endedAt),
+                    isLive(session) ? "录制中" : Self.durationLabel(from: session.startedAt, to: Self.endDate(of: session)),
                     "\(session.utterances.count) 句",
                     Self.compactLanguagePair(for: session),
                 ].joined(separator: " · ")
@@ -314,7 +323,13 @@ struct SessionListView: View {
     }
 
     /// "38 分钟" once a full minute has elapsed, else "42 秒" — a session
-    /// still in progress (`endedAt == nil`) measures up through `.now`.
+    /// still in progress (`end == nil`) measures up through `.now`.
+    /// `endedAt`, or — for a record a crash left without one — its last
+    /// utterance, so an orphan doesn't show an ever-growing duration.
+    private static func endDate(of session: RecordingSessionRecord) -> Date {
+        session.endedAt ?? session.utterances.map(\.createdAt).max() ?? session.startedAt
+    }
+
     private static func durationLabel(from start: Date, to end: Date?) -> String {
         let seconds = (end ?? .now).timeIntervalSince(start)
         if seconds < 60 {
