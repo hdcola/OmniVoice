@@ -14,7 +14,7 @@ The format is based on Keep a Changelog.
 
 ### Fixed
 - fix(history): recordings that captured nothing (0 句) are no longer saved; existing ones can be removed with "清理空记录" in the history toolbar menu (#62)
-- fix(history): only the record being recorded right now is protected from deletion; records a crash/force-quit left without an end time are shown normally and can be deleted (#62)
+- fix(history): only the record being recorded (or still starting up) right now is protected from deletion; records a crash/force-quit left without an end time are shown normally and can be deleted (#62)
 - fix(session): a new session's default title and start time now share one timestamp, so the history list can reliably tell a default title from a rename (#62)
 
 ### Dependencies

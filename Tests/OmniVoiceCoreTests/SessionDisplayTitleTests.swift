@@ -35,7 +35,9 @@ struct SessionDisplayTitleTests {
     }
 
     @Test func lowestIndexNonEmptyWinsRegardlessOfStorageOrder() {
-        #expect(makeSession(texts: ["", "b", "c"]).displayTitle() == "b")
+        let session = makeSession(texts: ["", "b", "c"])
+        session.utterances.reverse()
+        #expect(session.displayTitle() == "b")
     }
 
     @Test func customTitleIsKept() {

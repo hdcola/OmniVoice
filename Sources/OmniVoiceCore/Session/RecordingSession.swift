@@ -390,9 +390,12 @@ public final class RecordingSession: ObservableObject {
     /// is recording. The history window uses it to protect only that one
     /// record — a record with `endedAt == nil` that is *not* this one is a
     /// leftover from a crash/force-quit and is safe to show and delete.
-    /// Gated on `isRunning` (which is `@Published`) so observers refresh.
+    /// Gated on `isSessionActive` (all `@Published`, and true from the start
+    /// of `start()` — where the record is created and already visible in
+    /// history — through `stop()`), so there's no unprotected window while
+    /// models load, and observers refresh.
     public var liveSessionID: UUID? {
-        isRunning ? activeSessionRecord?.id : nil
+        isSessionActive ? activeSessionRecord?.id : nil
     }
 
     private var transcriptionProvider: TranscriptionProvider?

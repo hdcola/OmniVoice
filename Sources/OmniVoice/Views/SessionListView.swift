@@ -20,15 +20,11 @@ struct SessionListView: View {
     /// share the same `UUID` values, so picking a row for navigation and
     /// picking it for deletion are the same selection.
     @State private var selection: Set<UUID> = []
-    /// Non-nil while a delete confirmation is on screen — set from the swipe
-    /// action, the context menu, or ⌫, all funneled through the same
+    /// Non-nil while a delete confirmation is on screen — set from the
+    /// context menu, ⌫, or the toolbar menu, all funneled through the same
     /// `.confirmationDialog` so there's exactly one delete path to keep in
     /// sync with `RecordingSessionRecord`'s cascade-delete relationship.
-    @State private var pendingDeletion: [RecordingSessionRecord] = []
-    /// Non-empty while the "clean up old records" confirmation is on screen.
-    @State private var pendingCleanupDays: Int?
-    /// True while the "delete 0-utterance records" confirmation is on screen.
-    @State private var pendingEmptyCleanup = false
+    @State private var pendingRequest: DeletionRequest?
     /// Non-nil while the rename alert is on screen.
     @State private var renamingSession: RecordingSessionRecord?
     @State private var renameText: String = ""
@@ -57,12 +53,12 @@ struct SessionListView: View {
                         }
                         .disabled(selectedDeletable.isEmpty)
                         Divider()
-                        Button("清理空记录（0 句）…") { pendingEmptyCleanup = true }
-                            .disabled(emptySessions.isEmpty)
-                        Button("删除 30 天前的记录…") { pendingCleanupDays = 30 }
-                            .disabled(staleSessions(olderThanDays: 30).isEmpty)
-                        Button("删除 90 天前的记录…") { pendingCleanupDays = 90 }
-                            .disabled(staleSessions(olderThanDays: 90).isEmpty)
+                        Button("清理空记录（0 句）…") { pendingRequest = .empty }
+                            .disabled(!sessions.contains(where: isEmptyAndDeletable))
+                        Button("删除 30 天前的记录…") { pendingRequest = .olderThan(days: 30) }
+                            .disabled(!sessions.contains { isStale($0, olderThanDays: 30) })
+                        Button("删除 90 天前的记录…") { pendingRequest = .olderThan(days: 90) }
+                            .disabled(!sessions.contains { isStale($0, olderThanDays: 90) })
                     } label: {
                         Label("管理", systemImage: "trash")
                     }
@@ -94,36 +90,18 @@ struct SessionListView: View {
             }
         }
         .frame(minWidth: 900, minHeight: 460)
+        // One dialog for every delete flow — stacking several
+        // `.confirmationDialog`s on one view can leave some unpresentable.
         .confirmationDialog(
-            "删除 \(pendingDeletion.count) 条转录记录？",
-            isPresented: Binding(get: { !pendingDeletion.isEmpty }, set: { if !$0 { pendingDeletion = [] } }),
-            titleVisibility: .visible
-        ) {
-            Button("删除", role: .destructive) { performDeletion(pendingDeletion) }
-            Button("取消", role: .cancel) { pendingDeletion = [] }
-        } message: {
-            Text("删除后无法恢复。录制中的记录不会被删除。")
-        }
-        .confirmationDialog(
-            "清理 \(emptySessions.count) 条空记录？",
-            isPresented: $pendingEmptyCleanup,
-            titleVisibility: .visible
-        ) {
-            Button("删除", role: .destructive) { performDeletion(emptySessions) }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("这些记录没有任何转录内容，删除后无法恢复。")
-        }
-        .confirmationDialog(
-            "删除 \(pendingCleanupDays ?? 0) 天前的记录？",
-            isPresented: Binding(get: { pendingCleanupDays != nil }, set: { if !$0 { pendingCleanupDays = nil } }),
+            pendingRequest.map(title(for:)) ?? "",
+            isPresented: Binding(get: { pendingRequest != nil }, set: { if !$0 { pendingRequest = nil } }),
             titleVisibility: .visible,
-            presenting: pendingCleanupDays
-        ) { days in
-            Button("删除", role: .destructive) { performDeletion(staleSessions(olderThanDays: days)) }
+            presenting: pendingRequest
+        ) { request in
+            Button("删除", role: .destructive) { performDeletion(targets(for: request)) }
             Button("取消", role: .cancel) {}
-        } message: { days in
-            Text("将删除 \(staleSessions(olderThanDays: days).count) 条开始于 \(days) 天前的转录记录，无法恢复。")
+        } message: { request in
+            Text(message(for: request))
         }
         .alert(
             "重命名转录记录",
@@ -135,16 +113,49 @@ struct SessionListView: View {
         }
     }
 
-    /// Records with no utterances — leftovers from before empty recordings
-    /// stopped being saved.
-    private var emptySessions: [RecordingSessionRecord] {
-        sessions.filter { $0.utterances.isEmpty && isDeletable($0) }
+    /// What a confirmation dialog is asking to delete. Bulk cases resolve
+    /// their targets when shown/confirmed, so counts reflect current data.
+    private enum DeletionRequest: Equatable {
+        case sessions([RecordingSessionRecord])
+        /// Records with no utterances — leftovers from before empty
+        /// recordings stopped being saved.
+        case empty
+        case olderThan(days: Int)
     }
 
-    /// Finished sessions that started more than `days` days ago.
-    private func staleSessions(olderThanDays days: Int) -> [RecordingSessionRecord] {
+    private func targets(for request: DeletionRequest) -> [RecordingSessionRecord] {
+        switch request {
+        case .sessions(let sessions): return sessions
+        case .empty: return sessions.filter(isEmptyAndDeletable)
+        case .olderThan(let days): return sessions.filter { isStale($0, olderThanDays: days) }
+        }
+    }
+
+    private func title(for request: DeletionRequest) -> String {
+        switch request {
+        case .sessions(let sessions): return "删除 \(sessions.count) 条转录记录？"
+        case .empty: return "清理 \(targets(for: request).count) 条空记录？"
+        case .olderThan(let days): return "删除 \(days) 天前的记录？"
+        }
+    }
+
+    private func message(for request: DeletionRequest) -> String {
+        switch request {
+        case .sessions: return "删除后无法恢复。录制中的记录不会被删除。"
+        case .empty: return "这些记录没有任何转录内容，删除后无法恢复。"
+        case .olderThan(let days):
+            return "将删除 \(targets(for: request).count) 条开始于 \(days) 天前的转录记录，无法恢复。"
+        }
+    }
+
+    private func isEmptyAndDeletable(_ session: RecordingSessionRecord) -> Bool {
+        session.utterances.isEmpty && isDeletable(session)
+    }
+
+    /// Started more than `days` days ago and not the live session.
+    private func isStale(_ session: RecordingSessionRecord, olderThanDays days: Int) -> Bool {
         let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: .now) ?? .now
-        return sessions.filter { $0.startedAt < cutoff && isDeletable($0) }
+        return session.startedAt < cutoff && isDeletable(session)
     }
 
     private var selectedSessions: [RecordingSessionRecord] {
@@ -187,11 +198,11 @@ struct SessionListView: View {
     private func requestDeletion(of targets: [RecordingSessionRecord]) {
         let deletable = targets.filter(isDeletable)
         guard !deletable.isEmpty else { return }
-        pendingDeletion = deletable
+        pendingRequest = .sessions(deletable)
     }
 
     private func performDeletion(_ targets: [RecordingSessionRecord]) {
-        defer { pendingDeletion = [] }
+        defer { pendingRequest = nil }
         let deletable = targets.filter(isDeletable)
         guard !deletable.isEmpty else { return }
         let ids = Set(deletable.map(\.id))
@@ -347,7 +358,7 @@ struct SessionListView: View {
     /// `endedAt`, or — for a record a crash left without one — its last
     /// utterance, so an orphan doesn't show an ever-growing duration.
     private static func endDate(of session: RecordingSessionRecord) -> Date {
-        session.endedAt ?? session.utterances.map(\.createdAt).max() ?? session.startedAt
+        session.endedAt ?? session.utterances.max(by: { $0.createdAt < $1.createdAt })?.createdAt ?? session.startedAt
     }
 
     private static func durationLabel(from start: Date, to end: Date?) -> String {
