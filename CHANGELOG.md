@@ -12,6 +12,7 @@ The format is based on Keep a Changelog.
 ### Changed
 
 ### Fixed
+- fix(selection): ⌥A no longer comes up empty on large web pages (e.g. HuggingFace model pages) — when the app is too slow to answer the Accessibility selection query, the reader now falls back to copying with ⌘C instead of giving up
 - fix(models): deleting the selected model variant (e.g. R2T2 Q4_K_M, or HY-MT1.5 Q8_0) while another variant of the same engine is still downloaded now switches the selection to the downloaded one, instead of leaving it on the deleted file and failing with "尚未下载" on the next preload/recording (#66)
 - fix(models): the "搭配 R2T2 识别引擎" nudge shown after downloading a translation model now checks whether *any* R2T2 precision is downloaded, not just Q8_0 — so a user who picked R2T2 Q4_K_M or F16 is no longer pushed to download a 2.3GB Q8_0 on top (#64)
 

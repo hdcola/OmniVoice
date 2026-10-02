@@ -19,7 +19,7 @@ enum SelectionAnswer: Equatable {
     /// element, or its focused element does not offer `kAXSelectedText`.
     case unreadable(AXError)
     /// There is nothing to bring in and nothing to copy: a password field,
-    /// this app itself, no Accessibility permission, or no answer in time.
+    /// this app itself, or no Accessibility permission.
     case withheld
 }
 
@@ -94,7 +94,10 @@ enum SelectedTextReader {
             }
             Task {
                 try? await Task.sleep(for: readDeadline)
-                resume(.withheld)
+                // Not `.withheld`: an app that is slow to answer (a big web
+                // page building its accessibility tree) still has a
+                // selection ⌘C can copy.
+                resume(.unreadable(.cannotComplete))
             }
         }
     }
