@@ -341,6 +341,13 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       weights, and one-shot `HYMT15Translator.translateText` — plus floating
       panel toolbar/resize-cursor fixes (PR #41), the 启动时显示悬浮窗 toggle
       (PR #42), and the terminology unification pass (PR #43).
+- [x] **0.5.6 release cut** (2026-10-02, `chore/release-0.5.6`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.5.6,
+      `CFBundleVersion` 14), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.5.6]` section, `README.md`'s version/download-link references
+      bumped to match. History window overhaul: day-grouped sidebar with
+      content-based titles, multi-select batch delete, 30/90-day and
+      empty-record cleanup, empty recordings no longer saved (PR #62).
 - [x] **0.5.5 release cut** (2026-10-01, `chore/release-0.5.5`): version
       bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.5.5,
       `CFBundleVersion` 13), CHANGELOG's `[Unreleased]` cut into a dated
