@@ -59,13 +59,14 @@ final class OnboardingFinishFlowTests: XCTestCase {
     }
 
     /// `.lightweight` has nothing to download (`selectedBundleID == nil` in
-    /// `OnboardingView`) — clicking "一键开启并下载" after selecting it takes
+    /// `OnboardingView`) — clicking "完成" (the button's label when nothing downloads) after selecting it takes
     /// the same `startDownload: false` path as skipping, and must likewise
     /// close the window immediately rather than hanging or leaving it open.
     func testFinishWithLightweightModeSelectedClosesTheWindowImmediately() {
         XCTAssertTrue(onboardingWindow.waitForExistence(timeout: 10))
         app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "极速轻量模式")).firstMatch.click()
-        app.buttons["一键开启并下载"].click()
+        // Nothing to download in this mode, so the button reads "完成".
+        app.buttons["完成"].click()
         let closed = XCTWaiter.wait(
             for: [expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: onboardingWindow)],
             timeout: 5

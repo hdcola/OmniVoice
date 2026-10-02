@@ -256,6 +256,9 @@ struct OnboardingView: View {
 
     /// The run mode the user's current engines amount to, so a re-run doesn't
     /// default to (and download) the big bundle for someone on a lighter one.
+    /// An in-between setup (local R2T2 recognition with system translation)
+    /// reads as lightweight: the nearest of the three presets that downloads
+    /// nothing, rather than offering the 12 GB bundle.
     private var currentMode: Mode {
         if session.translationEngineID == "model.hymt15" { return .balanced }
         if session.translationEngineKind == .model { return .offlineModel }
@@ -365,8 +368,15 @@ struct OnboardingView: View {
     }
 
     private func finish(startDownload: Bool) {
+        // Read before the flag is set below: a re-run is the user choosing a
+        // mode on purpose, so it replaces the engines in use; a first run only
+        // upgrades engines that are still the system ones.
+        let replacingEngines = UserDefaults.standard.bool(forKey: PersistedOnboardingKey.hasCompletedOnboarding)
+        // Only when the mode actually changed: an in-between setup reads as
+        // lightweight (see `currentMode`) and must survive a plain 完成.
+        if selectedMode == .lightweight, replacingEngines, selectedMode != currentMode { switchToSystemEngines() }
         if startDownload {
-            guard startBundleDownload() else { return }
+            guard startBundleDownload(replacingEngines: replacingEngines) else { return }
         }
         persistLaunchOptions()
         // Both directions, so a re-run wizard can also turn it off.
@@ -407,7 +417,7 @@ struct OnboardingView: View {
     /// failed and `diskSpaceWarningMessage` was set instead — see
     /// `finish(startDownload:)`'s doc for why that distinction is what
     /// keeps this window (and its alert) open on failure.
-    private func startBundleDownload() -> Bool {
+    private func startBundleDownload(replacingEngines: Bool) -> Bool {
         guard let bundleID = selectedBundleID,
             let bundle = ProviderCatalog.bundles.first(where: { $0.id == bundleID })
         else {
@@ -420,7 +430,7 @@ struct OnboardingView: View {
             // is written in `finish(startDownload:)` right after this
             // returns, so hand it over via the same defaults key first.
             persistLaunchOptions()
-            preloadOnceBundleIsReady(bundle)
+            preloadOnceBundleIsReady(bundle, replacingEngines: replacingEngines)
             return true
         }
 
@@ -444,7 +454,7 @@ struct OnboardingView: View {
             Task {
                 do {
                     _ = try await downloadManager.ensureDownloaded(variant)
-                    activateIfStillSystemEngine(variant)
+                    activate(variant, replacingEngines: replacingEngines)
                     if !completionNotice.notified,
                         bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty
                     {
@@ -453,7 +463,7 @@ struct OnboardingView: View {
                             title: "模型下载完成",
                             body: "「\(bundle.displayName)」已下载并自动启用")
                     }
-                    preloadOnceBundleIsReady(bundle)
+                    preloadOnceBundleIsReady(bundle, replacingEngines: replacingEngines)
                 } catch is CancellationError {
                 } catch {
                     SystemNotifier.notify(
@@ -475,14 +485,14 @@ struct OnboardingView: View {
     /// downloaded yet), so do it as soon as the whole bundle has landed and
     /// its engines are active — earlier, a half-downloaded bundle would
     /// preload the system engine and then be discarded on the engine switch.
-    private func preloadOnceBundleIsReady(_ bundle: ModelBundle) {
+    private func preloadOnceBundleIsReady(_ bundle: ModelBundle, replacingEngines: Bool) {
         guard bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty else { return }
         // Activate every variant first: with two downloads finishing together,
         // the first finisher would otherwise preload while the second
         // variant's engine is still the system one, then have that load
         // discarded when the second activates.
         for variant in bundle.variantIDs.compactMap(ProviderCatalog.variant(forID:)) {
-            activateIfStillSystemEngine(variant)
+            activate(variant, replacingEngines: replacingEngines)
         }
         guard let scope = LaunchPreloadMode.stored.effectiveScope(for: session) else { return }
         Task { await session.preloadModel(scope: scope) }
@@ -497,17 +507,33 @@ struct OnboardingView: View {
     /// easily span a recording started on the system engine in the
     /// meantime, and switching engines mid-recording would tear down the
     /// live provider that recording is still feeding.
-    private func activateIfStillSystemEngine(_ variant: ModelVariant) {
+    /// Switches the recognition/translation engine to `variant`'s. First run
+    /// (`replacingEngines` false): only an engine still on the system one,
+    /// so a choice made while the download ran isn't undone. Re-run: the
+    /// wizard's mode wins — but an engine already on `variant`'s keeps the
+    /// precision the user picked (R2T2 Q4_K_M/F16), and nothing changes
+    /// while a session is recording.
+    private func activate(_ variant: ModelVariant, replacingEngines: Bool) {
         guard !session.isSessionActive else { return }
         if ProviderCatalog.transcriptionEngines.contains(where: { $0.id == variant.engineID }) {
-            guard session.transcriptionEngineKind == .system else { return }
+            guard replacingEngines ? session.transcriptionEngineID != variant.engineID : session.transcriptionEngineKind == .system
+            else { return }
             session.transcriptionEngineID = variant.engineID
             session.transcriptionModelVariantID = variant.id
         } else if ProviderCatalog.translationEngines.contains(where: { $0.id == variant.engineID }) {
-            guard session.translationEngineKind == .system else { return }
+            guard replacingEngines ? session.translationEngineID != variant.engineID : session.translationEngineKind == .system
+            else { return }
             session.translationEngineID = variant.engineID
             session.translationModelVariantID = variant.id
         }
+    }
+
+    /// Re-running the wizard on the lightweight mode: back to the system
+    /// engines (the first entries of the catalog).
+    private func switchToSystemEngines() {
+        guard !session.isSessionActive else { return }
+        session.transcriptionEngineID = ProviderCatalog.transcriptionEngines[0].id
+        session.translationEngineID = ProviderCatalog.translationEngines[0].id
     }
 }
 
