@@ -13,105 +13,94 @@ struct SessionListView: View {
     /// deletes/renames directly through it instead of standing up its own
     /// `SessionStore`/`ModelContainer`.
     @Environment(\.modelContext) private var modelContext
+    /// Tells which record (if any) is being recorded right now.
+    @EnvironmentObject private var recordingSession: RecordingSession
     /// Drives `List(selection:)` below, so `.onDeleteCommand` (the ⌫ key) has
     /// something to act on — `NavigationLink(value:)` and `List(selection:)`
     /// share the same `UUID` values, so picking a row for navigation and
     /// picking it for deletion are the same selection.
-    @State private var selectedID: UUID?
-    /// Non-nil while a delete confirmation is on screen — set from the swipe
-    /// action, the context menu, or ⌫, all funneled through the same
+    @State private var selection: Set<UUID> = []
+    /// Non-nil while a delete confirmation is on screen — set from the
+    /// context menu, ⌫, or the toolbar menu, all funneled through the same
     /// `.confirmationDialog` so there's exactly one delete path to keep in
     /// sync with `RecordingSessionRecord`'s cascade-delete relationship.
-    @State private var pendingDeletion: RecordingSessionRecord?
+    @State private var pendingRequest: DeletionRequest?
     /// Non-nil while the rename alert is on screen.
     @State private var renamingSession: RecordingSessionRecord?
     @State private var renameText: String = ""
 
     var body: some View {
         NavigationSplitView {
-            List(filteredSessions, selection: $selectedID) { session in
-                NavigationLink(value: session.id) {
-                    row(for: session)
-                }
-                .swipeActions(edge: .trailing) {
-                    // Never offered for the still-in-progress session
-                    // (`endedAt == nil`, the one `RecordingSession` is
-                    // actively appending to/ending) — see `pendingDeletion`'s
-                    // delete handler below for why deleting it is unsafe.
-                    if session.endedAt != nil {
-                        Button(role: .destructive) {
-                            pendingDeletion = session
-                        } label: {
-                            Label("删除", systemImage: "trash")
+            List(selection: $selection) {
+                ForEach(groupedSessions) { group in
+                    Section(group.title) {
+                        ForEach(group.sessions) { session in
+                            row(for: session)
+                                .tag(session.id)
+                                .contextMenu { contextMenu(for: session) }
                         }
                     }
                 }
-                .contextMenu {
-                    Button("重命名…") { beginRename(session) }
-                    if session.endedAt != nil {
-                        Button("删除转录记录…", role: .destructive) { pendingDeletion = session }
+            }
+            .frame(minWidth: 340)
+            .navigationSplitViewColumnWidth(min: 340, ideal: 380, max: 520)
+            .onDeleteCommand { requestDeletion(of: selectedSessions) }
+            .toolbar {
+                ToolbarItem {
+                    Menu {
+                        Button("删除所选 \(selectedDeletable.count) 条…", role: .destructive) {
+                            requestDeletion(of: selectedSessions)
+                        }
+                        .disabled(selectedDeletable.isEmpty)
+                        Divider()
+                        Button("清理空记录（0 句）…") { pendingRequest = .empty }
+                            .disabled(!sessions.contains(where: isEmptyAndDeletable))
+                        Button("删除 30 天前的记录…") { pendingRequest = .olderThan(days: 30) }
+                            .disabled(!sessions.contains { isStale($0, olderThanDays: 30) })
+                        Button("删除 90 天前的记录…") { pendingRequest = .olderThan(days: 90) }
+                            .disabled(!sessions.contains { isStale($0, olderThanDays: 90) })
+                    } label: {
+                        Label("管理", systemImage: "trash")
                     }
                 }
-            }
-            .onDeleteCommand {
-                guard let selectedID,
-                    let session = sessions.first(where: { $0.id == selectedID }),
-                    session.endedAt != nil
-                else { return }
-                pendingDeletion = session
             }
             .searchable(text: $searchText, prompt: "搜索转录或翻译内容")
             .navigationTitle("历史记录")
-            .navigationDestination(for: UUID.self) { id in
-                if let session = sessions.first(where: { $0.id == id }) {
-                    SessionDetailView(session: session)
-                }
-            }
         } detail: {
-            ContentUnavailableView(
-                "选择一条转录记录",
-                systemImage: "text.bubble",
-                description: Text("在左侧列表中选择一条转录记录查看详情")
-            )
-        }
-        .frame(minWidth: 720, minHeight: 460)
-        .confirmationDialog(
-            "删除转录记录？",
-            isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button("删除", role: .destructive) {
-                if let session = pendingDeletion, session.endedAt != nil {
-                    // `RecordingSessionRecord`'s `@Relationship(deleteRule:
-                    // .cascade, ...)` already cascades to every one of its
-                    // `UtteranceRecord`s — no separate cleanup needed here.
-                    //
-                    // Never the still-in-progress session (`endedAt == nil`,
-                    // guarded above defensively even though every path that
-                    // sets `pendingDeletion` already excludes it): this
-                    // view's `modelContext` and `RecordingSession`'s
-                    // `SessionStore` share the same `ModelContainer.mainContext`,
-                    // so deleting that session's model object here would
-                    // delete the very object `RecordingSession` still holds a
-                    // live reference to — the next `appendUtterance`/`endSession`
-                    // call would then mutate/save a deleted SwiftData model.
-                    modelContext.delete(session)
-                    try? modelContext.save()
-                    // Resetting stale selection after a delete — leaving
-                    // `selectedID` pointing at the now-deleted session's
-                    // UUID left the detail pane blank instead of resetting to
-                    // the "选择一条转录记录" placeholder, and a subsequent ⌫ did
-                    // nothing since `selectedID` no longer resolved to any
-                    // session.
-                    if selectedID == session.id {
-                        selectedID = nil
-                    }
-                }
-                pendingDeletion = nil
+            // Detail is driven straight from the selection: a `NavigationLink`
+            // inside a multi-selection `List` doesn't reliably fire on the
+            // first click.
+            let visibleSelection = selectedSessions
+            if visibleSelection.count == 1, let session = visibleSelection.first {
+                SessionDetailView(session: session)
+                    .id(session.id)
+            } else if visibleSelection.count > 1 {
+                ContentUnavailableView(
+                    "已选择 \(visibleSelection.count) 条记录",
+                    systemImage: "checkmark.circle",
+                    description: Text("按 ⌫ 或使用工具栏“管理”菜单批量删除")
+                )
+            } else {
+                ContentUnavailableView(
+                    "选择一条转录记录",
+                    systemImage: "text.bubble",
+                    description: Text("在左侧列表中选择一条转录记录查看详情")
+                )
             }
-            Button("取消", role: .cancel) { pendingDeletion = nil }
-        } message: {
-            Text("删除后无法恢复。")
+        }
+        .frame(minWidth: 900, minHeight: 460)
+        // One dialog for every delete flow — stacking several
+        // `.confirmationDialog`s on one view can leave some unpresentable.
+        .confirmationDialog(
+            pendingRequest.map(title(for:)) ?? "",
+            isPresented: Binding(get: { pendingRequest != nil }, set: { if !$0 { pendingRequest = nil } }),
+            titleVisibility: .visible,
+            presenting: pendingRequest
+        ) { request in
+            Button("删除", role: .destructive) { performDeletion(targets(for: request)) }
+            Button("取消", role: .cancel) {}
+        } message: { request in
+            Text(message(for: request))
         }
         .alert(
             "重命名转录记录",
@@ -123,10 +112,149 @@ struct SessionListView: View {
         }
     }
 
+    /// What a confirmation dialog is asking to delete. Bulk cases resolve
+    /// their targets when shown/confirmed, so counts reflect current data.
+    private enum DeletionRequest: Equatable {
+        case sessions([RecordingSessionRecord])
+        /// Records with no utterances — leftovers from before empty
+        /// recordings stopped being saved.
+        case empty
+        case olderThan(days: Int)
+    }
+
+    private func targets(for request: DeletionRequest) -> [RecordingSessionRecord] {
+        switch request {
+        case .sessions(let sessions): return sessions
+        case .empty: return sessions.filter(isEmptyAndDeletable)
+        case .olderThan(let days): return sessions.filter { isStale($0, olderThanDays: days) }
+        }
+    }
+
+    private func title(for request: DeletionRequest) -> String {
+        switch request {
+        case .sessions(let sessions): return "删除 \(sessions.count) 条转录记录？"
+        case .empty: return "清理 \(targets(for: request).count) 条空记录？"
+        case .olderThan(let days): return "删除 \(days) 天前的记录？"
+        }
+    }
+
+    private func message(for request: DeletionRequest) -> String {
+        switch request {
+        case .sessions: return "删除后无法恢复。录制中的记录不会被删除。"
+        case .empty: return "这些记录没有任何转录内容，删除后无法恢复。"
+        case .olderThan(let days):
+            return "将删除 \(targets(for: request).count) 条开始于 \(days) 天前的转录记录，无法恢复。"
+        }
+    }
+
+    private func isEmptyAndDeletable(_ session: RecordingSessionRecord) -> Bool {
+        session.utterances.isEmpty && isDeletable(session)
+    }
+
+    /// Started more than `days` days ago and not the live session.
+    private func isStale(_ session: RecordingSessionRecord, olderThanDays days: Int) -> Bool {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: .now) ?? .now
+        return session.startedAt < cutoff && isDeletable(session)
+    }
+
+    /// Selected *and currently visible*: a selection made before typing a
+    /// search must not let ⌫ delete rows the filter is now hiding.
+    private var selectedSessions: [RecordingSessionRecord] {
+        filteredSessions.filter { selection.contains($0.id) }
+    }
+
+    private var selectedDeletable: [RecordingSessionRecord] {
+        selectedSessions.filter(isDeletable)
+    }
+
+    @ViewBuilder
+    private func contextMenu(for session: RecordingSessionRecord) -> some View {
+        Button("重命名…") { beginRename(session) }
+        // Right-clicking a row inside a multi-selection acts on the whole
+        // selection, like Finder; otherwise just that row.
+        let targets = selection.contains(session.id) ? selectedSessions : [session]
+        let deletable = targets.filter(isDeletable)
+        if !deletable.isEmpty {
+            Button(
+                deletable.count > 1 ? "删除所选 \(deletable.count) 条…" : "删除转录记录…",
+                role: .destructive
+            ) { requestDeletion(of: targets) }
+        }
+    }
+
+    /// Only the record being recorded right now is protected — not every
+    /// `endedAt == nil` record, since a crash or force-quit leaves those
+    /// behind permanently and they'd otherwise be undeletable.
+    private func isLive(_ session: RecordingSessionRecord) -> Bool {
+        session.id == recordingSession.liveSessionID
+    }
+
+    private func isDeletable(_ session: RecordingSessionRecord) -> Bool {
+        !isLive(session)
+    }
+
+    /// Never includes the live session:
+    /// `RecordingSession` holds a live reference to that model object, so
+    /// deleting it would make its next append/end mutate a deleted model.
+    private func requestDeletion(of targets: [RecordingSessionRecord]) {
+        let deletable = targets.filter(isDeletable)
+        guard !deletable.isEmpty else { return }
+        pendingRequest = .sessions(deletable)
+    }
+
+    private func performDeletion(_ targets: [RecordingSessionRecord]) {
+        defer { pendingRequest = nil }
+        let deletable = targets.filter(isDeletable)
+        guard !deletable.isEmpty else { return }
+        let ids = Set(deletable.map(\.id))
+        // Cascade rule on `utterances` removes the child rows.
+        for session in deletable { modelContext.delete(session) }
+        try? modelContext.save()
+        selection.subtract(ids)
+    }
+
+    private struct SessionGroup: Identifiable {
+        /// Position, not `title` — a non-monotonic `startedAt` (clock change,
+        /// future timestamp) could produce two groups with the same title.
+        let id: Int
+        let title: String
+        var sessions: [RecordingSessionRecord]
+    }
+
+    /// Newest-first sessions bucketed into 今天 / 昨天 / 本周 / 本月 / "yyyy年M月".
+    private var groupedSessions: [SessionGroup] {
+        var groups: [SessionGroup] = []
+        for session in filteredSessions {
+            let title = Self.groupTitle(for: session.startedAt)
+            if let last = groups.indices.last, groups[last].title == title {
+                groups[last].sessions.append(session)
+            } else {
+                groups.append(SessionGroup(id: groups.count, title: title, sessions: [session]))
+            }
+        }
+        return groups
+    }
+
+    private static func groupTitle(for date: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return "今天" }
+        if calendar.isDateInYesterday(date) { return "昨天" }
+        if calendar.isDate(date, equalTo: .now, toGranularity: .weekOfYear) { return "本周" }
+        if calendar.isDate(date, equalTo: .now, toGranularity: .month) { return "本月" }
+        return yearMonthFormatter.string(from: date)
+    }
+
+    private static let yearMonthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年M月"
+        return formatter
+    }()
+
     private var filteredSessions: [RecordingSessionRecord] {
         guard !searchText.isEmpty else { return sessions }
         return sessions.filter { session in
             session.title.localizedCaseInsensitiveContains(searchText)
+                || session.displayTitle().localizedCaseInsensitiveContains(searchText)
                 || session.utterances.contains {
                     $0.sourceText.localizedCaseInsensitiveContains(searchText)
                         || $0.translationText.localizedCaseInsensitiveContains(searchText)
@@ -135,7 +263,9 @@ struct SessionListView: View {
     }
 
     private func beginRename(_ session: RecordingSessionRecord) {
-        renameText = session.title
+        // Full first sentence, not the truncated list label — saving a
+        // pre-filled "…" would permanently cut the title.
+        renameText = session.displayTitle(maxLength: nil)
         renamingSession = session
     }
 
@@ -155,22 +285,32 @@ struct SessionListView: View {
     /// bare "N 条记录" caption with the metadata the proposal's history
     /// section (3.3.A) asks for.
     private func row(for session: RecordingSessionRecord) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(session.title)
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                if isLive(session) {
+                    Circle().fill(.red).frame(width: 7, height: 7)
+                }
+                Text(session.displayTitle())
                     .font(.headline)
-                Spacer()
+                    .lineLimit(1)
+                Spacer(minLength: 4)
                 Text(Self.relativeTimeLabel(for: session.startedAt))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize()
             }
-            HStack(spacing: 10) {
-                Label(Self.durationLabel(from: session.startedAt, to: session.endedAt), systemImage: "clock")
-                Label(Self.languagePairLabel(for: session), systemImage: "globe")
-                Label("\(session.utterances.count) 句", systemImage: "text.bubble")
-            }
+            Text(
+                [
+                    isLive(session) ? "录制中" : Self.durationLabel(from: session.startedAt, to: Self.endDate(of: session)),
+                    "\(session.utterances.count) 句",
+                    Self.compactLanguagePair(for: session),
+                ].joined(separator: " · ")
+            )
             .font(.caption)
             .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.tail)
         }
         .padding(.vertical, 2)
     }
@@ -184,26 +324,35 @@ struct SessionListView: View {
         formatter.dateFormat = "HH:mm"
         return formatter
     }()
+    private static let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter
+    }()
     private static let monthDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "M月d日"
+        formatter.dateFormat = "M月d日 HH:mm"
         return formatter
     }()
     private static let yearMonthDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年M月d日"
+        formatter.dateFormat = "yyyy年M月d日 HH:mm"
         return formatter
     }()
 
-    /// "今天 14:30" / "昨天 09:15" / "9月20日" (this year, no year) / a full
-    /// dated string once the year itself is no longer implied.
+    /// "14:30" (today/yesterday, shown under their section header) /
+    /// "周三 14:30" (this week) / "9月20日 14:30" (this year) / "2025年9月20日 14:30"
+    /// once the year itself is no longer implied.
     private static func relativeTimeLabel(for date: Date) -> String {
         let calendar = Calendar.current
-        if calendar.isDateInToday(date) {
-            return "今天 \(timeFormatter.string(from: date))"
+        // The sidebar's 今天/昨天 section headers already name the day, so
+        // those rows only need the clock time.
+        if calendar.isDateInToday(date) || calendar.isDateInYesterday(date) {
+            return timeFormatter.string(from: date)
         }
-        if calendar.isDateInYesterday(date) {
-            return "昨天 \(timeFormatter.string(from: date))"
+        // Several recordings on one day are told apart by clock time.
+        if calendar.isDate(date, equalTo: .now, toGranularity: .weekOfYear) {
+            return "\(weekdayFormatter.string(from: date)) \(timeFormatter.string(from: date))"
         }
         let formatter = calendar.isDate(date, equalTo: .now, toGranularity: .year)
             ? monthDayFormatter
@@ -211,36 +360,30 @@ struct SessionListView: View {
         return formatter.string(from: date)
     }
 
+    /// `endedAt`, or — for a record a crash left without one — its last
+    /// utterance, so an orphan doesn't show an ever-growing duration.
+    private static func endDate(of session: RecordingSessionRecord) -> Date {
+        session.endedAt ?? session.utterances.max(by: { $0.createdAt < $1.createdAt })?.createdAt ?? session.startedAt
+    }
+
     /// "38 分钟" once a full minute has elapsed, else "42 秒" — a session
-    /// still in progress (`endedAt == nil`) measures up through `.now`.
+    /// still in progress (`end == nil`) measures up through `.now`.
     private static func durationLabel(from start: Date, to end: Date?) -> String {
-        let seconds = (end ?? .now).timeIntervalSince(start)
+        // Floored at 0 so a clock adjustment can't produce "-1 秒".
+        let seconds = max(0, (end ?? .now).timeIntervalSince(start))
         if seconds < 60 {
             return "\(Int(seconds.rounded())) 秒"
         }
         return "\(Int((seconds / 60).rounded())) 分钟"
     }
 
-    /// "英语 ➔ 简体中文" — looks both codes up through the same
-    /// `LanguageCatalog.common` the floating panel/Settings pickers use, so
-    /// the label always matches what the user actually picked from those
-    /// menus. `sourceLanguageCode == nil` means "自动" (auto-detect, only
-    /// ever offered for a `.model`-kind ASR engine — see `RecordingSession
-    /// .sourceLanguageCode`'s doc).
-    private static func languagePairLabel(for session: RecordingSessionRecord) -> String {
-        // Only an actually-nil `sourceLanguageCode` means "自动" (auto-
-        // detect) — a non-nil code that just isn't in `LanguageCatalog.common`
-        // (an unrecognized/custom code) should fall back to showing the raw
-        // code itself, same as `targetLabel` below already does, not be
-        // mistaken for "auto-detect".
-        let sourceLabel: String
-        if let code = session.sourceLanguageCode {
-            sourceLabel = LanguageCatalog.common.first { $0.code == code }?.displayName ?? code
-        } else {
-            sourceLabel = "自动"
+    /// "EN→ZH" (`AUTO→ZH` when the source is auto-detected, i.e. a nil
+    /// `sourceLanguageCode`) — full display names don't fit the sidebar row.
+    private static func compactLanguagePair(for session: RecordingSessionRecord) -> String {
+        func short(_ code: String) -> String {
+            code.split(separator: "-").first.map { $0.uppercased() } ?? code
         }
-        let targetLabel = LanguageCatalog.common.first { $0.code == session.targetLanguageCode }?.displayName
-            ?? session.targetLanguageCode
-        return "\(sourceLabel) ➔ \(targetLabel)"
+        let source = session.sourceLanguageCode.map(short) ?? "AUTO"
+        return "\(source)→\(short(session.targetLanguageCode))"
     }
 }

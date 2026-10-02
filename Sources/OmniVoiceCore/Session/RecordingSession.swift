@@ -385,7 +385,20 @@ public final class RecordingSession: ObservableObject {
     /// injected manager still sees a UI that reflects *that* instance's
     /// `downloadProgress`/cached files, not always the real shared one.
     public let modelDownloadManager: ModelDownloadManager
-    private var activeSessionRecord: RecordingSessionRecord?
+    /// `@Published` so `liveSessionID` observers refresh the moment the
+    /// record is created/cleared, independent of SwiftUI's `@Query` updates.
+    @Published private var activeSessionRecord: RecordingSessionRecord?
+    /// The persisted record being appended to right now, or nil when nothing
+    /// is recording. The history window uses it to protect only that one
+    /// record — a record with `endedAt == nil` that is *not* this one is a
+    /// leftover from a crash/force-quit and is safe to show and delete.
+    /// Gated on `isSessionActive` (all `@Published`, and true from the start
+    /// of `start()` — where the record is created and already visible in
+    /// history — through `stop()`), so there's no unprotected window while
+    /// models load, and observers refresh.
+    public var liveSessionID: UUID? {
+        isSessionActive ? activeSessionRecord?.id : nil
+    }
 
     private var transcriptionProvider: TranscriptionProvider?
     private var translationProvider: TranslationProvider?
@@ -870,7 +883,7 @@ public final class RecordingSession: ObservableObject {
     /// closing out here, not the live capture.
     public func finalizeActiveSessionBeforeQuit() {
         guard let sessionStore, let activeSessionRecord else { return }
-        sessionStore.endSession(activeSessionRecord)
+        sessionStore.finish(activeSessionRecord)
         try? sessionStore.save()
         self.activeSessionRecord = nil
     }
@@ -1026,8 +1039,13 @@ public final class RecordingSession: ObservableObject {
         translationRowIndex = 0
 
         if let sessionStore {
+            // One `Date` for both fields: `RecordingSessionRecord.displayTitle()`
+            // recognizes an untouched default title by re-deriving it from
+            // `startedAt`, so the two must not straddle a minute boundary.
+            let startedAt = Date.now
             activeSessionRecord = sessionStore.createSession(
-                title: Self.defaultTitle(),
+                title: RecordingSessionRecord.defaultTitle(for: startedAt),
+                startedAt: startedAt,
                 transcriptionEngineID: transcriptionEngineID,
                 translationEngineID: translationEngineID,
                 sourceLanguageCode: sourceLanguageCode,
@@ -1258,7 +1276,7 @@ public final class RecordingSession: ObservableObject {
         await translationProvider?.stop()
 
         if let sessionStore, let activeSessionRecord {
-            sessionStore.endSession(activeSessionRecord)
+            sessionStore.finish(activeSessionRecord)
             try? sessionStore.save()
         }
         activeSessionRecord = nil
@@ -1398,13 +1416,6 @@ public final class RecordingSession: ObservableObject {
         } else {
             inputLevel = inputLevel * 0.7 + level * 0.3
         }
-    }
-
-    private static func defaultTitle() -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: .now)
     }
 
     private static func makeTranscriptionProvider(engineID: String, modelPath: URL?) -> TranscriptionProvider {

@@ -20,6 +20,7 @@ public final class SessionStore {
 
     public func createSession(
         title: String,
+        startedAt: Date = .now,
         transcriptionEngineID: String,
         translationEngineID: String,
         sourceLanguageCode: String?,
@@ -27,6 +28,7 @@ public final class SessionStore {
     ) -> RecordingSessionRecord {
         let session = RecordingSessionRecord(
             title: title,
+            startedAt: startedAt,
             transcriptionEngineID: transcriptionEngineID,
             translationEngineID: translationEngineID,
             sourceLanguageCode: sourceLanguageCode,
@@ -48,6 +50,20 @@ public final class SessionStore {
 
     public func endSession(_ session: RecordingSessionRecord, at date: Date = .now) {
         session.endedAt = date
+    }
+
+    /// Closes out a finished recording. A session that captured no
+    /// utterances (started and stopped without anything transcribed) isn't
+    /// worth a history entry, so it's deleted instead. Returns whether the
+    /// session was kept. Caller still needs to `save()`.
+    @discardableResult
+    public func finish(_ session: RecordingSessionRecord, at date: Date = .now) -> Bool {
+        guard !session.utterances.isEmpty else {
+            context.delete(session)
+            return false
+        }
+        endSession(session, at: date)
+        return true
     }
 
     public func delete(_ session: RecordingSessionRecord) {
