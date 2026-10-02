@@ -19,7 +19,10 @@ final class DictationController: ObservableObject {
     @Published var isEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isEnabled, forKey: Self.enabledKey)
-            if isEnabled { requestPermissions() }
+            if isEnabled {
+                requestPermissions()
+                warmUp()
+            }
             updateMonitor()
         }
     }
@@ -43,6 +46,8 @@ final class DictationController: ObservableObject {
 
     /// Something the HUD should tell the user instead of listening.
     @Published private(set) var notice: String?
+    /// What the background warm-up is doing, for Settings — nil when idle.
+    @Published private(set) var warmupMessage: String?
 
     let dictation: DictationSession
 
@@ -50,6 +55,7 @@ final class DictationController: ObservableObject {
     private var machine: DictationTriggerMachine
     private let hud = DictationHUDPanel()
     private var noticeTask: Task<Void, Never>?
+    private var warmupTask: Task<Void, Never>?
     /// True while a finished dictation is being pasted — the clipboard is
     /// borrowed until it is put back, so the next one waits its turn.
     private var isInserting = false
@@ -102,6 +108,7 @@ final class DictationController: ObservableObject {
                 self?.showNotice(message)
             }
         updateMonitor()
+        if isEnabled { warmUp() }
     }
 
     var hasInputMonitoringPermission: Bool { DoubleCopyMonitor.hasPermission }
@@ -186,6 +193,26 @@ final class DictationController: ObservableObject {
     }
 
     // MARK: - Setup
+
+    /// Gets the slow first-use work out of the way while the user is still in
+    /// Settings (or at launch): the system recognizer's language assets, which
+    /// are also what a dictation falls back to when no local model is loaded.
+    /// The microphone is deliberately not opened — that would flash the
+    /// system's recording indicator for nothing. A failure here is left for
+    /// the first dictation to report.
+    private func warmUp() {
+        warmupTask?.cancel()
+        let code = languageCode() ?? Locale.current.identifier(.bcp47)
+        warmupTask = Task { [weak self] in
+            do {
+                try await SystemTranscriptionProvider.prepareAssets(languageCode: code) {
+                    Task { @MainActor in self?.warmupMessage = "正在下载语言识别资源，完成后首次听写会更快…" }
+                }
+            } catch {}
+            guard !Task.isCancelled else { return }
+            self?.warmupMessage = nil
+        }
+    }
 
     private func updateMonitor() {
         if isEnabled {

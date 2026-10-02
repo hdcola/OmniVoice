@@ -53,6 +53,17 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
 
     public init() {}
 
+    /// Installs the on-device recognition assets for `languageCode` ahead of
+    /// time, so the first `start(config:)` for it doesn't wait on the
+    /// download. A no-op once they are installed.
+    public static func prepareAssets(languageCode: String, onInstalling: (() -> Void)? = nil) async throws {
+        let locale = Locale(identifier: languageCode)
+        let transcriber = SpeechTranscriber(
+            locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults], attributeOptions: []
+        )
+        try await ensureModelInstalled(for: transcriber, locale: locale, onInstalling: onInstalling)
+    }
+
     public func loadModel() async throws {
         // No separate "load" phase — the on-device asset (if missing) is
         // installed lazily in `start(config:)`.
