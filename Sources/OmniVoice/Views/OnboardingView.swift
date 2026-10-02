@@ -21,6 +21,22 @@ struct OnboardingView: View {
     /// itself; this view has no window handle of its own to close.
     let onFinished: () -> Void
 
+    init(
+        session: RecordingSession, downloadManager: ModelDownloadManager,
+        selectionController: SelectionTranslationController, onFinished: @escaping () -> Void
+    ) {
+        self.session = session
+        self.downloadManager = downloadManager
+        self.selectionController = selectionController
+        self.onFinished = onFinished
+        // Decided here, not in `onAppear`, so the first frame already shows
+        // the right card and button label.
+        let isRerun = UserDefaults.standard.bool(forKey: PersistedOnboardingKey.hasCompletedOnboarding)
+        _isRerun = State(initialValue: isRerun)
+        _selectedMode = State(initialValue: isRerun ? Self.mode(of: session) : .offlineModel)
+        _preloadMode = State(initialValue: isRerun ? LaunchPreloadMode.stored : .all)
+    }
+
     private enum Mode {
         case lightweight
         /// Problem 1 (round-4 user report) — the middle tier between the
@@ -63,7 +79,12 @@ struct OnboardingView: View {
         ),
     ]
 
-    @State private var selectedMode: Mode = .offlineModel
+    @State private var selectedMode: Mode
+    /// Opened again from Settings → 新手引导 (the wizard was completed before).
+    @State private var isRerun: Bool
+    /// A re-run only touches the engines/downloads once the user has clicked a
+    /// run mode: the pre-selected card is just a reading of the current setup.
+    @State private var modeChosen = false
     @State private var microphoneAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     @State private var screenRecordingAuthorized = CGPreflightScreenCaptureAccess()
     @State private var accessibilityAuthorized = SelectedTextReader.isAccessibilityTrusted
@@ -78,7 +99,7 @@ struct OnboardingView: View {
     /// Applied only on finish (not when toggled), so skipping the wizard
     /// leaves the login item and launch preload untouched.
     @State private var launchAtLogin = false
-    @State private var preloadMode = LaunchPreloadMode.all
+    @State private var preloadMode: LaunchPreloadMode
     /// Once the user picks a preload mode themselves, switching run modes
     /// stops overriding it with that mode's default.
     @State private var preloadModeEdited = false
@@ -109,14 +130,6 @@ struct OnboardingView: View {
         .frame(width: 520)
         .onAppear {
             launchAtLogin = loginItem.isEnabled
-            // A re-run (Settings → 新手引导) starts from what the user has
-            // already chosen instead of overwriting it with the run mode's
-            // default.
-            if UserDefaults.standard.bool(forKey: PersistedOnboardingKey.hasCompletedOnboarding) {
-                selectedMode = currentMode
-                preloadMode = LaunchPreloadMode.stored
-                preloadModeEdited = true
-            }
         }
         .onChange(of: selectedMode) { _, mode in
             guard !preloadModeEdited else { return }
@@ -213,6 +226,7 @@ struct OnboardingView: View {
         let isSelected = selectedMode == option.mode
         return Button {
             selectedMode = option.mode
+            modeChosen = true
         } label: {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
@@ -258,17 +272,23 @@ struct OnboardingView: View {
     /// default to (and download) the big bundle for someone on a lighter one.
     /// An in-between setup (local R2T2 recognition with system translation)
     /// reads as lightweight: the nearest of the three presets that downloads
-    /// nothing, rather than offering the 12 GB bundle.
-    private var currentMode: Mode {
+    /// nothing, rather than offering the 12 GB bundle. It is only a reading —
+    /// nothing is changed until the user clicks a mode (`modeChosen`).
+    private static func mode(of session: RecordingSession) -> Mode {
         if session.translationEngineID == "model.hymt15" { return .balanced }
         if session.translationEngineKind == .model { return .offlineModel }
         return .lightweight
     }
 
+    /// First run, or a re-run where the user picked a mode: the mode section
+    /// takes effect. A re-run that left it alone only reviews permissions and
+    /// startup options.
+    private var appliesMode: Bool { !isRerun || modeChosen }
+
     /// Whether the primary button would start any download: not for the
     /// lightweight mode, nor when the chosen bundle is already on disk.
     private var willDownload: Bool {
-        guard let bundleID = selectedBundleID,
+        guard appliesMode, let bundleID = selectedBundleID,
             let bundle = ProviderCatalog.bundles.first(where: { $0.id == bundleID })
         else { return false }
         return !bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants.isEmpty
@@ -281,7 +301,7 @@ struct OnboardingView: View {
                 .foregroundStyle(.secondary)
             Spacer()
             PrimaryPillButton(title: willDownload ? "一键开启并下载" : "完成") {
-                finish(startDownload: selectedMode != .lightweight)
+                finish(startDownload: appliesMode && selectedMode != .lightweight)
             }
         }
         .padding(.horizontal, 16)
@@ -368,13 +388,13 @@ struct OnboardingView: View {
     }
 
     private func finish(startDownload: Bool) {
-        // Read before the flag is set below: a re-run is the user choosing a
-        // mode on purpose, so it replaces the engines in use; a first run only
-        // upgrades engines that are still the system ones.
-        let replacingEngines = UserDefaults.standard.bool(forKey: PersistedOnboardingKey.hasCompletedOnboarding)
-        // Only when the mode actually changed: an in-between setup reads as
-        // lightweight (see `currentMode`) and must survive a plain 完成.
-        if selectedMode == .lightweight, replacingEngines, selectedMode != currentMode { switchToSystemEngines() }
+        // A re-run is the user choosing a mode on purpose, so it replaces the
+        // engines in use; a first run only upgrades engines that are still
+        // the system ones. Clicking the lightweight card is explicit even when
+        // it was already pre-selected, so it can finish the move to system
+        // engines from an in-between setup.
+        let replacingEngines = isRerun
+        if selectedMode == .lightweight, isRerun, modeChosen { switchToSystemEngines() }
         if startDownload {
             guard startBundleDownload(replacingEngines: replacingEngines) else { return }
         }
@@ -388,7 +408,7 @@ struct OnboardingView: View {
     /// The lightweight mode has nothing to load, whatever the picker said.
     private func persistLaunchOptions() {
         UserDefaults.standard.set(
-            (selectedMode == .lightweight ? LaunchPreloadMode.off : preloadMode).rawValue,
+            (selectedMode == .lightweight && appliesMode ? LaunchPreloadMode.off : preloadMode).rawValue,
             forKey: PersistedLaunchKey.preloadMode
         )
     }
@@ -529,11 +549,15 @@ struct OnboardingView: View {
     }
 
     /// Re-running the wizard on the lightweight mode: back to the system
-    /// engines (the first entries of the catalog).
+    /// engines.
     private func switchToSystemEngines() {
         guard !session.isSessionActive else { return }
-        session.transcriptionEngineID = ProviderCatalog.transcriptionEngines[0].id
-        session.translationEngineID = ProviderCatalog.translationEngines[0].id
+        if let engine = ProviderCatalog.transcriptionEngines.first(where: { $0.kind == .system }) {
+            session.transcriptionEngineID = engine.id
+        }
+        if let engine = ProviderCatalog.translationEngines.first(where: { $0.kind == .system }) {
+            session.translationEngineID = engine.id
+        }
     }
 }
 

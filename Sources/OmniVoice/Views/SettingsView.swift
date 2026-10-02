@@ -589,6 +589,9 @@ struct SettingsView: View {
                 subtitle: "再次查看权限授权、运行模式和可选功能（如连按两次 ⌘C 翻译）；已有的设置和已下载的模型不会被清除"
             ) {
                 PillButton(title: "重新运行") { appDelegate.showOnboarding() }
+                    // Changing the run mode swaps engines, which Settings
+                    // refuses mid-recording / while a model loads.
+                    .disabled(isBusy)
             }
         }
     }

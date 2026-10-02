@@ -132,7 +132,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// A wizard that is already open is brought to the front instead of
     /// stacking a second one.
     func showOnboarding() {
-        if let onboardingWindow, onboardingWindow.isVisible {
+        // Cleared when the window closes (see below), so a non-nil window is
+        // open — possibly hidden with the whole app, where `isVisible` is false.
+        if let onboardingWindow {
             NSApp.activate(ignoringOtherApps: true)
             onboardingWindow.makeKeyAndOrderFront(nil)
             return
