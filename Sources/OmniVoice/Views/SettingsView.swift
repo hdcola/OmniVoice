@@ -22,6 +22,7 @@ struct SettingsView: View {
     @EnvironmentObject private var session: RecordingSession
     @EnvironmentObject private var navigation: SettingsNavigationState
     @EnvironmentObject private var selectionController: SelectionTranslationController
+    @EnvironmentObject private var appDelegate: AppDelegate
     /// Read once at launch by `AppDelegate` — flipping it doesn't show/hide
     /// the panel right now, only decides whether it opens on the next start.
     @AppStorage(PersistedFloatingPanelKey.showOnLaunch) private var showFloatingPanelOnLaunch = true
@@ -87,6 +88,8 @@ struct SettingsView: View {
                 notificationCard
 
                 panelCard
+
+                onboardingCard
             }
             .padding(16)
             // `modelVariantPicker`/`inlineDownloadSection`/the "翻译提交策略"
@@ -575,6 +578,17 @@ struct SettingsView: View {
                     .onChange(of: notificationsEnabled) { _, enabled in
                         if enabled { SystemNotifier.requestAuthorizationIfNeeded() }
                     }
+            }
+        }
+    }
+
+    private var onboardingCard: some View {
+        SettingsCard(title: "新手引导", icon: "sparkles") {
+            SettingsRow(
+                title: "重新运行引导",
+                subtitle: "再次查看权限授权、运行模式和可选功能（如连按两次 ⌘C 翻译）；已有的设置和已下载的模型不会被清除"
+            ) {
+                PillButton(title: "重新运行") { appDelegate.showOnboarding() }
             }
         }
     }

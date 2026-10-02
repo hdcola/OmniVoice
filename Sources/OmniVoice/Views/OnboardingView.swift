@@ -107,7 +107,16 @@ struct OnboardingView: View {
             actionBar
         }
         .frame(width: 520)
-        .onAppear { launchAtLogin = loginItem.isEnabled }
+        .onAppear {
+            launchAtLogin = loginItem.isEnabled
+            // A re-run (Settings → 新手引导) starts from what the user has
+            // already chosen instead of overwriting it with the run mode's
+            // default.
+            if UserDefaults.standard.bool(forKey: PersistedOnboardingKey.hasCompletedOnboarding) {
+                preloadMode = LaunchPreloadMode.stored
+                preloadModeEdited = true
+            }
+        }
         .onChange(of: selectedMode) { _, mode in
             guard !preloadModeEdited else { return }
             preloadMode = Self.defaultPreloadMode(for: mode)

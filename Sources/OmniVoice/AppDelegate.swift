@@ -124,6 +124,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// receive keyboard focus/dismiss correctly.
     private func presentOnboardingIfNeeded() {
         guard !UserDefaults.standard.bool(forKey: PersistedOnboardingKey.hasCompletedOnboarding) else { return }
+        showOnboarding()
+    }
+
+    /// Settings' "重新运行引导": opens the wizard again whatever
+    /// `hasCompletedOnboarding` says (finishing it just sets the flag again).
+    /// A wizard that is already open is brought to the front instead of
+    /// stacking a second one.
+    func showOnboarding() {
+        if let onboardingWindow, onboardingWindow.isVisible {
+            NSApp.activate(ignoringOtherApps: true)
+            onboardingWindow.makeKeyAndOrderFront(nil)
+            return
+        }
         NSApp.activate(ignoringOtherApps: true)
         // Fixed, non-resizable (no `.resizable` style mask): the content
         // scrolls inside this height, with the action row pinned below it.
