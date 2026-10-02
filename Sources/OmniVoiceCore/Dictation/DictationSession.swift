@@ -38,7 +38,7 @@ public final class DictationSession: ObservableObject {
     /// release the key a beat before the last word is out.
     static let trailingAudio: Duration = .milliseconds(250)
 
-    private var assembler = DictationTextAssembler()
+    private var transcript = DictationTranscript()
     private var provider: TranscriptionProvider?
     private var vadSegmenter: UtteranceSegmenter?
     private var isRecognizerBorrowed = false
@@ -71,7 +71,7 @@ public final class DictationSession: ObservableObject {
         errorMessage = nil
         microphonePermissionNeeded = false
         previewText = ""
-        assembler = DictationTextAssembler()
+        transcript = DictationTranscript()
         startTask = Task { await self.setUp(languageCode: languageCode, deviceID: deviceID) }
     }
 
@@ -86,7 +86,7 @@ public final class DictationSession: ObservableObject {
         await tearDown()
         // Whatever is still open counts: the engine's last hypothesis is
         // usually all there is when it is stopped before closing a segment.
-        let text = assembler.text
+        let text = transcript.text
         state = .idle
         return text
     }
@@ -126,8 +126,10 @@ public final class DictationSession: ObservableObject {
             // `SpeechTranscriber` needs one concrete locale.
             config = TranscriptionConfig(languageCode: languageCode ?? Locale.current.identifier(.bcp47))
         }
+        let transcript = transcript
         provider.onEvent = { [weak self] event in
-            Task { @MainActor in self?.handle(event) }
+            let text = transcript.apply(event)
+            Task { @MainActor in self?.previewText = text }
         }
         do {
             try await provider.start(config: config)
@@ -161,11 +163,6 @@ public final class DictationSession: ObservableObject {
         state = .listening
     }
 
-    private func handle(_ event: TranscriptionEvent) {
-        assembler.apply(event)
-        previewText = assembler.text
-    }
-
     private func tearDown() async {
         mic?.stop()
         mic = nil
@@ -173,9 +170,6 @@ public final class DictationSession: ObservableObject {
         if let provider { releaseRecognizer(provider) }
         provider = nil
         vadSegmenter = nil
-        // Events the engine flushed while stopping are queued on the main
-        // actor behind this call; let them land before the text is read.
-        await Task.yield()
     }
 
     /// Detaches from a recognizer: a borrowed one stays loaded for the next

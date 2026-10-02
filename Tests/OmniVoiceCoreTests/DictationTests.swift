@@ -47,6 +47,12 @@ struct DictationTextAssemblerTests {
         #expect(assembler.text == "打开Safari")
     }
 
+    @Test("Korean segments keep the space between words")
+    func koreanJoin() {
+        let assembler = assemble([.segmentClosed(finalAppend: "안녕하세요"), .segmentClosed(finalAppend: "반갑습니다")])
+        #expect(assembler.text == "안녕하세요 반갑습니다")
+    }
+
     @Test("nothing heard is empty")
     func empty() {
         #expect(DictationTextAssembler().text.isEmpty)
@@ -110,6 +116,29 @@ struct DictationTriggerMachineTests {
         #expect(machine.keyDown(at: 10.5) == .none)
     }
 
+    @Test("Esc cancels a toggle-mode dictation that the released trigger can't")
+    func escapeInToggle() {
+        var machine = DictationTriggerMachine(mode: .toggle)
+        _ = machine.keyDown(at: 10)
+        _ = machine.keyUp(at: 10.1)
+        #expect(machine.escapePressed() == .cancel)
+        #expect(machine.keyDown(at: 20) == .start)
+    }
+
+    @Test("Esc with nothing listening does nothing")
+    func escapeIdle() {
+        var machine = DictationTriggerMachine(mode: .hold)
+        #expect(machine.escapePressed() == .none)
+    }
+
+    @Test("reset while the key is still down doesn't swallow the next press")
+    func resetWhileHeld() {
+        var machine = DictationTriggerMachine(mode: .hold)
+        _ = machine.keyDown(at: 10)
+        machine.reset()
+        #expect(machine.keyDown(at: 20) == .start)
+    }
+
     @Test("reset lets the next press start again")
     func reset() {
         var machine = DictationTriggerMachine(mode: .toggle)
@@ -157,5 +186,81 @@ struct DictationRecognizerLendingTests {
             session.translationEngineID, session.currentTranslationModelVariant?.id
         )
         #expect(session.lendRecognizerToDictation() == nil)
+    }
+}
+
+@Suite("DictationTranscript")
+struct DictationTranscriptTests {
+    @Test("the text is complete as soon as the last event has been applied, from any thread")
+    func lastEventCounts() async {
+        let transcript = DictationTranscript()
+        await Task.detached {
+            _ = transcript.apply(.revised("hello"))
+            _ = transcript.apply(.segmentClosed(finalAppend: "hello"))
+            _ = transcript.apply(.segmentClosed(finalAppend: "world"))
+        }.value
+        #expect(transcript.text == "hello world")
+    }
+}
+
+@MainActor
+@Suite(.serialized)
+struct DictationRecognizerLeaseTests {
+    private let defaults = UserDefaults.standard
+
+    /// A session whose selected R2T2 engine has a stand-in recognizer "loaded".
+    private func makeSessionWithLoadedRecognizer() -> RecordingSession {
+        let session = RecordingSession()
+        session.transcriptionEngineID = "model.r2t2"
+        session.transcriptionProvider = ModelTranscriptionProvider()
+        session.isModelLoaded = true
+        session.loadedEngineIDs = (
+            "model.r2t2", session.currentTranscriptionModelVariant?.id,
+            session.translationEngineID, session.currentTranslationModelVariant?.id
+        )
+        return session
+    }
+
+    private func cleanUp() {
+        defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)
+        defaults.removeObject(forKey: PersistedSettingsKey.transcriptionModelVariantID)
+    }
+
+    @Test("a loaded recognizer is lent once and available again once returned")
+    func lendAndReturn() {
+        defer { cleanUp() }
+        let session = makeSessionWithLoadedRecognizer()
+        #expect(session.lendRecognizerToDictation() != nil)
+        #expect(session.lendRecognizerToDictation() == nil)
+        session.returnRecognizerFromDictation()
+        #expect(session.lendRecognizerToDictation() != nil)
+    }
+
+    @Test("while lent, unloading and starting a recording leave the model alone")
+    func lentModelIsProtected() async {
+        defer { cleanUp() }
+        let session = makeSessionWithLoadedRecognizer()
+        _ = session.lendRecognizerToDictation()
+
+        session.unloadModels()
+        #expect(session.isModelLoaded)
+
+        await session.start()
+        #expect(!session.isRunning)
+        #expect(!session.isStarting)
+        #expect(session.statusMessage == "正在语音输入，请稍后再开始")
+    }
+
+    @Test("an engine switch made while lent discards the stale load once it is returned")
+    func staleLoadDiscardedOnReturn() {
+        defer { cleanUp() }
+        let session = makeSessionWithLoadedRecognizer()
+        _ = session.lendRecognizerToDictation()
+
+        session.transcriptionEngineID = "system.speech"
+        #expect(session.isModelLoaded)
+
+        session.returnRecognizerFromDictation()
+        #expect(!session.isModelLoaded)
     }
 }

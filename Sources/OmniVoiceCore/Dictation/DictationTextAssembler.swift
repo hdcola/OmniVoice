@@ -51,14 +51,40 @@ public struct DictationTextAssembler: Equatable, Sendable {
         return first + " " + second
     }
 
+    /// Chinese and Japanese run words together; Korean (Hangul) separates
+    /// them with spaces like Latin text, so it is deliberately not here.
     private static func isSpaceless(_ character: Character) -> Bool {
         character.unicodeScalars.contains { scalar in
             switch scalar.value {
-            case 0x2E80...0x9FFF, 0xAC00...0xD7AF, 0xF900...0xFAFF, 0x3000...0x303F, 0xFF00...0xFFEF:
+            case 0x2E80...0x9FFF, 0xF900...0xFAFF, 0x3000...0x303F, 0xFF00...0xFFEF:
                 return true
             default:
                 return false
             }
         }
+    }
+}
+
+/// A `DictationTextAssembler` that can be fed from any thread. An engine
+/// reports events from its own queue (a local model's deltas arrive on the
+/// audio thread, its final tail synchronously inside `stop()`), and the text
+/// must be complete the moment `stop()` returns — hopping each event to the
+/// main actor first would leave the last one still in flight.
+final class DictationTranscript: @unchecked Sendable {
+    private let lock = NSLock()
+    private var assembler = DictationTextAssembler()
+
+    /// Applies `event` and returns the text so far.
+    func apply(_ event: TranscriptionEvent) -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        assembler.apply(event)
+        return assembler.text
+    }
+
+    var text: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return assembler.text
     }
 }

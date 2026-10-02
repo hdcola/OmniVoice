@@ -46,6 +46,7 @@ final class DictationKeyMonitor {
     var onKeyDown: ((TimeInterval) -> Void)?
     var onKeyUp: ((TimeInterval) -> Void)?
     var onOtherKey: (() -> Void)?
+    var onEscape: (() -> Void)?
 
     private static let eventMask: NSEvent.EventTypeMask = [.flagsChanged, .keyDown]
     private static let allModifiers: NSEvent.ModifierFlags = [.command, .option, .control, .shift]
@@ -85,6 +86,8 @@ final class DictationKeyMonitor {
 
     private func handle(_ event: NSEvent) {
         switch event.type {
+        case .keyDown where event.keyCode == UInt16(kVK_Escape):
+            onEscape?()
         case .keyDown:
             // ⌥ + a letter types a special character, ⌘ + a letter is a
             // shortcut: the trigger was a modifier there, not a request.

@@ -62,8 +62,19 @@ public struct DictationTriggerMachine: Sendable {
         return .cancel
     }
 
-    /// The dictation ended on its own (the microphone failed to start, ...).
+    /// Esc: abandon a dictation in either mode — in toggle mode the trigger
+    /// is up while listening, so nothing else could cancel it.
+    public mutating func escapePressed() -> Action {
+        guard isListening else { return .none }
+        isListening = false
+        return .cancel
+    }
+
+    /// The dictation ended on its own (the microphone failed to start, ...),
+    /// or the key monitor was switched off — either way no key-up for a key
+    /// still down will be seen.
     public mutating func reset() {
         isListening = false
+        isHeld = false
     }
 }

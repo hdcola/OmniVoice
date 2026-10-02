@@ -7,7 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(dictation): 语音输入 — hold the right ⌥ Option key (or right ⌘ / ⌃, or tap to start and tap again to stop) in any app, speak, and the recognized text is typed at the cursor. Uses on-device system speech recognition with the language and microphone from 实时转录; a small bubble shows what it hears while you speak. Text goes in by pasting (the clipboard is saved and put back afterwards, and marked transient so clipboard managers skip it); with no Accessibility permission or in a secure field it stays on the clipboard with a notice. Taps under 0.3 s and ⌥ used as a modifier for another key are ignored. When 实时转录 uses a local model (R2T2) that is already loaded (e.g. via 启动时加载模型), voice input borrows that same recognizer instead of loading a second copy — more accurate, and the HUD says 本地模型 or 系统识别; with no model loaded, or while a recording is running, it uses system recognition. Off by default — turn it on in 设置/通用 › 语音输入, which asks for Input Monitoring, Accessibility and the microphone (#74)
+- feat(dictation): 语音输入 — hold the right ⌥ Option key (or right ⌘ / ⌃, or tap to start and tap again to stop) in any app, speak, and the recognized text is typed at the cursor. Uses on-device system speech recognition with the language and microphone from 实时转录; a small bubble shows what it hears while you speak. Text goes in by pasting (the clipboard is saved and put back afterwards, and marked transient so clipboard managers skip it); with no Accessibility permission or in a secure field it stays on the clipboard with a notice. Taps under 0.3 s and ⌥ used as a modifier for another key are ignored, and Esc cancels a dictation in either mode. When 实时转录 uses a local model (R2T2) that is already loaded (e.g. via 启动时加载模型), voice input borrows that same recognizer instead of loading a second copy — more accurate, and the HUD says 本地模型 or 系统识别; with no model loaded, or while a recording is running, it uses system recognition. Off by default — turn it on in 设置/通用 › 语音输入, which asks for Input Monitoring, Accessibility and the microphone (#74)
 
 ### Changed
 
@@ -18,7 +18,7 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 ### Tests
-- test(dictation): cover the text assembler (segment joining incl. CJK), the hold/toggle trigger state machine and when a loaded recognizer is lent to voice input (#74)
+- test(dictation): cover the text assembler (segment joining incl. CJK), the hold/toggle trigger state machine when a loaded recognizer is lent to voice input and what is blocked meanwhile, Esc/reset in the trigger machine, and the thread-safe transcript (#74)
 
 ## [0.5.7] - 2026-10-02
 

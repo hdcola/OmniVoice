@@ -16,7 +16,7 @@ struct PermissionsSettingsCard: View {
     var body: some View {
         SettingsCard(title: "权限", icon: "lock.shield") {
             PermissionRow(
-                icon: "mic", title: "麦克风", detail: "转录你的声音（实时转录）",
+                icon: "mic", title: "麦克风", detail: "转录你的声音（实时转录、语音输入）",
                 isGranted: microphoneStatus == .authorized,
                 open: requestMicrophone
             )

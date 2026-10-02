@@ -68,9 +68,22 @@ final class DictationController: ObservableObject {
 
         hud.contentView = NSHostingView(rootView: DictationHUDView(controller: self, dictation: dictation))
 
-        monitor.onKeyDown = { [weak self] time in self.map { $0.perform($0.machine.keyDown(at: time)) } }
-        monitor.onKeyUp = { [weak self] time in self.map { $0.perform($0.machine.keyUp(at: time)) } }
-        monitor.onOtherKey = { [weak self] in self.map { $0.perform($0.machine.otherKeyPressed()) } }
+        monitor.onKeyDown = { [weak self] time in
+            guard let self else { return }
+            perform(machine.keyDown(at: time))
+        }
+        monitor.onKeyUp = { [weak self] time in
+            guard let self else { return }
+            perform(machine.keyUp(at: time))
+        }
+        monitor.onOtherKey = { [weak self] in
+            guard let self else { return }
+            perform(machine.otherKeyPressed())
+        }
+        monitor.onEscape = { [weak self] in
+            guard let self else { return }
+            perform(machine.escapePressed())
+        }
 
         // A start that fails (no microphone permission, unsupported language)
         // never reaches `finish`, so the failure is what ends it.

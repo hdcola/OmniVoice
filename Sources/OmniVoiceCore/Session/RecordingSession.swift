@@ -400,7 +400,10 @@ public final class RecordingSession: ObservableObject {
         isSessionActive ? activeSessionRecord?.id : nil
     }
 
-    private var transcriptionProvider: TranscriptionProvider?
+    /// Internal, not `private`, so `DictationTests` can put a stand-in
+    /// recognizer here to exercise `lendRecognizerToDictation()` without a
+    /// real model load — same reasoning as `loadedEngineIDs` below.
+    var transcriptionProvider: TranscriptionProvider?
     private var translationProvider: TranslationProvider?
     /// The engine + model-variant selection `transcriptionProvider`/
     /// `translationProvider` are currently loaded for, whenever they hold a
@@ -928,7 +931,8 @@ public final class RecordingSession: ObservableObject {
     /// true` on success — leaving `isModelLoaded == true` (and the panel
     /// reading "模型已就绪") while both provider ivars are actually `nil`.
     public func unloadModels() {
-        guard !isSessionActive, !isPreloadingModel else { return }
+        // Also not while voice input is streaming through the loaded recognizer.
+        guard !isSessionActive, !isPreloadingModel, !isRecognizerLentToDictation else { return }
         performModelUnload()
     }
 
