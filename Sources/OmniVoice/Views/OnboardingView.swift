@@ -13,7 +13,9 @@ import SwiftUI
 /// with the same cards/capsules as Settings (`SettingsComponents`); the
 /// action row is pinned below the scrolling content.
 struct OnboardingView: View {
-    let session: RecordingSession
+    /// Observed so a recording that starts while the wizard is open locks the
+    /// run mode (see `isModeLocked`).
+    @ObservedObject var session: RecordingSession
     let downloadManager: ModelDownloadManager
     @ObservedObject var selectionController: SelectionTranslationController
     /// Called once the user picks either bottom button — the host (see
@@ -219,7 +221,12 @@ struct OnboardingView: View {
                 if index > 0 { SettingsDivider() }
                 modeRow(option)
             }
+            if isModeLocked {
+                SettingsDivider()
+                SettingsNote(text: "录音进行中，暂时无法更换运行模式；停止录音后再试。", tint: .orange)
+            }
         }
+        .disabled(isModeLocked)
     }
 
     private func modeRow(_ option: ModeOption) -> some View {
@@ -285,6 +292,11 @@ struct OnboardingView: View {
     /// startup options.
     private var appliesMode: Bool { !isRerun || modeChosen }
 
+    /// Engines can't be swapped mid-recording (Settings refuses it too), so a
+    /// re-run's mode choice is frozen while a session runs — otherwise 完成
+    /// would close the wizard having silently changed nothing.
+    private var isModeLocked: Bool { isRerun && session.isSessionActive }
+
     /// Whether the primary button would start any download: not for the
     /// lightweight mode, nor when the chosen bundle is already on disk.
     private var willDownload: Bool {
@@ -303,6 +315,7 @@ struct OnboardingView: View {
             PrimaryPillButton(title: willDownload ? "一键开启并下载" : "完成") {
                 finish(startDownload: appliesMode && selectedMode != .lightweight)
             }
+            .disabled(isModeLocked && modeChosen)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -394,7 +407,7 @@ struct OnboardingView: View {
         // it was already pre-selected, so it can finish the move to system
         // engines from an in-between setup.
         let replacingEngines = isRerun
-        if selectedMode == .lightweight, isRerun, modeChosen { switchToSystemEngines() }
+        if selectedMode == .lightweight, modeChosen { switchToSystemEngines() }
         if startDownload {
             guard startBundleDownload(replacingEngines: replacingEngines) else { return }
         }

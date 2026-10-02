@@ -170,7 +170,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.onboardingWindow = nil
-                if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
+                if let observer = closeObserver {
+                    NotificationCenter.default.removeObserver(observer)
+                    closeObserver = nil
+                }
             }
         }
         window.makeKeyAndOrderFront(nil)
