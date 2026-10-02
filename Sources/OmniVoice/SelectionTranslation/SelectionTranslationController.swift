@@ -35,13 +35,14 @@ final class SelectionTranslationController: ObservableObject {
     }
 
     /// Whether pressing ⌘C twice in quick succession translates the copied
-    /// text. On by default; Settings can switch it off.
+    /// text. Off until the user opts in (onboarding or Settings), because it
+    /// needs the Input Monitoring permission.
     @Published var isDoubleCopyEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isDoubleCopyEnabled, forKey: Self.doubleCopyDefaultsKey)
             // Only the user switching it on asks for the permission: launch
             // never shows the "receive keystrokes from any application"
-            // prompt out of the blue (onboarding and Settings list it).
+            // prompt out of the blue.
             if isDoubleCopyEnabled, !DoubleCopyMonitor.hasPermission { DoubleCopyMonitor.requestPermission() }
             updateDoubleCopyMonitor()
         }
@@ -58,7 +59,7 @@ final class SelectionTranslationController: ObservableObject {
 
     init(translator: SelectionTranslator) {
         self.translator = translator
-        isDoubleCopyEnabled = UserDefaults.standard.object(forKey: Self.doubleCopyDefaultsKey) as? Bool ?? true
+        isDoubleCopyEnabled = UserDefaults.standard.object(forKey: Self.doubleCopyDefaultsKey) as? Bool ?? false
         panel.contentView = NSHostingView(rootView: SelectionTranslationView(controller: self, translator: translator))
         panel.positionOnActiveScreen()
         resignKeyObserver = NotificationCenter.default.addObserver(

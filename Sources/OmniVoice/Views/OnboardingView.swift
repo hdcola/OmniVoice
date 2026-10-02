@@ -15,6 +15,7 @@ import SwiftUI
 struct OnboardingView: View {
     let session: RecordingSession
     let downloadManager: ModelDownloadManager
+    @ObservedObject var selectionController: SelectionTranslationController
     /// Called once the user picks either bottom button — the host (see
     /// `AppDelegate`) is responsible for closing/releasing the window
     /// itself; this view has no window handle of its own to close.
@@ -168,10 +169,24 @@ struct OnboardingView: View {
                 isGranted: accessibilityAuthorized, open: requestAccessibilityPermission
             )
             SettingsDivider()
-            PermissionRow(
-                icon: "keyboard", title: "输入监控", detail: "识别连按两次 ⌘C 划词翻译；只检测这个组合，不记录其他按键",
-                isGranted: inputMonitoringAuthorized, open: requestInputMonitoringPermission
-            )
+            // Opt-in: the system's Input Monitoring prompt reads as alarming,
+            // so it only appears once the user asks for this shortcut.
+            SettingsRow(
+                title: "连按两次 ⌘C 翻译（可选）",
+                subtitle: "选中文字后快速按两下 ⌘C 即可翻译；开启后需要授予「输入监控」，之后可在设置里关闭"
+            ) {
+                Toggle("连按两次 ⌘C 翻译", isOn: $selectionController.isDoubleCopyEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+            if selectionController.isDoubleCopyEnabled {
+                SettingsDivider()
+                PermissionRow(
+                    icon: "keyboard", title: "输入监控", detail: "只检测 ⌘C 连按这个组合，不记录其他按键",
+                    isGranted: inputMonitoringAuthorized, open: requestInputMonitoringPermission
+                )
+            }
         }
     }
 
