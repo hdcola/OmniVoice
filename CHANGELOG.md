@@ -7,6 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(dictation): 语音输入 — hold the right ⌥ Option key (or right ⌘ / ⌃, or tap to start and tap again to stop) in any app, speak, and the recognized text is typed at the cursor. Uses on-device system speech recognition with the language and microphone from 实时转录; a small bubble shows what it hears while you speak. Text goes in by pasting (the clipboard is saved and put back afterwards, and marked transient so clipboard managers skip it); with no Accessibility permission or in a secure field it stays on the clipboard with a notice. Taps under 0.3 s and ⌥ used as a modifier for another key are ignored. Off by default — turn it on in 设置/通用 › 语音输入, which asks for Input Monitoring, Accessibility and the microphone (feature/dictation)
 
 ### Changed
 
@@ -17,6 +18,7 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 ### Tests
+- test(dictation): cover the text assembler (segment joining incl. CJK) and the hold/toggle trigger state machine (feature/dictation)
 
 ## [0.5.7] - 2026-10-02
 

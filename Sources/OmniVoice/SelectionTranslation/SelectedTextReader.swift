@@ -309,7 +309,7 @@ enum CopyCommand {
     /// The key that types `character` with ⌘ held in the current keyboard
     /// layout: C is not on the same key in Dvorak, and "Dvorak - QWERTY ⌘"
     /// moves it back only while ⌘ is down.
-    private static func keyCode(typing character: Character) -> Int? {
+    static func keyCode(typing character: Character) -> Int? {
         guard
             let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
             let property = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)

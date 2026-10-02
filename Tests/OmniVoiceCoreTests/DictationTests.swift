@@ -1,0 +1,120 @@
+import Testing
+@testable import OmniVoiceCore
+
+@Suite("DictationTextAssembler")
+struct DictationTextAssemblerTests {
+    private func assemble(_ events: [TranscriptionEvent]) -> DictationTextAssembler {
+        var assembler = DictationTextAssembler()
+        events.forEach { assembler.apply($0) }
+        return assembler
+    }
+
+    @Test("a replace-style engine's final text is the segment, not an addition to its hypothesis")
+    func revisedThenClosed() {
+        let assembler = assemble([.revised("hello wor"), .revised("hello world"), .segmentClosed(finalAppend: "Hello world.")])
+        #expect(assembler.text == "Hello world.")
+        #expect(assembler.pending.isEmpty)
+    }
+
+    @Test("an append-style engine's close adds only the tail")
+    func appendedThenClosed() {
+        let assembler = assemble([.appended("hello "), .appended("wor"), .segmentClosed(finalAppend: "ld")])
+        #expect(assembler.text == "hello world")
+    }
+
+    @Test("the open segment counts, so text survives a stop before it closes")
+    func openSegmentIncluded() {
+        let assembler = assemble([.segmentClosed(finalAppend: "First."), .revised("second part")])
+        #expect(assembler.text == "First. second part")
+    }
+
+    @Test("segments of space-delimited text are joined with one space")
+    func latinJoin() {
+        let assembler = assemble([.segmentClosed(finalAppend: "one"), .segmentClosed(finalAppend: " two ")])
+        #expect(assembler.text == "one two")
+    }
+
+    @Test("CJK segments are joined without a space")
+    func cjkJoin() {
+        let assembler = assemble([.segmentClosed(finalAppend: "你好，"), .segmentClosed(finalAppend: "世界")])
+        #expect(assembler.text == "你好，世界")
+    }
+
+    @Test("mixed CJK and Latin text gets no space at the boundary")
+    func mixedJoin() {
+        let assembler = assemble([.segmentClosed(finalAppend: "打开"), .segmentClosed(finalAppend: "Safari")])
+        #expect(assembler.text == "打开Safari")
+    }
+
+    @Test("nothing heard is empty")
+    func empty() {
+        #expect(DictationTextAssembler().text.isEmpty)
+        #expect(assemble([.revised("  ")]).text.isEmpty)
+    }
+}
+
+@Suite("DictationTriggerMachine")
+struct DictationTriggerMachineTests {
+    @Test("hold: press starts, a long hold finishes on release")
+    func holdFinishes() {
+        var machine = DictationTriggerMachine(mode: .hold)
+        #expect(machine.keyDown(at: 10) == .start)
+        #expect(machine.keyUp(at: 12) == .finish)
+    }
+
+    @Test("hold: a tap shorter than the minimum is cancelled")
+    func holdTapCancelled() {
+        var machine = DictationTriggerMachine(mode: .hold, minimumHold: 0.3)
+        #expect(machine.keyDown(at: 10) == .start)
+        #expect(machine.keyUp(at: 10.1) == .cancel)
+    }
+
+    @Test("hold: typing another key while held cancels, and release then does nothing")
+    func holdChord() {
+        var machine = DictationTriggerMachine(mode: .hold)
+        #expect(machine.keyDown(at: 10) == .start)
+        #expect(machine.otherKeyPressed() == .cancel)
+        #expect(machine.keyUp(at: 11) == .none)
+    }
+
+    @Test("hold: a key typed with nothing held is ignored")
+    func otherKeyIdle() {
+        var machine = DictationTriggerMachine(mode: .hold)
+        #expect(machine.otherKeyPressed() == .none)
+    }
+
+    @Test("toggle: one tap starts, the next finishes")
+    func toggle() {
+        var machine = DictationTriggerMachine(mode: .toggle)
+        #expect(machine.keyDown(at: 10) == .start)
+        #expect(machine.keyUp(at: 10.1) == .none)
+        #expect(machine.keyDown(at: 15) == .finish)
+        #expect(machine.keyUp(at: 15.1) == .none)
+        #expect(machine.keyDown(at: 20) == .start)
+    }
+
+    @Test("toggle: typing while the key is up does not cancel")
+    func toggleTypingWhileListening() {
+        var machine = DictationTriggerMachine(mode: .toggle)
+        _ = machine.keyDown(at: 10)
+        _ = machine.keyUp(at: 10.1)
+        #expect(machine.otherKeyPressed() == .none)
+        #expect(machine.keyDown(at: 12) == .finish)
+    }
+
+    @Test("a repeated key-down without a release is ignored")
+    func repeatedDown() {
+        var machine = DictationTriggerMachine(mode: .hold)
+        #expect(machine.keyDown(at: 10) == .start)
+        #expect(machine.keyDown(at: 10.5) == .none)
+    }
+
+    @Test("reset lets the next press start again")
+    func reset() {
+        var machine = DictationTriggerMachine(mode: .toggle)
+        _ = machine.keyDown(at: 10)
+        _ = machine.keyUp(at: 10.1)
+        machine.reset()
+        #expect(machine.keyDown(at: 20) == .start)
+    }
+}

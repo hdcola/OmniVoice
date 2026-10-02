@@ -33,14 +33,14 @@ struct PermissionsSettingsCard: View {
             SettingsDivider()
             PermissionRow(
                 icon: "figure.wave", title: "辅助功能",
-                detail: "读取其他应用中选中的文字；未授权时可复制后在翻译面板里粘贴",
+                detail: "读取其他应用中选中的文字，并把语音输入的文字粘贴到光标处；未授权时划词可复制后在翻译面板里粘贴",
                 isGranted: isAccessibilityTrusted,
                 open: controller.openAccessibilitySettings
             )
             SettingsDivider()
             PermissionRow(
                 icon: "keyboard", title: "输入监控",
-                detail: "识别连按两次 ⌘C；只检测这个组合，不记录其他按键",
+                detail: "识别连按两次 ⌘C 和语音输入的触发键；只检测这些按键，不记录其他输入",
                 isGranted: hasInputMonitoringPermission,
                 open: controller.openInputMonitoringSettings
             )

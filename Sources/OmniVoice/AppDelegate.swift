@@ -36,6 +36,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     /// same reason as `session`: its global hot keys must work from launch,
     /// before any menu or window has been opened.
     let selectionController: SelectionTranslationController
+    /// Push-to-talk voice input — constructed here for the same reason: its
+    /// trigger key must work from launch.
+    let dictationController: DictationController
 
     override init() {
         // A failed store (disk full, corrupted schema after a migration
@@ -52,6 +55,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
                 preferredModelVariantID: { [weak session] in session?.translationModelVariantID },
                 recordingEngineID: { [weak session] in session?.translationEngineID }
             )
+        )
+        dictationController = DictationController(
+            languageCode: { [weak session] in session?.sourceLanguageCode },
+            deviceID: { [weak session] in session?.selectedDeviceID }
         )
         super.init()
     }
