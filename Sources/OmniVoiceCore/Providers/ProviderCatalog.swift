@@ -254,6 +254,24 @@ public enum ProviderCatalog {
         modelVariants.filter { $0.engineID == engineID }
     }
 
+    /// The variant ID a selection should be switched to when the variant it
+    /// currently resolves to (`selectedID`, or the engine's first catalog
+    /// entry when unset/stale — mirroring `RecordingSession`'s own
+    /// resolution) isn't downloaded but a *different* one for the same
+    /// engine is: the first downloaded variant in catalog order. `nil` means
+    /// leave the selection alone — the resolved variant is downloaded, or
+    /// nothing is (that case is the engine-level fallback to `.system`'s
+    /// job, and a deliberately-picked not-yet-downloaded variant must keep
+    /// its selection).
+    public static func replacementVariantID(
+        forEngineID engineID: String, selectedID: String?, isDownloaded: (ModelVariant) -> Bool
+    ) -> String? {
+        let variants = modelVariants(forEngineID: engineID)
+        let resolved = variants.first { $0.id == selectedID } ?? variants.first
+        guard let resolved, !isDownloaded(resolved) else { return nil }
+        return variants.first(where: isDownloaded)?.id
+    }
+
     /// The variant to suggest downloading for `engineID` as a companion
     /// pick — the engine's default (first catalog) variant — or `nil` if
     /// *any* of the engine's variants is already downloaded. Checks the

@@ -47,4 +47,32 @@ struct R2T2VariantCatalogTests {
             #expect(suggestion == nil, "\(id) already covers R2T2")
         }
     }
+
+    @Test func replacementVariantIsNilWhenTheResolvedVariantIsDownloaded() {
+        let r = ProviderCatalog.replacementVariantID(
+            forEngineID: "model.r2t2", selectedID: "r2t2-q4_k_m"
+        ) { $0.id == "r2t2-q4_k_m" || $0.id == "r2t2-q8_0" }
+        #expect(r == nil)
+    }
+
+    @Test func replacementVariantIsTheFirstDownloadedOneWhenTheSelectedOneIsMissing() {
+        let r = ProviderCatalog.replacementVariantID(
+            forEngineID: "model.r2t2", selectedID: "r2t2-q4_k_m"
+        ) { $0.id == "r2t2-q8_0" || $0.id == "r2t2-f16" }
+        #expect(r == "r2t2-q8_0", "catalog order, so Q8_0 beats F16")
+    }
+
+    @Test func replacementVariantTreatsAnUnsetSelectionAsTheDefaultVariant() {
+        let r = ProviderCatalog.replacementVariantID(
+            forEngineID: "model.r2t2", selectedID: nil
+        ) { $0.id == "r2t2-q4_k_m" }
+        #expect(r == "r2t2-q4_k_m", "unset resolves to Q8_0, which isn't downloaded")
+    }
+
+    @Test func replacementVariantIsNilWhenNothingIsDownloaded() {
+        let r = ProviderCatalog.replacementVariantID(
+            forEngineID: "model.r2t2", selectedID: "r2t2-q4_k_m"
+        ) { _ in false }
+        #expect(r == nil, "engine-level fallback to .system handles this, and a pending pick keeps its selection")
+    }
 }

@@ -252,6 +252,54 @@ struct RecordingSessionSettingsTests {
         }
     }
 
+    /// Deleting the selected variant while another of the same engine stays
+    /// downloaded must move the selection onto the surviving one, instead of
+    /// leaving it pointing at the deleted file (→ "尚未下载" on start/preload).
+    @Test func deletingTheSelectedVariantReselectsADownloadedSibling() throws {
+        let q8 = try #require(ProviderCatalog.variant(forID: "r2t2-q8_0"))
+        let q4 = try #require(ProviderCatalog.variant(forID: "r2t2-q4_k_m"))
+        let manager = try makeDownloadManager(withDownloaded: q8)
+        FileManager.default.createFile(atPath: manager.localURL(for: q4).path, contents: Data())
+        withPersisted([
+            PersistedSettingsKey.transcriptionEngineID: "model.r2t2",
+            PersistedSettingsKey.transcriptionModelVariantID: "r2t2-q4_k_m",
+        ]) {
+            let session = RecordingSession(modelDownloadManager: manager)
+            #expect(session.transcriptionModelVariantID == "r2t2-q4_k_m", "both downloaded: selection stays")
+            try? FileManager.default.removeItem(at: manager.localURL(for: q4))
+            session.fallBackToSystemEngineIfModelUnavailable()
+            #expect(session.transcriptionEngineID == "model.r2t2", "Q8_0 is still there: no fallback to system")
+            #expect(session.transcriptionModelVariantID == "r2t2-q8_0")
+            #expect(session.currentTranscriptionModelVariant?.id == "r2t2-q8_0")
+        }
+    }
+
+    @Test func persistedSelectionOfAMissingVariantIsReselectedAtLaunch() throws {
+        let q8 = try #require(ProviderCatalog.variant(forID: "r2t2-q8_0"))
+        let manager = try makeDownloadManager(withDownloaded: q8)
+        withPersisted([
+            PersistedSettingsKey.transcriptionEngineID: "model.r2t2",
+            PersistedSettingsKey.transcriptionModelVariantID: "r2t2-q4_k_m",
+        ]) {
+            let session = RecordingSession(modelDownloadManager: manager)
+            #expect(session.transcriptionModelVariantID == "r2t2-q8_0")
+        }
+    }
+
+    @Test func translationOnlyFallbackLeavesATranscriptionSelectionAlone() throws {
+        let q8 = try #require(ProviderCatalog.variant(forID: "r2t2-q8_0"))
+        let manager = try makeDownloadManager(withDownloaded: q8)
+        withPersisted([
+            PersistedSettingsKey.transcriptionEngineID: "model.r2t2",
+            PersistedSettingsKey.transcriptionModelVariantID: "r2t2-q8_0",
+        ]) {
+            let session = RecordingSession(modelDownloadManager: manager)
+            session.transcriptionModelVariantID = "r2t2-q4_k_m"  // picked, not downloaded yet
+            session.fallBackToSystemEngineIfModelUnavailable(includingTranscription: false)
+            #expect(session.transcriptionModelVariantID == "r2t2-q4_k_m")
+        }
+    }
+
     /// A variant selection only makes sense for the engine it was picked
     /// under — switching engines must drop a selection that doesn't belong
     /// to the new one, the same way `sourceLanguageCode` self-heals on an
