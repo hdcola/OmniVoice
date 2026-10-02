@@ -731,6 +731,8 @@ struct SettingsView: View {
             .buttonStyle(.plain)
 
             SettingsCard {
+                aboutButton("查看新功能", icon: "sparkles") { appDelegate.showAllWhatsNew() }
+                SettingsDivider()
                 aboutLink("GitHub", icon: "chevron.left.forwardslash.chevron.right", url: Self.repositoryURL)
                 SettingsDivider()
                 aboutLink("版本发布", icon: "shippingbox", url: Self.repositoryURL.appendingPathComponent("releases"))
@@ -760,6 +762,26 @@ struct SettingsView: View {
                 Text(title).font(.system(size: 13))
                 Spacer()
                 Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func aboutButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 24)
+                Text(title).font(.system(size: 13))
+                Spacer()
+                Image(systemName: "chevron.right")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }
