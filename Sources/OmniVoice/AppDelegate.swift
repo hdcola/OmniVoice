@@ -149,7 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     /// Settings' "查看新功能": every note in the catalog, whatever the user
     /// has already seen.
     func showAllWhatsNew() {
-        showWhatsNew(WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 0))
+        showWhatsNew(WhatsNewCatalog.allEntriesNewestFirst)
     }
 
     private func showWhatsNew(_ entries: [WhatsNewEntry]) {

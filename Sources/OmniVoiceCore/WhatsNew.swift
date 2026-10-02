@@ -60,6 +60,11 @@ public enum WhatsNewCatalog {
         entries.map(\.revision).max() ?? 0
     }
 
+    /// Every entry, newest first — what Settings' "查看新功能" shows.
+    public static var allEntriesNewestFirst: [WhatsNewEntry] {
+        entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 0)
+    }
+
     /// Entries to show at launch, newest first.
     ///
     /// - Parameters:
