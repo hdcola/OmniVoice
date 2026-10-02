@@ -33,6 +33,9 @@ public final class DictationSession: ObservableObject {
     /// This dictation runs on the borrowed on-device model, not the system
     /// engine — for the HUD.
     @Published public private(set) var isUsingLocalModel = false
+    /// What a slow start is doing right now ("正在下载语言识别资源…"), for
+    /// the HUD; nil once listening.
+    @Published public private(set) var statusDetail: String?
 
     /// How long the microphone keeps running after the user lets go — people
     /// release the key a beat before the last word is out.
@@ -72,6 +75,7 @@ public final class DictationSession: ObservableObject {
         microphonePermissionNeeded = false
         previewText = ""
         isUsingLocalModel = false
+        statusDetail = "正在准备识别引擎…"
         transcript = DictationTranscript()
         startTask = Task { await self.setUp(languageCode: languageCode, deviceID: deviceID) }
     }
@@ -121,7 +125,11 @@ public final class DictationSession: ObservableObject {
             segmenter = vad
             config = TranscriptionConfig(languageCode: languageCode)
         } else {
-            provider = SystemTranscriptionProvider()
+            let system = SystemTranscriptionProvider()
+            system.onInstallingAssets = { [weak self] in
+                Task { @MainActor in self?.statusDetail = "正在下载语言识别资源，首次使用需要一点时间…" }
+            }
+            provider = system
             segmenter = nil
             isUsingLocalModel = false
             // `SpeechTranscriber` needs one concrete locale.
@@ -140,6 +148,7 @@ public final class DictationSession: ObservableObject {
             return
         }
 
+        statusDetail = "正在启动麦克风…"
         let mic = MicrophoneCapture(deviceID: deviceID)
         mic.onBuffer = { [weak provider, weak segmenter] samples in
             provider?.push(samples: samples)
@@ -161,6 +170,7 @@ public final class DictationSession: ObservableObject {
         self.provider = provider
         self.vadSegmenter = segmenter
         self.mic = mic
+        statusDetail = nil
         state = .listening
     }
 
@@ -186,6 +196,7 @@ public final class DictationSession: ObservableObject {
     }
 
     private func fail(_ message: String) {
+        statusDetail = nil
         errorMessage = message
         state = .idle
     }

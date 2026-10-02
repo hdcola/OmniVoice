@@ -51,6 +51,7 @@ struct DictationTextAssemblerTests {
     func punctuationAttaches() {
         #expect(assemble([.segmentClosed(finalAppend: "Hello"), .segmentClosed(finalAppend: ", world")]).text == "Hello, world")
         #expect(assemble([.segmentClosed(finalAppend: "Hello"), .segmentClosed(finalAppend: ".")]).text == "Hello.")
+        #expect(assemble([.segmentClosed(finalAppend: "“Hello"), .segmentClosed(finalAppend: "”")]).text == "“Hello”")
     }
 
     @Test("an opening bracket still gets its space")

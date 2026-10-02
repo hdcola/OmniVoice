@@ -28,7 +28,7 @@ struct DictationSettingsView: View {
                 .accessibilityLabel("触发键")
                 .fixedSize()
             }
-            .disabled(!controller.isEnabled)
+            .disabled(!controller.isEnabled || controller.dictation.isActive)
             SettingsDivider()
             SettingsRow(title: "触发方式") {
                 Picker("触发方式", selection: $controller.mode) {
@@ -39,7 +39,7 @@ struct DictationSettingsView: View {
                 .accessibilityLabel("触发方式")
                 .fixedSize()
             }
-            .disabled(!controller.isEnabled)
+            .disabled(!controller.isEnabled || controller.dictation.isActive)
             SettingsDivider()
             SettingsNote(text: "识别引擎、语言和麦克风跟随「实时转录」的设置：选了本地模型且已加载（可开启「启动时加载模型」），就直接复用它，否则用系统语音识别；录制字幕期间也用系统识别。按 Esc 可取消；输入时会借用剪贴板，随后自动恢复。")
         }

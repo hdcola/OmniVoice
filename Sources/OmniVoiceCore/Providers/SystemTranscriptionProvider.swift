@@ -14,6 +14,10 @@ import Speech
 /// Ported from `mac-poc-hybrid`'s `Recognition/AppleSpeechRecognizer.swift`.
 public final class SystemTranscriptionProvider: TranscriptionProvider {
     public var onEvent: ((TranscriptionEvent) -> Void)?
+    /// Called when `start(config:)` has to download the language's on-device
+    /// recognition assets first — the one slow step, worth telling the user
+    /// about. Called on the main actor, before the download begins.
+    public var onInstallingAssets: (() -> Void)?
 
     private var transcriber: SpeechTranscriber?
     private var analyzer: SpeechAnalyzer?
@@ -70,7 +74,7 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
             reportingOptions: [.volatileResults],
             attributeOptions: []
         )
-        try await Self.ensureModelInstalled(for: transcriber, locale: locale)
+        try await Self.ensureModelInstalled(for: transcriber, locale: locale, onInstalling: onInstallingAssets)
 
         guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
             throw ProviderError.notImplemented("SpeechAnalyzer 无可用音频格式")
@@ -169,7 +173,9 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
         transcriber = nil
     }
 
-    private static func ensureModelInstalled(for transcriber: SpeechTranscriber, locale: Locale) async throws {
+    private static func ensureModelInstalled(
+        for transcriber: SpeechTranscriber, locale: Locale, onInstalling: (() -> Void)?
+    ) async throws {
         let supported = await SpeechTranscriber.supportedLocales
         guard supported.contains(where: { $0.identifier(.bcp47) == locale.identifier(.bcp47) }) else {
             throw ProviderError.localeNotSupported
@@ -177,6 +183,7 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
         let installed = await SpeechTranscriber.installedLocales
         guard !installed.contains(where: { $0.identifier(.bcp47) == locale.identifier(.bcp47) }) else { return }
         if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+            onInstalling?()
             try await request.downloadAndInstall()
         }
     }

@@ -55,7 +55,7 @@ public struct DictationTextAssembler: Equatable, Sendable {
 
     /// Punctuation that attaches to the word before it ("Hello" + ", world").
     /// Opening brackets and quotes are not here: they take the space.
-    private static let closingPunctuation: Set<Character> = [",", ".", ";", ":", "!", "?", ")", "]", "}", "…", "%"]
+    private static let closingPunctuation: Set<Character> = [",", ".", ";", ":", "!", "?", ")", "]", "}", "”", "…", "%"]
 
     /// Chinese and Japanese run words together; Korean (Hangul) separates
     /// them with spaces like Latin text, so it is deliberately not here.

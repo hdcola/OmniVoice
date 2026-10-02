@@ -201,6 +201,7 @@ final class DictationController: ObservableObject {
 
     private func cancelActiveDictation() {
         machine.reset()
+        dismissNotice()
         guard dictation.isActive else { return }
         Task {
             await dictation.cancel()
