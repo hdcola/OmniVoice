@@ -400,7 +400,10 @@ public final class RecordingSession: ObservableObject {
         isSessionActive ? activeSessionRecord?.id : nil
     }
 
-    private var transcriptionProvider: TranscriptionProvider?
+    /// Internal, not `private`, so `DictationTests` can put a stand-in
+    /// recognizer here to exercise `lendRecognizerToDictation()` without a
+    /// real model load — same reasoning as `loadedEngineIDs` below.
+    var transcriptionProvider: TranscriptionProvider?
     private var translationProvider: TranslationProvider?
     /// The engine + model-variant selection `transcriptionProvider`/
     /// `translationProvider` are currently loaded for, whenever they hold a
@@ -714,7 +717,7 @@ public final class RecordingSession: ObservableObject {
     }
 
     public func preloadModel(scope: PreloadScope = .all) async {
-        guard !isSessionActive, !isPreloadingModel, !isModelLoaded else { return }
+        guard !isSessionActive, !isPreloadingModel, !isModelLoaded, !isRecognizerLentToDictation else { return }
         if scope == .translationOnly, loadedTranslationOnlyIDs != nil { return }
         isPreloadingModel = true
         defer { isPreloadingModel = false }
@@ -843,6 +846,9 @@ public final class RecordingSession: ObservableObject {
     /// would otherwise just leak a loaded model that's no longer reachable
     /// through `preloadModel()`'s `isModelLoaded` guard.
     private func discardLoadedModelsIfStale() {
+        // A dictation is mid-recognition on the loaded recognizer; the check
+        // runs again when it hands it back (`returnRecognizerFromDictation()`).
+        guard !isRecognizerLentToDictation else { return }
         if loadedTranslationOnlyIDs != nil, !translationOnlyLoadMatchesSelection {
             translationProvider?.unload()
             translationProvider = nil
@@ -925,7 +931,8 @@ public final class RecordingSession: ObservableObject {
     /// true` on success — leaving `isModelLoaded == true` (and the panel
     /// reading "模型已就绪") while both provider ivars are actually `nil`.
     public func unloadModels() {
-        guard !isSessionActive, !isPreloadingModel else { return }
+        // Also not while voice input is streaming through the loaded recognizer.
+        guard !isSessionActive, !isPreloadingModel, !isRecognizerLentToDictation else { return }
         performModelUnload()
     }
 
@@ -944,6 +951,10 @@ public final class RecordingSession: ObservableObject {
 
     public func start() async {
         guard !isRunning, !isStopping, !isStarting, !isPreloadingModel else { return }
+        guard !isRecognizerLentToDictation else {
+            statusMessage = "正在语音输入，请稍后再开始"
+            return
+        }
         // Reset at the very top, before any of the early-return guards below
         // — these used to reset partway through this method, after several
         // early-failure `return`s (missing audio source, model not
@@ -1307,6 +1318,47 @@ public final class RecordingSession: ObservableObject {
         isStopping = false
         statusMessage = "已停止"
         inputLevel = 0
+    }
+
+    // MARK: - Lending the recognizer to voice input
+
+    /// True while a dictation is recognizing on `transcriptionProvider`.
+    /// Starting a recording, preloading and unloading a stale load all wait
+    /// for it, since the recognizer streams one session at a time.
+    private var isRecognizerLentToDictation = false
+
+    /// An on-device recognizer matching the current engine and variant
+    /// selection is loaded — whether or not something is using it right now.
+    public var hasLoadedLocalRecognizer: Bool {
+        transcriptionEngineKind == .model
+            && isModelLoaded
+            && loadedEngineIDs?.transcription == transcriptionEngineID
+            && loadedEngineIDs?.transcriptionVariant == currentTranscriptionModelVariant?.id
+            && transcriptionProvider != nil
+    }
+
+    /// The loaded on-device recognizer, for one dictation to stream through —
+    /// so voice input gets the model's accuracy without loading a second
+    /// copy of its weights. `nil` (the caller falls back to the system
+    /// engine) when the selected engine is a system one, when no matching
+    /// model is loaded yet, or while a recording / preload is using it.
+    /// Pair every non-nil result with `returnRecognizerFromDictation()`.
+    public func lendRecognizerToDictation() -> DictationRecognizerLease? {
+        guard
+            hasLoadedLocalRecognizer, !isSessionActive, !isPreloadingModel, !isRecognizerLentToDictation,
+            let provider = transcriptionProvider
+        else { return nil }
+        isRecognizerLentToDictation = true
+        return DictationRecognizerLease(
+            provider: provider, vadSilenceSeconds: vadSilenceSeconds, vadSilenceDBFS: vadSilenceDBFS
+        )
+    }
+
+    public func returnRecognizerFromDictation() {
+        guard isRecognizerLentToDictation else { return }
+        isRecognizerLentToDictation = false
+        // An engine switch made during the dictation left a stale load.
+        discardLoadedModelsIfStale()
     }
 
     // MARK: - Bridging for one-shot (`.system`-kind) translation engines

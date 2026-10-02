@@ -7,16 +7,21 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(dictation): 语音输入 — hold the right ⌥ Option key (or right ⌘ / ⌃, or tap to start and tap again to stop) in any app, speak, and the recognized text is typed at the cursor. Uses on-device system speech recognition with the language and microphone from 实时转录; a small bubble shows what it hears while you speak, and during a slow first start says what it is doing (准备识别引擎 / 下载语言识别资源 / 启动麦克风). Turning voice input on (and launching with it on, or switching the recognition language) also pre-installs the system recognizer's language assets in the background, so the first dictation doesn't wait on the download (skipped while a local model is loaded and will be borrowed instead; at launch it waits for the 启动时加载模型 preload to finish before deciding); 设置 shows the progress note meanwhile. Text goes in by pasting (the clipboard is saved and put back afterwards, and marked transient so clipboard managers skip it); with no Accessibility permission or in a secure field it stays on the clipboard with a notice. Taps under 0.3 s and ⌥ used as a modifier for another key are ignored, Esc cancels a dictation in either mode (even one still starting up), and one still running past its time limit ends by itself and types what it heard, so a lost key release can't leave the microphone open — 2 minutes by default, adjustable (1 / 2 / 5 / 10 minutes or no limit) in 设置/通用 › 语音输入 › 单次最长时长 for dictating long prompts. When 实时转录 uses a local model (R2T2) that is already loaded (e.g. via 启动时加载模型), voice input borrows that same recognizer instead of loading a second copy — more accurate, and the HUD says 本地模型 or 系统识别; with no model loaded, or while a recording is running, it uses system recognition. The 新功能 window introduces it to existing users, with a 开启 button. Off by default — turn it on in 设置/通用 › 语音输入, which asks for Input Monitoring, Accessibility and the microphone (#74)
 
 ### Changed
 
 ### Fixed
+- fix(dictation): holding the left and right copy of the trigger modifier together (both ⌥) and releasing them no longer leaves voice input unable to trigger again; a missed key release is recovered from, and turning voice input off or changing its key/mode also cancels the pending time-limit timer (#74)
+- fix(dictation): a system locale such as zh-Hans-CN (used when the recognition language is 自动 or unset and no local model is loaded) now maps to the recognizer's supported zh-CN instead of failing with 不支持此语言环境; the same lookup applies to 实时转录's system engine, and variants like en-AU fall back to en-US, while a Simplified-Chinese region the recognizer doesn't list (zh-Hans-SG) still gets zh-CN rather than the Traditional zh-TW (#74)
+- fix(dictation): segments no longer gain a stray space before punctuation or between Chinese words when the engine pads the end of the previous one, and ’ » ” attach to the word before them (#74)
 
 ### Dependencies
 
 ### Documentation
 
 ### Tests
+- test(dictation): cover the text assembler (segment joining incl. CJK), the hold/toggle trigger state machine when a loaded recognizer is lent to voice input and what is blocked meanwhile, Esc/reset in the trigger machine, and the thread-safe transcript (#74)
 
 ## [0.5.7] - 2026-10-02
 

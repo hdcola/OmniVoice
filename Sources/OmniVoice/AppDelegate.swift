@@ -36,6 +36,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     /// same reason as `session`: its global hot keys must work from launch,
     /// before any menu or window has been opened.
     let selectionController: SelectionTranslationController
+    /// Push-to-talk voice input — constructed here for the same reason: its
+    /// trigger key must work from launch.
+    let dictationController: DictationController
 
     override init() {
         // A failed store (disk full, corrupted schema after a migration
@@ -52,6 +55,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
                 preferredModelVariantID: { [weak session] in session?.translationModelVariantID },
                 recordingEngineID: { [weak session] in session?.translationEngineID }
             )
+        )
+        dictationController = DictationController(
+            // Voice input borrows the loaded on-device recognizer when
+            // there is one (see `RecordingSession.lendRecognizerToDictation()`).
+            dictation: DictationSession(
+                borrowRecognizer: { [weak session] in session?.lendRecognizerToDictation() },
+                returnRecognizer: { [weak session] in session?.returnRecognizerFromDictation() }
+            ),
+            languageCode: { [weak session] in session?.sourceLanguageCode },
+            deviceID: { [weak session] in session?.selectedDeviceID },
+            isLocalRecognizerLoaded: { [weak session] in session?.hasLoadedLocalRecognizer ?? false },
+            languageChanges: session.$sourceLanguageCode.eraseToAnyPublisher()
         )
         super.init()
     }
@@ -113,9 +128,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     /// on-device ones. Runs in a background `Task` so launch isn't blocked by
     /// a multi-second weight load.
     private func preloadModelsOnLaunchIfNeeded() {
-        guard onboardingWindow == nil, let scope = LaunchPreloadMode.stored.effectiveScope(for: session)
-        else { return }
-        Task { [session] in await session.preloadModel(scope: scope) }
+        guard onboardingWindow == nil, let scope = LaunchPreloadMode.stored.effectiveScope(for: session) else {
+            dictationController.warmUpIfEnabled()
+            return
+        }
+        // Voice input's own warm-up waits for this: a model loaded here is
+        // what it borrows, and then needs no system assets.
+        Task { [session, dictationController] in
+            await session.preloadModel(scope: scope)
+            dictationController.warmUpIfEnabled()
+        }
     }
 
     /// Task 4.1 — shown exactly once, on the very first launch (see
@@ -161,6 +183,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         let hosting = NSHostingController(
             rootView: WhatsNewView(
                 entries: entries, selectionController: selectionController,
+                dictationController: dictationController,
                 onDismiss: { [weak self] in self?.whatsNewWindow?.close() },
                 onRerunOnboarding: { [weak self] in self?.showOnboarding() }
             )

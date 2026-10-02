@@ -22,6 +22,7 @@ struct SettingsView: View {
     @EnvironmentObject private var session: RecordingSession
     @EnvironmentObject private var navigation: SettingsNavigationState
     @EnvironmentObject private var selectionController: SelectionTranslationController
+    @EnvironmentObject private var dictationController: DictationController
     @EnvironmentObject private var appDelegate: AppDelegate
     /// Read once at launch by `AppDelegate` — flipping it doesn't show/hide
     /// the panel right now, only decides whether it opens on the next start.
@@ -78,6 +79,8 @@ struct SettingsView: View {
                     translator: selectionController.translator,
                     downloadManager: downloadManager
                 )
+
+                DictationSettingsView(controller: dictationController)
 
                 transcriptionEngineCard
                 translationEngineCard

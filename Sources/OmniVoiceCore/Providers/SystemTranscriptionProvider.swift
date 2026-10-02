@@ -14,6 +14,10 @@ import Speech
 /// Ported from `mac-poc-hybrid`'s `Recognition/AppleSpeechRecognizer.swift`.
 public final class SystemTranscriptionProvider: TranscriptionProvider {
     public var onEvent: ((TranscriptionEvent) -> Void)?
+    /// Called when `start(config:)` has to download the language's on-device
+    /// recognition assets first — the one slow step, worth telling the user
+    /// about. Called on the main actor, before the download begins.
+    public var onInstallingAssets: (() -> Void)?
 
     private var transcriber: SpeechTranscriber?
     private var analyzer: SpeechAnalyzer?
@@ -49,6 +53,17 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
 
     public init() {}
 
+    /// Installs the on-device recognition assets for `languageCode` ahead of
+    /// time, so the first `start(config:)` for it doesn't wait on the
+    /// download. A no-op once they are installed.
+    public static func prepareAssets(languageCode: String, onInstalling: (() -> Void)? = nil) async throws {
+        let locale = try await resolveSupportedLocale(Locale(identifier: languageCode))
+        let transcriber = SpeechTranscriber(
+            locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults], attributeOptions: []
+        )
+        try await ensureModelInstalled(for: transcriber, locale: locale, onInstalling: onInstalling)
+    }
+
     public func loadModel() async throws {
         // No separate "load" phase — the on-device asset (if missing) is
         // installed lazily in `start(config:)`.
@@ -62,7 +77,7 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
             // unlike a `.model` provider, there is no auto-detect option here.
             throw ProviderError.localeNotSupported
         }
-        let locale = Locale(identifier: languageCode)
+        let locale = try await Self.resolveSupportedLocale(Locale(identifier: languageCode))
 
         let transcriber = SpeechTranscriber(
             locale: locale,
@@ -70,7 +85,7 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
             reportingOptions: [.volatileResults],
             attributeOptions: []
         )
-        try await Self.ensureModelInstalled(for: transcriber, locale: locale)
+        try await Self.ensureModelInstalled(for: transcriber, locale: locale, onInstalling: onInstallingAssets)
 
         guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
             throw ProviderError.notImplemented("SpeechAnalyzer 无可用音频格式")
@@ -169,14 +184,42 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
         transcriber = nil
     }
 
-    private static func ensureModelInstalled(for transcriber: SpeechTranscriber, locale: Locale) async throws {
-        let supported = await SpeechTranscriber.supportedLocales
-        guard supported.contains(where: { $0.identifier(.bcp47) == locale.identifier(.bcp47) }) else {
+    /// The supported locale `requested` stands for — see `matchLocale(_:in:)`.
+    private static func resolveSupportedLocale(_ requested: Locale) async throws -> Locale {
+        guard let match = matchLocale(requested, in: Array(await SpeechTranscriber.supportedLocales)) else {
             throw ProviderError.localeNotSupported
         }
+        return match
+    }
+
+    /// Picks which of `supported` serves `requested`: the same BCP-47 tag,
+    /// else the same language and region (the system's own "zh-Hans-CN" is
+    /// listed as "zh-CN"), else the same language and writing system (a
+    /// Singapore Chinese "zh-Hans-SG" gets Simplified zh-CN, not the
+    /// Traditional zh-TW that happens to be listed first), else the same
+    /// language alone (en-AU → en-US).
+    nonisolated static func matchLocale(_ requested: Locale, in supported: [Locale]) -> Locale? {
+        let language = requested.language.languageCode
+        let script = likelyScript(of: requested)
+        return supported.first { $0.identifier(.bcp47) == requested.identifier(.bcp47) }
+            ?? supported.first { $0.language.languageCode == language && $0.region == requested.region }
+            ?? supported.first { $0.language.languageCode == language && likelyScript(of: $0) == script }
+            ?? supported.first { $0.language.languageCode == language }
+    }
+
+    /// The writing system a locale implies — "zh-CN" has no script of its
+    /// own in its tag, but is Simplified (Hans) once likely subtags are added.
+    private nonisolated static func likelyScript(of locale: Locale) -> Locale.Script? {
+        Locale.Language(identifier: locale.language.maximalIdentifier).script
+    }
+
+    private static func ensureModelInstalled(
+        for transcriber: SpeechTranscriber, locale: Locale, onInstalling: (() -> Void)?
+    ) async throws {
         let installed = await SpeechTranscriber.installedLocales
         guard !installed.contains(where: { $0.identifier(.bcp47) == locale.identifier(.bcp47) }) else { return }
         if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+            onInstalling?()
             try await request.downloadAndInstall()
         }
     }
