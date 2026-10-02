@@ -7,9 +7,9 @@ device quick translate (快捷翻译): select text in any app (划词翻译, ⌥
 frame part of the screen (截图翻译, ⌥S) and translate it in a translation
 panel (翻译面板).
 
-**Current version: 0.5.7 — internal test build.**
+**Current version: 0.6.0 — internal test build.**
 
-### [⬇ Download OmniVoice 0.5.7 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.5.7/OmniVoice-0.5.7.dmg)
+### [⬇ Download OmniVoice 0.6.0 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.6.0/OmniVoice-0.6.0.dmg)
 
 Or install via [Homebrew](https://brew.sh):
 
@@ -60,6 +60,11 @@ history and open items.
   languages live in Settings → 通用. Reading the selection needs the
   Accessibility permission (without it, copy and paste into the translation panel);
   ⌥S needs Screen Recording.
+- **Voice input (语音输入, opt-in)**: hold the right ⌥ Option key (or tap to
+  start and tap again to stop) in any app, speak, and the text is typed at the
+  cursor. Uses system speech recognition, or borrows the loaded R2T2 model when
+  实时转录 uses it. Turn it on in Settings → 通用 → 语音输入; it needs Input
+  Monitoring, Accessibility and Microphone.
 - **History (历史记录)**: past transcripts persisted locally (SwiftData), with
   a searchable history window and Markdown export.
 - **Settings persistence**: engine choice, language pair, mic device, and
