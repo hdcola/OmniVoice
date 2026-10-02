@@ -161,3 +161,9 @@ When in doubt:
 3. validate the change
 4. update `CHANGELOG.md`
 5. open a PR (Section 6)
+
+## 10. Releasing
+
+Cutting a version (version bump, changelog cut, DMG build, tag, GitHub
+Release, Homebrew cask) is described in `Docs/RELEASING.md`. A release cut is
+a `chore/release-X.Y.Z` branch and a PR like any other change.

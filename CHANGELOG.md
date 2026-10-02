@@ -21,6 +21,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(release): add `Docs/RELEASING.md` describing how a version is cut, built, tagged, published and bumped in the Homebrew cask, and point to it from `AGENTS.md`
 
 ### Tests
 - test(selection): add `DoubleCopyDetectorTests` covering the ⌘C ⌘C timing window, consumed pairs, reset and a backwards clock and key bounce, including a bounce right after a completed double and a continuous train of bounces (#68)
