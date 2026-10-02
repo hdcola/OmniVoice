@@ -1026,8 +1026,13 @@ public final class RecordingSession: ObservableObject {
         translationRowIndex = 0
 
         if let sessionStore {
+            // One `Date` for both fields: `RecordingSessionRecord.displayTitle()`
+            // recognizes an untouched default title by re-deriving it from
+            // `startedAt`, so the two must not straddle a minute boundary.
+            let startedAt = Date.now
             activeSessionRecord = sessionStore.createSession(
-                title: Self.defaultTitle(),
+                title: RecordingSessionRecord.defaultTitle(for: startedAt),
+                startedAt: startedAt,
                 transcriptionEngineID: transcriptionEngineID,
                 translationEngineID: translationEngineID,
                 sourceLanguageCode: sourceLanguageCode,
@@ -1398,13 +1403,6 @@ public final class RecordingSession: ObservableObject {
         } else {
             inputLevel = inputLevel * 0.7 + level * 0.3
         }
-    }
-
-    private static func defaultTitle() -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: .now)
     }
 
     private static func makeTranscriptionProvider(engineID: String, modelPath: URL?) -> TranscriptionProvider {

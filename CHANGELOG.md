@@ -10,16 +10,17 @@ The format is based on Keep a Changelog.
 - feat(history): multi-select (⌘/Shift-click, ⌘A) with batch delete via ⌫, context menu or the toolbar menu; "delete records older than 30/90 days" cleanup; in-progress recordings are always skipped (#62)
 
 ### Changed
-- feat(history): history sidebar (min width 340) groups by 今天/昨天/本周/本月/month, shows the first utterance instead of a default date title, and condenses duration · languages · count into one line; sidebar width is now bounded (#62)
+- feat(history): history sidebar (min width 340) groups by 今天/昨天/本周/本月/month, shows the first utterance instead of a default date title, and condenses duration · languages · count into one line; sidebar width is now bounded; this-week rows show weekday + time; cleanup menu items disable when nothing matches and the confirmation shows the record count (#62)
 
 ### Fixed
+- fix(session): a new session's default title and start time now share one timestamp, so the history list can reliably tell a default title from a rename (#62)
 
 ### Dependencies
 
 ### Documentation
 
 ### Tests
-- test(history): cover display-title fallback (#62)
+- test(history): cover display-title fallback, including a leading empty utterance (#62)
 
 ## [0.5.5] - 2026-10-01
 

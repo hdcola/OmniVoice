@@ -54,7 +54,9 @@ struct SessionListView: View {
                         .disabled(selectedDeletable.isEmpty)
                         Divider()
                         Button("删除 30 天前的记录…") { pendingCleanupDays = 30 }
+                            .disabled(staleSessions(olderThanDays: 30).isEmpty)
                         Button("删除 90 天前的记录…") { pendingCleanupDays = 90 }
+                            .disabled(staleSessions(olderThanDays: 90).isEmpty)
                     } label: {
                         Label("管理", systemImage: "trash")
                     }
@@ -103,14 +105,13 @@ struct SessionListView: View {
         ) {
             Button("删除", role: .destructive) {
                 if let days = pendingCleanupDays {
-                    let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: .now) ?? .now
-                    performDeletion(sessions.filter { $0.startedAt < cutoff })
+                    performDeletion(staleSessions(olderThanDays: days))
                 }
                 pendingCleanupDays = nil
             }
             Button("取消", role: .cancel) { pendingCleanupDays = nil }
         } message: {
-            Text("将删除开始于 \(pendingCleanupDays ?? 0) 天前的所有转录记录，无法恢复。")
+            Text("将删除 \(staleSessions(olderThanDays: pendingCleanupDays ?? 0).count) 条开始于 \(pendingCleanupDays ?? 0) 天前的转录记录，无法恢复。")
         }
         .alert(
             "重命名转录记录",
@@ -120,6 +121,12 @@ struct SessionListView: View {
             Button("保存") { commitRename() }
             Button("取消", role: .cancel) { renamingSession = nil }
         }
+    }
+
+    /// Finished sessions that started more than `days` days ago.
+    private func staleSessions(olderThanDays days: Int) -> [RecordingSessionRecord] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: .now) ?? .now
+        return sessions.filter { $0.startedAt < cutoff && $0.endedAt != nil }
     }
 
     private var selectedSessions: [RecordingSessionRecord] {
@@ -167,7 +174,7 @@ struct SessionListView: View {
 
     private struct SessionGroup {
         let title: String
-        let sessions: [RecordingSessionRecord]
+        var sessions: [RecordingSessionRecord]
     }
 
     /// Newest-first sessions bucketed into 今天 / 昨天 / 本周 / 本月 / "yyyy年M月".
@@ -175,8 +182,8 @@ struct SessionListView: View {
         var groups: [SessionGroup] = []
         for session in filteredSessions {
             let title = Self.groupTitle(for: session.startedAt)
-            if let last = groups.last, last.title == title {
-                groups[groups.count - 1] = SessionGroup(title: title, sessions: last.sessions + [session])
+            if let last = groups.indices.last, groups[last].title == title {
+                groups[last].sessions.append(session)
             } else {
                 groups.append(SessionGroup(title: title, sessions: [session]))
             }
@@ -271,6 +278,11 @@ struct SessionListView: View {
         formatter.dateFormat = "HH:mm"
         return formatter
     }()
+    private static let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter
+    }()
     private static let monthDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "M月d日"
@@ -290,6 +302,10 @@ struct SessionListView: View {
         // those rows only need the clock time.
         if calendar.isDateInToday(date) || calendar.isDateInYesterday(date) {
             return timeFormatter.string(from: date)
+        }
+        // Several recordings on one day are told apart by clock time.
+        if calendar.isDate(date, equalTo: .now, toGranularity: .weekOfYear) {
+            return "\(weekdayFormatter.string(from: date)) \(timeFormatter.string(from: date))"
         }
         let formatter = calendar.isDate(date, equalTo: .now, toGranularity: .year)
             ? monthDayFormatter

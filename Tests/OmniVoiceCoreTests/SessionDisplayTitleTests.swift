@@ -26,6 +26,10 @@ struct SessionDisplayTitleTests {
         #expect(title == String(repeating: "a", count: 10) + "…")
     }
 
+    @Test func leadingEmptyUtteranceIsSkipped() {
+        #expect(makeSession(texts: ["", "  ", "Real words"]).displayTitle() == "Real words")
+    }
+
     @Test func customTitleIsKept() {
         #expect(makeSession(title: "周会", texts: ["Hello"]).displayTitle() == "周会")
     }

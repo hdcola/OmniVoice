@@ -20,6 +20,7 @@ public final class SessionStore {
 
     public func createSession(
         title: String,
+        startedAt: Date = .now,
         transcriptionEngineID: String,
         translationEngineID: String,
         sourceLanguageCode: String?,
@@ -27,6 +28,7 @@ public final class SessionStore {
     ) -> RecordingSessionRecord {
         let session = RecordingSessionRecord(
             title: title,
+            startedAt: startedAt,
             transcriptionEngineID: transcriptionEngineID,
             translationEngineID: translationEngineID,
             sourceLanguageCode: sourceLanguageCode,
