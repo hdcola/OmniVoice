@@ -40,6 +40,21 @@ struct DictationSettingsView: View {
                 .fixedSize()
             }
             .disabled(!controller.isEnabled || controller.dictation.isActive)
+            SettingsDivider()
+            SettingsRow(
+                title: "单次最长时长",
+                subtitle: "到时自动结束并输入已识别的内容，防止忘记结束时麦克风一直开着；说长段内容可以调长"
+            ) {
+                Picker("单次最长时长", selection: $controller.maxDuration) {
+                    ForEach(DictationMaxDuration.allCases) { limit in
+                        Text(limit.title).tag(limit)
+                    }
+                }
+                .labelsHidden()
+                .accessibilityLabel("单次最长时长")
+                .fixedSize()
+            }
+            .disabled(!controller.isEnabled)
             if let warmup = controller.warmupMessage {
                 SettingsDivider()
                 SettingsNote(text: warmup)

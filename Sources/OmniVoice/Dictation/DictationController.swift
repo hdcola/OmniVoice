@@ -4,6 +4,33 @@ import Combine
 import OmniVoiceCore
 import SwiftUI
 
+/// How long one dictation may run before it ends by itself and types what it
+/// heard — a guard against a lost key release or a toggle left running
+/// keeping the microphone open. Long enough choices exist for dictating
+/// whole prompts or paragraphs.
+enum DictationMaxDuration: Int, CaseIterable, Identifiable {
+    case oneMinute = 60
+    case twoMinutes = 120
+    case fiveMinutes = 300
+    case tenMinutes = 600
+    /// No cap: only the trigger key or Esc ends it.
+    case unlimited = 0
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .oneMinute: return "1 分钟"
+        case .twoMinutes: return "2 分钟"
+        case .fiveMinutes: return "5 分钟"
+        case .tenMinutes: return "10 分钟"
+        case .unlimited: return "不限制"
+        }
+    }
+
+    var duration: Duration? { self == .unlimited ? nil : .seconds(rawValue) }
+}
+
 /// Push-to-talk dictation: hold (or tap) a modifier key anywhere, speak, and
 /// the text is typed into the focused app. Owns the key monitor, the
 /// `DictationSession` doing the recognition, and the HUD; `AppDelegate`
@@ -13,6 +40,7 @@ final class DictationController: ObservableObject {
     static let enabledKey = "org.hdcola.omnivoice.dictation.enabled"
     static let triggerKeyKey = "org.hdcola.omnivoice.dictation.triggerKey"
     static let modeKey = "org.hdcola.omnivoice.dictation.mode"
+    static let maxDurationKey = "org.hdcola.omnivoice.dictation.maxDuration"
 
     /// Off until the user opts in: it needs the Input Monitoring permission,
     /// which launch should never ask for out of the blue.
@@ -42,6 +70,11 @@ final class DictationController: ObservableObject {
             machine.mode = mode
             cancelActiveDictation()
         }
+    }
+
+    /// Read when a dictation starts, so a change applies from the next one.
+    @Published var maxDuration: DictationMaxDuration {
+        didSet { UserDefaults.standard.set(maxDuration.rawValue, forKey: Self.maxDurationKey) }
     }
 
     /// Something the HUD should tell the user instead of listening.
@@ -85,6 +118,8 @@ final class DictationController: ObservableObject {
         let storedMode = defaults.string(forKey: Self.modeKey).flatMap(DictationTriggerMachine.Mode.init) ?? .hold
         triggerKey = storedKey
         mode = storedMode
+        maxDuration = (defaults.object(forKey: Self.maxDurationKey) as? Int).flatMap(DictationMaxDuration.init)
+            ?? .twoMinutes
         machine = DictationTriggerMachine(mode: storedMode)
         monitor.triggerKey = storedKey
 
@@ -134,10 +169,6 @@ final class DictationController: ObservableObject {
 
     // MARK: - Flow
 
-    /// A dictation is ended on its own after this long, so a lost key-up or a
-    /// toggle left running can't keep the microphone open indefinitely.
-    static let maxDictationDuration: Duration = .seconds(120)
-
     private func perform(_ action: DictationTriggerMachine.Action) {
         if action == .finish || action == .cancel { maxDurationTask?.cancel() }
         switch action {
@@ -170,8 +201,9 @@ final class DictationController: ObservableObject {
             deviceID: deviceID == AudioInputDevice.noneID ? nil : deviceID
         )
         maxDurationTask?.cancel()
+        guard let limit = maxDuration.duration else { return }
         maxDurationTask = Task { [weak self] in
-            try? await Task.sleep(for: Self.maxDictationDuration)
+            try? await Task.sleep(for: limit)
             guard !Task.isCancelled, let self else { return }
             // Same as the user finishing: what was heard is still typed.
             machine.reset()
