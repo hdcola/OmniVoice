@@ -166,6 +166,19 @@ struct RecordingSessionSettingsTests {
         #expect(session.sourceLanguageCode == "en-US")
     }
 
+    @Test func selfHealKeepsMyAndForeignLanguagesDistinct() {
+        withPersisted([
+            PersistedSettingsKey.transcriptionEngineID: "system.speech",
+            PersistedSettingsKey.sourceLanguageCode: "ru-RU",
+            PersistedSettingsKey.targetLanguageCode: "en-US",
+        ]) {
+            let session = RecordingSession()
+            #expect(session.languages.myLanguageCode == "en-US")
+            #expect(session.languages.foreignLanguageCode == "zh-CN")
+            #expect(session.sourceLanguageCode == "zh-CN")
+        }
+    }
+
     @Test func swapIsRefusedWhenTheSystemRecognizerCannotHearTheOtherSide() {
         withPersisted([
             PersistedSettingsKey.transcriptionEngineID: "system.speech",

@@ -715,7 +715,10 @@ public final class RecordingSession: ObservableObject {
         languages.transcriptionDirection = .listenForeign
         languages.foreignLanguageAutoDetect = false
         if isUnsupported(languages.sourceLanguageCode) {
-            languages.foreignLanguageCode = LanguageSettingsMigration.defaultForeign
+            // Keep the two languages distinct (en-US as 我的语言 → fall back to zh-CN).
+            languages.foreignLanguageCode = LanguageSettingsMigration.distinctForeign(
+                from: languages.myLanguageCode, preferring: LanguageSettingsMigration.defaultForeign
+            )
         }
     }
 

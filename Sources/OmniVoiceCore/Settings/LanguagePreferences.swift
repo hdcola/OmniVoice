@@ -17,7 +17,8 @@ public enum DictationLanguageChoice: String, Sendable {
     case foreign
     /// Let an on-device model detect it. Only meaningful with a `.model`
     /// transcription engine — `RecordingSession.dictationLanguageCode`
-    /// falls back to `mine` otherwise.
+    /// falls back to `mine` otherwise, and to nil (the system locale) when
+    /// the system recognizer can't take `mine` either.
     case auto
 }
 
@@ -100,7 +101,7 @@ enum LanguageSettingsMigration {
         )
     }
 
-    private static func distinctForeign(from mine: String, preferring preferred: String) -> String {
+    static func distinctForeign(from mine: String, preferring preferred: String) -> String {
         if !SelectionLanguageDirection.isSameLanguage(preferred, mine) { return preferred }
         return SelectionLanguageDirection.isSameLanguage(mine, defaultForeign) ? defaultMine : defaultForeign
     }
