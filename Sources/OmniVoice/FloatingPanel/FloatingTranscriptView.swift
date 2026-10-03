@@ -176,12 +176,7 @@ struct FloatingTranscriptView: View {
     }
 
     /// Tooltip for the ⇄ button — says why it is greyed out.
-    private var swapHelp: String {
-        if session.isSessionActive { return "录制中不能互换，停止后再试" }
-        if session.languages.sourceLanguageCode == nil { return "自动检测下不能互换，请先选一种源语言" }
-        if !session.canSwapTranscriptionDirection { return "系统语音识别不支持互换后的源语言" }
-        return "互换源语言和目标语言"
-    }
+    private var swapHelp: String { session.swapBlockedReason ?? "互换源语言和目标语言" }
 
     /// Start/stop, the source ⇄ target language pickers, and the timer.
     /// The language pickers are flexible views that would otherwise stretch
@@ -235,8 +230,8 @@ struct FloatingTranscriptView: View {
         .fixedSize(horizontal: !compressible, vertical: false)
 
         // Swaps source and target (听外语 ⇄ 说我的语言). Not while a
-        // recording runs (the source is fixed at `start()`), nor while the
-        // source is "自动" (it would become the target).
+        // recording runs (the source is fixed at `start()`). "自动" survives a
+        // swap — it comes back when swapping back.
         Button {
             session.swapTranscriptionDirection()
         } label: {

@@ -211,12 +211,10 @@ public final class LanguagePreferences: ObservableObject {
         }
     }
 
-    /// False while the source is "自动": swapping would make the target "自动".
-    public var canSwapDirection: Bool { sourceLanguageCode != nil }
-
-    /// Flips source and target. No-op unless `canSwapDirection`.
+    /// Flips source and target. The auto-detect flag is kept apart from the
+    /// languages, so swapping away from an "自动" source speaks in my
+    /// language towards the foreign one, and swapping back restores "自动".
     public func swapDirection() {
-        guard canSwapDirection else { return }
         transcriptionDirection = transcriptionDirection == .listenForeign ? .speakMine : .listenForeign
     }
 

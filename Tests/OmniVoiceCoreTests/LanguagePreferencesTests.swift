@@ -120,12 +120,15 @@ struct LanguagePreferencesTests {
         #expect(languages.targetLanguageCode == "zh-CN")
     }
 
-    @Test func swapIsRefusedWhileSourceIsAuto() {
+    @Test func swapKeepsAutoDetectAndRestoresItOnSwapBack() {
         let languages = LanguagePreferences(defaults: Self.makeDefaults())
         languages.sourceLanguageCode = nil
-        #expect(!languages.canSwapDirection)
         languages.swapDirection()
-        #expect(languages.transcriptionDirection == .listenForeign)
+        #expect(languages.sourceLanguageCode == "zh-CN")
+        #expect(languages.targetLanguageCode == "en-US")
+        languages.swapDirection()
+        #expect(languages.sourceLanguageCode == nil)
+        #expect(languages.targetLanguageCode == "zh-CN")
     }
 
     @Test func settingSourceAndTargetWritesTheMatchingLanguage() {

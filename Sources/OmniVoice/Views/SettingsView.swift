@@ -286,7 +286,8 @@ struct SettingsView: View {
             SettingsDivider()
             SettingsRow(
                 title: "转录方向",
-                subtitle: "听外语：字幕把外语译成我的语言；说我的语言：把我说的话译成外语。悬浮窗里的 ⇄ 也能切换"
+                subtitle: session.swapBlockedReason
+                    ?? "听外语：字幕把外语译成我的语言；说我的语言：把我说的话译成外语。悬浮窗里的 ⇄ 也能切换"
             ) {
                 Picker("转录方向", selection: Binding(
                     get: { languages.transcriptionDirection },
@@ -316,8 +317,7 @@ struct SettingsView: View {
             }
             if let note = localTranslationLanguageNote {
                 SettingsDivider()
-                SettingsNote(text: note, tint: .orange)
-                SettingsRow(title: "") {
+                SettingsRow(title: "本地翻译模型可能回退为中文", subtitle: note) {
                     PillButton(title: "切换为系统翻译") { session.translationEngineID = "system.translation" }
                         .disabled(isBusy)
                 }

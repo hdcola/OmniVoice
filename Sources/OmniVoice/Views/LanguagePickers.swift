@@ -62,7 +62,7 @@ struct SourceLanguagePicker: View {
             // this small "?" sits next to it so the explanation is reachable
             // even while the picker itself is fully system-driven (auto
             // isn't selectable, so there's no "select and see" path).
-            if transcriptionEngineKind != .model {
+            if allowsAuto && transcriptionEngineKind != .model {
                 Button {
                     isAutoExplanationPresented = true
                 } label: {
