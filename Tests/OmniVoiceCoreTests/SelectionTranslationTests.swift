@@ -428,3 +428,71 @@ private final class FakeModelBackend: SelectionModelTranslating {
         provider.unload()
     }
 }
+
+@Suite struct SpeechVoiceResolverTests {
+    private func voice(_ id: String, _ language: String, _ quality: Int = 1) -> SpeechVoiceCandidate {
+        SpeechVoiceCandidate(identifier: id, language: language, quality: quality)
+    }
+
+    @Test func mapsRecognizerAndCatalogCodesToSpeechTags() {
+        #expect(SpeechVoiceResolver.speechLanguageCode(for: "zh-Hans") == "zh-CN")
+        #expect(SpeechVoiceResolver.speechLanguageCode(for: "zh-Hant") == "zh-TW")
+        #expect(SpeechVoiceResolver.speechLanguageCode(for: "zh-TW") == "zh-TW")
+        #expect(SpeechVoiceResolver.speechLanguageCode(for: "yue-CN") == "yue-HK")
+        #expect(SpeechVoiceResolver.speechLanguageCode(for: "zh-HK") == "yue-HK")
+        #expect(SpeechVoiceResolver.speechLanguageCode(for: "zh") == "zh-CN")
+        #expect(SpeechVoiceResolver.speechLanguageCode(for: "en") == "en-US")
+        #expect(SpeechVoiceResolver.speechLanguageCode(for: "ja") == "ja-JP")
+        #expect(SpeechVoiceResolver.speechLanguageCode(for: "en_gb") == "en-GB")
+        #expect(SpeechVoiceResolver.speechLanguageCode(for: "nl") == "nl")
+    }
+
+    @Test func prefersExactLanguageThenHigherQuality() {
+        let voices = [voice("a", "en-GB", 3), voice("b", "en-US", 1), voice("c", "en-US", 2)]
+        #expect(SpeechVoiceResolver.bestVoice(for: "en-US", among: voices)?.identifier == "c")
+        #expect(SpeechVoiceResolver.bestVoice(for: "en", among: voices)?.identifier == "c")
+    }
+
+    @Test func fallsBackToSameLanguageOtherRegion() {
+        let voices = [voice("a", "zh-CN"), voice("b", "en-US")]
+        #expect(SpeechVoiceResolver.bestVoice(for: "zh-Hant", among: voices)?.identifier == "a")
+    }
+
+    @Test func cantoneseMatchesItsOwnVoiceNeverMandarin() {
+        let voices = [voice("m", "zh-CN", 2), voice("c", "yue-HK")]
+        #expect(SpeechVoiceResolver.bestVoice(for: "yue-CN", among: voices)?.identifier == "c")
+        #expect(SpeechVoiceResolver.bestVoice(for: "yue-CN", among: [voice("m", "zh-CN")]) == nil)
+        // A voice still reported as `zh-HK` is Cantonese too.
+        #expect(SpeechVoiceResolver.bestVoice(for: "yue", among: [voice("old", "zh-HK")])?.identifier == "old")
+        #expect(SpeechVoiceResolver.bestVoice(for: "zh-CN", among: [voice("c", "yue-HK")]) == nil)
+    }
+
+    @Test func returnsNilWhenNoVoiceSpeaksTheLanguage() {
+        #expect(SpeechVoiceResolver.bestVoice(for: "th-TH", among: [voice("a", "en-US")]) == nil)
+        #expect(SpeechVoiceResolver.bestVoice(for: "en", among: []) == nil)
+    }
+
+    @Test func localizedNameResolvesCatalogAndRecognizerCodes() {
+        #expect(LanguageCatalog.localizedName(for: "zh-CN") == "简体中文")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hans") == "简体中文")
+        #expect(LanguageCatalog.localizedName(for: "zh-TW") == "繁体中文")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hant") == "繁体中文")
+        #expect(LanguageCatalog.localizedName(for: "yue-CN") == "粤语")
+        #expect(LanguageCatalog.localizedName(for: "yue") == "粤语")
+        #expect(LanguageCatalog.localizedName(for: "en-US") == "英语")
+        #expect(LanguageCatalog.localizedName(for: "en") == "英语")
+        #expect(LanguageCatalog.localizedName(for: "ja") == "日语")
+    }
+}
+
+@Suite struct LanguageCatalogLocalizedNameTests {
+    @Test func namesTagsOutsideTheCatalogExactly() {
+        #expect(LanguageCatalog.localizedName(for: "en-US") == "英语")
+        #expect(LanguageCatalog.localizedName(for: "en") == "英语")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hans") == "简体中文")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hant") == "繁体中文")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hant-TW") == "繁体中文")
+        #expect(LanguageCatalog.localizedName(for: "zh-HK") == "粤语")
+        #expect(LanguageCatalog.localizedName(for: "yue") == "粤语")
+    }
+}

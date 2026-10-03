@@ -79,6 +79,7 @@ struct SettingsView: View {
                 SelectionTranslationSettingsView(
                     controller: selectionController,
                     translator: selectionController.translator,
+                    speaker: selectionController.speaker,
                     downloadManager: downloadManager
                 )
 

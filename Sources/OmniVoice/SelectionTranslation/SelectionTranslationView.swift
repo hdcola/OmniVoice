@@ -16,6 +16,7 @@ import Translation
 struct SelectionTranslationView: View {
     @ObservedObject var controller: SelectionTranslationController
     @ObservedObject var translator: SelectionTranslator
+    @ObservedObject var speaker: SelectionSpeaker
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,27 +26,33 @@ struct SelectionTranslationView: View {
                 // translation is what's being read, so a long selection
                 // scrolls inside its own card instead of crowding out the
                 // result.
-                PanelTextView(
-                    text: $translator.sourceText,
-                    isEditable: true,
-                    placeholder: "输入或粘贴要翻译的文字，按 ⏎ 翻译",
-                    fontSize: 13,
-                    textColor: .secondaryLabelColor,
-                    lineSpacing: 2,
-                    focusRequest: controller.sourceFocusRequest,
-                    fitsContentHeight: true,
-                    onSubmit: { translator.translate() },
-                    onCancel: { controller.hidePanel() }
-                )
-                .frame(minHeight: 44, maxHeight: 110)
+                HStack(alignment: .top, spacing: 0) {
+                    PanelTextView(
+                        text: $translator.sourceText,
+                        isEditable: true,
+                        placeholder: "输入或粘贴要翻译的文字，按 ⏎ 翻译",
+                        fontSize: 13,
+                        textColor: .secondaryLabelColor,
+                        lineSpacing: 2,
+                        focusRequest: controller.sourceFocusRequest,
+                        fitsContentHeight: true,
+                        onSubmit: { translator.translate() },
+                        onCancel: { controller.hidePanel() }
+                    )
+                    .frame(minHeight: 44, maxHeight: 110)
+                    speakButton(.source, text: translator.sourceText)
+                }
                 .clipped()
                 .background(paneBackground)
                 if let notice = controller.notice {
                     noticeBanner(notice)
                 }
-                resultPane
-                    .clipped()
-                    .background(paneBackground)
+                HStack(alignment: .top, spacing: 0) {
+                    resultPane
+                    speakButton(.result, text: translator.resultText, disabled: translator.isBusy)
+                }
+                .clipped()
+                .background(paneBackground)
             }
             .padding(.horizontal, 12)
             footer
@@ -101,7 +108,7 @@ struct SelectionTranslationView: View {
     /// goes back to the automatic direction for the next one.
     private var targetMenu: some View {
         Menu {
-            Button("自动（\(displayName(for: automaticTargetCode))）") {
+            Button("自动（\(LanguageCatalog.localizedName(for: automaticTargetCode))）") {
                 translator.targetOverrideCode = nil
                 translator.translate()
             }
@@ -113,7 +120,7 @@ struct SelectionTranslationView: View {
                 }
             }
         } label: {
-            Text(displayName(for: translator.targetCode))
+            Text(LanguageCatalog.localizedName(for: translator.targetCode))
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -123,7 +130,7 @@ struct SelectionTranslationView: View {
     private var sourceLanguageLabel: String {
         guard translator.translatedSourceText != nil else { return "自动检测" }
         guard let code = translator.detectedSourceCode else { return "未能识别" }
-        return displayName(for: code)
+        return LanguageCatalog.localizedName(for: code)
     }
 
     /// What the automatic direction would pick for the current source text.
@@ -138,24 +145,6 @@ struct SelectionTranslationView: View {
     private var engineName: String {
         let name = SelectionTranslationEngine.displayName(for: translator.effectiveEngineID)
         return translator.engineID == SelectionTranslationEngine.followRecording ? "跟随转录 · \(name)" : name
-    }
-
-    /// `LanguageCatalog` name when there is one; otherwise the system's
-    /// Chinese name for the detected language (NaturalLanguage can detect
-    /// far more languages than the catalog lists).
-    private func displayName(for code: String) -> String {
-        if let exact = LanguageCatalog.common.first(where: { $0.code == code }) {
-            return exact.displayName
-        }
-        // NaturalLanguage names Chinese by script (`zh-Hant`), the catalog
-        // by region (`zh-TW`).
-        if code.lowercased().hasSuffix("hant") {
-            return "繁体中文"
-        }
-        if let sameLanguage = LanguageCatalog.common.first(where: { SelectionLanguageDirection.isSameLanguage($0.code, code) }) {
-            return sameLanguage.displayName
-        }
-        return Locale(identifier: "zh-Hans").localizedString(forIdentifier: code) ?? code
     }
 
     // MARK: - Notice
@@ -180,6 +169,13 @@ struct SelectionTranslationView: View {
             case .captureFailed:
                 Text("截取屏幕失败，请重试。")
                 Spacer(minLength: 4)
+            case .speechLanguageUnknown:
+                Text("无法判断这段文字的语言，没法选择朗读语音。")
+                Spacer(minLength: 4)
+            case .voiceUnavailable(let language):
+                Text("没有可用的「\(language)」朗读语音。点「去下载」打开系统设置，在「系统语音」旁的菜单里下载。")
+                Spacer(minLength: 4)
+                Button("去下载") { controller.openSpokenContentSettings() }
             }
             Button {
                 controller.dismissNotice()
@@ -193,6 +189,25 @@ struct SelectionTranslationView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    // MARK: - Speech
+
+    private func speakButton(_ target: SelectionSpeaker.Target, text: String, disabled: Bool = false) -> some View {
+        let isSpeaking = speaker.speaking == target
+        let name = target == .source ? "原文" : "译文"
+        return Button {
+            controller.speak(target)
+        } label: {
+            Image(systemName: isSpeaking ? "stop.circle" : "play.circle")
+                .foregroundStyle(.secondary)
+                .padding(6)
+        }
+        .buttonStyle(.plain)
+        // Stopping stays possible even if the source was emptied mid-reading.
+        .disabled(!isSpeaking && (disabled || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+        .help(isSpeaking ? "停止朗读" : "朗读\(name)")
+        .accessibilityLabel(isSpeaking ? "停止朗读" : "朗读\(name)")
     }
 
     // MARK: - Result

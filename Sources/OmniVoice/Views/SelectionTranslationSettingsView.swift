@@ -2,13 +2,14 @@ import AppKit
 import OmniVoiceCore
 import SwiftUI
 
-/// The "快捷翻译" cards of Settings' "通用" tab — shortcuts, the two-language
+/// The "划词与截图翻译" and "快捷翻译引擎" cards of Settings' "通用" tab — shortcuts, the two-language
 /// direction rule (see `SelectionLanguageDirection`; the languages are set in
 /// the "语言" card) and engine. Permissions
 /// live in `PermissionsSettingsCard`.
 struct SelectionTranslationSettingsView: View {
     @ObservedObject var controller: SelectionTranslationController
     @ObservedObject var translator: SelectionTranslator
+    @ObservedObject var speaker: SelectionSpeaker
     /// Observed so the HY-MT1.5 option un-greys the moment its weights
     /// finish downloading in the "模型库" tab.
     @ObservedObject var downloadManager: ModelDownloadManager
@@ -25,7 +26,7 @@ struct SelectionTranslationSettingsView: View {
     }
 
     private var shortcutsCard: some View {
-        SettingsCard(title: "划词与截图快捷键", icon: "keyboard") {
+        SettingsCard(title: "划词与截图翻译", icon: "keyboard") {
             ForEach(Array(GlobalShortcutAction.allCases.enumerated()), id: \.element.id) { index, action in
                 if index > 0 { SettingsDivider() }
                 ShortcutRecorderRow(controller: controller, action: action)
@@ -39,6 +40,35 @@ struct SelectionTranslationSettingsView: View {
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
+            }
+            SettingsDivider()
+            SettingsRow(
+                title: "翻译完成后自动朗读译文",
+                subtitle: "也可以随时点原文、译文右上角的 ▶ 手动朗读，使用 macOS 系统语音"
+            ) {
+                Toggle("翻译完成后自动朗读译文", isOn: $speaker.autoSpeakResult)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+            SettingsDivider()
+            SettingsRow(title: "朗读语速") {
+                HStack(spacing: 8) {
+                    Slider(value: $speaker.rate, in: SelectionSpeaker.rateRange)
+                        .frame(width: 140)
+                        .accessibilityLabel("朗读语速")
+                    Text(String(format: "%.1f×", speaker.rate / SelectionSpeaker.defaultRate))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, alignment: .trailing)
+                }
+            }
+            SettingsDivider()
+            SettingsRow(
+                title: "下载更多朗读语音",
+                subtitle: "更自然的声音或更多语言：打开后点「系统语音」旁的菜单下载"
+            ) {
+                PillButton(title: "打开系统语音设置") { controller.openSpokenContentSettings() }
             }
             SettingsDivider()
             SettingsNote(text: "翻译面板里 ⏎ 翻译、⇧⏎ 换行、Esc 关闭。")

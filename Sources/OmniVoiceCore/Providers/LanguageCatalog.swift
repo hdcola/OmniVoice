@@ -68,4 +68,29 @@ public enum LanguageCatalog {
     public static func displayName(for code: String) -> String {
         common.first { $0.code == code }?.displayName ?? code
     }
+
+    /// Like `displayName(for:)`, but also names the tags `NLLanguageRecognizer`
+    /// produces — `en`, `zh-Hant`, `nl`, ... — instead of echoing them back:
+    /// the catalog's name when it lists the language, else the system's
+    /// Chinese name for it.
+    public static func localizedName(for code: String) -> String {
+        if let exact = common.first(where: { $0.code == code }) {
+            return exact.displayName
+        }
+        // NaturalLanguage names Chinese by script (`zh-Hant`), the catalog
+        // by region (`zh-TW`).
+        let lowered = code.lowercased().replacingOccurrences(of: "_", with: "-")
+        if lowered.contains("hant") || lowered == "zh-tw" {
+            return "繁体中文"
+        }
+        // Cantonese counts as Chinese for `isSameLanguage`, but has a
+        // catalog entry of its own.
+        if lowered.hasPrefix("yue") || lowered == "zh-hk" {
+            return displayName(for: "yue-CN")
+        }
+        if let sameLanguage = common.first(where: { SelectionLanguageDirection.isSameLanguage($0.code, code) }) {
+            return sameLanguage.displayName
+        }
+        return Locale(identifier: "zh-Hans").localizedString(forIdentifier: code) ?? code
+    }
 }

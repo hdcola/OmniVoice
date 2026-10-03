@@ -37,6 +37,14 @@ public struct WhatsNewEntry: Equatable, Sendable, Identifiable {
 public enum WhatsNewCatalog {
     public static let entries: [WhatsNewEntry] = [
         WhatsNewEntry(
+            revision: 4,
+            title: "翻译朗读",
+            bullets: [
+                "翻译面板里，原文和译文旁边各有一个 ▶ 按钮，点一下用 macOS 系统语音朗读，再点一下停止，方便听发音、核对译文。",
+                "在「设置 › 通用 › 划词与截图翻译」里可以让译文翻译完成后自动朗读，并调节语速；想要更自然的声音或更多语言，可在系统设置的辅助功能里（「系统语音」旁的菜单）下载语音。",
+            ]
+        ),
+        WhatsNewEntry(
             revision: 3,
             title: "语音输入：按 Return 结束并发送",
             bullets: [

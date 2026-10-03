@@ -65,6 +65,16 @@ final class SelectionTranslationPanel: NSPanel {
         positionOnActiveScreen()
     }
 
+    /// Called whenever the panel goes away, however it was dismissed (Esc,
+    /// the close button, the hot key, losing focus) — so nothing keeps
+    /// speaking behind a hidden panel.
+    var onHide: (() -> Void)?
+
+    override func orderOut(_ sender: Any?) {
+        super.orderOut(sender)
+        onHide?()
+    }
+
     override func cancelOperation(_ sender: Any?) {
         orderOut(nil)
     }
