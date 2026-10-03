@@ -124,7 +124,11 @@ final class DictationController: ObservableObject {
         machine = DictationTriggerMachine(mode: storedMode)
         monitor.triggerKey = storedKey
 
-        hud.contentView = NSHostingView(rootView: DictationHUDView(controller: self, dictation: dictation))
+        hud.contentView = NSHostingView(
+            rootView: DictationHUDView(controller: self, dictation: dictation) { [hud] height in
+                hud.setContentHeight(height)
+            }
+        )
 
         monitor.onKeyDown = { [weak self] time in
             guard let self else { return }
@@ -204,13 +208,15 @@ final class DictationController: ObservableObject {
         }
         noticeTask?.cancel()
         notice = nil
-        hud.positionOnActiveScreen()
-        hud.orderFrontRegardless()
         let deviceID = deviceID()
+        // Starting clears the last dictation's text, which has to be gone
+        // before the bubble is shown again.
         dictation.start(
             languageCode: languageCode(),
             deviceID: deviceID == AudioInputDevice.noneID ? nil : deviceID
         )
+        hud.positionOnActiveScreen()
+        hud.orderFrontRegardless()
         // Toggle mode leaves the trigger key free to be let go, so Return
         // can end the dictation too.
         if mode == .toggle { returnInterceptor.start() }
