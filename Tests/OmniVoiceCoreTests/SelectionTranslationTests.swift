@@ -471,4 +471,16 @@ private final class FakeModelBackend: SelectionModelTranslating {
         #expect(SpeechVoiceResolver.bestVoice(for: "th-TH", among: [voice("a", "en-US")]) == nil)
         #expect(SpeechVoiceResolver.bestVoice(for: "en", among: []) == nil)
     }
+
+    @Test func localizedNameResolvesCatalogAndRecognizerCodes() {
+        #expect(LanguageCatalog.localizedName(for: "zh-CN") == "简体中文")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hans") == "简体中文")
+        #expect(LanguageCatalog.localizedName(for: "zh-TW") == "繁体中文")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hant") == "繁体中文")
+        #expect(LanguageCatalog.localizedName(for: "yue-CN") == "粤语")
+        #expect(LanguageCatalog.localizedName(for: "yue") == "粤语")
+        #expect(LanguageCatalog.localizedName(for: "en-US") == "英语")
+        #expect(LanguageCatalog.localizedName(for: "en") == "英语")
+        #expect(LanguageCatalog.localizedName(for: "ja") == "日语")
+    }
 }
