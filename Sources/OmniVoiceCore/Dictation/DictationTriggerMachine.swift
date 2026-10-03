@@ -16,6 +16,9 @@ public struct DictationTriggerMachine: Sendable {
         case start
         /// Stop listening and insert what was heard.
         case finish
+        /// `finish`, then press Return in the focused app — Return ended a
+        /// toggle-mode dictation instead of the trigger key.
+        case finishAndSend
         /// Stop listening and throw it away.
         case cancel
     }
@@ -61,6 +64,19 @@ public struct DictationTriggerMachine: Sendable {
         isListening = false
         return .cancel
     }
+
+    /// Return while a toggle-mode dictation is listening and the trigger is
+    /// up: end it and send. `.none` means Return is just a key being typed
+    /// and must reach the focused app untouched.
+    public mutating func returnPressed() -> Action {
+        guard mode == .toggle, isListening, !isHeld else { return .none }
+        isListening = false
+        return .finishAndSend
+    }
+
+    /// Whether Return is currently ours (see `returnPressed`) — the key
+    /// interceptor asks this to decide, synchronously, to swallow the key.
+    public var isAwaitingReturn: Bool { mode == .toggle && isListening && !isHeld }
 
     /// Esc: abandon a dictation in either mode — in toggle mode the trigger
     /// is up while listening, so nothing else could cancel it.

@@ -139,6 +139,30 @@ struct DictationTriggerMachineTests {
         #expect(machine.keyDown(at: 10.5) == .none)
     }
 
+    @Test("toggle: Return while listening finishes and sends")
+    func toggleReturnSends() {
+        var machine = DictationTriggerMachine(mode: .toggle)
+        #expect(machine.keyDown(at: 0) == .start)
+        #expect(machine.keyUp(at: 0.1) == .none)
+        #expect(machine.isAwaitingReturn)
+        #expect(machine.returnPressed() == .finishAndSend)
+        #expect(!machine.isAwaitingReturn)
+        // The trigger key afterwards starts a fresh dictation.
+        #expect(machine.keyDown(at: 1) == .start)
+    }
+
+    @Test("Return does nothing in hold mode, with nothing listening, or while the trigger is held")
+    func returnIgnoredOutsideToggleListening() {
+        var hold = DictationTriggerMachine(mode: .hold)
+        #expect(hold.keyDown(at: 0) == .start)
+        #expect(hold.returnPressed() == .none)
+        var toggle = DictationTriggerMachine(mode: .toggle)
+        #expect(toggle.returnPressed() == .none)
+        #expect(!toggle.isAwaitingReturn)
+        #expect(toggle.keyDown(at: 0) == .start)
+        #expect(toggle.returnPressed() == .none)
+    }
+
     @Test("Esc cancels a toggle-mode dictation that the released trigger can't")
     func escapeInToggle() {
         var machine = DictationTriggerMachine(mode: .toggle)

@@ -87,6 +87,7 @@ final class DictationController: ObservableObject {
     private let monitor = DictationKeyMonitor()
     private var machine: DictationTriggerMachine
     private let hud = DictationHUDPanel()
+    private let returnInterceptor = DictationReturnInterceptor()
     private var noticeTask: Task<Void, Never>?
     private var warmupTask: Task<Void, Never>?
     private var maxDurationTask: Task<Void, Never>?
@@ -137,6 +138,12 @@ final class DictationController: ObservableObject {
             guard let self else { return }
             perform(machine.otherKeyPressed())
         }
+        returnInterceptor.shouldSwallow = { [weak self] in
+            guard let self else { return false }
+            let action = machine.returnPressed()
+            perform(action)
+            return action != .none
+        }
         monitor.onEscape = { [weak self] in
             guard let self else { return }
             dismissNotice()
@@ -149,6 +156,7 @@ final class DictationController: ObservableObject {
             .compactMap { $0 }
             .sink { [weak self] message in
                 self?.machine.reset()
+                self?.returnInterceptor.stop()
                 self?.showNotice(message)
             }
         // Picking another recognition language means another set of assets
@@ -170,7 +178,7 @@ final class DictationController: ObservableObject {
     // MARK: - Flow
 
     private func perform(_ action: DictationTriggerMachine.Action) {
-        if action == .finish || action == .cancel { maxDurationTask?.cancel() }
+        if action == .finish || action == .finishAndSend || action == .cancel { maxDurationTask?.cancel() }
         switch action {
         case .none:
             break
@@ -178,8 +186,11 @@ final class DictationController: ObservableObject {
             start()
         case .finish:
             Task { await finish() }
+        case .finishAndSend:
+            Task { await finish(thenReturn: true) }
         case .cancel:
             // Gone at once; a slow start is torn down behind it.
+            returnInterceptor.stop()
             hideHUD()
             Task { await dictation.cancel() }
         }
@@ -200,6 +211,9 @@ final class DictationController: ObservableObject {
             languageCode: languageCode(),
             deviceID: deviceID == AudioInputDevice.noneID ? nil : deviceID
         )
+        // Toggle mode leaves the trigger key free to be let go, so Return
+        // can end the dictation too.
+        if mode == .toggle { returnInterceptor.start() }
         maxDurationTask?.cancel()
         guard let limit = maxDuration.duration else { return }
         maxDurationTask = Task { [weak self] in
@@ -211,7 +225,8 @@ final class DictationController: ObservableObject {
         }
     }
 
-    private func finish() async {
+    private func finish(thenReturn: Bool = false) async {
+        returnInterceptor.stop()
         let text = await dictation.finish()
         guard notice == nil else { return }
         guard !text.isEmpty else {
@@ -220,7 +235,7 @@ final class DictationController: ObservableObject {
         }
         hideHUD()
         isInserting = true
-        let outcome = await DictationTextInserter.insert(text)
+        let outcome = await DictationTextInserter.insert(text, thenReturn: thenReturn)
         isInserting = false
         if case .copiedOnly(let reason) = outcome {
             showNotice(reason)
@@ -303,6 +318,7 @@ final class DictationController: ObservableObject {
         maxDurationTask?.cancel()
         maxDurationTask = nil
         machine.reset()
+        returnInterceptor.stop()
         dismissNotice()
         guard dictation.isActive else { return }
         Task {
