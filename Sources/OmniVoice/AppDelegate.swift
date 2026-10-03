@@ -67,7 +67,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             languageCode: { [weak session] in session?.dictationLanguageCode },
             deviceID: { [weak session] in session?.selectedDeviceID },
             isLocalRecognizerLoaded: { [weak session] in session?.hasLoadedLocalRecognizer ?? false },
-            languageChanges: session.dictationLanguageChanges
+            languageChanges: session.dictationLanguageChanges,
+            // Its own translator, so a dictation never disturbs the selection
+            // panel's text; the engine is whichever the user picked there.
+            translator: SelectionTranslator(
+                modelDownloadManager: session.modelDownloadManager,
+                preferredModelVariantID: { [weak session] in session?.translationModelVariantID },
+                recordingEngineID: { [weak session] in session?.translationEngineID },
+                languages: session.languages
+            ),
+            translationEngineID: { [selectionController] in selectionController.translator.engineID }
         )
         super.init()
     }

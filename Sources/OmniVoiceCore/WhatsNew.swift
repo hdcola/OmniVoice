@@ -37,6 +37,14 @@ public struct WhatsNewEntry: Equatable, Sendable, Identifiable {
 public enum WhatsNewCatalog {
     public static let entries: [WhatsNewEntry] = [
         WhatsNewEntry(
+            revision: 5,
+            title: "语音输入：翻译后再输入",
+            bullets: [
+                "在「按一下开始，再按一下结束」的触发方式下，可以把你说的话先翻译成外语再输入：说完先在气泡里看译文，Return 输入并发送，触发键只输入，Esc 放弃，也可以点「输入原文」。",
+                "听写时点气泡上的「译成…」按钮就能随时开关；翻译用「划词与截图翻译」里选的引擎，目标语言是你的「外语」。长内容时气泡会随内容变高。",
+            ]
+        ),
+        WhatsNewEntry(
             revision: 4,
             title: "翻译朗读",
             bullets: [

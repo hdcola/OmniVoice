@@ -1,12 +1,13 @@
 import AppKit
 import OmniVoiceCore
 import SwiftUI
+import Translation
 
 /// The small non-activating bubble that shows a dictation is listening (and
 /// what it has heard so far). Never takes focus — the text has to land in the
-/// app the user is typing in — and ignores the mouse: a window either takes
-/// every click in its frame or none, so it must not take any while it sits
-/// over the user's work.
+/// app the user is typing in — and ignores the mouse unless it has buttons
+/// to offer (`setInteractive`): a window either takes every click in its
+/// frame or none, so it only takes them while it is the bubble itself.
 ///
 /// Its height follows the text (`setContentHeight`), growing upward from a
 /// fixed bottom edge, up to `maxHeight`; beyond that the text shows its newest
@@ -37,6 +38,13 @@ final class DictationHUDPanel: NSPanel {
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    /// Whether the bubble takes the mouse — for its buttons. It never takes
+    /// focus either way. Its frame is the bubble, so no clicks meant for the
+    /// app underneath are lost beyond the bubble's own area.
+    func setInteractive(_ interactive: Bool) {
+        ignoresMouseEvents = !interactive
+    }
 
     /// Resizes to `height`, keeping the bottom edge where it is.
     func setContentHeight(_ height: CGFloat) {
@@ -78,6 +86,9 @@ private struct DetailHeightKey: PreferenceKey {
 struct DictationHUDView: View {
     @ObservedObject var controller: DictationController
     @ObservedObject var dictation: DictationSession
+    /// Its system-engine bridge lives here — a `TranslationSession` only
+    /// exists inside a view (see `SelectionTranslator.systemTranslationConfiguration`).
+    @ObservedObject var translator: SelectionTranslator
     /// Told the height the bubble wants, so the panel can follow.
     var onLayout: (CGFloat) -> Void = { _ in }
 
@@ -87,6 +98,8 @@ struct DictationHUDView: View {
     private static let verticalPadding: CGFloat = 14
     private static let spacing: CGFloat = 2
 
+    private var review: DictationReview? { controller.review }
+
     /// The room the text gets under the headline, once the bubble is as tall
     /// as it goes.
     private var detailViewportHeight: CGFloat {
@@ -94,16 +107,32 @@ struct DictationHUDView: View {
         return min(detailHeight, max(available, 0))
     }
 
+    private var hasDetail: Bool { review != nil || !detail.isEmpty }
+
     private var height: CGFloat {
-        let text = detail.isEmpty ? 0 : Self.spacing + detailViewportHeight
+        let text = hasDetail ? Self.spacing + detailViewportHeight : 0
         return max(2 * Self.verticalPadding + headlineHeight + text, DictationHUDPanel.size.height)
     }
 
-    private var detailText: some View {
-        Text(detail)
-            .font(.system(size: 13))
+    @ViewBuilder
+    private var detailContent: some View {
+        if let review {
+            VStack(alignment: .leading, spacing: 8) {
+                if let translation = review.translation {
+                    Text(translation).font(.system(size: 13))
+                }
+                Text(review.original)
+                    .font(.system(size: review.translation == nil ? 13 : 12))
+                    .foregroundStyle(review.translation == nil ? .primary : .secondary)
+            }
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            Text(detail)
+                .font(.system(size: 13))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     var body: some View {
@@ -112,18 +141,25 @@ struct DictationHUDView: View {
             icon.frame(width: 22, height: 22)
             VStack(alignment: .leading, spacing: Self.spacing) {
                 // Kept apart from the text so a long one can't push it away.
-                Text(headline)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .background(
-                        GeometryReader { Color.clear.preference(key: HeadlineHeightKey.self, value: $0.size.height) }
-                    )
-                if !detail.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Text(headline)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    headerButton
+                }
+                .background(
+                    GeometryReader { Color.clear.preference(key: HeadlineHeightKey.self, value: $0.size.height) }
+                )
+                if hasDetail {
                     // An invisible copy of the text sizes the box (and measures
-                    // the height the whole text needs); the visible one sits at
-                    // its bottom edge, so when the text is taller than the box
-                    // the newest words stay in view and the oldest are clipped.
-                    detailText
+                    // the height the whole text needs). While listening, the
+                    // visible one sits at the box's bottom edge, so when the
+                    // text is taller the newest words stay in view and the
+                    // oldest are clipped; a review scrolls instead, from its
+                    // top.
+                    detailContent
                         .hidden()
                         .background(
                             GeometryReader {
@@ -131,7 +167,13 @@ struct DictationHUDView: View {
                             }
                         )
                         .frame(height: detailViewportHeight, alignment: .top)
-                        .overlay(alignment: .bottomLeading) { detailText }
+                        .overlay(alignment: review == nil ? .bottomLeading : .topLeading) {
+                            if review == nil {
+                                detailContent
+                            } else {
+                                ScrollView(.vertical) { detailContent }
+                            }
+                        }
                         .clipped()
                 }
             }
@@ -145,12 +187,42 @@ struct DictationHUDView: View {
         .onPreferenceChange(HeadlineHeightKey.self) { headlineHeight = $0 }
         .onPreferenceChange(DetailHeightKey.self) { detailHeight = $0 }
         .onChange(of: height, initial: true) { _, _ in onLayout(height) }
+        .translationTask(translator.systemTranslationConfiguration) { session in
+            await translator.runPendingSystemJob { text in
+                try await session.translate(text).targetText
+            }
+        }
+    }
+
+    /// The quick translate switch while listening in 按一下开始 mode; "输入原文"
+    /// once there is a translation to look at.
+    @ViewBuilder
+    private var headerButton: some View {
+        if let review {
+            if review.stage == .ready {
+                Button("输入原文") { controller.confirmReview(send: false, useOriginal: true) }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+        } else if controller.notice == nil, dictation.state == .listening, controller.mode == .toggle {
+            Toggle(isOn: $controller.translateEnabled) {
+                Label("译成\(LanguageCatalog.displayName(for: translator.foreignLanguageCode))", systemImage: "character.bubble")
+            }
+            .toggleStyle(.button)
+            .controlSize(.small)
+        }
     }
 
     @ViewBuilder
     private var icon: some View {
         if controller.notice != nil {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+        } else if let review {
+            switch review.stage {
+            case .translating: ProgressView().controlSize(.small)
+            case .ready: Image(systemName: "character.bubble.fill").foregroundStyle(.tint)
+            case .failed: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            }
         } else if dictation.state == .listening {
             Image(systemName: "mic.fill").foregroundStyle(.red)
         } else {
@@ -160,6 +232,14 @@ struct DictationHUDView: View {
 
     private var headline: String {
         if controller.notice != nil { return "听写" }
+        if let review {
+            let trigger = controller.triggerKey.title
+            switch review.stage {
+            case .translating: return "翻译中… · Esc 放弃"
+            case .ready: return "译文 · Return 输入并发送 · \(trigger) 仅输入 · Esc 放弃"
+            case .failed(let message): return "\(message) · Return 输入原文并发送 · \(trigger) 仅输入 · Esc 放弃"
+            }
+        }
         switch dictation.state {
         case .idle, .starting: return dictation.statusDetail ?? "准备中…"
         case .listening: return dictation.isUsingLocalModel ? "正在听写 · 本地模型" : "正在听写 · 系统识别"
@@ -170,7 +250,8 @@ struct DictationHUDView: View {
     private var detail: String {
         if let notice = controller.notice { return notice }
         if dictation.state == .listening, dictation.previewText.isEmpty {
-            return controller.mode == .toggle ? "请说话 · 按 Return 结束并发送" : "请说话"
+            guard controller.mode == .toggle else { return "请说话" }
+            return controller.translateEnabled ? "请说话 · 按 Return 结束并翻译" : "请说话 · 按 Return 结束并发送"
         }
         return dictation.previewText
     }

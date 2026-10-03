@@ -43,6 +43,19 @@ struct DictationSettingsView: View {
             .disabled(!controller.isEnabled || controller.dictation.isActive)
             SettingsDivider()
             SettingsRow(
+                title: "输入前翻译成外语（\(languageName(session.languages.foreignLanguageCode))）",
+                subtitle: controller.mode == .toggle
+                    ? "说完后先显示译文供你确认：Return 输入并发送，触发键仅输入，Esc 放弃，也可以改输原文；用「划词与截图翻译」里选的翻译引擎，说的已是外语时直接输入。听写时点气泡上的按钮也能随时开关"
+                    : "需要先把触发方式设为「按一下开始，再按一下结束」——按住说话没有地方让你确认译文"
+            ) {
+                Toggle("输入前翻译成外语", isOn: $controller.translateEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+            .disabled(!controller.isEnabled || controller.mode != .toggle)
+            SettingsDivider()
+            SettingsRow(
                 title: "听写语言",
                 subtitle: "按哪种语言识别；自动检测只在本地识别模型已加载时可用"
             ) {
