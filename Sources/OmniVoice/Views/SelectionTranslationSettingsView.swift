@@ -64,7 +64,14 @@ struct SelectionTranslationSettingsView: View {
                 }
             }
             SettingsDivider()
-            SettingsNote(text: "翻译面板里 ⏎ 翻译、⇧⏎ 换行、Esc 关闭。想要更自然的朗读声音或更多语言，可在 系统设置 → 辅助功能 → 朗读内容 里下载语音。")
+            SettingsRow(
+                title: "下载更多朗读语音",
+                subtitle: "更自然的声音或更多语言，在 系统设置 → 辅助功能 → 朗读内容 里下载"
+            ) {
+                PillButton(title: "打开朗读内容设置") { controller.openSpokenContentSettings() }
+            }
+            SettingsDivider()
+            SettingsNote(text: "翻译面板里 ⏎ 翻译、⇧⏎ 换行、Esc 关闭。")
         }
     }
 
