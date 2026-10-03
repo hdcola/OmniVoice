@@ -189,8 +189,35 @@ struct RecordingSessionSettingsTests {
             #expect(session.languages.myLanguageCode == "ru-RU")
             #expect(session.sourceLanguageCode == "en-US")
             #expect(!session.canSwapTranscriptionDirection)
+            #expect(session.swapBlockedReason == "系统语音识别不支持互换后的源语言")
             session.swapTranscriptionDirection()
             #expect(session.sourceLanguageCode == "en-US")
+        }
+    }
+
+    /// Auto-detect on a local model, swap to speaking, then switch to the
+    /// system recognizer (which has no "自动"): the way back to listening
+    /// must stay open.
+    @Test func switchingToSystemWhileSpeakingDoesNotTrapTheDirection() throws {
+        let variant = try #require(ProviderCatalog.modelVariants(forEngineID: "model.r2t2").first)
+        let manager = try makeDownloadManager(withDownloaded: variant)
+        withPersisted([
+            PersistedSettingsKey.transcriptionEngineID: "model.r2t2",
+            PersistedSettingsKey.sourceLanguageCode: "",
+        ]) {
+            let session = RecordingSession(modelDownloadManager: manager)
+            #expect(session.sourceLanguageCode == nil)
+            #expect(session.swapBlockedReason == nil)
+            session.swapTranscriptionDirection()
+            #expect(session.languages.transcriptionDirection == .speakMine)
+            #expect(session.sourceLanguageCode == "zh-CN")
+
+            session.transcriptionEngineID = "system.speech"
+            #expect(!session.languages.foreignLanguageAutoDetect)
+            #expect(session.swapBlockedReason == nil)
+            session.swapTranscriptionDirection()
+            #expect(session.sourceLanguageCode == "en-US")
+            #expect(session.targetLanguageCode == "zh-CN")
         }
     }
 

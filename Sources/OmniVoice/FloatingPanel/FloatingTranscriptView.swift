@@ -238,6 +238,8 @@ struct FloatingTranscriptView: View {
             Image(systemName: "arrow.left.arrow.right")
                 .foregroundStyle(.secondary)
                 .font(.caption)
+                .frame(width: 20, height: 20)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(!session.canSwapTranscriptionDirection)

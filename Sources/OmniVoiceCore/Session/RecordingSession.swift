@@ -282,7 +282,7 @@ public final class RecordingSession: ObservableObject {
         guard transcriptionEngineKind == .system else { return nil }
         let nextSource = languages.transcriptionDirection == .listenForeign
             ? languages.myLanguageCode
-            : (languages.foreignLanguageAutoDetect ? nil : languages.foreignLanguageCode)
+            : languages.foreignLanguageCode
         return Self.isUnsupportedForSystemASR(nextSource) ? "系统语音识别不支持互换后的源语言" : nil
     }
 
@@ -710,12 +710,15 @@ public final class RecordingSession: ObservableObject {
     /// doc).
     private func validateAndNormalizeSourceLanguage() {
         guard transcriptionEngineKind == .system else { return }
+        // The system recognizer has no "自动". Reset the flag whichever way
+        // the transcript runs: left on while speaking, it would make the way
+        // back to 听外语 look like a "nil" source and block it for good.
+        languages.foreignLanguageAutoDetect = false
         let isUnsupported = Self.isUnsupportedForSystemASR
         guard isUnsupported(languages.sourceLanguageCode) else { return }
         // The user's own language can't be recognized here: listen to the
-        // foreign one instead (and drop "自动"), then repair that side too.
+        // foreign one instead, then repair that side too.
         languages.transcriptionDirection = .listenForeign
-        languages.foreignLanguageAutoDetect = false
         if isUnsupported(languages.sourceLanguageCode) {
             // Keep the two languages distinct (en-US as 我的语言 → fall back to zh-CN).
             languages.foreignLanguageCode = LanguageSettingsMigration.distinctForeign(

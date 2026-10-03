@@ -313,7 +313,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
-                    .disabled(session.transcriptionEngineKind != .model || !isListening || session.isSessionActive)
+                    .disabled(session.transcriptionEngineKind != .model || session.isSessionActive)
             }
             if let note = localTranslationLanguageNote {
                 SettingsDivider()
