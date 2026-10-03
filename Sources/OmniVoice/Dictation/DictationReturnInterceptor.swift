@@ -45,6 +45,15 @@ final class DictationReturnInterceptor {
         guard tap == nil, SelectedTextReader.isAccessibilityTrusted else { return }
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue) | CGEventMask(1 << CGEventType.keyUp.rawValue)
         let callback: CGEventTapCallBack = { _, type, event, refcon in
+            // The system's tap-disabled notices carry no real event, so
+            // `event` must not be touched for them.
+            if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                if let refcon {
+                    let interceptor = Unmanaged<DictationReturnInterceptor>.fromOpaque(refcon).takeUnretainedValue()
+                    MainActor.assumeIsolated { interceptor.reenable() }
+                }
+                return nil
+            }
             guard let refcon else { return Unmanaged.passUnretained(event) }
             let interceptor = Unmanaged<DictationReturnInterceptor>.fromOpaque(refcon).takeUnretainedValue()
             let swallowed = MainActor.assumeIsolated { interceptor.handle(type: type, event: event) }
@@ -57,7 +66,10 @@ final class DictationReturnInterceptor {
                 userInfo: Unmanaged.passUnretained(self).toOpaque()
             )
         else { return }
-        let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
+        guard let source = CFMachPortCreateRunLoopSource(nil, tap, 0) else {
+            CFMachPortInvalidate(tap)
+            return
+        }
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         self.tap = tap
         self.source = source
@@ -92,12 +104,14 @@ final class DictationReturnInterceptor {
         source = nil
     }
 
+    /// The system switches a tap off when it is too slow or by request;
+    /// switch it back on while it is still wanted.
+    private func reenable() {
+        if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+    }
+
     /// True when the event must not reach the focused app.
     private func handle(type: CGEventType, event: CGEvent) -> Bool {
-        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
-            return false
-        }
         let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
         guard keyCode == kVK_Return || keyCode == kVK_ANSI_KeypadEnter,
               event.getIntegerValueField(.eventSourceUserData) != Self.ownEventMarker
