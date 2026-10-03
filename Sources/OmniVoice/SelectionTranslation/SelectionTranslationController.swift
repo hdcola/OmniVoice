@@ -19,9 +19,12 @@ final class SelectionTranslationController: ObservableObject {
         case screenRecordingNeeded
         case nothingRecognized
         case captureFailed
+        /// No installed system voice speaks this language (display name).
+        case voiceUnavailable(String)
     }
 
     let translator: SelectionTranslator
+    let speaker = SelectionSpeaker()
     @Published private(set) var notice: Notice?
     /// Bumped whenever the source pane should take focus and select all —
     /// see `PanelTextView.focusRequest`.
@@ -56,17 +59,33 @@ final class SelectionTranslationController: ObservableObject {
     private var isReadingSelection = false
     private var isCapturing = false
     private var resignKeyObserver: NSObjectProtocol?
+    private var speechCancellables: Set<AnyCancellable> = []
 
     init(translator: SelectionTranslator) {
         self.translator = translator
         isDoubleCopyEnabled = UserDefaults.standard.object(forKey: Self.doubleCopyDefaultsKey) as? Bool ?? false
-        panel.contentView = NSHostingView(rootView: SelectionTranslationView(controller: self, translator: translator))
+        panel.contentView = NSHostingView(rootView: SelectionTranslationView(controller: self, translator: translator, speaker: speaker))
         panel.positionOnActiveScreen()
         resignKeyObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didResignKeyNotification, object: panel, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.hideIfFocusLeft() }
         }
+
+        // A new translation starting silences whatever is being read; one
+        // finishing is read aloud when the user asked for that.
+        translator.$phase
+            .sink { [weak self] phase in
+                if phase == .loadingModel || phase == .translating { self?.speaker.stop() }
+            }
+            .store(in: &speechCancellables)
+        translator.$finishedTranslationCount
+            .dropFirst()
+            .sink { [weak self] _ in
+                guard let self, speaker.autoSpeakResult, panel.isVisible else { return }
+                speak(.result)
+            }
+            .store(in: &speechCancellables)
 
         for action in GlobalShortcutAction.allCases {
             let shortcut = Self.storedShortcut(for: action)
@@ -140,6 +159,7 @@ final class SelectionTranslationController: ObservableObject {
     }
 
     func hidePanel() {
+        speaker.stop()
         panel.orderOut(nil)
     }
 
@@ -150,7 +170,7 @@ final class SelectionTranslationController: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             guard let self, panel.isVisible, !panel.isKeyWindow, panel.attachedSheet == nil else { return }
             if let key = NSApp.keyWindow, key.sheetParent === panel { return }
-            panel.orderOut(nil)
+            hidePanel()
         }
     }
 
@@ -161,7 +181,7 @@ final class SelectionTranslationController: ObservableObject {
     private func toggleWithSelection() {
         guard !isCapturing else { return }
         if panel.isVisible {
-            panel.orderOut(nil)
+            hidePanel()
             return
         }
         guard !isReadingSelection else { return }
@@ -213,7 +233,7 @@ final class SelectionTranslationController: ObservableObject {
     /// text, recognizes it on-device, and shows the panel translating it.
     private func captureAndTranslate() {
         guard !isCapturing, !isReadingSelection else { return }
-        panel.orderOut(nil)
+        hidePanel()
         guard ScreenFreezer.hasPermission else {
             ScreenFreezer.requestPermission()
             notice = .screenRecordingNeeded
@@ -247,6 +267,39 @@ final class SelectionTranslationController: ObservableObject {
             }
             showPanel()
         }
+    }
+
+    // MARK: - Speech
+
+    /// Reads (or, if it is already being read, stops reading) one pane. The
+    /// source's language is detected from what is in the pane right now,
+    /// not from the last translation — the user may have edited it since.
+    func speak(_ target: SelectionSpeaker.Target) {
+        let text: String
+        let languageCode: String?
+        switch target {
+        case .source:
+            text = translator.sourceText
+            languageCode = SelectionLanguageDirection.detectLanguageCode(
+                of: text, myLanguageCode: translator.myLanguageCode, foreignLanguageCode: translator.foreignLanguageCode
+            )
+        case .result:
+            text = translator.resultText
+            languageCode = translator.targetCode
+        }
+        guard let languageCode else {
+            notice = .voiceUnavailable("未能识别的语言")
+            return
+        }
+        if speaker.toggle(target, text: text, languageCode: languageCode) {
+            if case .voiceUnavailable = notice { notice = nil }
+        } else if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            notice = .voiceUnavailable(LanguageCatalog.displayName(for: languageCode))
+        }
+    }
+
+    func openSpokenContentSettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Accessibility-Settings.extension?SpokenContent")!)
     }
 
     func dismissNotice() {

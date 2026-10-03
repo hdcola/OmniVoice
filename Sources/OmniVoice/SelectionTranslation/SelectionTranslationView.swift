@@ -16,6 +16,7 @@ import Translation
 struct SelectionTranslationView: View {
     @ObservedObject var controller: SelectionTranslationController
     @ObservedObject var translator: SelectionTranslator
+    @ObservedObject var speaker: SelectionSpeaker
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,12 +41,18 @@ struct SelectionTranslationView: View {
                 .frame(minHeight: 44, maxHeight: 110)
                 .clipped()
                 .background(paneBackground)
+                .overlay(alignment: .topTrailing) {
+                    speakButton(.source, text: translator.sourceText)
+                }
                 if let notice = controller.notice {
                     noticeBanner(notice)
                 }
                 resultPane
                     .clipped()
                     .background(paneBackground)
+                    .overlay(alignment: .topTrailing) {
+                        speakButton(.result, text: translator.resultText, disabled: translator.isBusy)
+                    }
             }
             .padding(.horizontal, 12)
             footer
@@ -180,6 +187,10 @@ struct SelectionTranslationView: View {
             case .captureFailed:
                 Text("截取屏幕失败，请重试。")
                 Spacer(minLength: 4)
+            case .voiceUnavailable(let language):
+                Text("没有可用的「\(language)」朗读语音。可在 系统设置 → 辅助功能 → 朗读内容 里下载。")
+                Spacer(minLength: 4)
+                Button("去下载") { controller.openSpokenContentSettings() }
             }
             Button {
                 controller.dismissNotice()
@@ -193,6 +204,24 @@ struct SelectionTranslationView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    // MARK: - Speech
+
+    private func speakButton(_ target: SelectionSpeaker.Target, text: String, disabled: Bool = false) -> some View {
+        let isSpeaking = speaker.speaking == target
+        let name = target == .source ? "原文" : "译文"
+        return Button {
+            controller.speak(target)
+        } label: {
+            Image(systemName: isSpeaking ? "stop.circle.fill" : "speaker.wave.2")
+                .foregroundStyle(.secondary)
+                .padding(6)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .help(isSpeaking ? "停止朗读" : "朗读\(name)")
+        .accessibilityLabel(isSpeaking ? "停止朗读" : "朗读\(name)")
     }
 
     // MARK: - Result

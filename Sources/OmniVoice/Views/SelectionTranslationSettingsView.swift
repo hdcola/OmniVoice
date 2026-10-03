@@ -9,6 +9,7 @@ import SwiftUI
 struct SelectionTranslationSettingsView: View {
     @ObservedObject var controller: SelectionTranslationController
     @ObservedObject var translator: SelectionTranslator
+    @ObservedObject var speaker: SelectionSpeaker
     /// Observed so the HY-MT1.5 option un-greys the moment its weights
     /// finish downloading in the "模型库" tab.
     @ObservedObject var downloadManager: ModelDownloadManager
@@ -21,6 +22,29 @@ struct SelectionTranslationSettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             shortcutsCard
             engineCard
+            speechCard
+        }
+    }
+
+    private var speechCard: some View {
+        SettingsCard(title: "朗读", icon: "speaker.wave.2") {
+            SettingsRow(
+                title: "翻译完成后自动朗读译文",
+                subtitle: "翻译面板里也可以随时点原文、译文右上角的喇叭手动朗读"
+            ) {
+                Toggle("翻译完成后自动朗读译文", isOn: $speaker.autoSpeakResult)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+            SettingsDivider()
+            SettingsRow(title: "语速") {
+                Slider(value: $speaker.rate, in: SelectionSpeaker.rateRange)
+                    .frame(width: 140)
+                    .accessibilityLabel("朗读语速")
+            }
+            SettingsDivider()
+            SettingsNote(text: "使用 macOS 系统语音。想要更自然的声音或更多语言，可在 系统设置 → 辅助功能 → 朗读内容 里下载。")
         }
     }
 

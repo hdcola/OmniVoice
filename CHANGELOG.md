@@ -7,6 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(translation): read the source or the translation aloud with the macOS system voices — a speaker button on each pane of the translation panel (the source's language is re-detected from what is in the pane), a notice with a shortcut to 朗读内容 settings when no voice speaks the language, and a 朗读 card in Settings to read finished translations automatically and set the speed
 
 ### Changed
 
@@ -17,6 +18,7 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 ### Tests
+- test(translation): cover choosing the system voice for a language
 
 ## [0.6.2] - 2026-10-02
 

@@ -65,6 +65,10 @@ public final class SelectionTranslator: ObservableObject {
     /// The source text `resultText` was translated from, so the panel can
     /// flag a result as stale once the user edits the source.
     @Published public private(set) var translatedSourceText: String?
+    /// Bumped each time a translation runs to its end (not when it is
+    /// stopped or fails) — what "read the translation aloud once it's
+    /// done" listens for.
+    @Published public private(set) var finishedTranslationCount = 0
 
     /// A `SelectionTranslationEngine` ID — `followRecording` or one of `all`.
     @Published public var engineID: String {
@@ -321,6 +325,7 @@ public final class SelectionTranslator: ObservableObject {
         guard job.generation == generation else { return }
         resultText = output.trimmingCharacters(in: .whitespacesAndNewlines)
         phase = .completed
+        finishedTranslationCount += 1
     }
 }
 
