@@ -256,6 +256,11 @@ struct FloatingTranscriptView: View {
         .help(swapHelp)
         .accessibilityLabel("互换源语言和目标语言")
         .accessibilityHint(session.swapBlockedReason ?? "")
+        // The reason ending (e.g. the recording stops) must not leave an empty
+        // bubble behind.
+        .onChange(of: session.canSwapTranscriptionDirection) {
+            if session.canSwapTranscriptionDirection { isSwapHintPresented = false }
+        }
         .popover(isPresented: $isSwapHintPresented) {
             Text(session.swapBlockedReason ?? "")
                 .font(.callout)
