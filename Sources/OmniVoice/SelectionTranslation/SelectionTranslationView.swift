@@ -173,7 +173,7 @@ struct SelectionTranslationView: View {
                 Text("无法判断这段文字的语言，没法选择朗读语音。")
                 Spacer(minLength: 4)
             case .voiceUnavailable(let language):
-                Text("没有可用的「\(language)」朗读语音。可在 系统设置 → 辅助功能 → 朗读内容 里下载。")
+                Text("没有可用的「\(language)」朗读语音。点「去下载」打开系统设置，在「系统语音」旁的菜单里下载。")
                 Spacer(minLength: 4)
                 Button("去下载") { controller.openSpokenContentSettings() }
             }
