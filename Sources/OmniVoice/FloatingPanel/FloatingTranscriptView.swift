@@ -27,6 +27,10 @@ struct FloatingTranscriptView: View {
     /// once that delay elapses, so a full-screen slide/video behind the
     /// panel isn't permanently competing with idle chrome for attention.
     @State private var isControlsVisible = true
+    @State private var isSwapHintPresented = false
+    /// The reason shown in the swap-blocked popover, captured at click time
+    /// so it keeps its text (and height) while the popover fades out.
+    @State private var swapHintText = ""
     @State private var autoHideTask: Task<Void, Never>?
     private static let autoHideDelay: Duration = .seconds(2)
 
@@ -232,19 +236,41 @@ struct FloatingTranscriptView: View {
         // Swaps source and target (听外语 ⇄ 说我的语言). Not while a
         // recording runs (the source is fixed at `start()`). "自动" survives a
         // swap — it comes back when swapping back.
+        //
+        // When blocked it is only dimmed, not `.disabled`: a click then shows
+        // why in a popover. A tooltip can't carry that — this panel never
+        // becomes key and the app is inactive while it is used, so no
+        // `.help` in it ever appears.
         Button {
-            session.swapTranscriptionDirection()
+            if session.canSwapTranscriptionDirection {
+                session.swapTranscriptionDirection()
+            } else {
+                swapHintText = session.swapBlockedReason ?? ""
+                isSwapHintPresented = true
+            }
         } label: {
             Image(systemName: "arrow.left.arrow.right")
                 .foregroundStyle(.secondary)
                 .font(.caption)
                 .frame(width: 20, height: 20)
                 .contentShape(Rectangle())
+                .opacity(session.canSwapTranscriptionDirection ? 1 : 0.35)
         }
         .buttonStyle(.plain)
-        .disabled(!session.canSwapTranscriptionDirection)
         .help(swapHelp)
         .accessibilityLabel("互换源语言和目标语言")
+        .accessibilityHint(session.swapBlockedReason ?? "")
+        // The reason ending (e.g. the recording stops) must not leave an empty
+        // bubble behind.
+        .onChange(of: session.canSwapTranscriptionDirection) {
+            if session.canSwapTranscriptionDirection { isSwapHintPresented = false }
+        }
+        .popover(isPresented: $isSwapHintPresented) {
+            Text(swapHintText)
+                .font(.callout)
+                .frame(width: 220, alignment: .leading)
+                .padding()
+        }
 
         // Target stays editable while running: unlike source, it isn't
         // baked into a provider at `start()` — the `.translationTask`
