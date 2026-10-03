@@ -231,6 +231,9 @@ final class DictationController: ObservableObject {
         guard notice == nil else { return }
         guard !text.isEmpty else {
             hideHUD()
+            // Nothing heard: the Return we swallowed is still the user's, so
+            // give it back rather than let it vanish.
+            if thenReturn { DictationTextInserter.pressReturn() }
             return
         }
         hideHUD()

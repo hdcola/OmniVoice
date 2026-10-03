@@ -18,8 +18,11 @@ final class DictationReturnInterceptor {
     /// Called on Return; true means the key was used and must be swallowed.
     var shouldSwallow: (() -> Bool)?
 
-    private var tap: CFMachPort?
-    private var source: CFRunLoopSource?
+    /// `nonisolated(unsafe)` only so `deinit` can tear them down; every
+    /// other access is on the main actor.
+    private nonisolated(unsafe) var tap: CFMachPort?
+    private nonisolated(unsafe) var source: CFRunLoopSource?
+    private var releaseTimeoutTask: Task<Void, Never>?
     /// A swallowed Return is down: its repeats and its release are swallowed
     /// too, even after the dictation ended, so no half of the key leaks out.
     private var swallowingHeldReturn = false
@@ -27,7 +30,17 @@ final class DictationReturnInterceptor {
 
     var isRunning: Bool { tap != nil }
 
+    deinit {
+        // The tap's callback holds an unretained pointer to `self`.
+        if let tap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
+        if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
+    }
+
     func start() {
+        releaseTimeoutTask?.cancel()
         stopWhenReleased = false
         guard tap == nil, SelectedTextReader.isAccessibilityTrusted else { return }
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue) | CGEventMask(1 << CGEventType.keyUp.rawValue)
@@ -55,8 +68,10 @@ final class DictationReturnInterceptor {
         if swallowingHeldReturn {
             stopWhenReleased = true
             // A release that never arrives must not leave the tap installed.
-            Task { [weak self] in
+            releaseTimeoutTask?.cancel()
+            releaseTimeoutTask = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
                 self?.swallowingHeldReturn = false
                 self?.removeTap()
             }
@@ -66,9 +81,12 @@ final class DictationReturnInterceptor {
     }
 
     private func removeTap() {
+        releaseTimeoutTask?.cancel()
+        releaseTimeoutTask = nil
         stopWhenReleased = false
         guard let tap else { return }
         CGEvent.tapEnable(tap: tap, enable: false)
+        CFMachPortInvalidate(tap)
         if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
         self.tap = nil
         source = nil
@@ -87,6 +105,9 @@ final class DictationReturnInterceptor {
         switch type {
         case .keyDown:
             if swallowingHeldReturn { return true }
+            // ⇧↩ is a newline, ⌘↩ and ⌥↩ are shortcuts: not a request to send.
+            let chord: CGEventFlags = [.maskShift, .maskControl, .maskAlternate, .maskCommand]
+            guard event.flags.isDisjoint(with: chord) else { return false }
             guard shouldSwallow?() == true else { return false }
             swallowingHeldReturn = true
             return true

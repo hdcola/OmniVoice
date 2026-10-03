@@ -34,7 +34,7 @@ enum DictationTextInserter {
             return .copiedOnly("当前输入框不允许自动输入（如密码框），文字已复制，可手动粘贴")
         }
         try? await Task.sleep(for: pasteSettleDelay)
-        if thenReturn { postReturn() }
+        if thenReturn { pressReturn() }
         // Something else copied in the meantime: that is the newer clipboard.
         if pasteboard.changeCount == ownChangeCount {
             snapshot.restore(to: pasteboard)
@@ -43,7 +43,7 @@ enum DictationTextInserter {
     }
 
     /// A bare Return, tagged so `DictationReturnInterceptor` lets it through.
-    private static func postReturn() {
+    static func pressReturn() {
         guard !IsSecureEventInputEnabled() else { return }
         let source = CGEventSource(stateID: .privateState)
         source?.userData = DictationReturnInterceptor.ownEventMarker

@@ -74,8 +74,8 @@ public struct DictationTriggerMachine: Sendable {
         return .finishAndSend
     }
 
-    /// Whether Return is currently ours (see `returnPressed`) — the key
-    /// interceptor asks this to decide, synchronously, to swallow the key.
+    /// Whether a Return pressed now would end the dictation (see
+    /// `returnPressed`), without consuming it.
     public var isAwaitingReturn: Bool { mode == .toggle && isListening && !isHeld }
 
     /// Esc: abandon a dictation in either mode — in toggle mode the trigger
