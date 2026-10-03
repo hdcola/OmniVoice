@@ -421,3 +421,40 @@ struct DictationKeyTrackerTests {
         #expect(tracker.keyDown(isEscape: false) == .otherKey)
     }
 }
+
+@Suite("DictationTranslationPlan")
+struct DictationTranslationPlanTests {
+    private func target(spoken: String?, text: String, mine: String = "zh-CN", foreign: String = "en-US") -> String? {
+        DictationTranslationPlan.targetCode(
+            spokenCode: spoken, text: text, myLanguageCode: mine, foreignLanguageCode: foreign
+        )
+    }
+
+    @Test("speaking my language translates into the foreign one")
+    func mineToForeign() {
+        #expect(target(spoken: "zh-CN", text: "你好，今天天气不错") == "en-US")
+    }
+
+    @Test("speaking the foreign language is typed as it is")
+    func foreignStaysAsSpoken() {
+        #expect(target(spoken: "en-US", text: "hello there") == nil)
+        #expect(target(spoken: "en-GB", text: "hello there") == nil)
+    }
+
+    @Test("an automatically detected language is read from the text")
+    func detectedFromText() {
+        #expect(target(spoken: nil, text: "Please send me the report by Friday.") == nil)
+        #expect(target(spoken: nil, text: "请在周五之前把报告发给我。") == "en-US")
+    }
+
+    @Test("text whose language can't be told is translated rather than typed untouched")
+    func undetectableText() {
+        #expect(target(spoken: nil, text: "???") == "en-US")
+    }
+
+    @Test("a foreign language that is Chinese leaves Chinese speech alone, whatever the variant")
+    func chineseForeign() {
+        #expect(target(spoken: "zh-TW", text: "你好", mine: "en-US", foreign: "zh-CN") == nil)
+        #expect(target(spoken: "en-US", text: "hello", mine: "en-US", foreign: "zh-CN") == "zh-CN")
+    }
+}

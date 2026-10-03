@@ -31,6 +31,21 @@ enum DictationMaxDuration: Int, CaseIterable, Identifiable {
     var duration: Duration? { self == .unlimited ? nil : .seconds(rawValue) }
 }
 
+/// A finished dictation waiting for the user to look at its translation before
+/// anything is typed.
+struct DictationReview: Equatable, Sendable {
+    enum Stage: Equatable {
+        case translating
+        case ready
+        /// The translation didn't work out; the original can still be typed.
+        case failed(String)
+    }
+
+    let original: String
+    var translation: String?
+    var stage: Stage
+}
+
 /// Push-to-talk dictation: hold (or tap) a modifier key anywhere, speak, and
 /// the text is typed into the focused app. Owns the key monitor, the
 /// `DictationSession` doing the recognition, and the HUD; `AppDelegate`
@@ -41,6 +56,7 @@ final class DictationController: ObservableObject {
     static let triggerKeyKey = "org.hdcola.omnivoice.dictation.triggerKey"
     static let modeKey = "org.hdcola.omnivoice.dictation.mode"
     static let maxDurationKey = "org.hdcola.omnivoice.dictation.maxDuration"
+    static let translateKey = "org.hdcola.omnivoice.dictation.translate"
 
     /// Off until the user opts in: it needs the Input Monitoring permission,
     /// which launch should never ask for out of the blue.
@@ -77,6 +93,17 @@ final class DictationController: ObservableObject {
         didSet { UserDefaults.standard.set(maxDuration.rawValue, forKey: Self.maxDurationKey) }
     }
 
+    /// Translate what was said into 外语 and let the user look at it before it
+    /// is typed. Only in 按一下开始 mode — there is no moment to review in
+    /// between when releasing the key types at once (`isTranslating`).
+    @Published var translateEnabled: Bool {
+        didSet { UserDefaults.standard.set(translateEnabled, forKey: Self.translateKey) }
+    }
+
+    /// The translation of the last dictation, awaiting a decision — nil
+    /// outside the review.
+    @Published private(set) var review: DictationReview?
+
     /// Something the HUD should tell the user instead of listening.
     @Published private(set) var notice: String?
     /// What the background warm-up is doing, for Settings — nil when idle.
@@ -88,6 +115,14 @@ final class DictationController: ObservableObject {
     private var machine: DictationTriggerMachine
     private let hud = DictationHUDPanel()
     private let returnInterceptor = DictationReturnInterceptor()
+    private let translator: SelectionTranslator
+    /// The engine the user picked for translating (a `SelectionTranslationEngine` ID).
+    private let translationEngineID: () -> String
+    private var reviewTask: Task<Void, Never>?
+    private var reviewTimeoutTask: Task<Void, Never>?
+    /// A review nobody answers is dropped, so Return isn't intercepted
+    /// system-wide for as long as the user has walked away.
+    private static let reviewTimeout: Duration = .seconds(120)
     private var noticeTask: Task<Void, Never>?
     private var warmupTask: Task<Void, Never>?
     private var maxDurationTask: Task<Void, Never>?
@@ -107,9 +142,13 @@ final class DictationController: ObservableObject {
         languageCode: @escaping () -> String?,
         deviceID: @escaping () -> String?,
         isLocalRecognizerLoaded: @escaping () -> Bool,
-        languageChanges: AnyPublisher<String?, Never>
+        languageChanges: AnyPublisher<String?, Never>,
+        translator: SelectionTranslator,
+        translationEngineID: @escaping () -> String
     ) {
         self.dictation = dictation
+        self.translator = translator
+        self.translationEngineID = translationEngineID
         self.isLocalRecognizerLoaded = isLocalRecognizerLoaded
         self.languageCode = languageCode
         self.deviceID = deviceID
@@ -121,17 +160,24 @@ final class DictationController: ObservableObject {
         mode = storedMode
         maxDuration = (defaults.object(forKey: Self.maxDurationKey) as? Int).flatMap(DictationMaxDuration.init)
             ?? .twoMinutes
+        translateEnabled = defaults.bool(forKey: Self.translateKey)
         machine = DictationTriggerMachine(mode: storedMode)
         monitor.triggerKey = storedKey
 
         hud.contentView = NSHostingView(
-            rootView: DictationHUDView(controller: self, dictation: dictation) { [hud] height in
+            rootView: DictationHUDView(controller: self, dictation: dictation, translator: translator) { [hud] height in
                 hud.setContentHeight(height)
             }
         )
 
         monitor.onKeyDown = { [weak self] time in
             guard let self else { return }
+            // The trigger key decides the review instead of starting
+            // another dictation.
+            if review != nil {
+                confirmReview(send: false)
+                return
+            }
             perform(machine.keyDown(at: time))
         }
         monitor.onKeyUp = { [weak self] time in
@@ -144,6 +190,11 @@ final class DictationController: ObservableObject {
         }
         returnInterceptor.shouldSwallow = { [weak self] in
             guard let self else { return false }
+            // Never let it type into the app before the text does.
+            if review != nil {
+                confirmReview(send: true)
+                return true
+            }
             let action = machine.returnPressed()
             perform(action)
             return action != .none
@@ -151,6 +202,10 @@ final class DictationController: ObservableObject {
         monitor.onEscape = { [weak self] in
             guard let self else { return }
             dismissNotice()
+            if review != nil {
+                cancelReview()
+                return
+            }
             perform(machine.escapePressed())
         }
 
@@ -202,7 +257,7 @@ final class DictationController: ObservableObject {
 
     private func start() {
         // The previous dictation is still being typed out.
-        guard !dictation.isActive, !isInserting else {
+        guard !dictation.isActive, !isInserting, review == nil else {
             machine.reset()
             return
         }
@@ -216,6 +271,9 @@ final class DictationController: ObservableObject {
             deviceID: deviceID == AudioInputDevice.noneID ? nil : deviceID
         )
         hud.positionOnActiveScreen()
+        // The 翻译 button on the bubble needs the mouse; hold mode has no
+        // such button and keeps the bubble click-through.
+        hud.setInteractive(mode == .toggle)
         hud.orderFrontRegardless()
         // Toggle mode leaves the trigger key free to be let go, so Return
         // can end the dictation too.
@@ -242,7 +300,15 @@ final class DictationController: ObservableObject {
             if thenReturn { DictationTextInserter.pressReturn() }
             return
         }
+        if let target = translationTarget(for: text) {
+            beginReview(of: text, into: target)
+            return
+        }
         hideHUD()
+        await type(text, thenReturn: thenReturn)
+    }
+
+    private func type(_ text: String, thenReturn: Bool) async {
         isInserting = true
         let outcome = await DictationTextInserter.insert(text, thenReturn: thenReturn)
         isInserting = false
@@ -251,10 +317,95 @@ final class DictationController: ObservableObject {
         }
     }
 
+    // MARK: - Translation review
+
+    /// 按一下开始 mode only; nil also when the text is already in 外语.
+    private func translationTarget(for text: String) -> String? {
+        guard translateEnabled, mode == .toggle,
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
+        let languages = translator.languages
+        return DictationTranslationPlan.targetCode(
+            spokenCode: languageCode(), text: text,
+            myLanguageCode: languages.myLanguageCode, foreignLanguageCode: languages.foreignLanguageCode
+        )
+    }
+
+    private func beginReview(of text: String, into target: String) {
+        review = DictationReview(original: text, translation: nil, stage: .translating)
+        // The Return that ended the dictation was swallowed; this one decides.
+        returnInterceptor.start()
+        hud.setInteractive(true)
+        reviewTimeoutTask?.cancel()
+        reviewTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.reviewTimeout)
+            guard !Task.isCancelled else { return }
+            self?.cancelReview()
+        }
+        translator.engineID = translationEngineID()
+        translator.sourceText = text
+        translator.targetOverrideCode = target
+        translator.translate()
+        reviewTask?.cancel()
+        reviewTask = Task { [weak self, translator] in
+            for await phase in translator.$phase.values {
+                guard let self, !Task.isCancelled, review?.original == text else { return }
+                switch phase {
+                case .completed:
+                    let translation = translator.resultText
+                    review?.translation = translation.isEmpty ? nil : translation
+                    review?.stage = translation.isEmpty ? .failed("没有得到译文") : .ready
+                    return
+                case .failed(let message):
+                    review?.stage = .failed(message)
+                    return
+                case .idle, .loadingModel, .translating:
+                    continue
+                }
+            }
+        }
+    }
+
+    /// Return (`send`) or the trigger key types the translation; the button
+    /// types the original (`useOriginal`).
+    func confirmReview(send: Bool, useOriginal: Bool = false) {
+        // Still translating: nothing to decide yet. Return and the trigger
+        // key are deliberately not queued — the point of the review is to see
+        // the translation before choosing.
+        guard let current = review, current.stage != .translating else { return }
+        let text = useOriginal ? current.original : (current.translation ?? current.original)
+        endReview()
+        hideHUD()
+        Task { await type(text, thenReturn: send) }
+    }
+
+    /// Synchronously gives back the translation weights before exit — see
+    /// `AppDelegate.applicationWillTerminate`.
+    func unloadModelBeforeQuit() {
+        translator.unloadModelBeforeQuit()
+    }
+
+    func cancelReview() {
+        endReview()
+        hideHUD()
+    }
+
+    private func endReview() {
+        reviewTask?.cancel()
+        reviewTask = nil
+        reviewTimeoutTask?.cancel()
+        reviewTimeoutTask = nil
+        translator.cancel()
+        review = nil
+        returnInterceptor.stop()
+        hud.setInteractive(false)
+    }
+
     // MARK: - HUD
 
     private func showNotice(_ message: String) {
         notice = message
+        hud.setInteractive(false)
         hud.positionOnActiveScreen()
         hud.orderFrontRegardless()
         noticeTask?.cancel()
@@ -328,6 +479,10 @@ final class DictationController: ObservableObject {
         maxDurationTask = nil
         machine.reset()
         returnInterceptor.stop()
+        if review != nil {
+            endReview()
+            hideHUD()
+        }
         dismissNotice()
         guard dictation.isActive else { return }
         Task {

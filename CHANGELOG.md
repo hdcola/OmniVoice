@@ -7,6 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(dictation): translate what is dictated before it is typed — in 按一下开始 mode the voice input bubble shows the translation into 外语 for review (Return types it and presses Return, the trigger key only types it, Esc drops it, 输入原文 types what was said); it uses the engine chosen for selection translation, skips text already in 外语, falls back to the original when translating fails, and is switched on in Settings or with the button on the bubble; the update's 新功能 window announces it (#87)
 
 ### Changed
 
@@ -18,6 +19,7 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 ### Tests
+- test(dictation): cover deciding whether and into what a dictation is translated (#87)
 
 ## [0.6.3] - 2026-10-03
 
