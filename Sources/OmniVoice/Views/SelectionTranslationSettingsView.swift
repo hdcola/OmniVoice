@@ -94,7 +94,7 @@ struct SelectionTranslationSettingsView: View {
         guard translator.effectiveEngineID == SelectionTranslationEngine.hymt15 else { return nil }
         let names = [translator.myLanguageCode, translator.foreignLanguageCode]
             .filter { !ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: $0) }
-            .map { code in LanguageCatalog.common.first { $0.code == code }?.displayName ?? code }
+            .map(LanguageCatalog.displayName(for:))
         return names.isEmpty ? nil : names.joined(separator: "、")
     }
 }

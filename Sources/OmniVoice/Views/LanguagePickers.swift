@@ -119,8 +119,8 @@ struct TargetLanguagePicker: View {
     /// for the floating panel's single-row `controlBarContent` `HStack`,
     /// where the full multi-line `antiFallbackWarningCard` would blow the
     /// bar's ~30pt height out to 120pt+ and shove the transcript list down;
-    /// `false` (the default) keeps `SettingsView`'s own vertical `Form`
-    /// layout, where that card fits naturally.
+    /// `false` (the default) is the vertical layout with the full card —
+    /// today only the panel uses this view, always compact.
     var isCompact: Bool = false
 
     @State private var isCompactWarningPresented = false
@@ -249,6 +249,6 @@ struct TargetLanguagePicker: View {
     }
 
     private var targetDisplayName: String {
-        LanguageCatalog.common.first(where: { $0.code == targetLanguageCode })?.displayName ?? targetLanguageCode
+        LanguageCatalog.displayName(for: targetLanguageCode)
     }
 }

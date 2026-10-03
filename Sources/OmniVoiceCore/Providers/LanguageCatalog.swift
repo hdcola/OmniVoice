@@ -62,4 +62,10 @@ public enum LanguageCatalog {
         LanguageOption(code: "vi-VN", displayName: "越南语", supportsSystemASRSource: false),
         LanguageOption(code: "th-TH", displayName: "泰语", supportsSystemASRSource: false),
     ]
+
+    /// The Chinese display name for `code`, or `code` itself for a custom
+    /// locale outside `common`.
+    public static func displayName(for code: String) -> String {
+        common.first { $0.code == code }?.displayName ?? code
+    }
 }

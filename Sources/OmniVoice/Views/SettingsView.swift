@@ -287,7 +287,8 @@ struct SettingsView: View {
             SettingsRow(
                 title: "转录方向",
                 subtitle: session.swapBlockedReason
-                    ?? "听外语：字幕把外语译成我的语言；说我的语言：把我说的话译成外语。悬浮窗里的 ⇄ 也能切换"
+                    ?? "听外语：字幕把外语译成我的语言；说我的语言：把我说的话译成外语。悬浮窗里的 ⇄ 也能切换",
+                subtitleTint: session.swapBlockedReason == nil ? .secondary : .orange
             ) {
                 Picker("转录方向", selection: Binding(
                     get: { languages.transcriptionDirection },
@@ -331,8 +332,7 @@ struct SettingsView: View {
         guard session.translationEngineKind == .model,
               !ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: session.targetLanguageCode)
         else { return nil }
-        let name = LanguageCatalog.common.first { $0.code == session.targetLanguageCode }?.displayName
-            ?? session.targetLanguageCode
+        let name = LanguageCatalog.displayName(for: session.targetLanguageCode)
         return "当前翻译引擎是本地模型，针对中、英、日、韩训练；翻译成「\(name)」可能会静默回退为中文。"
     }
 

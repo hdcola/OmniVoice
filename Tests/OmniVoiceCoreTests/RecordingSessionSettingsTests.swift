@@ -195,6 +195,16 @@ struct RecordingSessionSettingsTests {
         }
     }
 
+    @Test func swapIsBlockedWhileARecordingRuns() {
+        withPersisted([:]) {
+            let session = RecordingSession()
+            #expect(session.swapBlockedReason == nil)
+            session.isRunning = true
+            #expect(session.swapBlockedReason == "录制中不能互换，停止后再试")
+            #expect(!session.canSwapTranscriptionDirection)
+        }
+    }
+
     /// Auto-detect on a local model, swap to speaking, then switch to the
     /// system recognizer (which has no "自动"): the way back to listening
     /// must stay open.

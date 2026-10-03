@@ -83,6 +83,6 @@ struct DictationSettingsView: View {
     }
 
     private func languageName(_ code: String) -> String {
-        LanguageCatalog.common.first { $0.code == code }?.displayName ?? code
+        LanguageCatalog.displayName(for: code)
     }
 }
