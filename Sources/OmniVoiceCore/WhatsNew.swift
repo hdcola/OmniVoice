@@ -37,6 +37,14 @@ public struct WhatsNewEntry: Equatable, Sendable, Identifiable {
 public enum WhatsNewCatalog {
     public static let entries: [WhatsNewEntry] = [
         WhatsNewEntry(
+            revision: 3,
+            title: "语音输入：按 Return 结束并发送",
+            bullets: [
+                "在「按一下开始，再按一下结束」的触发方式下，说完直接按 Return：文字输入后自动回车，聊天消息、提示词一步发出；按触发键结束则只输入文字，不回车。",
+                "在「设置 › 语音输入」里把触发方式设为按一下开始即可使用。",
+            ]
+        ),
+        WhatsNewEntry(
             revision: 2,
             title: "语音输入（可选）",
             bullets: [

@@ -47,9 +47,15 @@ struct WhatsNewTests {
         #expect(WhatsNewCatalog.latestRevision >= 1)
     }
 
-    @Test("someone who saw revision 1 is shown just the voice input note")
+    @Test("someone who saw revision 1 is shown the Return-to-send note, then the voice input note")
     func voiceInputIsNewForRevisionOneUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 1)
-        #expect(shown.map(\.action) == [.enableDictation])
+        #expect(shown.map(\.action) == [nil, .enableDictation])
+    }
+
+    @Test("someone who saw revision 2 is shown just the Return-to-send note")
+    func returnToSendIsNewForRevisionTwoUsers() {
+        let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 2)
+        #expect(shown.map(\.revision) == [3])
     }
 }
