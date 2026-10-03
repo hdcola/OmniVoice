@@ -11,7 +11,7 @@ The format is based on Keep a Changelog.
 ### Changed
 
 ### Fixed
-- fix(dictation): the voice-input bubble grows with what is said instead of cutting long text down to two lines — up to half the screen's height, then the text scrolls (it follows the newest words while listening, and takes the mouse wheel once it overflows)
+- fix(dictation): the voice-input bubble grows with what is said instead of cutting long text down to two lines — up to half the screen's height, then it shows the newest words (#86)
 
 ### Dependencies
 
