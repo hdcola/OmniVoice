@@ -28,6 +28,9 @@ struct FloatingTranscriptView: View {
     /// panel isn't permanently competing with idle chrome for attention.
     @State private var isControlsVisible = true
     @State private var isSwapHintPresented = false
+    /// The reason shown in the swap-blocked popover, captured at click time
+    /// so it keeps its text (and height) while the popover fades out.
+    @State private var swapHintText = ""
     @State private var autoHideTask: Task<Void, Never>?
     private static let autoHideDelay: Duration = .seconds(2)
 
@@ -242,6 +245,7 @@ struct FloatingTranscriptView: View {
             if session.canSwapTranscriptionDirection {
                 session.swapTranscriptionDirection()
             } else {
+                swapHintText = session.swapBlockedReason ?? ""
                 isSwapHintPresented = true
             }
         } label: {
@@ -262,7 +266,7 @@ struct FloatingTranscriptView: View {
             if session.canSwapTranscriptionDirection { isSwapHintPresented = false }
         }
         .popover(isPresented: $isSwapHintPresented) {
-            Text(session.swapBlockedReason ?? "")
+            Text(swapHintText)
                 .font(.callout)
                 .frame(width: 220, alignment: .leading)
                 .padding()
