@@ -9,7 +9,7 @@ The format is based on Keep a Changelog.
 ### Added
 
 ### Changed
-- refactor(panel): drop the unused full-width warning card from the target language picker — it is only used in the floating panel's control bar, where the warning is a glyph with a popover (no behavior change)
+- refactor(panel): drop the unused full-width warning card from the target language picker — it is only used in the floating panel's control bar, where the warning is a glyph with a popover (no behavior change) (#78)
 - feat(settings): 设置 now has one 语言 card — 我的语言, 外语, 转录方向 (听外语 / 说我的语言) and 自动检测外语 — replacing the separate 转录语言 and 快捷翻译语言 cards; 语音输入 gets its own 听写语言 (我的语言 / 外语 / 自动检测, the last only with a local model). In the floating panel the → between the source and target pickers is now a ⇄ button that swaps them; it is greyed out (with the reason in its tooltip) while recording and when the system recognizer can't recognize the swapped source; 自动 is kept across a swap (#77)
 - refactor(settings): recording, 快捷翻译 and voice input now share one pair of languages — 我的语言 and 外语 — plus a transcript direction (听外语 / 说我的语言); the recording's source and target are derived from them, so a change in one place applies to all. Voice input gets its own language choice (我的语言 / 外语 / 自动, 自动 only with a local model). Existing settings are migrated once on first launch (快捷翻译's languages win if you customized them, otherwise the recording's target becomes 我的语言 and its source 外语; voice input keeps the language it used); the old keys are left in place. The settings and panel UI follow in a later change (#76)
 
