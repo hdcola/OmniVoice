@@ -341,6 +341,13 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       weights, and one-shot `HYMT15Translator.translateText` — plus floating
       panel toolbar/resize-cursor fixes (PR #41), the 启动时显示悬浮窗 toggle
       (PR #42), and the terminology unification pass (PR #43).
+- [x] **0.6.2 release cut** (2026-10-02, `chore/release-0.6.2`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.6.2,
+      `CFBundleVersion` 18), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.6.2]` section, `README.md`'s version/download-link references
+      bumped to match. Voice input in 按一下开始，再按一下结束 mode can now be
+      ended with Return, which types the text and presses Return (PR #82).
+      What's-new entry added (revision 3).
 - [x] **0.6.1 release cut** (2026-10-02, `chore/release-0.6.1`): version
       bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.6.1,
       `CFBundleVersion` 17), CHANGELOG's `[Unreleased]` cut into a dated
