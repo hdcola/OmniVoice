@@ -70,13 +70,18 @@ public final class SelectionTranslator: ObservableObject {
     @Published public var engineID: String {
         didSet { defaults.set(engineID, forKey: PersistedSelectionKey.engineID) }
     }
+    /// The user's languages, shared with the recording and voice input.
+    public let languages: LanguagePreferences
+    private var languagesObserver: AnyCancellable?
     /// "我的语言" — see `SelectionLanguageDirection`'s doc.
-    @Published public var myLanguageCode: String {
-        didSet { defaults.set(myLanguageCode, forKey: PersistedSelectionKey.myLanguageCode) }
+    public var myLanguageCode: String {
+        get { languages.myLanguageCode }
+        set { languages.myLanguageCode = newValue }
     }
     /// "外语" — where text already in `myLanguageCode` is translated to.
-    @Published public var foreignLanguageCode: String {
-        didSet { defaults.set(foreignLanguageCode, forKey: PersistedSelectionKey.foreignLanguageCode) }
+    public var foreignLanguageCode: String {
+        get { languages.foreignLanguageCode }
+        set { languages.foreignLanguageCode = newValue }
     }
 
     /// What `SelectionTranslationView`'s `.translationTask` watches —
@@ -121,10 +126,12 @@ public final class SelectionTranslator: ObservableObject {
     public convenience init(
         modelDownloadManager: ModelDownloadManager,
         preferredModelVariantID: @escaping () -> String? = { nil },
-        recordingEngineID: @escaping () -> String? = { nil }
+        recordingEngineID: @escaping () -> String? = { nil },
+        languages: LanguagePreferences? = nil
     ) {
         self.init(
             defaults: .standard,
+            languages: languages,
             modelBackend: SelectionModelBackend(),
             recordingEngineID: recordingEngineID,
             modelURLProvider: {
@@ -139,7 +146,7 @@ public final class SelectionTranslator: ObservableObject {
     /// Internal — tests inject an in-memory `UserDefaults`, a fake model
     /// backend, and a fixed model URL instead of real downloaded weights.
     init(
-        defaults: UserDefaults, modelBackend: SelectionModelTranslating,
+        defaults: UserDefaults, languages: LanguagePreferences? = nil, modelBackend: SelectionModelTranslating,
         recordingEngineID: @escaping () -> String? = { nil }, modelURLProvider: @escaping () -> URL?
     ) {
         self.defaults = defaults
@@ -150,12 +157,11 @@ public final class SelectionTranslator: ObservableObject {
         let isKnown = storedEngine == SelectionTranslationEngine.followRecording
             || SelectionTranslationEngine.all.contains { $0.id == storedEngine }
         engineID = isKnown ? storedEngine! : SelectionTranslationEngine.followRecording
-        let storedMine = defaults.string(forKey: PersistedSelectionKey.myLanguageCode)
-        let mine = LanguageCatalog.common.contains { $0.code == storedMine } ? storedMine! : "zh-CN"
-        myLanguageCode = mine
-        let storedForeign = defaults.string(forKey: PersistedSelectionKey.foreignLanguageCode)
-        foreignLanguageCode = LanguageCatalog.common.contains { $0.code == storedForeign } ? storedForeign! : "en-US"
+        let languages = languages ?? LanguagePreferences(defaults: defaults)
+        self.languages = languages
+        let mine = languages.myLanguageCode
         targetCode = mine
+        languagesObserver = languages.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
     }
 
     /// Whether HY-MT1.5 weights are downloaded — the settings tab greys the

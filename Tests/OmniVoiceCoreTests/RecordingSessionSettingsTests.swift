@@ -13,7 +13,18 @@ import Testing
 struct RecordingSessionSettingsTests {
     private let defaults = UserDefaults.standard
 
+    /// The unified language keys (and the schema version that gates the
+    /// migration from the old source/target keys) — cleared around every
+    /// test so the old keys a test seeds are actually migrated.
+    private static let languageKeys = [
+        PersistedLanguageKey.schemaVersion, PersistedLanguageKey.myLanguageCode,
+        PersistedLanguageKey.foreignLanguageCode, PersistedLanguageKey.transcriptionDirection,
+        PersistedLanguageKey.foreignLanguageAutoDetect, PersistedLanguageKey.dictationLanguage,
+    ]
+
     private func withPersisted(_ values: [String: Any?], _ body: () -> Void) {
+        for key in Self.languageKeys { defaults.removeObject(forKey: key) }
+        defer { for key in Self.languageKeys { defaults.removeObject(forKey: key) } }
         for (key, value) in values {
             if let value {
                 defaults.set(value, forKey: key)
@@ -145,12 +156,42 @@ struct RecordingSessionSettingsTests {
         defer {
             defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)
             defaults.removeObject(forKey: PersistedSettingsKey.sourceLanguageCode)
+            for key in Self.languageKeys { defaults.removeObject(forKey: key) }
         }
+        for key in Self.languageKeys { defaults.removeObject(forKey: key) }
         let session = RecordingSession()
         session.transcriptionEngineID = "model.r2t2"
         session.sourceLanguageCode = "ru-RU"
         session.transcriptionEngineID = "system.speech"
         #expect(session.sourceLanguageCode == "en-US")
+    }
+
+    @Test func selfHealKeepsMyAndForeignLanguagesDistinct() {
+        withPersisted([
+            PersistedSettingsKey.transcriptionEngineID: "system.speech",
+            PersistedSettingsKey.sourceLanguageCode: "ru-RU",
+            PersistedSettingsKey.targetLanguageCode: "en-US",
+        ]) {
+            let session = RecordingSession()
+            #expect(session.languages.myLanguageCode == "en-US")
+            #expect(session.languages.foreignLanguageCode == "zh-CN")
+            #expect(session.sourceLanguageCode == "zh-CN")
+        }
+    }
+
+    @Test func swapIsRefusedWhenTheSystemRecognizerCannotHearTheOtherSide() {
+        withPersisted([
+            PersistedSettingsKey.transcriptionEngineID: "system.speech",
+            PersistedSettingsKey.sourceLanguageCode: "en-US",
+            PersistedSettingsKey.targetLanguageCode: "ru-RU",
+        ]) {
+            let session = RecordingSession()
+            #expect(session.languages.myLanguageCode == "ru-RU")
+            #expect(session.sourceLanguageCode == "en-US")
+            #expect(!session.canSwapTranscriptionDirection)
+            session.swapTranscriptionDirection()
+            #expect(session.sourceLanguageCode == "en-US")
+        }
     }
 
     @Test func includeSystemAudioIsRestoredFromPersistedValue() {

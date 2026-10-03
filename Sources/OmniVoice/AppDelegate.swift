@@ -53,7 +53,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             translator: SelectionTranslator(
                 modelDownloadManager: session.modelDownloadManager,
                 preferredModelVariantID: { [weak session] in session?.translationModelVariantID },
-                recordingEngineID: { [weak session] in session?.translationEngineID }
+                recordingEngineID: { [weak session] in session?.translationEngineID },
+                languages: session.languages
             )
         )
         dictationController = DictationController(
@@ -63,10 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
                 borrowRecognizer: { [weak session] in session?.lendRecognizerToDictation() },
                 returnRecognizer: { [weak session] in session?.returnRecognizerFromDictation() }
             ),
-            languageCode: { [weak session] in session?.sourceLanguageCode },
+            languageCode: { [weak session] in session?.dictationLanguageCode },
             deviceID: { [weak session] in session?.selectedDeviceID },
             isLocalRecognizerLoaded: { [weak session] in session?.hasLoadedLocalRecognizer ?? false },
-            languageChanges: session.$sourceLanguageCode.eraseToAnyPublisher()
+            languageChanges: session.dictationLanguageChanges
         )
         super.init()
     }

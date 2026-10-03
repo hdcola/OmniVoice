@@ -9,6 +9,7 @@ The format is based on Keep a Changelog.
 ### Added
 
 ### Changed
+- refactor(settings): recording, 快捷翻译 and voice input now share one pair of languages — 我的语言 and 外语 — plus a transcript direction (听外语 / 说我的语言); the recording's source and target are derived from them, so a change in one place applies to all. Voice input gets its own language choice (我的语言 / 外语 / 自动, 自动 only with a local model). Existing settings are migrated once on first launch (快捷翻译's languages win if you customized them, otherwise the recording's target becomes 我的语言 and its source 外语; voice input keeps the language it used); the old keys are left in place. The settings and panel UI follow in a later change (#76)
 
 ### Fixed
 
@@ -17,6 +18,7 @@ The format is based on Keep a Changelog.
 ### Documentation
 
 ### Tests
+- test(settings): cover the language settings migration, direction swap and voice input language resolution
 
 ## [0.6.0] - 2026-10-02
 
