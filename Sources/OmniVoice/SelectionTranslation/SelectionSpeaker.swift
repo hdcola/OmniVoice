@@ -38,7 +38,7 @@ final class SelectionSpeaker: NSObject, ObservableObject {
     override init() {
         let defaults = UserDefaults.standard
         autoSpeakResult = defaults.bool(forKey: Self.autoSpeakKey)
-        let stored = defaults.object(forKey: Self.rateKey) as? Float
+        let stored = (defaults.object(forKey: Self.rateKey) as? NSNumber)?.floatValue
         rate = stored.map { min(max($0, Self.rateRange.lowerBound), Self.rateRange.upperBound) }
             ?? Self.defaultRate
         super.init()

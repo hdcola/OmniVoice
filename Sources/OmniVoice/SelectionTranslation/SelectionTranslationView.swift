@@ -204,7 +204,8 @@ struct SelectionTranslationView: View {
                 .padding(6)
         }
         .buttonStyle(.plain)
-        .disabled(disabled || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        // Stopping stays possible even if the source was emptied mid-reading.
+        .disabled(!isSpeaking && (disabled || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
         .help(isSpeaking ? "停止朗读" : "朗读\(name)")
         .accessibilityLabel(isSpeaking ? "停止朗读" : "朗读\(name)")
     }
