@@ -7,6 +7,20 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.6.2] - 2026-10-02
+
+### Added
 - feat(dictation): in 按一下开始，再按一下结束 mode, pressing Return instead of the trigger key ends the voice input, types the text and then presses Return (to send a chat message, run a prompt, …); the Return is swallowed while listening so it never reaches the app before the text does, needs the 辅助功能 permission voice input already asks for, and the other mode and a plain trigger-key tap behave as before; the update's 新功能 window announces it (#82)
 
 ### Changed
