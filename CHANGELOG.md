@@ -7,7 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(translation): read the source or the translation aloud with the macOS system voices — a play button on each pane of the translation panel (the source's language is re-detected from what is in the pane), a notice with a shortcut to 朗读内容 settings when no voice speaks the language, and, in Settings' 划词与截图翻译 card, an option to read finished translations automatically plus a speed setting (#84)
+- feat(translation): read the source or the translation aloud with the macOS system voices — a play button beside each pane of the translation panel (the source's language is re-detected from what is in the pane), a notice with a shortcut to 朗读内容 settings when no voice speaks the language, and, in Settings' 划词与截图翻译 card, an option to read finished translations automatically plus a speed setting (#84)
 
 ### Changed
 

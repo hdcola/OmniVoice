@@ -25,6 +25,8 @@ final class SelectionSpeaker: NSObject, ObservableObject {
     static let autoSpeakKey = "selectionSpeechAutoSpeak"
     static let rateKey = "selectionSpeechRate"
     static let rateRange: ClosedRange<Float> = 0.3...0.6
+    /// The system's normal speaking rate — the "1×" of the settings label.
+    static let defaultRate = AVSpeechUtteranceDefaultSpeechRate
 
     private let synthesizer = AVSpeechSynthesizer()
     /// The last utterance queued for the current reading; its finish/cancel
@@ -38,7 +40,7 @@ final class SelectionSpeaker: NSObject, ObservableObject {
         autoSpeakResult = defaults.bool(forKey: Self.autoSpeakKey)
         let stored = defaults.object(forKey: Self.rateKey) as? Float
         rate = stored.map { min(max($0, Self.rateRange.lowerBound), Self.rateRange.upperBound) }
-            ?? AVSpeechUtteranceDefaultSpeechRate
+            ?? Self.defaultRate
         super.init()
         synthesizer.delegate = self
     }

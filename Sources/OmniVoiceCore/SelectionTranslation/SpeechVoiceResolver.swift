@@ -22,8 +22,8 @@ public struct SpeechVoiceCandidate: Equatable, Sendable {
 /// `en`) onto the installed system voice that should read them.
 public enum SpeechVoiceResolver {
     /// The tag speech voices use for `code`: Chinese by region (`zh-Hans` →
-    /// `zh-CN`, `zh-Hant` → `zh-TW`, Cantonese → `zh-HK`), and a bare
-    /// language gets its usual region.
+    /// `zh-CN`, `zh-Hant` → `zh-TW`), Cantonese as `yue-HK` (what the system's
+    /// Cantonese voice reports), and a bare language gets its usual region.
     public static func speechLanguageCode(for code: String) -> String {
         let normalized = code.replacingOccurrences(of: "_", with: "-")
         let parts = normalized.split(separator: "-").map(String.init)
@@ -31,9 +31,9 @@ public enum SpeechVoiceResolver {
         let rest = Set(parts.dropFirst().map { $0.lowercased() })
 
         switch primary {
-        case "yue": return "zh-HK"
+        case "yue": return "yue-HK"
         case "zh":
-            if rest.contains("hk") { return "zh-HK" }
+            if rest.contains("hk") { return "yue-HK" }
             if rest.contains("hant") || rest.contains("tw") { return "zh-TW" }
             return "zh-CN"
         default: break
@@ -70,8 +70,11 @@ public enum SpeechVoiceResolver {
         "pt": "PT", "hi": "IN", "ru": "RU", "ar": "SA", "vi": "VN", "th": "TH",
     ]
 
+    /// Lowercased, with the older `zh-HK` spelling of Cantonese folded into
+    /// `yue-HK` so a voice reporting either one matches either request.
     private static func tag(_ code: String) -> String {
-        code.replacingOccurrences(of: "_", with: "-").lowercased()
+        let tag = code.replacingOccurrences(of: "_", with: "-").lowercased()
+        return tag == "zh-hk" ? "yue-hk" : tag
     }
 
     private static func primary(_ code: String) -> String {

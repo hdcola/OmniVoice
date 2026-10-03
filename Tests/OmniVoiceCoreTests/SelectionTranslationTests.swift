@@ -438,7 +438,8 @@ private final class FakeModelBackend: SelectionModelTranslating {
         #expect(SpeechVoiceResolver.speechLanguageCode(for: "zh-Hans") == "zh-CN")
         #expect(SpeechVoiceResolver.speechLanguageCode(for: "zh-Hant") == "zh-TW")
         #expect(SpeechVoiceResolver.speechLanguageCode(for: "zh-TW") == "zh-TW")
-        #expect(SpeechVoiceResolver.speechLanguageCode(for: "yue-CN") == "zh-HK")
+        #expect(SpeechVoiceResolver.speechLanguageCode(for: "yue-CN") == "yue-HK")
+        #expect(SpeechVoiceResolver.speechLanguageCode(for: "zh-HK") == "yue-HK")
         #expect(SpeechVoiceResolver.speechLanguageCode(for: "zh") == "zh-CN")
         #expect(SpeechVoiceResolver.speechLanguageCode(for: "en") == "en-US")
         #expect(SpeechVoiceResolver.speechLanguageCode(for: "ja") == "ja-JP")
@@ -455,6 +456,15 @@ private final class FakeModelBackend: SelectionModelTranslating {
     @Test func fallsBackToSameLanguageOtherRegion() {
         let voices = [voice("a", "zh-CN"), voice("b", "en-US")]
         #expect(SpeechVoiceResolver.bestVoice(for: "zh-Hant", among: voices)?.identifier == "a")
+    }
+
+    @Test func cantoneseMatchesItsOwnVoiceNeverMandarin() {
+        let voices = [voice("m", "zh-CN", 2), voice("c", "yue-HK")]
+        #expect(SpeechVoiceResolver.bestVoice(for: "yue-CN", among: voices)?.identifier == "c")
+        #expect(SpeechVoiceResolver.bestVoice(for: "yue-CN", among: [voice("m", "zh-CN")]) == nil)
+        // A voice still reported as `zh-HK` is Cantonese too.
+        #expect(SpeechVoiceResolver.bestVoice(for: "yue", among: [voice("old", "zh-HK")])?.identifier == "old")
+        #expect(SpeechVoiceResolver.bestVoice(for: "zh-CN", among: [voice("c", "yue-HK")]) == nil)
     }
 
     @Test func returnsNilWhenNoVoiceSpeaksTheLanguage() {

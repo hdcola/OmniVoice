@@ -53,9 +53,15 @@ struct SelectionTranslationSettingsView: View {
             }
             SettingsDivider()
             SettingsRow(title: "朗读语速") {
-                Slider(value: $speaker.rate, in: SelectionSpeaker.rateRange)
-                    .frame(width: 140)
-                    .accessibilityLabel("朗读语速")
+                HStack(spacing: 8) {
+                    Slider(value: $speaker.rate, in: SelectionSpeaker.rateRange)
+                        .frame(width: 140)
+                        .accessibilityLabel("朗读语速")
+                    Text(String(format: "%.1f×", speaker.rate / SelectionSpeaker.defaultRate))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, alignment: .trailing)
+                }
             }
             SettingsDivider()
             SettingsNote(text: "翻译面板里 ⏎ 翻译、⇧⏎ 换行、Esc 关闭。想要更自然的朗读声音或更多语言，可在 系统设置 → 辅助功能 → 朗读内容 里下载语音。")

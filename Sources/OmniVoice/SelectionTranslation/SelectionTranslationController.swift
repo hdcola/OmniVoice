@@ -21,6 +21,9 @@ final class SelectionTranslationController: ObservableObject {
         case captureFailed
         /// No installed system voice speaks this language (display name).
         case voiceUnavailable(String)
+        /// The source text is too short or too mixed to tell its language,
+        /// so there is no voice to pick.
+        case speechLanguageUnknown
     }
 
     let translator: SelectionTranslator
@@ -66,6 +69,7 @@ final class SelectionTranslationController: ObservableObject {
         isDoubleCopyEnabled = UserDefaults.standard.object(forKey: Self.doubleCopyDefaultsKey) as? Bool ?? false
         panel.contentView = NSHostingView(rootView: SelectionTranslationView(controller: self, translator: translator, speaker: speaker))
         panel.positionOnActiveScreen()
+        panel.onHide = { [weak self] in self?.speaker.stop() }
         resignKeyObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didResignKeyNotification, object: panel, queue: .main
         ) { [weak self] _ in
@@ -159,7 +163,6 @@ final class SelectionTranslationController: ObservableObject {
     }
 
     func hidePanel() {
-        speaker.stop()
         panel.orderOut(nil)
     }
 
@@ -288,13 +291,16 @@ final class SelectionTranslationController: ObservableObject {
             languageCode = translator.targetCode
         }
         guard let languageCode else {
-            notice = .voiceUnavailable("未能识别的语言")
+            notice = .speechLanguageUnknown
             return
         }
         if speaker.toggle(target, text: text, languageCode: languageCode) {
-            if case .voiceUnavailable = notice { notice = nil }
+            switch notice {
+            case .voiceUnavailable, .speechLanguageUnknown: notice = nil
+            default: break
+            }
         } else if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            notice = .voiceUnavailable(LanguageCatalog.displayName(for: languageCode))
+            notice = .voiceUnavailable(LanguageCatalog.localizedName(for: languageCode))
         }
     }
 
