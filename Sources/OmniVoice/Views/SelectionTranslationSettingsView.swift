@@ -95,6 +95,8 @@ struct SelectionTranslationSettingsView: View {
         let names = [translator.myLanguageCode, translator.foreignLanguageCode]
             .filter { !ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: $0) }
             .map(LanguageCatalog.displayName(for:))
-        return names.isEmpty ? nil : names.joined(separator: "、")
+        // 我的语言 and 外语 can both be the same unsupported language.
+        let unique = names.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        return unique.isEmpty ? nil : unique.joined(separator: "、")
     }
 }

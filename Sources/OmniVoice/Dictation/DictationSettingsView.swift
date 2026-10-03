@@ -46,7 +46,7 @@ struct DictationSettingsView: View {
                 title: "听写语言",
                 subtitle: "按哪种语言识别；自动检测只在本地识别模型已加载时可用"
             ) {
-                Picker("听写语言", selection: Binding(get: { session.languages.dictationLanguage }, set: { session.languages.dictationLanguage = $0 })) {
+                Picker("听写语言", selection: dictationLanguageSelection) {
                     Text("我的语言（\(languageName(session.languages.myLanguageCode))）").tag(DictationLanguageChoice.mine)
                     Text("外语（\(languageName(session.languages.foreignLanguageCode))）").tag(DictationLanguageChoice.foreign)
                     Text(session.transcriptionEngineKind == .model ? "自动检测" : "自动检测（需本地模型）")
@@ -80,6 +80,19 @@ struct DictationSettingsView: View {
             SettingsDivider()
             SettingsNote(text: "识别引擎和麦克风跟随「实时转录」的设置：选了本地模型且已加载（可开启「启动时加载模型」），就直接复用它，否则用系统语音识别；录制字幕期间也用系统识别。按 Esc 可取消；输入时会借用剪贴板，随后自动恢复。")
         }
+    }
+
+    /// 自动检测 only works with a local model; elsewhere voice input uses
+    /// 我的语言 (see `RecordingSession.dictationLanguageCode`), so show that —
+    /// the stored choice is kept for when a local model is selected again.
+    private var dictationLanguageSelection: Binding<DictationLanguageChoice> {
+        Binding(
+            get: {
+                let choice = session.languages.dictationLanguage
+                return choice == .auto && session.transcriptionEngineKind != .model ? .mine : choice
+            },
+            set: { session.languages.dictationLanguage = $0 }
+        )
     }
 
     private func languageName(_ code: String) -> String {

@@ -195,6 +195,17 @@ struct RecordingSessionSettingsTests {
         }
     }
 
+    @Test func swapIsRefusedWhenSpeakingAndTheForeignSideIsUnrecognizable() {
+        withPersisted([PersistedSettingsKey.transcriptionEngineID: "system.speech"]) {
+            let session = RecordingSession()
+            session.languages.transcriptionDirection = .speakMine
+            session.languages.foreignLanguageCode = "ru-RU"
+            #expect(session.swapBlockedReason == "系统语音识别不支持互换后的源语言")
+            session.swapTranscriptionDirection()
+            #expect(session.languages.transcriptionDirection == .speakMine)
+        }
+    }
+
     @Test func swapIsBlockedWhileARecordingRuns() {
         withPersisted([:]) {
             let session = RecordingSession()
