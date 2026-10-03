@@ -86,7 +86,6 @@ struct DictationHUDView: View {
 
     private static let verticalPadding: CGFloat = 14
     private static let spacing: CGFloat = 2
-    private static let bottomID = "dictation-hud-bottom"
 
     /// The room the text gets under the headline, once the bubble is as tall
     /// as it goes.
@@ -100,12 +99,19 @@ struct DictationHUDView: View {
         return max(2 * Self.verticalPadding + headlineHeight + text, DictationHUDPanel.size.height)
     }
 
+    private var detailText: some View {
+        Text(detail)
+            .font(.system(size: 13))
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             // Fixed size so swapping icons doesn't shift the text.
             icon.frame(width: 22, height: 22)
             VStack(alignment: .leading, spacing: Self.spacing) {
-                // Outside the scroll view so a long text can't push it away.
+                // Kept apart from the text so a long one can't push it away.
                 Text(headline)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
@@ -113,24 +119,20 @@ struct DictationHUDView: View {
                         GeometryReader { Color.clear.preference(key: HeadlineHeightKey.self, value: $0.size.height) }
                     )
                 if !detail.isEmpty {
-                    ScrollViewReader { proxy in
-                        ScrollView(.vertical, showsIndicators: false) {
-                            Text(detail)
-                                .font(.system(size: 13))
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    GeometryReader {
-                                        Color.clear.preference(key: DetailHeightKey.self, value: $0.size.height)
-                                    }
-                                )
-                            Color.clear.frame(height: 0).id(Self.bottomID)
-                        }
-                        .frame(height: detailViewportHeight)
-                        // What was just said is what matters while listening.
-                        .onChange(of: detail, initial: true) { _, _ in proxy.scrollTo(Self.bottomID, anchor: .bottom) }
-                        .onChange(of: detailHeight) { _, _ in proxy.scrollTo(Self.bottomID, anchor: .bottom) }
-                    }
+                    // An invisible copy of the text sizes the box (and measures
+                    // the height the whole text needs); the visible one sits at
+                    // its bottom edge, so when the text is taller than the box
+                    // the newest words stay in view and the oldest are clipped.
+                    detailText
+                        .hidden()
+                        .background(
+                            GeometryReader {
+                                Color.clear.preference(key: DetailHeightKey.self, value: $0.size.height)
+                            }
+                        )
+                        .frame(height: detailViewportHeight, alignment: .top)
+                        .overlay(alignment: .bottomLeading) { detailText }
+                        .clipped()
                 }
             }
             Spacer(minLength: 0)
