@@ -1,6 +1,15 @@
 import OmniVoiceCore
 import SwiftUI
 
+/// True while a popover anchored in the floating panel's control bar is
+/// open. A popover is its own window, so the pointer moving into it counts
+/// as leaving the panel — the panel reads this to keep its auto-hiding
+/// controls (the popover's anchor) on screen meanwhile.
+struct PanelPopoverOpenKey: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
+}
+
 /// Shared quick-pick source-language `Picker`, used by both the floating
 /// panel and Settings so their behavior can't drift apart — see
 /// `RecordingSession.sourceLanguageCode`'s doc for why "自动" only takes
@@ -79,6 +88,7 @@ struct SourceLanguagePicker: View {
                 }
             }
         }
+        .preference(key: PanelPopoverOpenKey.self, value: isAutoExplanationPresented)
     }
 }
 
@@ -143,6 +153,7 @@ struct TargetLanguagePicker: View {
                 warningButton
             }
         }
+        .preference(key: PanelPopoverOpenKey.self, value: isWarningPresented)
     }
 
     private var picker: some View {

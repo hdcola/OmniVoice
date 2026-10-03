@@ -32,6 +32,11 @@ struct FloatingTranscriptView: View {
     /// so it keeps its text (and height) while the popover fades out.
     @State private var swapHintText = ""
     @State private var autoHideTask: Task<Void, Never>?
+    /// A popover from the control bar is open (see `PanelPopoverOpenKey`),
+    /// and whether the pointer is over the panel itself — together they
+    /// decide when the controls may fade out.
+    @State private var isPopoverOpen = false
+    @State private var isPointerInside = false
     private static let autoHideDelay: Duration = .seconds(2)
 
     var body: some View {
@@ -82,15 +87,23 @@ struct FloatingTranscriptView: View {
                 .opacity(session.panelBackgroundOpacity)
         )
         .onHover { isHovering in
+            isPointerInside = isHovering
             autoHideTask?.cancel()
             if isHovering {
                 isControlsVisible = true
             } else {
-                autoHideTask = Task {
-                    try? await Task.sleep(for: Self.autoHideDelay)
-                    guard !Task.isCancelled else { return }
-                    isControlsVisible = false
-                }
+                scheduleAutoHide()
+            }
+        }
+        .onPreferenceChange(PanelPopoverOpenKey.self) { isPopoverOpen = $0 }
+        .onChange(of: isPopoverOpen) {
+            if isPopoverOpen {
+                autoHideTask?.cancel()
+                isControlsVisible = true
+            } else if !isPointerInside {
+                // The pointer left while the popover was up (into it, or
+                // away): no hover event will follow, so restart the timer.
+                scheduleAutoHide()
             }
         }
         .onAppear { rebuildConfiguration() }
@@ -113,6 +126,17 @@ struct FloatingTranscriptView: View {
                 let result = try? await translationSession.translate(request.text)
                 session.resolveTranslationBridgeResult(result?.targetText ?? "", isFinal: request.isFinal)
             }
+        }
+    }
+
+    /// Fades the controls out after `autoHideDelay`, unless a popover is
+    /// open by then.
+    private func scheduleAutoHide() {
+        autoHideTask?.cancel()
+        autoHideTask = Task {
+            try? await Task.sleep(for: Self.autoHideDelay)
+            guard !Task.isCancelled, !isPopoverOpen else { return }
+            isControlsVisible = false
         }
     }
 
@@ -260,6 +284,7 @@ struct FloatingTranscriptView: View {
         .help(swapHelp)
         .accessibilityLabel("互换源语言和目标语言")
         .accessibilityHint(session.swapBlockedReason ?? "")
+        .preference(key: PanelPopoverOpenKey.self, value: isSwapHintPresented)
         // The reason ending (e.g. the recording stops) must not leave an empty
         // bubble behind.
         .onChange(of: session.canSwapTranscriptionDirection) {
