@@ -20,7 +20,6 @@ struct SelectionTranslationSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             shortcutsCard
-            languageNote
             engineCard
         }
     }
@@ -46,20 +45,6 @@ struct SelectionTranslationSettingsView: View {
         }
     }
 
-    /// 我的语言 / 外语 live in the "语言" card above (shared with the
-    /// recording and voice input); only the engine-specific caveat stays.
-    @ViewBuilder
-    private var languageNote: some View {
-        if let unsupported = unsupportedLanguageNames {
-            SettingsCard(title: "快捷翻译语言", icon: "globe") {
-                SettingsNote(
-                    text: "HY-MT1.5 暂时只能译成中文、英语、日语或韩语，译成\(unsupported)时会报错，可改用系统翻译。",
-                    tint: .orange
-                )
-            }
-        }
-    }
-
     private var engineCard: some View {
         SettingsCard(title: "快捷翻译引擎", icon: "cpu") {
             SettingsRow(title: "引擎", subtitle: "两种引擎都在本机运行；HY-MT1.5 闲置 5 分钟后自动释放内存") {
@@ -77,6 +62,15 @@ struct SelectionTranslationSettingsView: View {
                translator.engineID == SelectionTranslationEngine.followRecording {
                 SettingsDivider()
                 SettingsNote(text: "转录使用的 T3PO 专为实时语音设计，不适合整段翻译，快捷翻译会改用\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID))。")
+            }
+            // 我的语言 / 外语 are set in the "语言" card (shared with the
+            // recording and voice input); only this engine's caveat lives here.
+            if let unsupported = unsupportedLanguageNames {
+                SettingsDivider()
+                SettingsNote(
+                    text: "HY-MT1.5 暂时只能译成中文、英语、日语或韩语，译成\(unsupported)时会报错，可改用系统翻译。",
+                    tint: .orange
+                )
             }
             if translator.effectiveEngineID == SelectionTranslationEngine.hymt15, !translator.isModelEngineAvailable {
                 SettingsDivider()
