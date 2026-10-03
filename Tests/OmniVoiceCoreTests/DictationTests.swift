@@ -447,6 +447,11 @@ struct DictationTranslationPlanTests {
         #expect(target(spoken: nil, text: "请在周五之前把报告发给我。") == "en-US")
     }
 
+    @Test("text whose language can't be told is translated rather than typed untouched")
+    func undetectableText() {
+        #expect(target(spoken: nil, text: "???") == "en-US")
+    }
+
     @Test("a foreign language that is Chinese leaves Chinese speech alone, whatever the variant")
     func chineseForeign() {
         #expect(target(spoken: "zh-TW", text: "你好", mine: "en-US", foreign: "zh-CN") == nil)

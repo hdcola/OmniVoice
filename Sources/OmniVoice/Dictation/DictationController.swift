@@ -33,7 +33,7 @@ enum DictationMaxDuration: Int, CaseIterable, Identifiable {
 
 /// A finished dictation waiting for the user to look at its translation before
 /// anything is typed.
-struct DictationReview: Equatable {
+struct DictationReview: Equatable, Sendable {
     enum Stage: Equatable {
         case translating
         case ready
@@ -365,6 +365,12 @@ final class DictationController: ObservableObject {
         endReview()
         hideHUD()
         Task { await type(text, thenReturn: send) }
+    }
+
+    /// Synchronously gives back the translation weights before exit — see
+    /// `AppDelegate.applicationWillTerminate`.
+    func unloadModelBeforeQuit() {
+        translator.unloadModelBeforeQuit()
     }
 
     func cancelReview() {

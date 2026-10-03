@@ -29,7 +29,7 @@ struct DictationSettingsView: View {
                 .accessibilityLabel("触发键")
                 .fixedSize()
             }
-            .disabled(!controller.isEnabled || controller.dictation.isActive)
+            .disabled(!controller.isEnabled || controller.dictation.isActive || controller.review != nil)
             SettingsDivider()
             SettingsRow(title: "触发方式") {
                 Picker("触发方式", selection: $controller.mode) {
@@ -40,7 +40,7 @@ struct DictationSettingsView: View {
                 .accessibilityLabel("触发方式")
                 .fixedSize()
             }
-            .disabled(!controller.isEnabled || controller.dictation.isActive)
+            .disabled(!controller.isEnabled || controller.dictation.isActive || controller.review != nil)
             SettingsDivider()
             SettingsRow(
                 title: "输入前翻译成外语（\(languageName(session.languages.foreignLanguageCode))）",

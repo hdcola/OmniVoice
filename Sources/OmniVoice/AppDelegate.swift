@@ -286,5 +286,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         // Same Metal exit-time concern for the selection panel's own
         // HY-MT1.5 copy (see `SelectionTranslator`'s doc).
         selectionController.translator.unloadModelBeforeQuit()
+        // ...and voice input's translator, which holds its own.
+        dictationController.unloadModelBeforeQuit()
     }
 }
