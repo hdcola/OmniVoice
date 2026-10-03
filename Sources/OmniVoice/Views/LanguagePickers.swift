@@ -87,17 +87,18 @@ struct SourceLanguagePicker: View {
 /// is never optional) and isn't gated by engine kind — but a `.model`-kind
 /// translation engine (T3PO/HY-MT1.5) silently falls back to Chinese for any
 /// target `ModelLanguageMapping` doesn't recognize (see that type's doc), so
-/// this view instead renders a grouped list plus a warning card, both driven
-/// by `translationEngineID` — Task 1.1 (语言防静默错译).
+/// this view instead renders a grouped list plus a warning glyph (whose
+/// popover has the details), both driven by `translationEngineID` — Task 1.1
+/// (语言防静默错译). Built for the floating panel's single-row control bar.
 struct TargetLanguagePicker: View {
     @Binding var targetLanguageCode: String
     /// `nil` keeps this view's old, ungated behavior (no grouping, no
-    /// warning card) — every call site should pass a real engine ID; this
+    /// warning) — every call site should pass a real engine ID; this
     /// only exists so a hypothetical future caller with nothing to gate by
     /// doesn't have to fabricate one.
     var translationEngineID: String?
     /// Invoked when the user taps "一键将翻译引擎切换为「系统翻译」"
-    /// in the warning card/popover below. Review Round 1 Must-Fix 1 — this
+    /// in the warning popover below. Review Round 1 Must-Fix 1 — this
     /// closure ultimately sets `session.translationEngineID`, whose `didSet`
     /// unconditionally calls `discardLoadedModelsIfStale()`, tearing down
     /// the live `translationProvider` an active recording is still feeding.
@@ -115,15 +116,7 @@ struct TargetLanguagePicker: View {
     /// the top of `start()`, so changing them during that setup would
     /// either race the read or silently not apply to the run in progress").
     var isSessionActive: Bool = false
-    /// Review Round 1 Must-Fix 2 (悬浮窗控制栏被全宽警告卡片挤压变形) — `true`
-    /// for the floating panel's single-row `controlBarContent` `HStack`,
-    /// where the full multi-line `antiFallbackWarningCard` would blow the
-    /// bar's ~30pt height out to 120pt+ and shove the transcript list down;
-    /// `false` (the default) is the vertical layout with the full card —
-    /// today only the panel uses this view, always compact.
-    var isCompact: Bool = false
-
-    @State private var isCompactWarningPresented = false
+    @State private var isWarningPresented = false
 
     private var isLocalModelEngine: Bool {
         translationEngineID == "model.t3po" || translationEngineID == "model.hymt15"
@@ -144,19 +137,10 @@ struct TargetLanguagePicker: View {
     }
 
     var body: some View {
-        if isCompact {
-            HStack(spacing: 4) {
-                picker
-                if showsWarning {
-                    compactWarningButton
-                }
-            }
-        } else {
-            VStack(alignment: .leading, spacing: 6) {
-                picker
-                if showsWarning {
-                    antiFallbackWarningCard
-                }
+        HStack(spacing: 4) {
+            picker
+            if showsWarning {
+                warningButton
             }
         }
     }
@@ -185,38 +169,28 @@ struct TargetLanguagePicker: View {
         }
     }
 
-    /// Compact stand-in for `antiFallbackWarningCard` (Must-Fix 2) — a
-    /// single-glyph affordance that fits the floating panel's one-row
-    /// control bar instead of a multi-line card, surfacing the same
-    /// warning/switch action in a `.popover` on tap.
-    private var compactWarningButton: some View {
+    /// Task 1.1's warning — shown the moment a `.model`-kind translation
+    /// engine is paired with a target `ModelLanguageMapping` silently
+    /// downgrades to Chinese for (see that type's doc). A single glyph that
+    /// fits the panel's one-row control bar, with the details and the switch
+    /// action in a `.popover`. UI warning only, deliberately not a hard block
+    /// — the mapping's own fallback logic is untouched (see
+    /// `ModelLanguageMapping.t3poTargetLanguage(forCode:)`'s doc), so the
+    /// user can still proceed and get Chinese output if that's what they want.
+    private var warningButton: some View {
         Button {
-            isCompactWarningPresented = true
+            isWarningPresented = true
         } label: {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
         }
         .buttonStyle(.plain)
         .help("语言支持提示")
-        .popover(isPresented: $isCompactWarningPresented) {
+        .popover(isPresented: $isWarningPresented) {
             warningContent
                 .frame(width: 260)
                 .padding()
         }
-    }
-
-    /// Task 1.1's yellow warning card — shown the moment a `.model`-kind
-    /// translation engine is paired with a target `ModelLanguageMapping`
-    /// silently downgrades to Chinese for (see that type's doc). This is UI
-    /// warning only, deliberately not a hard block — the mapping's own
-    /// fallback logic is untouched (see `ModelLanguageMapping.t3poTargetLanguage(forCode:)`'s
-    /// doc), so the user can still proceed and get Chinese output if that's
-    /// actually what they want.
-    private var antiFallbackWarningCard: some View {
-        warningContent
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var warningContent: some View {
