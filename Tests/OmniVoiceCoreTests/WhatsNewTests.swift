@@ -58,4 +58,10 @@ struct WhatsNewTests {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 2)
         #expect(shown.map(\.revision) == [3])
     }
+
+    @Test("someone who saw revision 3 is shown just the translation-speech note")
+    func translationSpeechIsNewForRevisionThreeUsers() {
+        let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 3)
+        #expect(shown.map(\.title) == ["翻译朗读"])
+    }
 }
