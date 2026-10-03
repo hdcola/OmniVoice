@@ -30,10 +30,10 @@ final class SelectionSpeaker: NSObject, ObservableObject {
 
     private let synthesizer = AVSpeechSynthesizer()
     /// The last utterance queued for the current reading; its finish/cancel
-    /// callback is what ends `speaking`. Identifiers rather than the
-    /// utterance itself so a stale callback from a cut-off reading can be
-    /// told apart from the current one.
-    private var lastUtteranceID: ObjectIdentifier?
+    /// callback is what ends `speaking`. Held strongly so a callback from a
+    /// cut-off reading can never match a new utterance that happened to be
+    /// allocated at the old one's address.
+    private var lastUtterance: AVSpeechUtterance?
 
     override init() {
         let defaults = UserDefaults.standard
@@ -88,33 +88,31 @@ final class SelectionSpeaker: NSObject, ObservableObject {
             return utterance
         }
         guard let last = utterances.last else { return false }
-        lastUtteranceID = ObjectIdentifier(last)
+        lastUtterance = last
         speaking = target
         utterances.forEach { synthesizer.speak($0) }
         return true
     }
 
     func stop() {
-        lastUtteranceID = nil
+        lastUtterance = nil
         speaking = nil
         synthesizer.stopSpeaking(at: .immediate)
     }
 
-    private func utteranceEnded(_ id: ObjectIdentifier) {
-        guard id == lastUtteranceID else { return }
-        lastUtteranceID = nil
+    private func utteranceEnded(_ utterance: AVSpeechUtterance) {
+        guard utterance === lastUtterance else { return }
+        lastUtterance = nil
         speaking = nil
     }
 }
 
 extension SelectionSpeaker: AVSpeechSynthesizerDelegate {
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        let id = ObjectIdentifier(utterance)
-        Task { @MainActor in self.utteranceEnded(id) }
+        Task { @MainActor in self.utteranceEnded(utterance) }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        let id = ObjectIdentifier(utterance)
-        Task { @MainActor in self.utteranceEnded(id) }
+        Task { @MainActor in self.utteranceEnded(utterance) }
     }
 }

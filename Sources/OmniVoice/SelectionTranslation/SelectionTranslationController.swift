@@ -278,6 +278,12 @@ final class SelectionTranslationController: ObservableObject {
     /// source's language is detected from what is in the pane right now,
     /// not from the last translation — the user may have edited it since.
     func speak(_ target: SelectionSpeaker.Target) {
+        // A press while this pane is being read is always "stop" — whatever
+        // the pane holds by now (it may have been emptied mid-reading).
+        if speaker.speaking == target {
+            speaker.stop()
+            return
+        }
         let text: String
         let languageCode: String?
         switch target {
@@ -305,7 +311,8 @@ final class SelectionTranslationController: ObservableObject {
     }
 
     func openSpokenContentSettings() {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Accessibility-Settings.extension?SpokenContent")!)
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.Accessibility-Settings.extension?SpokenContent") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     func dismissNotice() {
