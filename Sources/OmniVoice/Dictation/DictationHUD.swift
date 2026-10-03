@@ -84,7 +84,9 @@ struct DictationHUDView: View {
 
     private var detail: String {
         if let notice = controller.notice { return notice }
-        if dictation.state == .listening, dictation.previewText.isEmpty { return "请说话" }
+        if dictation.state == .listening, dictation.previewText.isEmpty {
+            return controller.mode == .toggle ? "请说话 · 按 Return 结束并发送" : "请说话"
+        }
         return dictation.previewText
     }
 }

@@ -16,7 +16,9 @@ enum DictationTextInserter {
     /// How long ⌘V gets to be read before the old pasteboard comes back.
     private static let pasteSettleDelay: Duration = .milliseconds(400)
 
-    static func insert(_ text: String) async -> Outcome {
+    /// - Parameter thenReturn: press Return in the focused app once the text
+    ///   has landed (never when it could only be copied).
+    static func insert(_ text: String, thenReturn: Bool = false) async -> Outcome {
         let pasteboard = NSPasteboard.general
         let snapshot = PasteboardSnapshot(of: pasteboard)
         pasteboard.clearContents()
@@ -32,11 +34,24 @@ enum DictationTextInserter {
             return .copiedOnly("当前输入框不允许自动输入（如密码框），文字已复制，可手动粘贴")
         }
         try? await Task.sleep(for: pasteSettleDelay)
+        if thenReturn { pressReturn() }
         // Something else copied in the meantime: that is the newer clipboard.
         if pasteboard.changeCount == ownChangeCount {
             snapshot.restore(to: pasteboard)
         }
         return .pasted
+    }
+
+    /// A bare Return, tagged so `DictationReturnInterceptor` lets it through.
+    static func pressReturn() {
+        guard !IsSecureEventInputEnabled() else { return }
+        let source = CGEventSource(stateID: .privateState)
+        source?.userData = DictationReturnInterceptor.ownEventMarker
+        for keyDown in [true, false] {
+            let event = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_Return), keyDown: keyDown)
+            event?.flags = []
+            event?.post(tap: .cgSessionEventTap)
+        }
     }
 
     /// ⌘V with only ⌘ held — the event source is private, so a modifier the
