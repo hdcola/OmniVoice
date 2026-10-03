@@ -2,7 +2,7 @@ import AppKit
 import OmniVoiceCore
 import SwiftUI
 
-/// The "快捷翻译" cards of Settings' "通用" tab — shortcuts, the two-language
+/// The "划词与截图翻译" and "快捷翻译引擎" cards of Settings' "通用" tab — shortcuts, the two-language
 /// direction rule (see `SelectionLanguageDirection`; the languages are set in
 /// the "语言" card) and engine. Permissions
 /// live in `PermissionsSettingsCard`.
@@ -22,34 +22,11 @@ struct SelectionTranslationSettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             shortcutsCard
             engineCard
-            speechCard
-        }
-    }
-
-    private var speechCard: some View {
-        SettingsCard(title: "朗读", icon: "speaker.wave.2") {
-            SettingsRow(
-                title: "翻译完成后自动朗读译文",
-                subtitle: "翻译面板里也可以随时点原文、译文右上角的喇叭手动朗读"
-            ) {
-                Toggle("翻译完成后自动朗读译文", isOn: $speaker.autoSpeakResult)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-            }
-            SettingsDivider()
-            SettingsRow(title: "语速") {
-                Slider(value: $speaker.rate, in: SelectionSpeaker.rateRange)
-                    .frame(width: 140)
-                    .accessibilityLabel("朗读语速")
-            }
-            SettingsDivider()
-            SettingsNote(text: "使用 macOS 系统语音。想要更自然的声音或更多语言，可在 系统设置 → 辅助功能 → 朗读内容 里下载。")
         }
     }
 
     private var shortcutsCard: some View {
-        SettingsCard(title: "划词与截图快捷键", icon: "keyboard") {
+        SettingsCard(title: "划词与截图翻译", icon: "keyboard") {
             ForEach(Array(GlobalShortcutAction.allCases.enumerated()), id: \.element.id) { index, action in
                 if index > 0 { SettingsDivider() }
                 ShortcutRecorderRow(controller: controller, action: action)
@@ -65,7 +42,23 @@ struct SelectionTranslationSettingsView: View {
                     .controlSize(.small)
             }
             SettingsDivider()
-            SettingsNote(text: "翻译面板里 ⏎ 翻译、⇧⏎ 换行、Esc 关闭。")
+            SettingsRow(
+                title: "翻译完成后自动朗读译文",
+                subtitle: "也可以随时点原文、译文右上角的 ▶ 手动朗读，使用 macOS 系统语音"
+            ) {
+                Toggle("翻译完成后自动朗读译文", isOn: $speaker.autoSpeakResult)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+            SettingsDivider()
+            SettingsRow(title: "朗读语速") {
+                Slider(value: $speaker.rate, in: SelectionSpeaker.rateRange)
+                    .frame(width: 140)
+                    .accessibilityLabel("朗读语速")
+            }
+            SettingsDivider()
+            SettingsNote(text: "翻译面板里 ⏎ 翻译、⇧⏎ 换行、Esc 关闭。想要更自然的朗读声音或更多语言，可在 系统设置 → 辅助功能 → 朗读内容 里下载语音。")
         }
     }
 

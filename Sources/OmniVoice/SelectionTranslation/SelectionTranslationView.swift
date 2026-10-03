@@ -214,7 +214,7 @@ struct SelectionTranslationView: View {
         return Button {
             controller.speak(target)
         } label: {
-            Image(systemName: isSpeaking ? "stop.circle.fill" : "speaker.wave.2")
+            Image(systemName: isSpeaking ? "stop.circle" : "play.circle")
                 .foregroundStyle(.secondary)
                 .padding(6)
         }
