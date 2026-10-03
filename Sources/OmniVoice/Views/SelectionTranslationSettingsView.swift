@@ -3,7 +3,8 @@ import OmniVoiceCore
 import SwiftUI
 
 /// The "快捷翻译" cards of Settings' "通用" tab — shortcuts, the two-language
-/// direction rule (see `SelectionLanguageDirection`) and engine. Permissions
+/// direction rule (see `SelectionLanguageDirection`; the languages are set in
+/// the "语言" card) and engine. Permissions
 /// live in `PermissionsSettingsCard`.
 struct SelectionTranslationSettingsView: View {
     @ObservedObject var controller: SelectionTranslationController
@@ -19,7 +20,6 @@ struct SelectionTranslationSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             shortcutsCard
-            languageCard
             engineCard
         }
     }
@@ -45,25 +45,6 @@ struct SelectionTranslationSettingsView: View {
         }
     }
 
-    private var languageCard: some View {
-        SettingsCard(title: "快捷翻译语言", icon: "globe") {
-            SettingsRow(title: "我的语言", subtitle: "选中的文字是这种语言时，译成「外语」") {
-                languagePicker("我的语言", selection: $translator.myLanguageCode)
-            }
-            SettingsDivider()
-            SettingsRow(title: "外语", subtitle: "其他语言一律译成「我的语言」") {
-                languagePicker("外语", selection: $translator.foreignLanguageCode)
-            }
-            if let unsupported = unsupportedLanguageNames {
-                SettingsDivider()
-                SettingsNote(
-                    text: "HY-MT1.5 暂时只能译成中文、英语、日语或韩语，译成\(unsupported)时会报错，可改用系统翻译。",
-                    tint: .orange
-                )
-            }
-        }
-    }
-
     private var engineCard: some View {
         SettingsCard(title: "快捷翻译引擎", icon: "cpu") {
             SettingsRow(title: "引擎", subtitle: "两种引擎都在本机运行；HY-MT1.5 闲置 5 分钟后自动释放内存") {
@@ -81,6 +62,15 @@ struct SelectionTranslationSettingsView: View {
                translator.engineID == SelectionTranslationEngine.followRecording {
                 SettingsDivider()
                 SettingsNote(text: "转录使用的 T3PO 专为实时语音设计，不适合整段翻译，快捷翻译会改用\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID))。")
+            }
+            // 我的语言 / 外语 are set in the "语言" card (shared with the
+            // recording and voice input); only this engine's caveat lives here.
+            if let unsupported = unsupportedLanguageNames {
+                SettingsDivider()
+                SettingsNote(
+                    text: "HY-MT1.5 暂时只能译成中文、英语、日语或韩语，译成\(unsupported)时会报错，可改用系统翻译。",
+                    tint: .orange
+                )
             }
             if translator.effectiveEngineID == SelectionTranslationEngine.hymt15, !translator.isModelEngineAvailable {
                 SettingsDivider()
@@ -100,22 +90,13 @@ struct SelectionTranslationSettingsView: View {
             ? "\(engine.displayName)（未下载）" : engine.displayName
     }
 
-    private func languagePicker(_ title: String, selection: Binding<String>) -> some View {
-        Picker(title, selection: selection) {
-            ForEach(LanguageCatalog.common) { option in
-                Text(option.displayName).tag(option.code)
-            }
-        }
-        .labelsHidden()
-        .accessibilityLabel(title)
-        .fixedSize()
-    }
-
     private var unsupportedLanguageNames: String? {
         guard translator.effectiveEngineID == SelectionTranslationEngine.hymt15 else { return nil }
         let names = [translator.myLanguageCode, translator.foreignLanguageCode]
             .filter { !ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: $0) }
-            .compactMap { code in LanguageCatalog.common.first { $0.code == code }?.displayName }
-        return names.isEmpty ? nil : names.joined(separator: "、")
+            .map(LanguageCatalog.displayName(for:))
+        // 我的语言 and 外语 can both be the same unsupported language.
+        let unique = names.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        return unique.isEmpty ? nil : unique.joined(separator: "、")
     }
 }

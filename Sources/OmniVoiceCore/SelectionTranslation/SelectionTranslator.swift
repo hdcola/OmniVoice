@@ -254,7 +254,7 @@ public final class SelectionTranslator: ObservableObject {
 
     private func startModelJob(_ job: Job) {
         guard ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: job.targetCode) else {
-            let name = LanguageCatalog.common.first { $0.code == job.targetCode }?.displayName ?? job.targetCode
+            let name = LanguageCatalog.displayName(for: job.targetCode)
             phase = .failed("HY-MT1.5 暂时只能译成中文、英语、日语或韩语，无法译成\(name)。可以在设置里改用系统翻译。")
             return
         }

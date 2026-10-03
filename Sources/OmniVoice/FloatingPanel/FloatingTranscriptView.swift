@@ -175,7 +175,10 @@ struct FloatingTranscriptView: View {
         .padding(10)
     }
 
-    /// Start/stop, the source → target language pickers, and the timer.
+    /// Tooltip for the ⇄ button — says why it is greyed out.
+    private var swapHelp: String { session.swapBlockedReason ?? "互换源语言和目标语言" }
+
+    /// Start/stop, the source ⇄ target language pickers, and the timer.
     /// The language pickers are flexible views that would otherwise stretch
     /// across the whole bar in a wide panel, so they're pinned to their
     /// natural width (the selected language's label) — except with
@@ -219,15 +222,29 @@ struct FloatingTranscriptView: View {
         // apply until the next start.
         SourceLanguagePicker(
             sourceLanguageCode: $session.sourceLanguageCode,
-            transcriptionEngineKind: session.transcriptionEngineKind
+            transcriptionEngineKind: session.transcriptionEngineKind,
+            allowsAuto: session.languages.transcriptionDirection == .listenForeign
         )
         .labelsHidden()
         .disabled(session.isSessionActive)
         .fixedSize(horizontal: !compressible, vertical: false)
 
-        Image(systemName: "arrow.right")
-            .foregroundStyle(.secondary)
-            .font(.caption)
+        // Swaps source and target (听外语 ⇄ 说我的语言). Not while a
+        // recording runs (the source is fixed at `start()`). "自动" survives a
+        // swap — it comes back when swapping back.
+        Button {
+            session.swapTranscriptionDirection()
+        } label: {
+            Image(systemName: "arrow.left.arrow.right")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+                .frame(width: 20, height: 20)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!session.canSwapTranscriptionDirection)
+        .help(swapHelp)
+        .accessibilityLabel("互换源语言和目标语言")
 
         // Target stays editable while running: unlike source, it isn't
         // baked into a provider at `start()` — the `.translationTask`

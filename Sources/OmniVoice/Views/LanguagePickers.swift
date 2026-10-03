@@ -9,6 +9,9 @@ import SwiftUI
 struct SourceLanguagePicker: View {
     @Binding var sourceLanguageCode: String?
     let transcriptionEngineKind: EngineKind?
+    /// False while speaking in the user's own language — there is no
+    /// "自动" for that side (see `LanguagePreferences.sourceLanguageCode`).
+    var allowsAuto: Bool = true
     @State private var isAutoExplanationPresented = false
 
     /// The system ASR engine can't recognize a handful of `LanguageCatalog`
@@ -26,12 +29,16 @@ struct SourceLanguagePicker: View {
     /// wrapped in `if transcriptionEngineKind == .model`), just disabled and
     /// suffixed so the user can see the feature exists rather than
     /// concluding OmniVoice has no auto-detect at all.
-    private var isAutoAvailable: Bool { transcriptionEngineKind == .model }
+    private var isAutoAvailable: Bool { transcriptionEngineKind == .model && allowsAuto }
+    private var autoLabel: String {
+        if isAutoAvailable { return "✨ 自动检测语种 (Auto)" }
+        return allowsAuto ? "✨ 自动检测（需本地 R2T2 引擎）" : "✨ 自动检测（仅听外语时可用）"
+    }
 
     var body: some View {
         HStack(spacing: 4) {
             Picker("源语言", selection: $sourceLanguageCode) {
-                Text(isAutoAvailable ? "✨ 自动检测语种 (Auto)" : "✨ 自动检测（需本地 R2T2 引擎）")
+                Text(autoLabel)
                     .tag(String?.none)
                     // Kept in the list (not filtered out) so the feature
                     // stays discoverable under the system engine — see
@@ -55,7 +62,7 @@ struct SourceLanguagePicker: View {
             // this small "?" sits next to it so the explanation is reachable
             // even while the picker itself is fully system-driven (auto
             // isn't selectable, so there's no "select and see" path).
-            if !isAutoAvailable {
+            if allowsAuto && transcriptionEngineKind != .model {
                 Button {
                     isAutoExplanationPresented = true
                 } label: {
@@ -112,8 +119,8 @@ struct TargetLanguagePicker: View {
     /// for the floating panel's single-row `controlBarContent` `HStack`,
     /// where the full multi-line `antiFallbackWarningCard` would blow the
     /// bar's ~30pt height out to 120pt+ and shove the transcript list down;
-    /// `false` (the default) keeps `SettingsView`'s own vertical `Form`
-    /// layout, where that card fits naturally.
+    /// `false` (the default) is the vertical layout with the full card —
+    /// today only the panel uses this view, always compact.
     var isCompact: Bool = false
 
     @State private var isCompactWarningPresented = false
@@ -242,6 +249,6 @@ struct TargetLanguagePicker: View {
     }
 
     private var targetDisplayName: String {
-        LanguageCatalog.common.first(where: { $0.code == targetLanguageCode })?.displayName ?? targetLanguageCode
+        LanguageCatalog.displayName(for: targetLanguageCode)
     }
 }

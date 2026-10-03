@@ -74,6 +74,8 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 PermissionsSettingsCard(controller: selectionController)
 
+                languageCard
+
                 SelectionTranslationSettingsView(
                     controller: selectionController,
                     translator: selectionController.translator,
@@ -84,7 +86,6 @@ struct SettingsView: View {
 
                 transcriptionEngineCard
                 translationEngineCard
-                transcriptionLanguageCard
                 memoryConsole
 
                 launchCard
@@ -268,35 +269,91 @@ struct SettingsView: View {
         }
     }
 
-    private var transcriptionLanguageCard: some View {
-        SettingsCard(title: "转录语言", icon: "globe") {
-            SettingsRow(title: "源语言", subtitle: "正在说的语言") {
-                SourceLanguagePicker(
-                    sourceLanguageCode: $session.sourceLanguageCode,
-                    transcriptionEngineKind: session.transcriptionEngineKind
-                )
-                .labelsHidden()
+    /// 我的语言 / 外语 — the one pair of languages recording, 快捷翻译 and
+    /// 语音输入 all share (see `LanguagePreferences`). The side that is
+    /// currently the recognizer's source is locked while a recording runs.
+    private var languageCard: some View {
+        let languages = session.languages
+        let isListening = languages.transcriptionDirection == .listenForeign
+        return SettingsCard(title: "语言", icon: "globe") {
+            SettingsRow(title: "我的语言", subtitle: "你自己的语言：字幕和快捷翻译都会把外语译成它") {
+                languagePicker("我的语言", selection: Binding(get: { session.languages.myLanguageCode }, set: { session.languages.myLanguageCode = $0 }), isSourceSide: !isListening)
             }
             SettingsDivider()
-            SettingsRow(title: "目标语言", subtitle: "字幕要翻译成的语言") {
-                // Compact: the picker plus a warning glyph whose popover
-                // carries the "一键切换为系统翻译" action, so the row keeps
-                // the same shape as every other row in the card.
-                TargetLanguagePicker(
-                    targetLanguageCode: $session.targetLanguageCode,
-                    translationEngineID: session.translationEngineID,
-                    onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
-                    // Belt-and-suspenders alongside this card's own
-                    // `.disabled(isBusy)` (Review Round 1 Must-Fix 1) — keeps
-                    // the button's own guard/caption correct even if this
-                    // picker is ever reused outside a `.disabled` ancestor.
-                    isSessionActive: session.isSessionActive,
-                    isCompact: true
-                )
+            SettingsRow(title: "外语", subtitle: "你要听、要读的外语；快捷翻译里「我的语言」的文字会译成它") {
+                languagePicker("外语", selection: Binding(get: { session.languages.foreignLanguageCode }, set: { session.languages.foreignLanguageCode = $0 }), isSourceSide: isListening)
+            }
+            SettingsDivider()
+            SettingsRow(
+                title: "转录方向",
+                subtitle: session.swapBlockedReason
+                    ?? "听外语：字幕把外语译成我的语言；说我的语言：把我说的话译成外语。悬浮窗里的 ⇄ 也能切换",
+                subtitleTint: session.swapBlockedReason == nil ? .secondary : .orange
+            ) {
+                Picker("转录方向", selection: Binding(
+                    get: { languages.transcriptionDirection },
+                    set: { if $0 != languages.transcriptionDirection { session.swapTranscriptionDirection() } }
+                )) {
+                    Text("听外语").tag(TranscriptionDirection.listenForeign)
+                    Text("说我的语言").tag(TranscriptionDirection.speakMine)
+                }
                 .labelsHidden()
+                .pickerStyle(.segmented)
+                .accessibilityLabel("转录方向")
+                .fixedSize()
+                .disabled(!session.canSwapTranscriptionDirection)
+            }
+            SettingsDivider()
+            SettingsRow(
+                title: "自动检测外语",
+                subtitle: session.transcriptionEngineKind == .model
+                    ? "听外语时由本地模型判断对方说的语种"
+                    : "需要本地识别模型；系统语音识别必须指定语种"
+            ) {
+                Toggle("自动检测外语", isOn: Binding(get: { session.languages.foreignLanguageAutoDetect }, set: { session.languages.foreignLanguageAutoDetect = $0 }))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .disabled(session.transcriptionEngineKind != .model || session.isSessionActive)
+            }
+            if let note = localTranslationLanguageNote {
+                SettingsDivider()
+                SettingsRow(title: "本地翻译模型可能回退为中文", subtitle: note) {
+                    PillButton(title: "切换为系统翻译") { session.translationEngineID = "system.translation" }
+                        .disabled(isBusy)
+                }
             }
         }
-        .disabled(isBusy)
+    }
+
+    /// The local translation models are trained for 中/英/日/韩 only and fall
+    /// back to Chinese for any other target (see `ModelLanguageMapping`).
+    private var localTranslationLanguageNote: String? {
+        guard session.translationEngineKind == .model,
+              !ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: session.targetLanguageCode)
+        else { return nil }
+        let name = LanguageCatalog.displayName(for: session.targetLanguageCode)
+        return "当前翻译引擎是本地模型，针对中、英、日、韩训练；翻译成「\(name)」可能会静默回退为中文。"
+    }
+
+    /// Under the system recognizer the source side can't be one of the
+    /// languages it can't recognize — those stay offered on the other side,
+    /// where they are only ever a translation target.
+    private func languagePicker(_ title: String, selection: Binding<String>, isSourceSide: Bool) -> some View {
+        let restricted = isSourceSide && session.transcriptionEngineKind == .system
+        let options = restricted ? LanguageCatalog.common.filter(\.supportsSystemASRSource) : LanguageCatalog.common
+        return Picker(title, selection: selection) {
+            ForEach(options) { option in
+                Text(option.displayName).tag(option.code)
+            }
+            if !options.contains(where: { $0.code == selection.wrappedValue }) {
+                Text("\(selection.wrappedValue)（自定义）").tag(selection.wrappedValue)
+            }
+        }
+        .labelsHidden()
+        .accessibilityLabel(title)
+        .fixedSize()
+        .disabled(isSourceSide && session.isSessionActive)
     }
 
     /// `isPreloadingModel` alongside `isSessionActive`: switching engines

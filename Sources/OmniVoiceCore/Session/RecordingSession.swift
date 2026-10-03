@@ -273,18 +273,20 @@ public final class RecordingSession: ObservableObject {
         set { languages.targetLanguageCode = newValue }
     }
 
-    /// The ⇄ button's gate: not while a recording is in progress (the
-    /// source is fixed at `start()`), and not while the source is "自动".
-    /// On the system recognizer it is also refused when the other side's
-    /// language can't be recognized there (e.g. 俄语 as 我的语言).
-    public var canSwapTranscriptionDirection: Bool {
-        guard !isSessionActive, languages.canSwapDirection else { return false }
-        guard transcriptionEngineKind == .system else { return true }
+    /// Why ⇄ (and 设置' 转录方向) can't be used right now, nil when it can:
+    /// not while a recording runs (the source is fixed at `start()`), and on
+    /// the system recognizer not when the other side's language can't be
+    /// recognized there (e.g. 俄语 as 我的语言).
+    public var swapBlockedReason: String? {
+        if isSessionActive { return "录制中不能互换，停止后再试" }
+        guard transcriptionEngineKind == .system else { return nil }
         let nextSource = languages.transcriptionDirection == .listenForeign
             ? languages.myLanguageCode
-            : (languages.foreignLanguageAutoDetect ? nil : languages.foreignLanguageCode)
-        return !Self.isUnsupportedForSystemASR(nextSource)
+            : languages.foreignLanguageCode
+        return Self.isUnsupportedForSystemASR(nextSource) ? "系统语音识别不支持互换后的源语言" : nil
     }
+
+    public var canSwapTranscriptionDirection: Bool { swapBlockedReason == nil }
 
     /// nil ("自动") is unsupported; a code outside `LanguageCatalog` (a
     /// custom locale) is left to the system recognizer to accept or reject.
@@ -708,12 +710,15 @@ public final class RecordingSession: ObservableObject {
     /// doc).
     private func validateAndNormalizeSourceLanguage() {
         guard transcriptionEngineKind == .system else { return }
+        // The system recognizer has no "自动". Reset the flag whichever way
+        // the transcript runs: left on while speaking, it would make the way
+        // back to 听外语 look like a "nil" source and block it for good.
+        languages.foreignLanguageAutoDetect = false
         let isUnsupported = Self.isUnsupportedForSystemASR
         guard isUnsupported(languages.sourceLanguageCode) else { return }
         // The user's own language can't be recognized here: listen to the
-        // foreign one instead (and drop "自动"), then repair that side too.
+        // foreign one instead, then repair that side too.
         languages.transcriptionDirection = .listenForeign
-        languages.foreignLanguageAutoDetect = false
         if isUnsupported(languages.sourceLanguageCode) {
             // Keep the two languages distinct (en-US as 我的语言 → fall back to zh-CN).
             languages.foreignLanguageCode = LanguageSettingsMigration.distinctForeign(
