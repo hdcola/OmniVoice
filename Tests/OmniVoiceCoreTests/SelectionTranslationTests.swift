@@ -484,3 +484,15 @@ private final class FakeModelBackend: SelectionModelTranslating {
         #expect(LanguageCatalog.localizedName(for: "ja") == "日语")
     }
 }
+
+@Suite struct LanguageCatalogLocalizedNameTests {
+    @Test func namesTagsOutsideTheCatalogExactly() {
+        #expect(LanguageCatalog.localizedName(for: "en-US") == "英语")
+        #expect(LanguageCatalog.localizedName(for: "en") == "英语")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hans") == "简体中文")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hant") == "繁体中文")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hant-TW") == "繁体中文")
+        #expect(LanguageCatalog.localizedName(for: "zh-HK") == "粤语")
+        #expect(LanguageCatalog.localizedName(for: "yue") == "粤语")
+    }
+}

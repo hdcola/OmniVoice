@@ -79,12 +79,13 @@ public enum LanguageCatalog {
         }
         // NaturalLanguage names Chinese by script (`zh-Hant`), the catalog
         // by region (`zh-TW`).
-        if code.lowercased().hasSuffix("hant") {
+        let lowered = code.lowercased().replacingOccurrences(of: "_", with: "-")
+        if lowered.contains("hant") || lowered == "zh-tw" {
             return "繁体中文"
         }
         // Cantonese counts as Chinese for `isSameLanguage`, but has a
         // catalog entry of its own.
-        if code.lowercased().hasPrefix("yue") {
+        if lowered.hasPrefix("yue") || lowered == "zh-hk" {
             return displayName(for: "yue-CN")
         }
         if let sameLanguage = common.first(where: { SelectionLanguageDirection.isSameLanguage($0.code, code) }) {
