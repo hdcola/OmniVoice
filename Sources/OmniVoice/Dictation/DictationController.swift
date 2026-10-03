@@ -124,7 +124,11 @@ final class DictationController: ObservableObject {
         machine = DictationTriggerMachine(mode: storedMode)
         monitor.triggerKey = storedKey
 
-        hud.contentView = NSHostingView(rootView: DictationHUDView(controller: self, dictation: dictation))
+        hud.contentView = NSHostingView(
+            rootView: DictationHUDView(controller: self, dictation: dictation) { [hud] height, isScrollable in
+                hud.setContentHeight(height, isScrollable: isScrollable)
+            }
+        )
 
         monitor.onKeyDown = { [weak self] time in
             guard let self else { return }
