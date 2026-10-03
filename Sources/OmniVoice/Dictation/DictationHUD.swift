@@ -121,6 +121,9 @@ struct DictationHUDView: View {
                 if let translation = review.translation {
                     Text(translation).font(.system(size: 13))
                 }
+                if case .failed(let message) = review.stage {
+                    Text(message).font(.system(size: 13)).foregroundStyle(.orange)
+                }
                 Text(review.original)
                     .font(.system(size: review.translation == nil ? 13 : 12))
                     .foregroundStyle(review.translation == nil ? .primary : .secondary)
@@ -199,7 +202,7 @@ struct DictationHUDView: View {
     @ViewBuilder
     private var headerButton: some View {
         if let review {
-            if review.stage == .ready {
+            if review.stage != .translating {
                 Button("输入原文") { controller.confirmReview(send: false, useOriginal: true) }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -237,7 +240,7 @@ struct DictationHUDView: View {
             switch review.stage {
             case .translating: return "翻译中… · Esc 放弃"
             case .ready: return "译文 · Return 输入并发送 · \(trigger) 仅输入 · Esc 放弃"
-            case .failed(let message): return "\(message) · Return 输入原文并发送 · \(trigger) 仅输入 · Esc 放弃"
+            case .failed: return "翻译失败 · Return 输入原文并发送 · \(trigger) 仅输入 · Esc 放弃"
             }
         }
         switch dictation.state {

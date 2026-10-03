@@ -122,8 +122,14 @@ final class DictationReturnInterceptor {
             // ⇧↩ is a newline, ⌘↩ and ⌥↩ are shortcuts: not a request to send.
             let chord: CGEventFlags = [.maskShift, .maskControl, .maskAlternate, .maskCommand]
             guard event.flags.isDisjoint(with: chord) else { return false }
-            guard shouldSwallow?() == true else { return false }
+            // Set before asking: the answer may end the interception right
+            // away (`stop()`), which has to see a held Return and wait for
+            // its release instead of dropping the tap under it.
             swallowingHeldReturn = true
+            guard shouldSwallow?() == true else {
+                swallowingHeldReturn = false
+                return false
+            }
             return true
         case .keyUp:
             guard swallowingHeldReturn else { return false }

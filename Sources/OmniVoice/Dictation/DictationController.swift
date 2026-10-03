@@ -119,6 +119,10 @@ final class DictationController: ObservableObject {
     /// The engine the user picked for translating (a `SelectionTranslationEngine` ID).
     private let translationEngineID: () -> String
     private var reviewTask: Task<Void, Never>?
+    private var reviewTimeoutTask: Task<Void, Never>?
+    /// A review nobody answers is dropped, so Return isn't intercepted
+    /// system-wide for as long as the user has walked away.
+    private static let reviewTimeout: Duration = .seconds(120)
     private var noticeTask: Task<Void, Never>?
     private var warmupTask: Task<Void, Never>?
     private var maxDurationTask: Task<Void, Never>?
@@ -332,6 +336,12 @@ final class DictationController: ObservableObject {
         // The Return that ended the dictation was swallowed; this one decides.
         returnInterceptor.start()
         hud.setInteractive(true)
+        reviewTimeoutTask?.cancel()
+        reviewTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.reviewTimeout)
+            guard !Task.isCancelled else { return }
+            self?.cancelReview()
+        }
         translator.engineID = translationEngineID()
         translator.sourceText = text
         translator.targetOverrideCode = target
@@ -359,7 +369,9 @@ final class DictationController: ObservableObject {
     /// Return (`send`) or the trigger key types the translation; the button
     /// types the original (`useOriginal`).
     func confirmReview(send: Bool, useOriginal: Bool = false) {
-        // Still translating: nothing to decide yet.
+        // Still translating: nothing to decide yet. Return and the trigger
+        // key are deliberately not queued — the point of the review is to see
+        // the translation before choosing.
         guard let current = review, current.stage != .translating else { return }
         let text = useOriginal ? current.original : (current.translation ?? current.original)
         endReview()
@@ -381,6 +393,8 @@ final class DictationController: ObservableObject {
     private func endReview() {
         reviewTask?.cancel()
         reviewTask = nil
+        reviewTimeoutTask?.cancel()
+        reviewTimeoutTask = nil
         translator.cancel()
         review = nil
         returnInterceptor.stop()
