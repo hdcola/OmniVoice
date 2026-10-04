@@ -19,6 +19,11 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
     /// about. Called on the main actor, before the download begins.
     public var onInstallingAssets: (() -> Void)?
 
+    /// Called once the recognition assets are in place — right away when
+    /// they already were — so audio sent from here on is analyzed, not
+    /// merely buffered behind a download. Main actor.
+    public var onAssetsReady: (() -> Void)?
+
     private var transcriber: SpeechTranscriber?
     private var analyzer: SpeechAnalyzer?
     private var resultsTask: Task<Void, Never>?
@@ -87,6 +92,7 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
             attributeOptions: []
         )
         try await Self.ensureModelInstalled(for: transcriber, locale: locale, onInstalling: onInstallingAssets)
+        onAssetsReady?()
 
         let format = try await Self.analyzerFormat(for: transcriber, locale: locale)
 

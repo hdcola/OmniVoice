@@ -42,6 +42,7 @@ public final class DictationSession: ObservableObject {
     static let trailingAudio: Duration = .milliseconds(250)
 
     private static let preparingMessage = "正在准备识别引擎…"
+    private static let speakNowMessage = "请说话…"
 
     private var transcript = DictationTranscript()
     private var provider: TranscriptionProvider?
@@ -134,6 +135,10 @@ public final class DictationSession: ObservableObject {
             system.onInstallingAssets = { [weak self] in
                 Task { @MainActor in self?.statusDetail = "正在下载语言识别资源，首次使用需要一点时间…" }
             }
+            system.onAssetsReady = { [weak self] in
+                guard let self, self.state == .starting else { return }
+                self.statusDetail = Self.speakNowMessage
+            }
             provider = system
             segmenter = nil
             isUsingLocalModel = false
@@ -168,9 +173,10 @@ public final class DictationSession: ObservableObject {
             }
             return
         }
-        // Speaking now is safe — unless a language download is what we're
-        // waiting for, which says so itself.
-        if statusDetail == Self.preparingMessage { statusDetail = "请说话…" }
+        // Speaking now is safe once nothing slow is left to wait for: a
+        // borrowed model is already loaded; the system engine says when its
+        // language assets are in place (`onAssetsReady`).
+        if isRecognizerBorrowed { statusDetail = Self.speakNowMessage }
         do {
             // `providerStart` is its own task, so a cancelled dictation has to cancel it.
             try await withTaskCancellationHandler {
