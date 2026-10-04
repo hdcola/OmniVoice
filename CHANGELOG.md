@@ -9,6 +9,7 @@ The format is based on Keep a Changelog.
 ### Added
 
 ### Changed
+- perf(dictation): voice input opens the microphone as soon as the key goes down and replays the audio once the recognizer is ready, so the first words aren't lost during "正在准备识别引擎…"; the system engine also remembers its resolved locale, installed-assets check and audio format between dictations, shortening that wait
 
 ### Fixed
 

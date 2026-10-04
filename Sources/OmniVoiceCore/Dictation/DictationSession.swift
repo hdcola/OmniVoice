@@ -145,31 +145,14 @@ public final class DictationSession: ObservableObject {
             // late-running update can't put an older hypothesis back.
             Task { @MainActor in self?.previewText = transcript.text }
         }
-        do {
-            try await provider.start(config: config)
-        } catch {
-            releaseRecognizer(provider)
-            // Cancelled while starting is the user's own doing, not a failure.
-            if Task.isCancelled { abandonStart() } else { fail("听写启动失败: \(error.localizedDescription)") }
-            return
-        }
-        if Task.isCancelled {
-            await provider.stop()
-            releaseRecognizer(provider)
-            abandonStart()
-            return
-        }
-
-        statusDetail = "正在启动麦克风…"
+        // The microphone opens first and its audio waits in `pending`, so the
+        // recognizer's (slow) start doesn't cost the first words.
+        let pending = PendingAudioBuffer()
         let mic = MicrophoneCapture(deviceID: deviceID)
-        mic.onBuffer = { [weak provider, weak segmenter] samples in
-            provider?.push(samples: samples)
-            segmenter?.submit(samples)
-        }
+        mic.onBuffer = { pending.submit($0) }
         do {
             try mic.start()
         } catch {
-            await provider.stop()
             releaseRecognizer(provider)
             if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized {
                 microphonePermissionNeeded = true
@@ -178,6 +161,26 @@ public final class DictationSession: ObservableObject {
                 fail("麦克风启动失败: \(error.localizedDescription)")
             }
             return
+        }
+        do {
+            try await provider.start(config: config)
+        } catch {
+            mic.stop()
+            releaseRecognizer(provider)
+            // Cancelled while starting is the user's own doing, not a failure.
+            if Task.isCancelled { abandonStart() } else { fail("听写启动失败: \(error.localizedDescription)") }
+            return
+        }
+        if Task.isCancelled {
+            mic.stop()
+            await provider.stop()
+            releaseRecognizer(provider)
+            abandonStart()
+            return
+        }
+        pending.attach { [weak provider, weak segmenter] samples in
+            provider?.push(samples: samples)
+            segmenter?.submit(samples)
         }
         self.provider = provider
         self.vadSegmenter = segmenter

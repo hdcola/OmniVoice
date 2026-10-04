@@ -87,7 +87,14 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
         )
         try await Self.ensureModelInstalled(for: transcriber, locale: locale, onInstalling: onInstallingAssets)
 
-        guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
+        let formatKey = locale.identifier(.bcp47)
+        let format: AVAudioFormat
+        if let cached = Self.analyzerFormats[formatKey] {
+            format = cached
+        } else if let best = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) {
+            Self.analyzerFormats[formatKey] = best
+            format = best
+        } else {
             throw ProviderError.notImplemented("SpeechAnalyzer 无可用音频格式")
         }
 
@@ -186,9 +193,12 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
 
     /// The supported locale `requested` stands for — see `matchLocale(_:in:)`.
     private static func resolveSupportedLocale(_ requested: Locale) async throws -> Locale {
+        let key = requested.identifier(.bcp47)
+        if let cached = resolvedLocales[key] { return cached }
         guard let match = matchLocale(requested, in: Array(await SpeechTranscriber.supportedLocales)) else {
             throw ProviderError.localeNotSupported
         }
+        resolvedLocales[key] = match
         return match
     }
 
@@ -213,14 +223,24 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
         Locale.Language(identifier: locale.language.maximalIdentifier).script
     }
 
+    /// What a start would otherwise look up again every time: the locale a
+    /// requested language resolves to, the locales whose assets are known to
+    /// be installed, and each locale's analyzer audio format.
+    private static var resolvedLocales: [String: Locale] = [:]
+    private static var installedLocaleIDs: Set<String> = []
+    private static var analyzerFormats: [String: AVAudioFormat] = [:]
+
     private static func ensureModelInstalled(
         for transcriber: SpeechTranscriber, locale: Locale, onInstalling: (() -> Void)?
     ) async throws {
+        let id = locale.identifier(.bcp47)
+        if installedLocaleIDs.contains(id) { return }
         let installed = await SpeechTranscriber.installedLocales
-        guard !installed.contains(where: { $0.identifier(.bcp47) == locale.identifier(.bcp47) }) else { return }
-        if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+        if !installed.contains(where: { $0.identifier(.bcp47) == id }),
+           let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
             onInstalling?()
             try await request.downloadAndInstall()
         }
+        installedLocaleIDs.insert(id)
     }
 }
