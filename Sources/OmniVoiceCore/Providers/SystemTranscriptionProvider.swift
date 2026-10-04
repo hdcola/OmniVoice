@@ -107,7 +107,13 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
         }
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
-        try await analyzer.start(inputSequence: stream)
+        do {
+            try await analyzer.start(inputSequence: stream)
+        } catch {
+            // Assets removed or damaged since they were checked: look again next time.
+            Self.installedLocaleIDs.remove(locale.identifier(.bcp47))
+            throw error
+        }
 
         self.transcriber = transcriber
         self.analyzer = analyzer

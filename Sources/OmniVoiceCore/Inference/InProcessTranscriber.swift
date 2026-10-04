@@ -114,7 +114,14 @@ final class InProcessTranscriber: @unchecked Sendable {
     /// Read by `startStream()` when it creates a session — i.e. changes only
     /// take effect on the next full Start, not on a mid-run VAD rotation
     /// (`rotateStream()` reuses the existing session as-is).
-    var tuning = StreamingTuning()
+    var tuning: StreamingTuning {
+        get { tuningLock.withLock { storedTuning } }
+        set { tuningLock.withLock { storedTuning = newValue } }
+    }
+    /// The session is now built on `queue` ahead of a start (`prepareSession()`),
+    /// while callers set `tuning` from the main actor — so it needs a lock.
+    private let tuningLock = NSLock()
+    private var storedTuning = StreamingTuning()
 
     private let queue = DispatchQueue(label: "org.hdcola.omnivoice.inprocess.audiocpp")
 
@@ -124,6 +131,9 @@ final class InProcessTranscriber: @unchecked Sendable {
     /// The knobs `session` was created with — they are baked in, so a session
     /// made ahead of time is only reused while they still match `tuning`.
     private var sessionKnobs: [Int]?
+    /// A stream has been started on `session` and not yet finished. A session
+    /// made ahead of time exists without one, and must not be fed audio.
+    private var isStreamActive = false
     private var streamSampleOffset: Int64 = 0
     /// Concatenation of every delta reported for the *current* utterance —
     /// needed because, unlike the per-push deltas, `audiocpp_stream_finish`'s
@@ -284,6 +294,7 @@ final class InProcessTranscriber: @unchecked Sendable {
 
         guard let requestLanguage = tuning.recognitionLanguage.requestValue else {
             try check(audiocpp_stream_start(session, nil), "启动流失败")
+            isStreamActive = true
             return
         }
         let request = audiocpp_request_create()
@@ -292,6 +303,7 @@ final class InProcessTranscriber: @unchecked Sendable {
             try check(audiocpp_request_set_text_language(request, languagePtr), "设置识别语言失败")
         }
         try check(audiocpp_stream_start(session, request), "启动流失败")
+        isStreamActive = true
     }
 
     /// Feeds one buffer of mono 16 kHz Float32 PCM in -1...1 range (the
@@ -304,7 +316,7 @@ final class InProcessTranscriber: @unchecked Sendable {
     }
 
     private func pushLocked(samples: [Float]) {
-        guard let session, !samples.isEmpty else { return }
+        guard isStreamActive, let session, !samples.isEmpty else { return }
         var event: OpaquePointer?
         let status = samples.withUnsafeBufferPointer { buffer in
             audiocpp_stream_push(
@@ -327,6 +339,8 @@ final class InProcessTranscriber: @unchecked Sendable {
     /// hook (a VAD-triggered pause), not the end of the whole recording.
     func rotateStream() {
         queue.sync {
+            guard isStreamActive else { return }
+            isStreamActive = false
             if let tail = finishLocked() {
                 onFinalTail?(tail)
             }
@@ -339,8 +353,11 @@ final class InProcessTranscriber: @unchecked Sendable {
     /// gets a fresh session instead of restarting a finished one.
     func finishStream() {
         queue.sync {
-            if let tail = finishLocked() {
-                onFinalTail?(tail)
+            if isStreamActive {
+                isStreamActive = false
+                if let tail = finishLocked() {
+                    onFinalTail?(tail)
+                }
             }
             audiocpp_session_free(session)
             session = nil
@@ -375,6 +392,7 @@ final class InProcessTranscriber: @unchecked Sendable {
     /// keep their parents alive internally (see audiocpp.h's lifetime note).
     func unload() {
         queue.sync {
+            isStreamActive = false
             audiocpp_session_free(session)
             audiocpp_model_free(model)
             audiocpp_registry_free(registry)

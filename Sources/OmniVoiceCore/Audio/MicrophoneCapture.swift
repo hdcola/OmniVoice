@@ -70,6 +70,8 @@ final class MicrophoneCapture: NSObject {
     }
 
     func stop() {
+        // The session keeps delivering frames until `stopRunning()` lands.
+        output?.setSampleBufferDelegate(nil, queue: nil)
         if let session { Self.controlQueue.async { session.stopRunning() } }
         session = nil
         output = nil
