@@ -41,6 +41,8 @@ public final class DictationSession: ObservableObject {
     /// release the key a beat before the last word is out.
     static let trailingAudio: Duration = .milliseconds(250)
 
+    private static let preparingMessage = "正在准备识别引擎…"
+
     private var transcript = DictationTranscript()
     private var provider: TranscriptionProvider?
     private var vadSegmenter: UtteranceSegmenter?
@@ -75,7 +77,7 @@ public final class DictationSession: ObservableObject {
         microphonePermissionNeeded = false
         previewText = ""
         isUsingLocalModel = false
-        statusDetail = "正在准备识别引擎…"
+        statusDetail = Self.preparingMessage
         transcript = DictationTranscript()
         startTask = Task { await self.setUp(languageCode: languageCode, deviceID: deviceID) }
     }
@@ -145,14 +147,18 @@ public final class DictationSession: ObservableObject {
             // late-running update can't put an older hypothesis back.
             Task { @MainActor in self?.previewText = transcript.text }
         }
-        // The microphone opens first and its audio waits in `pending`, so the
-        // recognizer's (slow) start doesn't cost the first words.
+        // The recognizer starts while the microphone opens; the audio waits in
+        // `pending`, so the recognizer's (slow) start doesn't cost the first words.
         let pending = PendingAudioBuffer()
         let mic = MicrophoneCapture(deviceID: deviceID)
         mic.onBuffer = { pending.submit($0) }
+        let providerStart = Task { try await provider.start(config: config) }
         do {
             try mic.start()
         } catch {
+            providerStart.cancel()
+            _ = try? await providerStart.value
+            await provider.stop()
             releaseRecognizer(provider)
             if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized {
                 microphonePermissionNeeded = true
@@ -162,8 +168,16 @@ public final class DictationSession: ObservableObject {
             }
             return
         }
+        // Speaking now is safe — unless a language download is what we're
+        // waiting for, which says so itself.
+        if statusDetail == Self.preparingMessage { statusDetail = "请说话…" }
         do {
-            try await provider.start(config: config)
+            // `providerStart` is its own task, so a cancelled dictation has to cancel it.
+            try await withTaskCancellationHandler {
+                try await providerStart.value
+            } onCancel: {
+                providerStart.cancel()
+            }
         } catch {
             mic.stop()
             releaseRecognizer(provider)

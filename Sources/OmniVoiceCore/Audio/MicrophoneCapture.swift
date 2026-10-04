@@ -24,6 +24,9 @@ final class MicrophoneCapture: NSObject {
     private var session: AVCaptureSession?
     private var output: AVCaptureAudioDataOutput?
     private let queue = DispatchQueue(label: "org.hdcola.omnivoice.mic")
+    /// `startRunning()`/`stopRunning()` block until the hardware answers, so
+    /// they run here, in order, instead of on the main actor.
+    private let controlQueue = DispatchQueue(label: "org.hdcola.omnivoice.mic.control")
     private let converter = PCMConverter(targetSampleRate: 16000, targetChannels: 1)
 
     init(deviceID: String?) {
@@ -61,11 +64,11 @@ final class MicrophoneCapture: NSObject {
 
         self.session = session
         self.output = output
-        session.startRunning()
+        controlQueue.async { session.startRunning() }
     }
 
     func stop() {
-        session?.stopRunning()
+        if let session { controlQueue.async { session.stopRunning() } }
         session = nil
         output = nil
     }

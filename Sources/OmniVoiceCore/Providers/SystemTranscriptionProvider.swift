@@ -62,6 +62,7 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
             locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults], attributeOptions: []
         )
         try await ensureModelInstalled(for: transcriber, locale: locale, onInstalling: onInstalling)
+        _ = try await analyzerFormat(for: transcriber, locale: locale)
     }
 
     public func loadModel() async throws {
@@ -87,16 +88,7 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
         )
         try await Self.ensureModelInstalled(for: transcriber, locale: locale, onInstalling: onInstallingAssets)
 
-        let formatKey = locale.identifier(.bcp47)
-        let format: AVAudioFormat
-        if let cached = Self.analyzerFormats[formatKey] {
-            format = cached
-        } else if let best = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) {
-            Self.analyzerFormats[formatKey] = best
-            format = best
-        } else {
-            throw ProviderError.notImplemented("SpeechAnalyzer 无可用音频格式")
-        }
+        let format = try await Self.analyzerFormat(for: transcriber, locale: locale)
 
         let (stream, continuation) = AsyncStream<AnalyzerInput>.makeStream()
         audioQueue.sync {
@@ -229,6 +221,16 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
     private static var resolvedLocales: [String: Locale] = [:]
     private static var installedLocaleIDs: Set<String> = []
     private static var analyzerFormats: [String: AVAudioFormat] = [:]
+
+    private static func analyzerFormat(for transcriber: SpeechTranscriber, locale: Locale) async throws -> AVAudioFormat {
+        let key = locale.identifier(.bcp47)
+        if let cached = analyzerFormats[key] { return cached }
+        guard let best = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
+            throw ProviderError.notImplemented("SpeechAnalyzer 无可用音频格式")
+        }
+        analyzerFormats[key] = best
+        return best
+    }
 
     private static func ensureModelInstalled(
         for transcriber: SpeechTranscriber, locale: Locale, onInstalling: (() -> Void)?
