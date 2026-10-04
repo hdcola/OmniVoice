@@ -24,6 +24,11 @@ final class MicrophoneCapture: NSObject {
     private var session: AVCaptureSession?
     private var output: AVCaptureAudioDataOutput?
     private let queue = DispatchQueue(label: "org.hdcola.omnivoice.mic")
+    /// `startRunning()`/`stopRunning()` block until the hardware answers, so
+    /// they run here, in order, instead of on the main actor. One queue for
+    /// every instance, so a quick re-press never starts a new session while
+    /// the previous one is still stopping.
+    private static let controlQueue = DispatchQueue(label: "org.hdcola.omnivoice.mic.control")
     private let converter = PCMConverter(targetSampleRate: 16000, targetChannels: 1)
 
     init(deviceID: String?) {
@@ -61,11 +66,13 @@ final class MicrophoneCapture: NSObject {
 
         self.session = session
         self.output = output
-        session.startRunning()
+        Self.controlQueue.async { session.startRunning() }
     }
 
     func stop() {
-        session?.stopRunning()
+        // The session keeps delivering frames until `stopRunning()` lands.
+        output?.setSampleBufferDelegate(nil, queue: nil)
+        if let session { Self.controlQueue.async { session.stopRunning() } }
         session = nil
         output = nil
     }

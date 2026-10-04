@@ -19,6 +19,11 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
     /// about. Called on the main actor, before the download begins.
     public var onInstallingAssets: (() -> Void)?
 
+    /// Called once the recognition assets are in place — right away when
+    /// they already were — so audio sent from here on is analyzed, not
+    /// merely buffered behind a download. Main actor.
+    public var onAssetsReady: (() -> Void)?
+
     private var transcriber: SpeechTranscriber?
     private var analyzer: SpeechAnalyzer?
     private var resultsTask: Task<Void, Never>?
@@ -62,6 +67,7 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
             locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults], attributeOptions: []
         )
         try await ensureModelInstalled(for: transcriber, locale: locale, onInstalling: onInstalling)
+        _ = try await analyzerFormat(for: transcriber, locale: locale)
     }
 
     public func loadModel() async throws {
@@ -86,10 +92,9 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
             attributeOptions: []
         )
         try await Self.ensureModelInstalled(for: transcriber, locale: locale, onInstalling: onInstallingAssets)
+        onAssetsReady?()
 
-        guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
-            throw ProviderError.notImplemented("SpeechAnalyzer 无可用音频格式")
-        }
+        let format = try await Self.analyzerFormat(for: transcriber, locale: locale)
 
         let (stream, continuation) = AsyncStream<AnalyzerInput>.makeStream()
         audioQueue.sync {
@@ -102,7 +107,13 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
         }
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
-        try await analyzer.start(inputSequence: stream)
+        do {
+            try await analyzer.start(inputSequence: stream)
+        } catch {
+            // Assets removed or damaged since they were checked: look again next time.
+            Self.installedLocaleIDs.remove(locale.identifier(.bcp47))
+            throw error
+        }
 
         self.transcriber = transcriber
         self.analyzer = analyzer
@@ -186,9 +197,12 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
 
     /// The supported locale `requested` stands for — see `matchLocale(_:in:)`.
     private static func resolveSupportedLocale(_ requested: Locale) async throws -> Locale {
+        let key = requested.identifier(.bcp47)
+        if let cached = resolvedLocales[key] { return cached }
         guard let match = matchLocale(requested, in: Array(await SpeechTranscriber.supportedLocales)) else {
             throw ProviderError.localeNotSupported
         }
+        resolvedLocales[key] = match
         return match
     }
 
@@ -213,14 +227,34 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
         Locale.Language(identifier: locale.language.maximalIdentifier).script
     }
 
+    /// What a start would otherwise look up again every time: the locale a
+    /// requested language resolves to, the locales whose assets are known to
+    /// be installed, and each locale's analyzer audio format.
+    private static var resolvedLocales: [String: Locale] = [:]
+    private static var installedLocaleIDs: Set<String> = []
+    private static var analyzerFormats: [String: AVAudioFormat] = [:]
+
+    private static func analyzerFormat(for transcriber: SpeechTranscriber, locale: Locale) async throws -> AVAudioFormat {
+        let key = locale.identifier(.bcp47)
+        if let cached = analyzerFormats[key] { return cached }
+        guard let best = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
+            throw ProviderError.notImplemented("SpeechAnalyzer 无可用音频格式")
+        }
+        analyzerFormats[key] = best
+        return best
+    }
+
     private static func ensureModelInstalled(
         for transcriber: SpeechTranscriber, locale: Locale, onInstalling: (() -> Void)?
     ) async throws {
+        let id = locale.identifier(.bcp47)
+        if installedLocaleIDs.contains(id) { return }
         let installed = await SpeechTranscriber.installedLocales
-        guard !installed.contains(where: { $0.identifier(.bcp47) == locale.identifier(.bcp47) }) else { return }
-        if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+        if !installed.contains(where: { $0.identifier(.bcp47) == id }),
+           let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
             onInstalling?()
             try await request.downloadAndInstall()
         }
+        installedLocaleIDs.insert(id)
     }
 }
