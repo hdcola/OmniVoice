@@ -121,6 +121,9 @@ final class InProcessTranscriber: @unchecked Sendable {
     private var registry: OpaquePointer?
     private var model: OpaquePointer?
     private var session: OpaquePointer?
+    /// The knobs `session` was created with — they are baked in, so a session
+    /// made ahead of time is only reused while they still match `tuning`.
+    private var sessionKnobs: [Int]?
     private var streamSampleOffset: Int64 = 0
     /// Concatenation of every delta reported for the *current* utterance —
     /// needed because, unlike the per-push deltas, `audiocpp_stream_finish`'s
@@ -172,6 +175,7 @@ final class InProcessTranscriber: @unchecked Sendable {
                 do {
                     try self.loadModelLocked(modelPath: modelPath)
                     continuation.resume()
+                    self.prepareSession()
                 } catch {
                     continuation.resume(throwing: error)
                 }
@@ -224,29 +228,56 @@ final class InProcessTranscriber: @unchecked Sendable {
         model = mdl
     }
 
+    private var currentKnobs: [Int] {
+        [tuning.chunkSizeMs, tuning.unfixedChunkNum, tuning.unfixedTokenNum, tuning.rollbackPunctuation ? 1 : 0]
+    }
+
+    /// Makes the streaming session unless one made with today's knobs is
+    /// already there. Creating it is the slow part of a start (hundreds of
+    /// milliseconds), which is why `prepareSession()` does it ahead of time.
+    private func createSessionLocked(matchingKnobs: Bool = true) throws {
+        if session != nil, !matchingKnobs || sessionKnobs == currentKnobs { return }
+        guard let model else { throw TranscriberError.notLoaded }
+        if session != nil {
+            audiocpp_session_free(session)
+            session = nil
+        }
+        let sessionOptions = Self.makeSessionOptions(tuning)
+        defer { audiocpp_options_free(sessionOptions) }
+        var sess: OpaquePointer?
+        try Self.resolveBackend().withCString { backendPtr -> Void in
+            var backend = audiocpp_backend_config(backend: backendPtr, device: 0, threads: 4)
+            try check(
+                audiocpp_session_create(model, "asr", "streaming", &backend, sessionOptions, &sess),
+                "创建流式会话失败"
+            )
+        }
+        session = sess
+        sessionKnobs = currentKnobs
+    }
+
+    /// Builds the next streaming session in the background, so the next
+    /// `startStream()` finds it ready instead of paying for it. Does nothing
+    /// when no model is loaded or a session already exists.
+    func prepareSession() {
+        queue.async { [self] in
+            guard model != nil, session == nil else { return }
+            try? createSessionLocked()
+        }
+    }
+
     /// Starts a fresh utterance stream. Creates a new session first if the
     /// previous run's was freed by `finishStream()` — cheap relative to
     /// `loadModel()` (no weights to re-read), and avoids reusing a session
     /// that already went through a full `audiocpp_stream_finish`.
     func startStream() throws {
-        try queue.sync { try startStreamLocked() }
+        try queue.sync { try startStreamLocked(freshStart: true) }
     }
 
-    private func startStreamLocked() throws {
-        if session == nil {
-            guard let model else { throw TranscriberError.notLoaded }
-            let sessionOptions = Self.makeSessionOptions(tuning)
-            defer { audiocpp_options_free(sessionOptions) }
-            var sess: OpaquePointer?
-            try Self.resolveBackend().withCString { backendPtr -> Void in
-                var backend = audiocpp_backend_config(backend: backendPtr, device: 0, threads: 4)
-                try check(
-                    audiocpp_session_create(model, "asr", "streaming", &backend, sessionOptions, &sess),
-                    "创建流式会话失败"
-                )
-            }
-            session = sess
-        }
+    /// - Parameter freshStart: a full Start (not a mid-recording `rotateStream()`),
+    ///   the only time a changed knob is allowed to cost a new session.
+    private func startStreamLocked(freshStart: Bool = false) throws {
+        try createSessionLocked(matchingKnobs: freshStart)
         guard let session else { throw TranscriberError.notLoaded }
         streamSampleOffset = 0
         committedThisUtterance = ""
@@ -314,6 +345,7 @@ final class InProcessTranscriber: @unchecked Sendable {
             audiocpp_session_free(session)
             session = nil
         }
+        prepareSession()
     }
 
     /// Ends the stream and returns just the uncommitted tail (the suffix of
