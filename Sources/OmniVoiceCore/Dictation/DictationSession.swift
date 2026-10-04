@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import os
 
 /// An already-loaded on-device recognizer lent to a dictation, plus the
 /// pause-detection tuning the live recording uses with it.
@@ -41,6 +42,16 @@ public final class DictationSession: ObservableObject {
     /// release the key a beat before the last word is out.
     static let trailingAudio: Duration = .milliseconds(250)
 
+    private static let log = Logger(subsystem: "org.hdcola.omnivoice", category: "dictation")
+    private var startedAt = ContinuousClock.now
+
+    /// Logs how long into a start `step` happened (`log stream --predicate 'category == "dictation"'`).
+    private func logStep(_ step: String) {
+        let elapsed = startedAt.duration(to: .now).components
+        let ms = elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000
+        Self.log.info("start +\(ms)ms: \(step)")
+    }
+
     private static let preparingMessage = "正在准备识别引擎…"
     private static let speakNowMessage = "请说话…"
 
@@ -79,6 +90,7 @@ public final class DictationSession: ObservableObject {
         previewText = ""
         isUsingLocalModel = false
         statusDetail = Self.preparingMessage
+        startedAt = .now
         transcript = DictationTranscript()
         startTask = Task { await self.setUp(languageCode: languageCode, deviceID: deviceID) }
     }
@@ -137,6 +149,7 @@ public final class DictationSession: ObservableObject {
             }
             system.onAssetsReady = { [weak self] in
                 guard let self, self.state == .starting else { return }
+                self.logStep("assets ready")
                 self.statusDetail = Self.speakNowMessage
             }
             provider = system
@@ -158,6 +171,7 @@ public final class DictationSession: ObservableObject {
         let mic = MicrophoneCapture(deviceID: deviceID)
         mic.onBuffer = { pending.submit($0) }
         let providerStart = Task { try await provider.start(config: config) }
+        logStep("recognizer start requested")
         do {
             try mic.start()
         } catch {
@@ -173,6 +187,7 @@ public final class DictationSession: ObservableObject {
             }
             return
         }
+        logStep("microphone started")
         // Speaking now is safe once nothing slow is left to wait for: a
         // borrowed model is already loaded; the system engine says when its
         // language assets are in place (`onAssetsReady`).
@@ -199,6 +214,7 @@ public final class DictationSession: ObservableObject {
             abandonStart()
             return
         }
+        logStep("recognizer started")
         pending.attach { [weak provider, weak segmenter] samples in
             provider?.push(samples: samples)
             segmenter?.submit(samples)
