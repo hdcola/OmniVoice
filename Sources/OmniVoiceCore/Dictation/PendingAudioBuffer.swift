@@ -3,7 +3,7 @@ import Foundation
 /// Holds microphone audio while the recognizer is still starting, then hands
 /// it over in order once there is somewhere to send it — so the microphone can
 /// open the moment the key goes down and the first words aren't lost.
-/// `submit` runs on the capture queue, `attach`/`discard` on the main actor.
+/// `submit` runs on the capture queue, `attach` on the main actor; an abandoned buffer is simply released.
 final class PendingAudioBuffer: @unchecked Sendable {
     /// Audio kept while waiting (16 kHz mono): anything longer is dropped
     /// rather than growing without bound behind a long asset download.

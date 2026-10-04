@@ -180,6 +180,7 @@ public final class DictationSession: ObservableObject {
             }
         } catch {
             mic.stop()
+            await provider.stop()
             releaseRecognizer(provider)
             // Cancelled while starting is the user's own doing, not a failure.
             if Task.isCancelled { abandonStart() } else { fail("听写启动失败: \(error.localizedDescription)") }
