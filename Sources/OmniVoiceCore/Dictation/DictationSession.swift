@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import os
 
 /// An already-loaded on-device recognizer lent to a dictation, plus the
 /// pause-detection tuning the live recording uses with it.
@@ -41,6 +42,19 @@ public final class DictationSession: ObservableObject {
     /// release the key a beat before the last word is out.
     static let trailingAudio: Duration = .milliseconds(250)
 
+    private static let log = Logger(subsystem: "org.hdcola.omnivoice", category: "dictation")
+    private var startedAt = ContinuousClock.now
+
+    /// Logs how long into a start `step` happened (`log stream --predicate 'category == "dictation"'`).
+    private func logStep(_ step: String) {
+        let elapsed = startedAt.duration(to: .now).components
+        let ms = elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000
+        Self.log.info("start +\(ms)ms: \(step)")
+    }
+
+    private static let preparingMessage = "正在准备识别引擎…"
+    private static let speakNowMessage = "请说话…"
+
     private var transcript = DictationTranscript()
     private var provider: TranscriptionProvider?
     private var vadSegmenter: UtteranceSegmenter?
@@ -75,7 +89,8 @@ public final class DictationSession: ObservableObject {
         microphonePermissionNeeded = false
         previewText = ""
         isUsingLocalModel = false
-        statusDetail = "正在准备识别引擎…"
+        statusDetail = Self.preparingMessage
+        startedAt = .now
         transcript = DictationTranscript()
         startTask = Task { await self.setUp(languageCode: languageCode, deviceID: deviceID) }
     }
@@ -132,6 +147,11 @@ public final class DictationSession: ObservableObject {
             system.onInstallingAssets = { [weak self] in
                 Task { @MainActor in self?.statusDetail = "正在下载语言识别资源，首次使用需要一点时间…" }
             }
+            system.onAssetsReady = { [weak self] in
+                guard let self, self.state == .starting else { return }
+                self.logStep("assets ready")
+                self.statusDetail = Self.speakNowMessage
+            }
             provider = system
             segmenter = nil
             isUsingLocalModel = false
@@ -145,30 +165,18 @@ public final class DictationSession: ObservableObject {
             // late-running update can't put an older hypothesis back.
             Task { @MainActor in self?.previewText = transcript.text }
         }
-        do {
-            try await provider.start(config: config)
-        } catch {
-            releaseRecognizer(provider)
-            // Cancelled while starting is the user's own doing, not a failure.
-            if Task.isCancelled { abandonStart() } else { fail("听写启动失败: \(error.localizedDescription)") }
-            return
-        }
-        if Task.isCancelled {
-            await provider.stop()
-            releaseRecognizer(provider)
-            abandonStart()
-            return
-        }
-
-        statusDetail = "正在启动麦克风…"
+        // The recognizer starts while the microphone opens; the audio waits in
+        // `pending`, so the recognizer's (slow) start doesn't cost the first words.
+        let pending = PendingAudioBuffer()
         let mic = MicrophoneCapture(deviceID: deviceID)
-        mic.onBuffer = { [weak provider, weak segmenter] samples in
-            provider?.push(samples: samples)
-            segmenter?.submit(samples)
-        }
+        mic.onBuffer = { pending.submit($0) }
+        let providerStart = Task { try await provider.start(config: config) }
+        logStep("recognizer start requested")
         do {
             try mic.start()
         } catch {
+            providerStart.cancel()
+            _ = try? await providerStart.value
             await provider.stop()
             releaseRecognizer(provider)
             if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized {
@@ -178,6 +186,38 @@ public final class DictationSession: ObservableObject {
                 fail("麦克风启动失败: \(error.localizedDescription)")
             }
             return
+        }
+        logStep("microphone started")
+        // Speaking now is safe once nothing slow is left to wait for: a
+        // borrowed model is already loaded; the system engine says when its
+        // language assets are in place (`onAssetsReady`).
+        if isRecognizerBorrowed { statusDetail = Self.speakNowMessage }
+        do {
+            // `providerStart` is its own task, so a cancelled dictation has to cancel it.
+            try await withTaskCancellationHandler {
+                try await providerStart.value
+            } onCancel: {
+                providerStart.cancel()
+            }
+        } catch {
+            mic.stop()
+            await provider.stop()
+            releaseRecognizer(provider)
+            // Cancelled while starting is the user's own doing, not a failure.
+            if Task.isCancelled { abandonStart() } else { fail("听写启动失败: \(error.localizedDescription)") }
+            return
+        }
+        if Task.isCancelled {
+            mic.stop()
+            await provider.stop()
+            releaseRecognizer(provider)
+            abandonStart()
+            return
+        }
+        logStep("recognizer started")
+        pending.attach { [weak provider, weak segmenter] samples in
+            provider?.push(samples: samples)
+            segmenter?.submit(samples)
         }
         self.provider = provider
         self.vadSegmenter = segmenter

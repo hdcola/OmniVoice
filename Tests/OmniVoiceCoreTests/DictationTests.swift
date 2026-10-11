@@ -458,3 +458,25 @@ struct DictationTranslationPlanTests {
         #expect(target(spoken: "en-US", text: "hello", mine: "en-US", foreign: "zh-CN") == "zh-CN")
     }
 }
+
+@Suite("PendingAudioBuffer")
+struct PendingAudioBufferTests {
+    @Test func replaysBufferedAudioInOrderThenForwardsLive() {
+        let buffer = PendingAudioBuffer()
+        buffer.submit([1])
+        buffer.submit([2, 3])
+        var received: [[Float]] = []
+        buffer.attach { received.append($0) }
+        buffer.submit([4])
+        #expect(received == [[1], [2, 3], [4]])
+    }
+
+    @Test func dropsAudioBeyondTheCap() {
+        let buffer = PendingAudioBuffer()
+        buffer.submit([Float](repeating: 0, count: PendingAudioBuffer.maxBufferedSamples))
+        buffer.submit([1])
+        var count = 0
+        buffer.attach { count += $0.count }
+        #expect(count == PendingAudioBuffer.maxBufferedSamples)
+    }
+}
