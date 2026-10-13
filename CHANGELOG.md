@@ -16,7 +16,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
-- docs(dictation): add a design draft for polishing dictated text with a user-configured OpenAI-compatible LLM, off by default (901eaf4)
+- docs(dictation): add a design draft for polishing dictated text with a user-configured OpenAI-compatible LLM, off by default (#91)
 
 ### Tests
 
