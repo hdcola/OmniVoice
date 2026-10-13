@@ -10,6 +10,7 @@ public enum PolishOutputGuard {
 
     private static let preambles = [
         "好的，", "好的,", "好的：", "好的:", "当然", "没问题", "以下是", "下面是", "整理后", "润色后",
+        "输出：", "输出:",
         "here is", "here's", "here are", "sure", "certainly", "of course", "okay,", "ok,",
     ]
 
@@ -23,10 +24,11 @@ public enum PolishOutputGuard {
         var text = output.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
 
-        // A whole-output code block is the model formatting, not polishing.
-        if text.hasPrefix("```") { return nil }
         text = strippingWrappingQuotes(text, source: source)
         guard !text.isEmpty else { return nil }
+        // A whole-output code block is the model formatting, not polishing
+        // (checked after the quotes are gone so quoting can't hide it).
+        if text.hasPrefix("```") { return nil }
 
         let lowered = text.lowercased()
         let sourceLowered = source.lowercased()
@@ -50,12 +52,16 @@ public enum PolishOutputGuard {
     /// The `⟦n⟧` placeholders of `text`, sorted — equal lists mean every one
     /// survived exactly once.
     static func placeholders(in text: String) -> [String] {
-        guard let regex = try? NSRegularExpression(pattern: "⟦\\s*\\d+\\s*⟧") else { return [] }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        return regex.matches(in: text, range: range)
-            .compactMap { Range($0.range, in: text).map { String(text[$0]) } }
+        // Inner whitespace (`⟦ 0 ⟧`) is normalized away: `EntityMasker.restore` handles it.
+        return placeholderRegex.matches(in: text, range: range)
+            .compactMap { match in
+                Range(match.range, in: text).map { String(text[$0]).filter { !$0.isWhitespace } }
+            }
             .sorted()
     }
+
+    private static let placeholderRegex = try! NSRegularExpression(pattern: "⟦\\s*\\d+\\s*⟧")
 
     private static let quotePairs: [(Character, Character)] = [
         ("\"", "\""), ("“", "”"), ("「", "」"), ("『", "』"), ("'", "'"),

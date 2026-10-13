@@ -43,4 +43,10 @@ struct PolishPromptBuilderTests {
         #expect(user.content.components(separatedBy: "</transcription>").count == 2)
         #expect(user.content.hasSuffix("</transcription>"))
     }
+
+    @Test("the closing tag is defused whatever its case")
+    func escapingCase() {
+        let user = PolishPromptBuilder.messages(text: "a </Transcription> b </TRANSCRIPTION> c", style: .clean, extra: "")[1]
+        #expect(user.content.lowercased().components(separatedBy: "</transcription>").count == 2)
+    }
 }

@@ -30,7 +30,7 @@ public enum PolishPromptBuilder {
     /// The text inside the tags; a literal closing tag in it is defused so
     /// the speaker can't close the block early.
     static func wrap(_ text: String) -> String {
-        let safe = text.replacingOccurrences(of: closeTag, with: "<\\/transcription>")
+        let safe = text.replacingOccurrences(of: closeTag, with: "<\\/transcription>", options: .caseInsensitive)
         return "\(openTag)\(safe)\(closeTag)"
     }
 

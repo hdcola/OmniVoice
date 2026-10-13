@@ -131,6 +131,9 @@ final class DictationController: ObservableObject {
     private let translationEngineID: () -> String
     private var reviewTask: Task<Void, Never>?
     private var polishTask: Task<DictationPolishFlow.Result, Never>?
+    /// Dictation was switched off or reconfigured mid-polish: drop the text
+    /// instead of typing it into whatever is focused later.
+    private var polishAborted = false
     let polishCredentials: any PolishCredentialStore
     private var reviewTimeoutTask: Task<Void, Never>?
     /// A review nobody answers is dropped, so Return isn't intercepted
@@ -324,7 +327,13 @@ final class DictationController: ObservableObject {
         // Polish comes first so the translation (and the review's 原文) work
         // from the tidied text; any failure leaves `text` as it was.
         let polished = await polishIfEnabled(text)
-        if let target = translationTarget(for: polished.text) {
+        if polishAborted {
+            polishAborted = false
+            hideHUD()
+            return
+        }
+        // Esc while polishing means "type what I said", not "go review it".
+        if !polished.cancelled, let target = translationTarget(for: polished.text) {
             // No notice here: it would cover the review.
             beginReview(of: polished.text, into: target)
             return
@@ -339,9 +348,9 @@ final class DictationController: ObservableObject {
     // MARK: - Polish
 
     /// The text to carry on with, and whether a polish was tried and failed.
-    private func polishIfEnabled(_ text: String) async -> (text: String, failed: Bool) {
+    private func polishIfEnabled(_ text: String) async -> (text: String, failed: Bool, cancelled: Bool) {
         let flow = makePolishFlow()
-        guard flow.skipReason(for: text) == nil else { return (text, false) }
+        guard flow.skipReason(for: text) == nil else { return (text, false, false) }
         isPolishing = true
         let task = Task { await flow.run(text) }
         polishTask = task
@@ -350,10 +359,10 @@ final class DictationController: ObservableObject {
         isPolishing = false
         if case .failed(let error) = result.outcome {
             if error == .unauthorized { polishKeyRejected = true }
-            return (result.text, true)
+            return (result.text, true, false)
         }
         if result.outcome == .polished { polishKeyRejected = false }
-        return (result.text, false)
+        return (result.text, false, result.outcome == .cancelled)
     }
 
     private func makePolishFlow() -> DictationPolishFlow {
@@ -570,6 +579,11 @@ final class DictationController: ObservableObject {
             hideHUD()
         }
         dismissNotice()
+        if isPolishing {
+            polishAborted = true
+            polishTask?.cancel()
+            hideHUD()
+        }
         guard dictation.isActive else { return }
         Task {
             await dictation.cancel()

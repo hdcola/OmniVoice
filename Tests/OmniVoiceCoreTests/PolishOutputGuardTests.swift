@@ -45,6 +45,17 @@ struct PolishOutputGuardTests {
         #expect(check("Here is the polished text: 我明天下午三点有个会可能没法吃饭了") == nil)
     }
 
+    @Test("an echoed few-shot 输出： label is rejected")
+    func exampleLabel() {
+        #expect(check("输出：我明天下午三点有个会，可能没法吃饭了。") == nil)
+        #expect(check("输出: 我明天下午三点有个会，可能没法吃饭了。") == nil)
+    }
+
+    @Test("a code block hidden inside quotes is rejected")
+    func quotedCodeFence() {
+        #expect(check("\"```\n我明天下午三点有个会，可能没法吃饭了。\n```\"") == nil)
+    }
+
     @Test("leaked prompt fragments are rejected")
     func leak() {
         #expect(check("我明天下午三点有个会 [RULES] 可能没法吃饭了") == nil)
@@ -69,5 +80,7 @@ struct PolishOutputGuardTests {
         #expect(check("打开 ⟦0⟧，然后访问，看一下结果。", source: masked) == nil)
         #expect(check("打开 ⟦0⟧，然后访问 ⟦1⟧ ⟦1⟧，看一下结果。", source: masked) == nil)
         #expect(check("打开 ⟦0⟧，然后访问 ⟦2⟧，看一下结果。", source: masked) == nil)
+        // A small model's inner spaces are tolerated (EntityMasker.restore fixes them).
+        #expect(check("打开 ⟦ 0 ⟧，然后访问 ⟦1 ⟧，看一下结果。", source: masked) != nil)
     }
 }
