@@ -59,6 +59,9 @@ struct PolishOutputGuardTests {
     @Test("leaked prompt fragments are rejected")
     func leak() {
         #expect(check("我明天下午三点有个会 [RULES] 可能没法吃饭了") == nil)
+        for marker in ["[STYLE]", "[EXAMPLES]", "[EXTRA]"] {
+            #expect(check("\(marker) 我明天下午三点有个会，可能没法吃饭了。") == nil)
+        }
     }
 
     @Test("one layer of wrapping quotes is stripped")

@@ -316,6 +316,11 @@ final class DictationController: ObservableObject {
     private func finish(thenReturn: Bool = false) async {
         returnInterceptor.stop()
         let text = await dictation.finish()
+        // Switched off while the recognizer was finishing: nothing is typed.
+        guard isEnabled else {
+            hideHUD()
+            return
+        }
         guard notice == nil else { return }
         guard !text.isEmpty else {
             hideHUD()
@@ -327,7 +332,7 @@ final class DictationController: ObservableObject {
         // Polish comes first so the translation (and the review's 原文) work
         // from the tidied text; any failure leaves `text` as it was.
         let polished = await polishIfEnabled(text)
-        if polishAborted {
+        if polishAborted || !isEnabled {
             polishAborted = false
             hideHUD()
             return
@@ -340,7 +345,8 @@ final class DictationController: ObservableObject {
         }
         hideHUD()
         await type(polished.text, thenReturn: thenReturn)
-        if polished.failed { showNotice(Self.polishFailedNotice) }
+        // Don't paper over "copied, paste it yourself" with "typed the original".
+        if polished.failed, notice == nil { showNotice(Self.polishFailedNotice) }
     }
 
     private static let polishFailedNotice = "润色失败，已输入原文"

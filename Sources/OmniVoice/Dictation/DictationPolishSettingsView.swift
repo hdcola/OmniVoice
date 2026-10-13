@@ -81,7 +81,8 @@ struct DictationPolishSettingsRows: View {
             SettingsDivider()
             SettingsRow(
                 title: "API Key",
-                subtitle: keySubtitle
+                subtitle: keySubtitle,
+                subtitleTint: controller.polishKeyRejected ? .red : .secondary
             ) {
                 HStack {
                     SecureField(hasKey ? "已保存" : "粘贴后回车", text: $keyDraft)

@@ -15,7 +15,9 @@ public struct PolishMessage: Equatable, Sendable {
 public enum PolishPromptBuilder {
     /// Fragments of the system prompt that must never show up in an output
     /// (`PolishOutputGuard` rejects one that does).
-    static let leakMarkers = ["[ROLE]", "[RULES]", "[SECURITY]", "你是语音输入的文字整理助手"]
+    static let leakMarkers = [
+        "[ROLE]", "[RULES]", "[SECURITY]", "[STYLE]", "[EXAMPLES]", "[EXTRA]", "你是语音输入的文字整理助手",
+    ]
 
     static let openTag = "<transcription>"
     static let closeTag = "</transcription>"
