@@ -55,6 +55,8 @@ struct DictationSettingsView: View {
             }
             .disabled(!controller.isEnabled || controller.mode != .toggle)
             SettingsDivider()
+            DictationPolishSettingsRows(controller: controller)
+            SettingsDivider()
             SettingsRow(
                 title: "听写语言",
                 subtitle: "按哪种语言识别；自动检测只在本地识别模型已加载时可用"

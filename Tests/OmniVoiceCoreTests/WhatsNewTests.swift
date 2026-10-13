@@ -47,27 +47,33 @@ struct WhatsNewTests {
         #expect(WhatsNewCatalog.latestRevision >= 1)
     }
 
-    @Test("someone who saw revision 1 is shown the dictation-translation, speech and Return-to-send notes, then the voice input note")
+    @Test("someone who saw revision 1 is shown the polish, dictation-translation, speech and Return-to-send notes, then the voice input note")
     func voiceInputIsNewForRevisionOneUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 1)
-        #expect(shown.map(\.action) == [nil, nil, nil, .enableDictation])
+        #expect(shown.map(\.action) == [nil, nil, nil, nil, .enableDictation])
     }
 
     @Test("someone who saw revision 2 is shown the dictation-translation, translation-speech and Return-to-send notes")
     func returnToSendIsNewForRevisionTwoUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 2)
-        #expect(shown.map(\.revision) == [5, 4, 3])
+        #expect(shown.map(\.revision) == [6, 5, 4, 3])
     }
 
     @Test("someone who saw revision 3 is shown the dictation-translation and translation-speech notes")
     func translationSpeechIsNewForRevisionThreeUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 3)
-        #expect(shown.map(\.title) == ["语音输入：翻译后再输入", "翻译朗读"])
+        #expect(shown.map(\.title) == ["语音输入：润色识别结果（可选）", "语音输入：翻译后再输入", "翻译朗读"])
     }
 
-    @Test("someone who saw revision 4 is shown just the dictation-translation note")
+    @Test("someone who saw revision 4 is shown the polish and dictation-translation notes")
     func dictationTranslationIsNewForRevisionFourUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 4)
-        #expect(shown.map(\.title) == ["语音输入：翻译后再输入"])
+        #expect(shown.map(\.title) == ["语音输入：润色识别结果（可选）", "语音输入：翻译后再输入"])
+    }
+
+    @Test("someone who saw revision 5 is shown just the polish note")
+    func polishIsNewForRevisionFiveUsers() {
+        let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 5)
+        #expect(shown.map(\.title) == ["语音输入：润色识别结果（可选）"])
     }
 }

@@ -100,6 +100,17 @@ final class DictationController: ObservableObject {
         didSet { UserDefaults.standard.set(translateEnabled, forKey: Self.translateKey) }
     }
 
+    /// The LLM polish configuration; the API key is kept apart in the Keychain.
+    @Published var polish: PolishSettings {
+        didSet { polish.save() }
+    }
+
+    /// The last polish was refused with 401/403 — Settings shows the key in red.
+    @Published private(set) var polishKeyRejected = false
+
+    /// True while the recognized text is with the LLM; Esc types the original.
+    @Published private(set) var isPolishing = false
+
     /// The translation of the last dictation, awaiting a decision — nil
     /// outside the review.
     @Published private(set) var review: DictationReview?
@@ -119,6 +130,8 @@ final class DictationController: ObservableObject {
     /// The engine the user picked for translating (a `SelectionTranslationEngine` ID).
     private let translationEngineID: () -> String
     private var reviewTask: Task<Void, Never>?
+    private var polishTask: Task<DictationPolishFlow.Result, Never>?
+    let polishCredentials: any PolishCredentialStore
     private var reviewTimeoutTask: Task<Void, Never>?
     /// A review nobody answers is dropped, so Return isn't intercepted
     /// system-wide for as long as the user has walked away.
@@ -144,8 +157,11 @@ final class DictationController: ObservableObject {
         isLocalRecognizerLoaded: @escaping () -> Bool,
         languageChanges: AnyPublisher<String?, Never>,
         translator: SelectionTranslator,
-        translationEngineID: @escaping () -> String
+        translationEngineID: @escaping () -> String,
+        polishCredentials: any PolishCredentialStore = KeychainPolishCredentialStore()
     ) {
+        self.polishCredentials = polishCredentials
+        polish = PolishSettings.load()
         self.dictation = dictation
         self.translator = translator
         self.translationEngineID = translationEngineID
@@ -206,6 +222,11 @@ final class DictationController: ObservableObject {
                 cancelReview()
                 return
             }
+            // Skip the polish, not the dictation: the text is still typed.
+            if isPolishing {
+                polishTask?.cancel()
+                return
+            }
             perform(machine.escapePressed())
         }
 
@@ -257,7 +278,7 @@ final class DictationController: ObservableObject {
 
     private func start() {
         // The previous dictation is still being typed out.
-        guard !dictation.isActive, !isInserting, review == nil else {
+        guard !dictation.isActive, !isInserting, !isPolishing, review == nil else {
             machine.reset()
             return
         }
@@ -300,12 +321,77 @@ final class DictationController: ObservableObject {
             if thenReturn { DictationTextInserter.pressReturn() }
             return
         }
-        if let target = translationTarget(for: text) {
-            beginReview(of: text, into: target)
+        // Polish comes first so the translation (and the review's 原文) work
+        // from the tidied text; any failure leaves `text` as it was.
+        let polished = await polishIfEnabled(text)
+        if let target = translationTarget(for: polished.text) {
+            // No notice here: it would cover the review.
+            beginReview(of: polished.text, into: target)
             return
         }
         hideHUD()
-        await type(text, thenReturn: thenReturn)
+        await type(polished.text, thenReturn: thenReturn)
+        if polished.failed { showNotice(Self.polishFailedNotice) }
+    }
+
+    private static let polishFailedNotice = "润色失败，已输入原文"
+
+    // MARK: - Polish
+
+    /// The text to carry on with, and whether a polish was tried and failed.
+    private func polishIfEnabled(_ text: String) async -> (text: String, failed: Bool) {
+        let flow = makePolishFlow()
+        guard flow.skipReason(for: text) == nil else { return (text, false) }
+        isPolishing = true
+        let task = Task { await flow.run(text) }
+        polishTask = task
+        let result = await task.value
+        polishTask = nil
+        isPolishing = false
+        if case .failed(let error) = result.outcome {
+            if error == .unauthorized { polishKeyRejected = true }
+            return (result.text, true)
+        }
+        if result.outcome == .polished { polishKeyRejected = false }
+        return (result.text, false)
+    }
+
+    private func makePolishFlow() -> DictationPolishFlow {
+        let credentials = polishCredentials
+        return DictationPolishFlow(settings: polish, hasAPIKey: credentials.hasAPIKey) { settings in
+            Self.makePolisher(settings: settings, apiKey: credentials.apiKey())
+        }
+    }
+
+    nonisolated static func makePolisher(settings: PolishSettings, apiKey: String?) -> any TextPolisher {
+        OpenAICompatiblePolisher(
+            baseURL: settings.endpointBase ?? URL(string: "http://localhost")!,
+            model: settings.model.trimmingCharacters(in: .whitespacesAndNewlines), apiKey: apiKey,
+            style: settings.style, extra: settings.extra, timeout: TimeInterval(settings.timeoutSeconds)
+        )
+    }
+
+    /// Settings' 测试连接: the time it took, or why it failed.
+    func testPolishConnection() async -> Result<TimeInterval, PolishError> {
+        guard polish.isConfigured(hasAPIKey: polishCredentials.hasAPIKey) else { return .failure(.notConfigured) }
+        let polisher = Self.makePolisher(settings: polish, apiKey: polishCredentials.apiKey())
+        guard let polisher = polisher as? OpenAICompatiblePolisher else { return .failure(.notConfigured) }
+        do {
+            let elapsed = try await polisher.testConnection()
+            polishKeyRejected = false
+            return .success(elapsed)
+        } catch let error as PolishError {
+            polishKeyRejected = error == .unauthorized
+            return .failure(error)
+        } catch {
+            return .failure(.network)
+        }
+    }
+
+    func setPolishAPIKey(_ key: String?) {
+        polishCredentials.setAPIKey(key)
+        polishKeyRejected = false
+        objectWillChange.send()
     }
 
     private func type(_ text: String, thenReturn: Bool) async {
