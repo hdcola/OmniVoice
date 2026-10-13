@@ -102,7 +102,11 @@ final class DictationController: ObservableObject {
 
     /// The LLM polish configuration; the API key is kept apart in the Keychain.
     @Published var polish: PolishSettings {
-        didSet { polish.save() }
+        didSet {
+            // A rejection belonged to the old service/URL.
+            if oldValue.baseURL != polish.baseURL || oldValue.preset != polish.preset { polishKeyRejected = false }
+            polish.save()
+        }
     }
 
     /// The last polish was refused with 401/403 — Settings shows the key in red.
