@@ -997,3 +997,7 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
   full, schema mismatch after a future migration) beyond "history window has
   no data" — `RecordingSession` itself keeps working with `sessionStore ==
   nil` (in-memory only, nothing persisted).
+
+## TODO — dictation LLM polish (deferred from round-1 review)
+
+- Add automated tests for the `DictationController` post-recognition flow (`finish()` polish → translation review, Esc during polish, abort on disable). The controller lives in the app target; extract the flow into `OmniVoiceCore` or add a mockable seam, then test it (would have caught the Esc-with-translation bug).
