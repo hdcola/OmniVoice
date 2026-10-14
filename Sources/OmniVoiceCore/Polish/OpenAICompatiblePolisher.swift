@@ -132,7 +132,7 @@ public struct OpenAICompatiblePolisher: TextPolisher {
         let raw = (message["content"] as? String) ?? ""
         // Cut off by the token limit: typically a thinking model whose
         // reasoning ate max_tokens. Even a non-empty answer is incomplete.
-        if (choice["finish_reason"] as? String) == "length" { throw PolishError.truncated }
+        if (choice["finish_reason"] as? String)?.lowercased() == "length" { throw PolishError.truncated }
         let content = Self.strippingThinking(raw)
         if content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { throw PolishError.emptyResponse }
         return content

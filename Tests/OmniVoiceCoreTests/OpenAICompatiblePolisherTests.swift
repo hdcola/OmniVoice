@@ -215,6 +215,15 @@ struct OpenAICompatiblePolisherTests {
         } catch { #expect(error as? PolishError == .truncated) }
     }
 
+    @Test("finish_reason is matched case-insensitively")
+    func finishReasonCase() async {
+        let body = #"{"choices":[{"finish_reason":"LENGTH","message":{"content":"半句"}}]}"#
+        do {
+            _ = try await polisher { _ in self.response(200, body) }.polish("x")
+            Issue.record("expected a throw")
+        } catch { #expect(error as? PolishError == .truncated) }
+    }
+
     @Test("null content cut off by max_tokens is .truncated")
     func nullContentTruncated() async {
         let body = #"{"choices":[{"finish_reason":"length","message":{"content":null,"reasoning_content":"t"}}]}"#
