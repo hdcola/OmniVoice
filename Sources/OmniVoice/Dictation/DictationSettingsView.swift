@@ -72,7 +72,7 @@ struct DictationSettingsView: View {
                 .accessibilityLabel("听写语言")
                 .fixedSize()
             }
-            .disabled(!controller.isEnabled || controller.dictation.isActive || controller.isPolishing)
+            .disabled(!controller.isEnabled || controller.dictation.isActive || controller.isPolishing || controller.review != nil)
             SettingsDivider()
             SettingsRow(
                 title: "单次最长时长",
