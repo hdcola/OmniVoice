@@ -24,6 +24,7 @@ The format is based on Keep a Changelog.
 
 ### Documentation
 - docs(dictation): add a design draft for polishing dictated text with a user-configured OpenAI-compatible LLM, off by default (#91)
+- docs(repo): remove the finished UX review round notes and the settings/model-management UX doc (Docs/UX-REVIEW-ROUND-1…4.md, Docs/UX-SETTINGS-MODEL-MANAGEMENT.md); they stay in git history
 
 ### Tests
 - test(dictation): cover the polish prompt builder, output guard, OpenAI-compatible client (fake transport), the dictation polish flow and settings defaults (#92)
