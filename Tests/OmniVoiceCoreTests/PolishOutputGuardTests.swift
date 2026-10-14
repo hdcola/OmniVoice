@@ -86,4 +86,11 @@ struct PolishOutputGuardTests {
         // A small model's inner spaces are tolerated (EntityMasker.restore fixes them).
         #expect(check("打开 ⟦ 0 ⟧，然后访问 ⟦1 ⟧，看一下结果。", source: masked) != nil)
     }
+
+    @Test("a leftover think tag is rejected unless the speaker said it")
+    func thinkTags() {
+        #expect(check("我想了想</think>今天天气很好。", source: "今天天气很好") == nil)
+        #expect(check("<Think>今天天气很好。", source: "今天天气很好") == nil)
+        #expect(check("今天天气很好，用 <think> 标签。", source: "今天天气很好 <think> 标签") != nil)
+    }
 }

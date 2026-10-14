@@ -67,7 +67,7 @@ public struct OpenAICompatiblePolisher: TextPolisher {
         }
         // GLM-4.5 and later think by default and ignore reasoning_effort; send
         // only `thinking`, so a 400 retry can't be caused by (or drop) it twice.
-        if model.lowercased().hasPrefix("glm-") { return ["thinking": ["type": "disabled"]] }
+        if model.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasPrefix("glm-") { return ["thinking": ["type": "disabled"]] }
         return ["reasoning_effort": "none"]
     }
 
@@ -146,11 +146,10 @@ public struct OpenAICompatiblePolisher: TextPolisher {
         guard text.range(of: "<think>", options: .caseInsensitive) != nil
             || text.range(of: "</think>", options: .caseInsensitive) != nil else { return text }
         var result = text
-        if let close = result.range(of: "</think>", options: .caseInsensitive) {
+        while let close = result.range(of: "</think>", options: .caseInsensitive) {
             let open = result.range(of: "<think>", options: .caseInsensitive)
-            if open == nil || open!.lowerBound > close.lowerBound {
-                result.removeSubrange(result.startIndex..<close.upperBound)
-            }
+            guard open == nil || open!.lowerBound > close.lowerBound else { break }
+            result.removeSubrange(result.startIndex..<close.upperBound)
         }
         while let open = result.range(of: "<think>", options: .caseInsensitive) {
             if let close = result.range(of: "</think>", options: .caseInsensitive, range: open.upperBound..<result.endIndex) {

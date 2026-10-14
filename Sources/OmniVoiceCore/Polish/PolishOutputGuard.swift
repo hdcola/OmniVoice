@@ -39,6 +39,11 @@ public enum PolishOutputGuard {
             return nil
         }
 
+        // A reasoning tag that survived stripping means reasoning may be in the text.
+        for tag in ["<think>", "</think>"] where lowered.contains(tag) && !sourceLowered.contains(tag) {
+            return nil
+        }
+
         let sourceLength = source.trimmingCharacters(in: .whitespacesAndNewlines).count
         guard sourceLength > 0 else { return nil }
         let ratio = Double(text.count) / Double(sourceLength)

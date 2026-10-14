@@ -241,6 +241,37 @@ struct OpenAICompatiblePolisherTests {
         #expect(try await polisher { _ in self.response(200, upper) }.polish("x") == "你好。")
     }
 
+    @Test("several closing-only </think> blocks are all dropped")
+    func repeatedClosing() async throws {
+        let body = #"{"choices":[{"message":{"content":"one</think>two</think>你好。"}}]}"#
+        #expect(try await polisher { _ in self.response(200, body) }.polish("x") == "你好。")
+    }
+
+    @Test("a 400 on a GLM model is retried once without thinking")
+    func glmRetry() async throws {
+        let captured = Captured2()
+        let result = try await polisher(baseURL: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4.5") { request in
+            let hasThinking = try self.bodyJSON(request)["thinking"] != nil
+            captured.append(hasThinking)
+            return hasThinking ? self.response(400, "{}") : self.response(200, self.ok)
+        }.polish("x")
+        #expect(result == "整理好的文字。")
+        #expect(captured.values == [true, false])
+    }
+
+    @Test("a persistent 400 is rethrown after exactly one retry")
+    func persistent400() async {
+        let captured = Captured2()
+        do {
+            _ = try await polisher(baseURL: "https://other.test/v1") { _ in
+                captured.append(true)
+                return self.response(400, "{}")
+            }.polish("x")
+            Issue.record("expected a throw")
+        } catch { #expect(error as? PolishError == .http(400)) }
+        #expect(captured.values.count == 2)
+    }
+
     private final class Captured2: @unchecked Sendable {
         private let lock = NSLock()
         private var items: [Bool] = []
