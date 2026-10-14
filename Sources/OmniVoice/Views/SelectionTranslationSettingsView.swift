@@ -2,9 +2,9 @@ import AppKit
 import OmniVoiceCore
 import SwiftUI
 
-/// The "划词与截图翻译" and "快捷翻译引擎" cards of Settings' "通用" tab — shortcuts, the two-language
+/// The "划词与截图翻译" and "快捷翻译引擎" cards of Settings' "快捷翻译" tab — shortcuts, the two-language
 /// direction rule (see `SelectionLanguageDirection`; the languages are set in
-/// the "语言" card) and engine. Permissions
+/// the "语言" card of the "通用" tab) and engine. Permissions
 /// live in `PermissionsSettingsCard`.
 struct SelectionTranslationSettingsView: View {
     @ObservedObject var controller: SelectionTranslationController
@@ -15,7 +15,7 @@ struct SelectionTranslationSettingsView: View {
     @ObservedObject var downloadManager: ModelDownloadManager
     @EnvironmentObject private var navigation: SettingsNavigationState
     /// Observed so "跟随转录设置" re-resolves the moment the recording's
-    /// translation engine changes in the "通用" tab.
+    /// translation engine changes in the "语音识别" tab.
     @EnvironmentObject private var session: RecordingSession
 
     var body: some View {
@@ -112,7 +112,7 @@ struct SelectionTranslationSettingsView: View {
     }
 
     private var followRecordingLabel: String {
-        "跟随转录设置（当前：\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID))）"
+        "跟随语音识别设置（当前：\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID))）"
     }
 
     private func engineLabel(for engine: EngineDescriptor) -> String {

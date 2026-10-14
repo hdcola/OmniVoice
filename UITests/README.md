@@ -88,12 +88,15 @@ given machine, try a different one before assuming a regression.
   `TranscriptListView`'s `@State` directly — see that file's doc.
 - `SettingsDisabledStateTests.swift` — item 3: the idle-state baseline and
   the `isModelLoaded == false` half of the memory console's disabled matrix.
+  The engine pickers and memory console live on Settings' "语音识别" tab and
+  the quick-translation engine on "快捷翻译", so each test switches to the
+  right tab first (the tab pills carry an `.isSelected` trait to wait on).
   The rest of the matrix needs microphone permission or a downloaded model —
   see that file's doc.
 - `FloatingPanelControlBarAutoHideTests.swift` — item 4: fully covered. The
   2s auto-hide delay, re-show on hover, and drag-vs-control-click hit testing
   need neither permissions nor downloads.
-- `CrossSurfaceModelStateSyncTests.swift` — item 5: Settings' memory console
+- `CrossSurfaceModelStateSyncTests.swift` — item 5: Settings' "语音识别" memory console
   and the floating panel's status control appear and disappear together when
   an on-device engine is selected/falls back, without needing a real
   download.

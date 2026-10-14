@@ -1,7 +1,7 @@
 import SwiftUI
 import OmniVoiceCore
 
-/// The "语音输入" card of Settings' "通用" tab. Permissions live in
+/// The "语音输入" card of Settings' "语音输入" tab. Permissions live in
 /// `PermissionsSettingsCard`.
 struct DictationSettingsView: View {
     @ObservedObject var controller: DictationController
@@ -45,7 +45,7 @@ struct DictationSettingsView: View {
             SettingsRow(
                 title: "输入前翻译成外语（\(languageName(session.languages.foreignLanguageCode))）",
                 subtitle: controller.mode == .toggle
-                    ? "说完后先显示译文供你确认：Return 输入并发送，触发键仅输入，Esc 放弃，也可以改输原文；用「划词与截图翻译」里选的翻译引擎，说的已是外语时直接输入。听写时点气泡上的按钮也能随时开关"
+                    ? "说完后先显示译文供你确认：Return 输入并发送，触发键仅输入，Esc 放弃，也可以改输原文；用「快捷翻译」页里选的翻译引擎，说的已是外语时直接输入。听写时点气泡上的按钮也能随时开关"
                     : "需要先把触发方式设为「按一下开始，再按一下结束」——按住说话没有地方让你确认译文"
             ) {
                 Toggle("输入前翻译成外语", isOn: $controller.translateEnabled)
@@ -93,7 +93,7 @@ struct DictationSettingsView: View {
                 SettingsNote(text: warmup)
             }
             SettingsDivider()
-            SettingsNote(text: "识别引擎和麦克风跟随「实时转录」的设置：选了本地模型且已加载（可开启「启动时加载模型」），就直接复用它，否则用系统语音识别；录制字幕期间也用系统识别。按 Esc 可取消；「按一下开始」时，再按 Return 可结束并自动回车发送；输入时会借用剪贴板，随后自动恢复。")
+            SettingsNote(text: "识别引擎和麦克风跟随「语音识别」页的设置：选了本地模型且已加载（可在「通用」页开启「启动时加载模型」），就直接复用它，否则用系统语音识别；录制字幕期间也用系统识别。按 Esc 可取消；「按一下开始」时，再按 Return 可结束并自动回车发送；输入时会借用剪贴板，随后自动恢复。")
         }
     }
 

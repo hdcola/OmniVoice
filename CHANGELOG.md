@@ -10,6 +10,7 @@ The format is based on Keep a Changelog.
 - feat(dictation): optionally polish dictated text with a user-configured OpenAI-compatible LLM (OpenAI, DeepSeek, 智谱, local Ollama or a custom Base URL) before it is typed — adds punctuation, drops filler words, tidies lists; off by default with a first-use privacy notice, four styles (保持原话 / 清爽 (default) / 结构化 / 正式), an extra-requirements field, a 3–30 s timeout (default 8 s), 测试连接, the API key in the Keychain, URLs/paths/code kept intact via entity masking, and every failure, timeout, unreliable output, too-short text or Esc while polishing types the original; with translation on, polishing runs first and the review shows the polished text; the update's 新功能 window announces it (#92)
 
 ### Changed
+- refactor(settings): split Settings' crowded 通用 tab into 通用 (permissions, 语言, 启动, 通知, 字幕悬浮窗, 新手引导), 语音识别 (识别引擎, 转录翻译引擎, 引擎运行与内存状态), 语音输入 and 快捷翻译 tabs (⌘1–⌘6); 语音输入 / 快捷翻译 link back to 通用 → 语言; no setting changes (feature/settings-tabs-split)
 - perf(dictation): voice input opens the microphone as soon as the key goes down and replays the audio once the recognizer is ready, so the first words aren't lost during "正在准备识别引擎…"; the system engine also remembers its resolved locale, installed-assets check and audio format between dictations, shortening that wait; the recognizer now starts while the microphone opens, the microphone no longer blocks the main thread when it starts or stops, and the bubble says 请说话… as soon as the microphone is live; each start step is timed in the unified log (category dictation); the on-device model's streaming session is now built in the background after each stop and after a model loads, so starting a dictation (or recording) no longer waits for it, and audio is only fed to a stream that was started (#89)
 
 ### Fixed
@@ -29,6 +30,7 @@ The format is based on Keep a Changelog.
 - docs(repo): remove the finished UX review round notes and the settings/model-management UX doc (Docs/UX-REVIEW-ROUND-1…4.md, Docs/UX-SETTINGS-MODEL-MANAGEMENT.md); they stay in git history
 
 ### Tests
+- test(ui): Settings UI tests switch to the 语音识别 / 快捷翻译 tab before asserting the engine pickers and memory console (feature/settings-tabs-split)
 - test(app): cover the Dock presence tracker (single/multiple windows, reopen, idempotence) (#94)
 - test(dictation): cover the polish prompt builder, output guard, OpenAI-compatible client (fake transport), the dictation polish flow and settings defaults (#92)
 
