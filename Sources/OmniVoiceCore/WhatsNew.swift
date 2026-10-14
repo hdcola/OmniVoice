@@ -37,6 +37,14 @@ public struct WhatsNewEntry: Equatable, Sendable, Identifiable {
 public enum WhatsNewCatalog {
     public static let entries: [WhatsNewEntry] = [
         WhatsNewEntry(
+            revision: 6,
+            title: "语音输入：润色识别结果（可选）",
+            bullets: [
+                "开启后，说完的话在输入前先交给你自己配置的 LLM（OpenAI 兼容接口，也可用本机 Ollama）补标点、去口癖、整理列表；识别出的文字会发送到该服务，默认关闭。",
+                "在「设置 › 通用 › 语音输入」里填写服务、模型和 API Key（存在钥匙串），可选保持原话、清爽、结构化、正式四种风格，并调整超时。失败、超时或结果不可靠时一律输入原文，润色中按 Esc 也输入原文；同时开着翻译时先润色再翻译。",
+            ]
+        ),
+        WhatsNewEntry(
             revision: 5,
             title: "语音输入：翻译后再输入",
             bullets: [

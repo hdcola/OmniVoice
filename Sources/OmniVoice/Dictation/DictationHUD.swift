@@ -220,6 +220,8 @@ struct DictationHUDView: View {
     private var icon: some View {
         if controller.notice != nil {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+        } else if controller.isPolishing {
+            ProgressView().controlSize(.small)
         } else if let review {
             switch review.stage {
             case .translating: ProgressView().controlSize(.small)
@@ -235,6 +237,7 @@ struct DictationHUDView: View {
 
     private var headline: String {
         if controller.notice != nil { return "听写" }
+        if controller.isPolishing { return "润色中… · Esc 输入原文" }
         if let review {
             let trigger = controller.triggerKey.title
             switch review.stage {

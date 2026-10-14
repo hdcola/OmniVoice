@@ -1,6 +1,6 @@
 # 语音输入 · LLM 文本润色（设计草案）
 
-状态：草案，未实现。参考 OpenTypeless（`tover0314-w/opentypeless`）的润色方案，按 OmniVoice 的架构裁剪。
+状态：第一版已实现（见 §10 第 1 项），第二、三版未做。参考 OpenTypeless（`tover0314-w/opentypeless`）的润色方案，按 OmniVoice 的架构裁剪。
 
 ## 1. 目标与非目标
 

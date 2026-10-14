@@ -7,11 +7,18 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(dictation): optionally polish dictated text with a user-configured OpenAI-compatible LLM (OpenAI, DeepSeek, 智谱, local Ollama or a custom Base URL) before it is typed — adds punctuation, drops filler words, tidies lists; off by default with a first-use privacy notice, four styles (保持原话 / 清爽 (default) / 结构化 / 正式), an extra-requirements field, a 3–30 s timeout (default 8 s), 测试连接, the API key in the Keychain, URLs/paths/code kept intact via entity masking, and every failure, timeout, unreliable output, too-short text or Esc while polishing types the original; with translation on, polishing runs first and the review shows the polished text; the update's 新功能 window announces it (#92)
 
 ### Changed
 - perf(dictation): voice input opens the microphone as soon as the key goes down and replays the audio once the recognizer is ready, so the first words aren't lost during "正在准备识别引擎…"; the system engine also remembers its resolved locale, installed-assets check and audio format between dictations, shortening that wait; the recognizer now starts while the microphone opens, the microphone no longer blocks the main thread when it starts or stops, and the bubble says 请说话… as soon as the microphone is live; each start step is timed in the unified log (category dictation); the on-device model's streaming session is now built in the background after each stop and after a model loads, so starting a dictation (or recording) no longer waits for it, and audio is only fed to a stream that was started (#89)
 
 ### Fixed
+- fix(dictation): polishing and 测试连接 no longer fail with "服务没有返回内容" on thinking models (LM Studio gemma, Qwen3, Ollama…) — requests send `reasoning_effort: none` (not to api.openai.com; retried without it on a 400), inline `<think>` blocks are stripped, and an answer cut off by the token limit now says to use a non-reasoning model (#92)
+- fix(dictation): polish requests now speak each service's dialect — api.openai.com gets `max_completion_tokens` (and no `temperature`, a low reasoning effort and a roomier token ceiling on gpt-5 / o-series models), and GLM models get `thinking: disabled`; the optional thinking fields are dropped and retried once if a service answers 400 (#92)
+- fix(dictation): polishing no longer types reasoning or half an answer — a reply cut off by the token limit (including `content: null`, or a partial answer) now falls back to the original text, a lone `</think>` (template-prefilled thinking) and any-case `<think>` tags are stripped, and GLM models get only `thinking: disabled` (#92)
+- fix(dictation): polishing strips repeated reasoning blocks that lack an opening `<think>`, and the output guard rejects any text still containing a think tag (#92)
+- fix(dictation): dictating a sentence that mentions a literal `<think>` / `</think>` tag no longer types a half sentence — polishing is refused and the original text is typed (#92)
+- fix(dictation): polishing no longer drops the decimal point of dictated numbers (三点一四一五九二六 used to become 31415926) — the prompt now says a 点 between digits is a decimal point and numbers must keep their value (#92)
 
 ### Dependencies
 
@@ -19,6 +26,7 @@ The format is based on Keep a Changelog.
 - docs(dictation): add a design draft for polishing dictated text with a user-configured OpenAI-compatible LLM, off by default (#91)
 
 ### Tests
+- test(dictation): cover the polish prompt builder, output guard, OpenAI-compatible client (fake transport), the dictation polish flow and settings defaults (#92)
 
 ## [0.7.0] - 2026-10-03
 
