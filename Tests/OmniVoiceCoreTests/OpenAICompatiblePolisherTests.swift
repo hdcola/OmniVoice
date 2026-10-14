@@ -247,6 +247,26 @@ struct OpenAICompatiblePolisherTests {
         #expect(try await polisher { _ in self.response(200, body) }.polish("x") == "你好。")
     }
 
+    @Test("a balanced block followed by an orphan </think> is fully stripped")
+    func mixedBlocks() async throws {
+        let body = #"{"choices":[{"message":{"content":"<think>t1</think> t2 </think> 你好。"}}]}"#
+        #expect(try await polisher { _ in self.response(200, body) }.polish("x") == "你好。")
+    }
+
+    @Test("a dictation that mentions <think> is typed intact (the cut reply is refused)")
+    func literalThinkTag() async throws {
+        let spoken = "我想请教一下关于深度寻思模型里面的 <think> 标签具体应该如何正确使用"
+        let echoed = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": spoken]]]])
+        let reply = String(decoding: echoed, as: UTF8.self)
+        let polished = try await polisher { _ in self.response(200, reply) }.polish(spoken)
+        #expect(PolishOutputGuard.validate(output: polished, source: spoken, style: .clean) == nil)
+        let closing = "如果响应里面只有一个 </think> 闭合标签我们应该如何进行解析"
+        let data2 = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": closing]]]])
+        let reply2 = String(decoding: data2, as: UTF8.self)
+        let polished2 = try await polisher { _ in self.response(200, reply2) }.polish(closing)
+        #expect(PolishOutputGuard.validate(output: polished2, source: closing, style: .clean) == nil)
+    }
+
     @Test("a 400 on a GLM model is retried once without thinking")
     func glmRetry() async throws {
         let captured = Captured2()

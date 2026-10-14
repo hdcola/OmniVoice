@@ -146,17 +146,16 @@ public struct OpenAICompatiblePolisher: TextPolisher {
         guard text.range(of: "<think>", options: .caseInsensitive) != nil
             || text.range(of: "</think>", options: .caseInsensitive) != nil else { return text }
         var result = text
-        while let close = result.range(of: "</think>", options: .caseInsensitive) {
-            let open = result.range(of: "<think>", options: .caseInsensitive)
-            guard open == nil || open!.lowerBound > close.lowerBound else { break }
-            result.removeSubrange(result.startIndex..<close.upperBound)
-        }
         while let open = result.range(of: "<think>", options: .caseInsensitive) {
             if let close = result.range(of: "</think>", options: .caseInsensitive, range: open.upperBound..<result.endIndex) {
                 result.removeSubrange(open.lowerBound..<close.upperBound)
             } else {
                 result.removeSubrange(open.lowerBound..<result.endIndex)
             }
+        }
+        // What is left of a `</think>` is reasoning from a pre-filled `<think>`.
+        while let close = result.range(of: "</think>", options: .caseInsensitive) {
+            result.removeSubrange(result.startIndex..<close.upperBound)
         }
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }

@@ -87,10 +87,12 @@ struct PolishOutputGuardTests {
         #expect(check("打开 ⟦ 0 ⟧，然后访问 ⟦1 ⟧，看一下结果。", source: masked) != nil)
     }
 
-    @Test("a leftover think tag is rejected unless the speaker said it")
+    @Test("think tags are rejected, whether leftover or said by the speaker")
     func thinkTags() {
         #expect(check("我想了想</think>今天天气很好。", source: "今天天气很好") == nil)
         #expect(check("<Think>今天天气很好。", source: "今天天气很好") == nil)
-        #expect(check("今天天气很好，用 <think> 标签。", source: "今天天气很好 <think> 标签") != nil)
+        // The speaker said it: stripping would have cut the sentence, so type the original.
+        #expect(check("今天天气很好，用", source: "今天天气很好 <think> 标签") == nil)
+        #expect(check("今天天气很好，用 <think> 标签。", source: "今天天气很好 <think> 标签") == nil)
     }
 }

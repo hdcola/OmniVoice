@@ -39,8 +39,10 @@ public enum PolishOutputGuard {
             return nil
         }
 
-        // A reasoning tag that survived stripping means reasoning may be in the text.
-        for tag in ["<think>", "</think>"] where lowered.contains(tag) && !sourceLowered.contains(tag) {
+        // Think tags never survive the polisher's reasoning stripping, so a
+        // reply to text that mentions them was cut (or still holds reasoning):
+        // refuse, and the original is typed.
+        for tag in ["<think>", "</think>"] where lowered.contains(tag) || sourceLowered.contains(tag) {
             return nil
         }
 
