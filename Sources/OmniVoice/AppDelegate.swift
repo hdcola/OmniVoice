@@ -194,6 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     private func showWhatsNew(_ entries: [WhatsNewEntry]) {
         NSApp.activate(ignoringOtherApps: true)
         if let whatsNewWindow {
+            if whatsNewWindow.isMiniaturized { whatsNewWindow.deminiaturize(nil) }
             whatsNewWindow.makeKeyAndOrderFront(nil)
             return
         }
@@ -213,7 +214,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         window.delegate = self
         whatsNewWindow = window
         trackForDock(window, id: "whatsNew")
-        window.makeKeyAndOrderFront(nil)
     }
 
     /// Settings' "重新运行引导": opens the wizard again whatever
@@ -225,6 +225,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         // open — possibly hidden with the whole app, where `isVisible` is false.
         if let onboardingWindow {
             NSApp.activate(ignoringOtherApps: true)
+            if onboardingWindow.isMiniaturized { onboardingWindow.deminiaturize(nil) }
             onboardingWindow.makeKeyAndOrderFront(nil)
             return
         }
@@ -256,7 +257,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         // live on.
         window.delegate = self
         trackForDock(window, id: "onboarding")
-        window.makeKeyAndOrderFront(nil)
     }
 
     /// Gives the app a Dock icon (`.regular`) while `window` is open and
@@ -276,13 +276,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             let closing = center.addObserver(
                 forName: NSWindow.willCloseNotification, object: window, queue: .main
             ) { [weak self] _ in
-                MainActor.assumeIsolated { self?.dockWindowClosed(id) }
+                MainActor.assumeIsolated {
+                    self?.dockWindowClosed(id)
+                    // The wizard / what's-new windows are deallocated on close
+                    // (a new one may reuse this address), so drop their
+                    // observers; Settings' window persists and re-keys.
+                    if id != "settings" { self?.removeDockObservers(for: key) }
+                }
             }
             dockObservers[key] = [becameKey, closing]
         }
         dockWindowOpened(id)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+    }
+
+    private func removeDockObservers(for key: ObjectIdentifier) {
+        dockObservers.removeValue(forKey: key)?.forEach(NotificationCenter.default.removeObserver)
     }
 
     private func dockWindowOpened(_ id: String) {

@@ -65,6 +65,10 @@ struct SettingsView: View {
             }
         }
         .frame(width: SettingsWindowLayout.width, height: SettingsWindowLayout.height)
+        // Settings is a SwiftUI `Settings` scene (no NSWindow of ours), so
+        // pick its window up here — on the root, not a per-tab child, so it
+        // works whichever tab opens first — to give the app a Dock icon.
+        .background(WindowReader { appDelegate.trackForDock($0, id: "settings") })
     }
 
     // MARK: - Tab 1: 通用
@@ -619,9 +623,6 @@ struct SettingsView: View {
             onOpenLoginItems: { loginItem.openLoginItemsSettings() }
         )
         .onAppear { loginItem.refresh() }
-        // Settings is a SwiftUI `Settings` scene (no NSWindow of ours), so
-        // pick its window up here to give the app a Dock icon while it is open.
-        .background(WindowReader { appDelegate.trackForDock($0, id: "settings") })
         // Coming back from System Settings → 登录项 (this view stays on
         // screen the whole time, so `onAppear` doesn't fire again).
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
