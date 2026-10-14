@@ -1001,3 +1001,9 @@ Roughly in the order they'll likely get tackled — not a hard commitment.
 ## TODO — dictation LLM polish (deferred from round-1 review)
 
 - Add automated tests for the `DictationController` post-recognition flow (`finish()` polish → translation review, Esc during polish, abort on disable). The controller lives in the app target; extract the flow into `OmniVoiceCore` or add a mockable seam, then test it (would have caught the Esc-with-translation bug).
+
+## TODO — dictation LLM polish (deferred from round-5 review)
+
+- OpenAI reasoning models (o1/o3/gpt-5) behind a reverse proxy / gateway (host != api.openai.com) still get `max_tokens`, `temperature` and `reasoning_effort: none`, so they 400. Detecting the dialect by model name alone risks misfiring on local servers; consider a per-service "OpenAI dialect" toggle.
+- DeepSeek preset may reject `reasoning_effort` (400 -> one retry per call, double latency). Unverified; skip the field for `api.deepseek.com` if it's confirmed, or cache "this service rejected the controls" per polisher.
+- `o1-mini` / `o1-preview` reject `reasoning_effort: low` on api.openai.com (retry succeeds; only a latency cost).

@@ -141,11 +141,11 @@ struct OpenAICompatiblePolisherTests {
         #expect(body["max_tokens"] != nil && body["temperature"] as? Double == 0.3)
     }
 
-    @Test("glm models also get thinking disabled")
+    @Test("glm models get thinking disabled, and no reasoning_effort")
     func glmThinking() async throws {
         let body = try await sentBody(baseURL: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4.5")
         #expect((body["thinking"] as? [String: String]) == ["type": "disabled"])
-        #expect(body["reasoning_effort"] as? String == "none")
+        #expect(body["reasoning_effort"] == nil)
     }
 
     @Test("api.openai.com: max_completion_tokens, no thinking controls on a regular model")
@@ -213,6 +213,32 @@ struct OpenAICompatiblePolisherTests {
             _ = try await polisher { _ in self.response(200, open) }.polish("x")
             Issue.record("expected a throw")
         } catch { #expect(error as? PolishError == .truncated) }
+    }
+
+    @Test("null content cut off by max_tokens is .truncated")
+    func nullContentTruncated() async {
+        let body = #"{"choices":[{"finish_reason":"length","message":{"content":null,"reasoning_content":"t"}}]}"#
+        do {
+            _ = try await polisher { _ in self.response(200, body) }.polish("x")
+            Issue.record("expected a throw")
+        } catch { #expect(error as? PolishError == .truncated) }
+    }
+
+    @Test("a partial answer cut off by max_tokens is .truncated, never typed")
+    func partialTruncated() async {
+        let body = #"{"choices":[{"finish_reason":"length","message":{"content":"整理好的一半"}}]}"#
+        do {
+            _ = try await polisher { _ in self.response(200, body) }.polish("x")
+            Issue.record("expected a throw")
+        } catch { #expect(error as? PolishError == .truncated) }
+    }
+
+    @Test("a closing </think> alone (pre-filled <think>) drops the reasoning before it; tags are case-insensitive")
+    func closingOnly() async throws {
+        let closing = #"{"choices":[{"message":{"content":"reasoning here\n</think>\n你好。"}}]}"#
+        #expect(try await polisher { _ in self.response(200, closing) }.polish("x") == "你好。")
+        let upper = #"{"choices":[{"message":{"content":"<THINK>hmm</Think>你好。"}}]}"#
+        #expect(try await polisher { _ in self.response(200, upper) }.polish("x") == "你好。")
     }
 
     private final class Captured2: @unchecked Sendable {

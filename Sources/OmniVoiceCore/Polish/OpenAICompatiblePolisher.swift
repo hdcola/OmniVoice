@@ -51,7 +51,7 @@ public struct OpenAICompatiblePolisher: TextPolisher {
     /// OpenAI's reasoning families (gpt-5, o1, o3, o4): reasoning tokens count
     /// against the token limit, and sampling controls are rejected.
     private var isOpenAIReasoningModel: Bool {
-        let name = model.trimmingCharacters(in: .whitespaces).lowercased()
+        let name = model.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return name.hasPrefix("gpt-5")
             || ["o1", "o3", "o4"].contains { name == $0 || name.hasPrefix($0 + "-") }
     }
@@ -65,10 +65,10 @@ public struct OpenAICompatiblePolisher: TextPolisher {
             // "none" is not accepted by every OpenAI reasoning model; "low" is.
             return isOpenAIReasoningModel ? ["reasoning_effort": "low"] : [:]
         }
-        var controls: [String: Any] = ["reasoning_effort": "none"]
-        // GLM-4.5 and later think by default and ignore reasoning_effort.
-        if model.lowercased().hasPrefix("glm-") { controls["thinking"] = ["type": "disabled"] }
-        return controls
+        // GLM-4.5 and later think by default and ignore reasoning_effort; send
+        // only `thinking`, so a 400 retry can't be caused by (or drop) it twice.
+        if model.lowercased().hasPrefix("glm-") { return ["thinking": ["type": "disabled"]] }
+        return ["reasoning_effort": "none"]
     }
 
     private func complete(messages: [PolishMessage], maxTokens: Int) async throws -> String {
@@ -126,25 +126,34 @@ public struct OpenAICompatiblePolisher: TextPolisher {
         }
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choice = (object["choices"] as? [[String: Any]])?.first,
-              let message = choice["message"] as? [String: Any],
-              let raw = message["content"] as? String
+              let message = choice["message"] as? [String: Any]
         else { throw PolishError.emptyResponse }
+        // `content` is JSON null when reasoning used up the limit.
+        let raw = (message["content"] as? String) ?? ""
+        // Cut off by the token limit: typically a thinking model whose
+        // reasoning ate max_tokens. Even a non-empty answer is incomplete.
+        if (choice["finish_reason"] as? String) == "length" { throw PolishError.truncated }
         let content = Self.strippingThinking(raw)
-        if content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            // Cut off before any answer: typically a thinking model whose
-            // reasoning used up max_tokens.
-            throw (choice["finish_reason"] as? String) == "length" ? PolishError.truncated : PolishError.emptyResponse
-        }
+        if content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { throw PolishError.emptyResponse }
         return content
     }
 
     /// Some servers inline a thinking model's reasoning as `<think>…</think>`
-    /// (an unterminated block means the answer never started).
+    /// (an unterminated block means the answer never started). When the chat
+    /// template pre-fills `<think>`, only the closing tag appears: everything
+    /// before it is reasoning.
     static func strippingThinking(_ text: String) -> String {
-        guard text.contains("<think>") else { return text }
+        guard text.range(of: "<think>", options: .caseInsensitive) != nil
+            || text.range(of: "</think>", options: .caseInsensitive) != nil else { return text }
         var result = text
-        while let open = result.range(of: "<think>") {
-            if let close = result.range(of: "</think>", range: open.upperBound..<result.endIndex) {
+        if let close = result.range(of: "</think>", options: .caseInsensitive) {
+            let open = result.range(of: "<think>", options: .caseInsensitive)
+            if open == nil || open!.lowerBound > close.lowerBound {
+                result.removeSubrange(result.startIndex..<close.upperBound)
+            }
+        }
+        while let open = result.range(of: "<think>", options: .caseInsensitive) {
+            if let close = result.range(of: "</think>", options: .caseInsensitive, range: open.upperBound..<result.endIndex) {
                 result.removeSubrange(open.lowerBound..<close.upperBound)
             } else {
                 result.removeSubrange(open.lowerBound..<result.endIndex)
