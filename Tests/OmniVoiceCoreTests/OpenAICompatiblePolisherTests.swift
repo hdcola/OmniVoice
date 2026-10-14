@@ -13,11 +13,12 @@ struct OpenAICompatiblePolisherTests {
     }
 
     private func polisher(
-        baseURL: String = "https://api.test/v1", apiKey: String? = "sk-1", timeout: TimeInterval = 8,
+        baseURL: String = "https://api.test/v1", model: String = "m1", apiKey: String? = "sk-1",
+        timeout: TimeInterval = 8,
         transport: @escaping OpenAICompatiblePolisher.Transport
     ) -> OpenAICompatiblePolisher {
         OpenAICompatiblePolisher(
-            baseURL: URL(string: baseURL)!, model: "m1", apiKey: apiKey, style: .clean, extra: "",
+            baseURL: URL(string: baseURL)!, model: model, apiKey: apiKey, style: .clean, extra: "",
             timeout: timeout, transport: transport)
     }
 
@@ -123,17 +124,50 @@ struct OpenAICompatiblePolisherTests {
         #expect(body["max_tokens"] as? Int == 8)
     }
 
-    @Test("reasoning_effort none is sent, except to api.openai.com")
-    func reasoningEffort() async throws {
-        for (url, expected) in [("http://127.0.0.1:1234/v1", true), ("https://api.openai.com/v1", false)] {
-            let captured = Captured()
-            _ = try await polisher(baseURL: url) { request in
-                captured.request = request
-                return self.response(200, self.ok)
-            }.polish("x")
-            let body = try bodyJSON(try #require(captured.request))
-            #expect((body["reasoning_effort"] as? String == "none") == expected)
+    private func sentBody(baseURL: String, model: String = "m1") async throws -> [String: Any] {
+        let captured = Captured()
+        _ = try await polisher(baseURL: baseURL, model: model) { request in
+            captured.request = request
+            return self.response(200, self.ok)
+        }.polish("x")
+        return try bodyJSON(try #require(captured.request))
+    }
+
+    @Test("other services get reasoning_effort none")
+    func reasoningEffortNone() async throws {
+        let body = try await sentBody(baseURL: "http://127.0.0.1:1234/v1")
+        #expect(body["reasoning_effort"] as? String == "none")
+        #expect(body["thinking"] == nil)
+        #expect(body["max_tokens"] != nil && body["temperature"] as? Double == 0.3)
+    }
+
+    @Test("glm models also get thinking disabled")
+    func glmThinking() async throws {
+        let body = try await sentBody(baseURL: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4.5")
+        #expect((body["thinking"] as? [String: String]) == ["type": "disabled"])
+        #expect(body["reasoning_effort"] as? String == "none")
+    }
+
+    @Test("api.openai.com: max_completion_tokens, no thinking controls on a regular model")
+    func openAIRegularModel() async throws {
+        let body = try await sentBody(baseURL: "https://api.openai.com/v1", model: "gpt-4o-mini")
+        #expect(body["max_completion_tokens"] as? Int == 258)
+        #expect(body["max_tokens"] == nil)
+        #expect(body["temperature"] as? Double == 0.3)
+        #expect(body["reasoning_effort"] == nil)
+    }
+
+    @Test("api.openai.com reasoning models: no temperature, low effort, roomy token ceiling")
+    func openAIReasoningModels() async throws {
+        for model in ["gpt-5", "gpt-5.1-mini", "o1", "o3-mini", "o4-mini", "GPT-5"] {
+            let body = try await sentBody(baseURL: "https://api.openai.com/v1", model: model)
+            #expect(body["max_completion_tokens"] as? Int == 4096, "\(model)")
+            #expect(body["max_tokens"] == nil && body["temperature"] == nil, "\(model)")
+            #expect(body["reasoning_effort"] as? String == "low", "\(model)")
         }
+        // Names that merely start with the same letters are not reasoning models.
+        let other = try await sentBody(baseURL: "https://api.openai.com/v1", model: "o10-custom")
+        #expect(other["temperature"] as? Double == 0.3)
     }
 
     @Test("a 400 is retried once without reasoning_effort")
@@ -148,11 +182,11 @@ struct OpenAICompatiblePolisherTests {
         #expect(bodies.values == [true, false])
     }
 
-    @Test("a 400 on api.openai.com is not retried")
+    @Test("a 400 on a regular OpenAI model has nothing to retry without")
     func noRetryOnOpenAI() async {
         let bodies = Captured2()
         do {
-            _ = try await polisher(baseURL: "https://api.openai.com/v1") { _ in
+            _ = try await polisher(baseURL: "https://api.openai.com/v1", model: "gpt-4o-mini") { _ in
                 bodies.append(false)
                 return self.response(400, "{}")
             }.polish("x")

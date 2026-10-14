@@ -14,6 +14,7 @@ The format is based on Keep a Changelog.
 
 ### Fixed
 - fix(dictation): polishing and 测试连接 no longer fail with "服务没有返回内容" on thinking models (LM Studio gemma, Qwen3, Ollama…) — requests send `reasoning_effort: none` (not to api.openai.com; retried without it on a 400), inline `<think>` blocks are stripped, and an answer cut off by the token limit now says to use a non-reasoning model (#92)
+- fix(dictation): polish requests now speak each service's dialect — api.openai.com gets `max_completion_tokens` (and no `temperature`, a low reasoning effort and a roomier token ceiling on gpt-5 / o-series models), and GLM models get `thinking: disabled`; the optional thinking fields are dropped and retried once if a service answers 400 (#92)
 
 ### Dependencies
 

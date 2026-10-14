@@ -42,22 +42,45 @@ public struct OpenAICompatiblePolisher: TextPolisher {
         return Date().timeIntervalSince(start)
     }
 
-    /// api.openai.com rejects `reasoning_effort` on non-reasoning models, so it
-    /// is never sent there; every other service gets it (and a retry without
-    /// it if the service answers 400).
-    private var sendsReasoningEffort: Bool {
-        baseURL.host?.lowercased() != "api.openai.com"
+    /// api.openai.com has its own dialect: `max_completion_tokens` instead of
+    /// `max_tokens`, and no `temperature` on its reasoning models.
+    private var isDirectOpenAI: Bool {
+        baseURL.host?.lowercased() == "api.openai.com"
+    }
+
+    /// OpenAI's reasoning families (gpt-5, o1, o3, o4): reasoning tokens count
+    /// against the token limit, and sampling controls are rejected.
+    private var isOpenAIReasoningModel: Bool {
+        let name = model.trimmingCharacters(in: .whitespaces).lowercased()
+        return name.hasPrefix("gpt-5")
+            || ["o1", "o3", "o4"].contains { name == $0 || name.hasPrefix($0 + "-") }
+    }
+
+    /// Fields that switch a thinking model's reasoning off (or down). Polishing
+    /// needs none, and thinking tokens would otherwise eat the token limit and
+    /// leave `content` empty. They are optional: if a service rejects them
+    /// with a 400, the request is retried without.
+    private var thinkingControls: [String: Any] {
+        if isDirectOpenAI {
+            // "none" is not accepted by every OpenAI reasoning model; "low" is.
+            return isOpenAIReasoningModel ? ["reasoning_effort": "low"] : [:]
+        }
+        var controls: [String: Any] = ["reasoning_effort": "none"]
+        // GLM-4.5 and later think by default and ignore reasoning_effort.
+        if model.lowercased().hasPrefix("glm-") { controls["thinking"] = ["type": "disabled"] }
+        return controls
     }
 
     private func complete(messages: [PolishMessage], maxTokens: Int) async throws -> String {
+        let controls = thinkingControls
         do {
-            return try await send(messages: messages, maxTokens: maxTokens, reasoningOff: sendsReasoningEffort)
-        } catch PolishError.http(400) where sendsReasoningEffort {
-            return try await send(messages: messages, maxTokens: maxTokens, reasoningOff: false)
+            return try await send(messages: messages, maxTokens: maxTokens, extras: controls)
+        } catch PolishError.http(400) where !controls.isEmpty {
+            return try await send(messages: messages, maxTokens: maxTokens, extras: [:])
         }
     }
 
-    private func send(messages: [PolishMessage], maxTokens: Int, reasoningOff: Bool) async throws -> String {
+    private func send(messages: [PolishMessage], maxTokens: Int, extras: [String: Any]) async throws -> String {
         var request = URLRequest(url: baseURL.appendingPathComponent("chat/completions"))
         request.httpMethod = "POST"
         request.timeoutInterval = timeout
@@ -67,14 +90,19 @@ public struct OpenAICompatiblePolisher: TextPolisher {
         }
         var body: [String: Any] = [
             "model": model,
-            "temperature": 0.3,
-            "max_tokens": maxTokens,
             "stream": false,
             "messages": messages.map { ["role": $0.role, "content": $0.content] },
         ]
-        // Thinking models spend max_tokens on reasoning and can return an empty
-        // `content`; polishing needs no reasoning.
-        if reasoningOff { body["reasoning_effort"] = "none" }
+        if isDirectOpenAI {
+            // Reasoning models spend this limit on thinking too, so give it
+            // headroom; it is a ceiling, only what is generated is billed.
+            body["max_completion_tokens"] = isOpenAIReasoningModel ? 4096 : maxTokens
+            if !isOpenAIReasoningModel { body["temperature"] = 0.3 }
+        } else {
+            body["max_tokens"] = maxTokens
+            body["temperature"] = 0.3
+        }
+        body.merge(extras) { _, new in new }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let data: Data
