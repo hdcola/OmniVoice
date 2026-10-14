@@ -619,6 +619,9 @@ struct SettingsView: View {
             onOpenLoginItems: { loginItem.openLoginItemsSettings() }
         )
         .onAppear { loginItem.refresh() }
+        // Settings is a SwiftUI `Settings` scene (no NSWindow of ours), so
+        // pick its window up here to give the app a Dock icon while it is open.
+        .background(WindowReader { appDelegate.trackForDock($0, id: "settings") })
         // Coming back from System Settings → 登录项 (this view stays on
         // screen the whole time, so `onAppear` doesn't fire again).
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -857,5 +860,31 @@ struct SettingsView: View {
         let shortVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
         return build.map { "\(shortVersion) (\($0))" } ?? shortVersion
+    }
+}
+
+
+/// Hands the hosting `NSWindow` to `onWindow` whenever the view (re)attaches
+/// to one — SwiftUI offers no direct handle on a `Settings` scene's window.
+private struct WindowReader: NSViewRepresentable {
+    let onWindow: (NSWindow) -> Void
+
+    func makeNSView(context: Context) -> NSView { WindowReportingView(onWindow: onWindow) }
+    func updateNSView(_ view: NSView, context: Context) {
+        (view as? WindowReportingView)?.onWindow = onWindow
+    }
+
+    private final class WindowReportingView: NSView {
+        var onWindow: (NSWindow) -> Void
+        init(onWindow: @escaping (NSWindow) -> Void) {
+            self.onWindow = onWindow
+            super.init(frame: .zero)
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window else { return }
+            DispatchQueue.main.async { [onWindow] in onWindow(window) }
+        }
     }
 }

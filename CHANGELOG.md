@@ -13,6 +13,7 @@ The format is based on Keep a Changelog.
 - perf(dictation): voice input opens the microphone as soon as the key goes down and replays the audio once the recognizer is ready, so the first words aren't lost during "正在准备识别引擎…"; the system engine also remembers its resolved locale, installed-assets check and audio format between dictations, shortening that wait; the recognizer now starts while the microphone opens, the microphone no longer blocks the main thread when it starts or stops, and the bubble says 请说话… as soon as the microphone is live; each start step is timed in the unified log (category dictation); the on-device model's streaming session is now built in the background after each stop and after a model loads, so starting a dictation (or recording) no longer waits for it, and audio is only fed to a stream that was started (#89)
 
 ### Fixed
+- fix(app): show a Dock icon (and bring the window to the front) while the setup wizard, Settings or the 新功能 window is open, so you can find your way back to it; the menu-bar-only mode returns once the last of them closes
 - fix(dictation): polishing and 测试连接 no longer fail with "服务没有返回内容" on thinking models (LM Studio gemma, Qwen3, Ollama…) — requests send `reasoning_effort: none` (not to api.openai.com; retried without it on a 400), inline `<think>` blocks are stripped, and an answer cut off by the token limit now says to use a non-reasoning model (#92)
 - fix(dictation): polish requests now speak each service's dialect — api.openai.com gets `max_completion_tokens` (and no `temperature`, a low reasoning effort and a roomier token ceiling on gpt-5 / o-series models), and GLM models get `thinking: disabled`; the optional thinking fields are dropped and retried once if a service answers 400 (#92)
 - fix(dictation): polishing no longer types reasoning or half an answer — a reply cut off by the token limit (including `content: null`, or a partial answer) now falls back to the original text, a lone `</think>` (template-prefilled thinking) and any-case `<think>` tags are stripped, and GLM models get only `thinking: disabled` (#92)
@@ -23,10 +24,12 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(app): add a Dock-icon manual test checklist to Docs/RELEASE_TESTING.md
 - docs(dictation): add a design draft for polishing dictated text with a user-configured OpenAI-compatible LLM, off by default (#91)
 - docs(repo): remove the finished UX review round notes and the settings/model-management UX doc (Docs/UX-REVIEW-ROUND-1…4.md, Docs/UX-SETTINGS-MODEL-MANAGEMENT.md); they stay in git history
 
 ### Tests
+- test(app): cover the Dock presence tracker (single/multiple windows, reopen, idempotence)
 - test(dictation): cover the polish prompt builder, output guard, OpenAI-compatible client (fake transport), the dictation polish flow and settings defaults (#92)
 
 ## [0.7.0] - 2026-10-03

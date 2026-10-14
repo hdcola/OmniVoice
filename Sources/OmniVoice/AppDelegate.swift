@@ -32,6 +32,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     private var onboardingWindow: NSWindow?
     /// The once-per-update "what's new" window, kept only while it is open.
     private var whatsNewWindow: NSWindow?
+    /// Which wizard/Settings/what's-new windows are open: while any is, the
+    /// app shows a Dock icon so the user can find its way back to them.
+    private var dockPresence = DockPresenceTracker()
+    /// The policy to restore when the last such window closes (`.accessory`
+    /// for the `LSUIElement` menu-bar app).
+    private var policyBeforeDock: NSApplication.ActivationPolicy = .accessory
+    private var dockObservers: [ObjectIdentifier: [NSObjectProtocol]] = [:]
     /// ⌥A/⌥S selection translation — constructed here (not lazily) for the
     /// same reason as `session`: its global hot keys must work from launch,
     /// before any menu or window has been opened.
@@ -205,6 +212,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         window.center()
         window.delegate = self
         whatsNewWindow = window
+        trackForDock(window, id: "whatsNew")
         window.makeKeyAndOrderFront(nil)
     }
 
@@ -247,7 +255,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         // `windowWillClose(_:)` the wizard (and its permission polling) would
         // live on.
         window.delegate = self
+        trackForDock(window, id: "onboarding")
         window.makeKeyAndOrderFront(nil)
+    }
+
+    /// Gives the app a Dock icon (`.regular`) while `window` is open and
+    /// restores the previous policy once the last tracked window closes.
+    /// Safe to call repeatedly for the same window (Settings calls it each
+    /// time its view appears): a re-shown window is activated and fronted
+    /// again, and observers are installed only once.
+    func trackForDock(_ window: NSWindow, id: String) {
+        let key = ObjectIdentifier(window)
+        if dockObservers[key] == nil {
+            let center = NotificationCenter.default
+            let becameKey = center.addObserver(
+                forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.dockWindowOpened(id) }
+            }
+            let closing = center.addObserver(
+                forName: NSWindow.willCloseNotification, object: window, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.dockWindowClosed(id) }
+            }
+            dockObservers[key] = [becameKey, closing]
+        }
+        dockWindowOpened(id)
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    private func dockWindowOpened(_ id: String) {
+        let before = NSApp.activationPolicy()
+        guard dockPresence.windowOpened(id) == .showDock else { return }
+        if before != .regular { policyBeforeDock = before }
+        NSApp.setActivationPolicy(.regular)
+        // Switching to `.regular` can leave the app behind the previous one.
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func dockWindowClosed(_ id: String) {
+        guard dockPresence.windowClosed(id) == .hideDock else { return }
+        NSApp.setActivationPolicy(policyBeforeDock)
     }
 
     func windowWillClose(_ notification: Notification) {
