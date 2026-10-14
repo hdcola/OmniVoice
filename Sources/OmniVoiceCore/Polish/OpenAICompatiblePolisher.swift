@@ -42,7 +42,22 @@ public struct OpenAICompatiblePolisher: TextPolisher {
         return Date().timeIntervalSince(start)
     }
 
+    /// api.openai.com rejects `reasoning_effort` on non-reasoning models, so it
+    /// is never sent there; every other service gets it (and a retry without
+    /// it if the service answers 400).
+    private var sendsReasoningEffort: Bool {
+        baseURL.host?.lowercased() != "api.openai.com"
+    }
+
     private func complete(messages: [PolishMessage], maxTokens: Int) async throws -> String {
+        do {
+            return try await send(messages: messages, maxTokens: maxTokens, reasoningOff: sendsReasoningEffort)
+        } catch PolishError.http(400) where sendsReasoningEffort {
+            return try await send(messages: messages, maxTokens: maxTokens, reasoningOff: false)
+        }
+    }
+
+    private func send(messages: [PolishMessage], maxTokens: Int, reasoningOff: Bool) async throws -> String {
         var request = URLRequest(url: baseURL.appendingPathComponent("chat/completions"))
         request.httpMethod = "POST"
         request.timeoutInterval = timeout
@@ -50,13 +65,16 @@ public struct OpenAICompatiblePolisher: TextPolisher {
         if let apiKey, !apiKey.isEmpty {
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "temperature": 0.3,
             "max_tokens": maxTokens,
             "stream": false,
             "messages": messages.map { ["role": $0.role, "content": $0.content] },
         ]
+        // Thinking models spend max_tokens on reasoning and can return an empty
+        // `content`; polishing needs no reasoning.
+        if reasoningOff { body["reasoning_effort"] = "none" }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let data: Data
@@ -79,11 +97,31 @@ public struct OpenAICompatiblePolisher: TextPolisher {
         default: throw PolishError.http(http.statusCode)
         }
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choices = object["choices"] as? [[String: Any]],
-              let message = choices.first?["message"] as? [String: Any],
-              let content = message["content"] as? String,
-              !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+              let choice = (object["choices"] as? [[String: Any]])?.first,
+              let message = choice["message"] as? [String: Any],
+              let raw = message["content"] as? String
         else { throw PolishError.emptyResponse }
+        let content = Self.strippingThinking(raw)
+        if content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // Cut off before any answer: typically a thinking model whose
+            // reasoning used up max_tokens.
+            throw (choice["finish_reason"] as? String) == "length" ? PolishError.truncated : PolishError.emptyResponse
+        }
         return content
+    }
+
+    /// Some servers inline a thinking model's reasoning as `<think>…</think>`
+    /// (an unterminated block means the answer never started).
+    static func strippingThinking(_ text: String) -> String {
+        guard text.contains("<think>") else { return text }
+        var result = text
+        while let open = result.range(of: "<think>") {
+            if let close = result.range(of: "</think>", range: open.upperBound..<result.endIndex) {
+                result.removeSubrange(open.lowerBound..<close.upperBound)
+            } else {
+                result.removeSubrange(open.lowerBound..<result.endIndex)
+            }
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

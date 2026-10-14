@@ -13,6 +13,7 @@ The format is based on Keep a Changelog.
 - perf(dictation): voice input opens the microphone as soon as the key goes down and replays the audio once the recognizer is ready, so the first words aren't lost during "正在准备识别引擎…"; the system engine also remembers its resolved locale, installed-assets check and audio format between dictations, shortening that wait; the recognizer now starts while the microphone opens, the microphone no longer blocks the main thread when it starts or stops, and the bubble says 请说话… as soon as the microphone is live; each start step is timed in the unified log (category dictation); the on-device model's streaming session is now built in the background after each stop and after a model loads, so starting a dictation (or recording) no longer waits for it, and audio is only fed to a stream that was started (#89)
 
 ### Fixed
+- fix(dictation): polishing and 测试连接 no longer fail with "服务没有返回内容" on thinking models (LM Studio gemma, Qwen3, Ollama…) — requests send `reasoning_effort: none` (not to api.openai.com; retried without it on a 400), inline `<think>` blocks are stripped, and an answer cut off by the token limit now says to use a non-reasoning model (#92)
 
 ### Dependencies
 

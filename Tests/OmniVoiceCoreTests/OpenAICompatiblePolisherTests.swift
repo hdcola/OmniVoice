@@ -122,4 +122,69 @@ struct OpenAICompatiblePolisherTests {
         let body = try bodyJSON(try #require(captured.request))
         #expect(body["max_tokens"] as? Int == 8)
     }
+
+    @Test("reasoning_effort none is sent, except to api.openai.com")
+    func reasoningEffort() async throws {
+        for (url, expected) in [("http://127.0.0.1:1234/v1", true), ("https://api.openai.com/v1", false)] {
+            let captured = Captured()
+            _ = try await polisher(baseURL: url) { request in
+                captured.request = request
+                return self.response(200, self.ok)
+            }.polish("x")
+            let body = try bodyJSON(try #require(captured.request))
+            #expect((body["reasoning_effort"] as? String == "none") == expected)
+        }
+    }
+
+    @Test("a 400 is retried once without reasoning_effort")
+    func retryWithoutReasoning() async throws {
+        let bodies = Captured2()
+        let result = try await polisher(baseURL: "https://other.test/v1") { request in
+            let sent = try self.bodyJSON(request)
+            bodies.append(sent["reasoning_effort"] != nil)
+            return sent["reasoning_effort"] != nil ? self.response(400, "{}") : self.response(200, self.ok)
+        }.polish("x")
+        #expect(result == "整理好的文字。")
+        #expect(bodies.values == [true, false])
+    }
+
+    @Test("a 400 on api.openai.com is not retried")
+    func noRetryOnOpenAI() async {
+        let bodies = Captured2()
+        do {
+            _ = try await polisher(baseURL: "https://api.openai.com/v1") { _ in
+                bodies.append(false)
+                return self.response(400, "{}")
+            }.polish("x")
+            Issue.record("expected a throw")
+        } catch { #expect(error as? PolishError == .http(400)) }
+        #expect(bodies.values.count == 1)
+    }
+
+    @Test("empty content cut off by max_tokens is .truncated")
+    func truncated() async {
+        let body = #"{"choices":[{"finish_reason":"length","message":{"content":"","reasoning_content":"thinking"}}]}"#
+        do {
+            _ = try await polisher { _ in self.response(200, body) }.testConnection()
+            Issue.record("expected a throw")
+        } catch { #expect(error as? PolishError == .truncated) }
+    }
+
+    @Test("<think> blocks are stripped, and an unterminated one leaves nothing")
+    func thinkBlocks() async throws {
+        let withThink = #"{"choices":[{"message":{"content":"<think>hmm</think>\n你好。"}}]}"#
+        #expect(try await polisher { _ in self.response(200, withThink) }.polish("x") == "你好。")
+        let open = #"{"choices":[{"finish_reason":"length","message":{"content":"<think>never ends"}}]}"#
+        do {
+            _ = try await polisher { _ in self.response(200, open) }.polish("x")
+            Issue.record("expected a throw")
+        } catch { #expect(error as? PolishError == .truncated) }
+    }
+
+    private final class Captured2: @unchecked Sendable {
+        private let lock = NSLock()
+        private var items: [Bool] = []
+        func append(_ value: Bool) { lock.lock(); items.append(value); lock.unlock() }
+        var values: [Bool] { lock.lock(); defer { lock.unlock() }; return items }
+    }
 }

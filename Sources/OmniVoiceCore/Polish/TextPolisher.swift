@@ -9,6 +9,8 @@ public enum PolishError: Error, Equatable, Sendable {
     case timeout
     case network
     case emptyResponse
+    /// Cut off by max_tokens before any answer (usually a thinking model).
+    case truncated
     /// The output failed `PolishOutputGuard`.
     case rejected
 
@@ -20,6 +22,7 @@ public enum PolishError: Error, Equatable, Sendable {
         case .timeout: return "请求超时"
         case .network: return "网络错误"
         case .emptyResponse: return "服务没有返回内容"
+        case .truncated: return "输出被截断，可能是推理模型：请换非推理模型，或在服务端关闭思考"
         case .rejected: return "输出没有通过校验"
         }
     }
