@@ -159,7 +159,7 @@ struct GeneralSettingsView: View {
 
     // MARK: - 字幕悬浮窗
 
-    /// Deliberately outside any `.disabled(isBusy)` — these only ever touch
+    /// Deliberately outside any `.disabled(session.isSettingsBusy)` — these only ever touch
     /// `FloatingTranscriptView`'s own SwiftUI opacity (see
     /// `panelBackgroundOpacity`/`panelContentOpacity`'s docs), never
     /// anything `start()` reads once at setup time, so there's no race to
