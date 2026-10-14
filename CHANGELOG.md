@@ -18,6 +18,7 @@ The format is based on Keep a Changelog.
 - fix(dictation): polishing no longer types reasoning or half an answer — a reply cut off by the token limit (including `content: null`, or a partial answer) now falls back to the original text, a lone `</think>` (template-prefilled thinking) and any-case `<think>` tags are stripped, and GLM models get only `thinking: disabled` (#92)
 - fix(dictation): polishing strips repeated reasoning blocks that lack an opening `<think>`, and the output guard rejects any text still containing a think tag (#92)
 - fix(dictation): dictating a sentence that mentions a literal `<think>` / `</think>` tag no longer types a half sentence — polishing is refused and the original text is typed (#92)
+- fix(dictation): polishing no longer drops the decimal point of dictated numbers (三点一四一五九二六 used to become 31415926) — the prompt now says a 点 between digits is a decimal point and numbers must keep their value (#92)
 
 ### Dependencies
 

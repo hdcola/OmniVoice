@@ -15,6 +15,13 @@ struct PolishPromptBuilderTests {
         }
     }
 
+    @Test("the rules say a 点 between digits is a decimal point, not a filler")
+    func decimalPointRule() {
+        let prompt = PolishPromptBuilder.systemPrompt(style: .clean, extra: "")
+        #expect(prompt.contains("“点”夹在数字中间是小数点"))
+        #expect(prompt.contains("不要改变任何数字的数值"))
+    }
+
     @Test("an empty or blank extra adds no EXTRA section")
     func emptyExtra() {
         #expect(!PolishPromptBuilder.systemPrompt(style: .clean, extra: "").contains("[EXTRA]"))
