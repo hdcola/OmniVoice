@@ -67,6 +67,23 @@ struct PolishSettingsTests {
         #expect(settings.preset == .custom)
     }
 
+    @Test("a model id with line breaks keeps only its first line, also when loaded")
+    func modelSingleLine() {
+        var settings = PolishSettings()
+        settings.model = "google/gemma-4-e2b\n\n\n\ngoogle/gemma-4-e2b"
+        #expect(settings.model == "google/gemma-4-e2b")
+        settings.model = "\n gpt-4o \n"
+        #expect(settings.model == "gpt-4o")
+        settings.model = "\n\n"
+        #expect(settings.model == "")
+
+        let suite = "PolishSettingsTests.modelSingleLine"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("m1\n\nm1", forKey: PolishSettings.modelKey)
+        #expect(PolishSettings.load(from: defaults).model == "m1")
+    }
+
     @Test("configured needs a URL, a model and a key — except on this Mac")
     func configured() {
         var settings = PolishSettings()

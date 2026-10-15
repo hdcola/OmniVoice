@@ -36,9 +36,13 @@ public struct OpenAICompatiblePolisher: TextPolisher {
     }
 
     /// A fixed tiny request for Settings' 测试连接; returns the round trip time.
+    /// It only checks that the service answers with a well-formed completion:
+    /// a reply cut off by the small token limit (or spent on thinking) still
+    /// proves the endpoint, key and model work.
     public func testConnection() async throws -> TimeInterval {
         let start = Date()
-        _ = try await complete(messages: [PolishMessage(role: "user", content: "ping")], maxTokens: 8)
+        _ = try await complete(
+            messages: [PolishMessage(role: "user", content: "Reply with OK.")], maxTokens: 64, requireCompleteAnswer: false)
         return Date().timeIntervalSince(start)
     }
 
@@ -71,16 +75,21 @@ public struct OpenAICompatiblePolisher: TextPolisher {
         return ["reasoning_effort": "none"]
     }
 
-    private func complete(messages: [PolishMessage], maxTokens: Int) async throws -> String {
+    @discardableResult
+    private func complete(
+        messages: [PolishMessage], maxTokens: Int, requireCompleteAnswer: Bool = true
+    ) async throws -> String {
         let controls = thinkingControls
         do {
-            return try await send(messages: messages, maxTokens: maxTokens, extras: controls)
+            return try await send(
+                messages: messages, maxTokens: maxTokens, extras: controls, requireCompleteAnswer: requireCompleteAnswer)
         } catch PolishError.http(400) where !controls.isEmpty {
-            return try await send(messages: messages, maxTokens: maxTokens, extras: [:])
+            return try await send(
+                messages: messages, maxTokens: maxTokens, extras: [:], requireCompleteAnswer: requireCompleteAnswer)
         }
     }
 
-    private func send(messages: [PolishMessage], maxTokens: Int, extras: [String: Any]) async throws -> String {
+    private func send(messages: [PolishMessage], maxTokens: Int, extras: [String: Any], requireCompleteAnswer: Bool) async throws -> String {
         var request = URLRequest(url: baseURL.appendingPathComponent("chat/completions"))
         request.httpMethod = "POST"
         request.timeoutInterval = timeout
@@ -130,6 +139,7 @@ public struct OpenAICompatiblePolisher: TextPolisher {
         else { throw PolishError.emptyResponse }
         // `content` is JSON null when reasoning used up the limit.
         let raw = (message["content"] as? String) ?? ""
+        if !requireCompleteAnswer { return raw }
         // Cut off by the token limit: typically a thinking model whose
         // reasoning ate max_tokens. Even a non-empty answer is incomplete.
         if (choice["finish_reason"] as? String)?.lowercased() == "length" { throw PolishError.truncated }
