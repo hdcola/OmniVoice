@@ -22,7 +22,7 @@ brew trust hdcola/tap      # Homebrew 7+ only
 brew install --cask omnivoice
 ```
 
-This build is **ad-hoc signed, not notarized**: macOS refuses to open it
+This build is **self-signed (OmniVoice Dev Signing), not notarized**: macOS refuses to open it
 until you clear its quarantine flag (`xattr -cr /path/to/OmniVoice.app`).
 See [`Docs/RELEASE_TESTING.md`](Docs/RELEASE_TESTING.md) for details and the
 permissions it asks for.
