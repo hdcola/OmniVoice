@@ -1,6 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
 import CoreGraphics
+import IOKit.hid
 import OmniVoiceCore
 
 /// Calls `onDoubleCopy` when the user presses ⌘C twice in quick succession in
@@ -22,9 +23,31 @@ final class DoubleCopyMonitor {
 
     static var hasPermission: Bool { CGPreflightListenEventAccess() }
 
-    /// Shows the system's Input Monitoring prompt (macOS shows it once).
+    /// Shows the system's Input Monitoring prompt (macOS shows it once) and
+    /// makes sure the app is listed in System Settings → Input Monitoring.
+    ///
+    /// The global `NSEvent` monitor also hears keys when only Accessibility is
+    /// granted, so ⌘C ⌘C can work while Input Monitoring was never requested
+    /// and the app is missing from the list. `CGRequestListenEventAccess`
+    /// alone doesn't always add the entry, so also ask through IOHID and
+    /// briefly open a listen-only event tap — either registers the app.
     static func requestPermission() {
         _ = CGRequestListenEventAccess()
+        _ = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+        registerWithInputMonitoring()
+    }
+
+    private static func registerWithInputMonitoring() {
+        let callback: CGEventTapCallBack = { _, _, event, _ in Unmanaged.passUnretained(event) }
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .tailAppendEventTap,
+            options: .listenOnly,
+            eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue),
+            callback: callback,
+            userInfo: nil
+        ) else { return }
+        CFMachPortInvalidate(tap)
     }
 
     private var detector = DoubleCopyDetector()
