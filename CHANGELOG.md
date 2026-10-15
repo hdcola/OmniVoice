@@ -7,6 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(dictation): voice input pauses music or video that is playing while you dictate and resumes it afterwards, only if it paused it (Play/Pause media key, playback detected via CoreAudio); on by default, switch in Settings → 语音输入 (#102)
 
 ### Changed
 

@@ -57,6 +57,7 @@ final class DictationController: ObservableObject {
     static let modeKey = "org.hdcola.omnivoice.dictation.mode"
     static let maxDurationKey = "org.hdcola.omnivoice.dictation.maxDuration"
     static let translateKey = "org.hdcola.omnivoice.dictation.translate"
+    static let pauseMediaKey = "org.hdcola.omnivoice.dictation.pauseMedia"
 
     /// Off until the user opts in: it needs the Input Monitoring permission,
     /// which launch should never ask for out of the blue.
@@ -100,6 +101,14 @@ final class DictationController: ObservableObject {
         didSet { UserDefaults.standard.set(translateEnabled, forKey: Self.translateKey) }
     }
 
+    /// Pause music while dictating and resume it after. On unless switched off.
+    @Published var pauseMediaEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(pauseMediaEnabled, forKey: Self.pauseMediaKey)
+            if !pauseMediaEnabled { mediaPauser.resumeIfWePaused() }
+        }
+    }
+
     /// The LLM polish configuration; the API key is kept apart in the Keychain.
     @Published var polish: PolishSettings {
         didSet {
@@ -130,6 +139,7 @@ final class DictationController: ObservableObject {
     private var machine: DictationTriggerMachine
     private let hud = DictationHUDPanel()
     private let returnInterceptor = DictationReturnInterceptor()
+    private let mediaPauser = MediaPauser()
     private let translator: SelectionTranslator
     /// The engine the user picked for translating (a `SelectionTranslationEngine` ID).
     private let translationEngineID: () -> String
@@ -184,6 +194,7 @@ final class DictationController: ObservableObject {
         maxDuration = (defaults.object(forKey: Self.maxDurationKey) as? Int).flatMap(DictationMaxDuration.init)
             ?? .twoMinutes
         translateEnabled = defaults.bool(forKey: Self.translateKey)
+        pauseMediaEnabled = defaults.object(forKey: Self.pauseMediaKey) as? Bool ?? true
         machine = DictationTriggerMachine(mode: storedMode)
         monitor.triggerKey = storedKey
 
@@ -244,6 +255,7 @@ final class DictationController: ObservableObject {
             .sink { [weak self] message in
                 self?.machine.reset()
                 self?.returnInterceptor.stop()
+                self?.mediaPauser.resumeIfWePaused()
                 self?.showNotice(message)
             }
         // Picking another recognition language means another set of assets
@@ -279,7 +291,10 @@ final class DictationController: ObservableObject {
             // Gone at once; a slow start is torn down behind it.
             returnInterceptor.stop()
             hideHUD()
-            Task { await dictation.cancel() }
+            Task {
+                await dictation.cancel()
+                mediaPauser.resumeIfWePaused()
+            }
         }
     }
 
@@ -292,6 +307,8 @@ final class DictationController: ObservableObject {
         noticeTask?.cancel()
         notice = nil
         let deviceID = deviceID()
+        // Before the microphone opens, so the music isn't recorded.
+        if pauseMediaEnabled { mediaPauser.pauseIfPlaying() }
         // Starting clears the last dictation's text, which has to be gone
         // before the bubble is shown again.
         dictation.start(
@@ -320,6 +337,7 @@ final class DictationController: ObservableObject {
     private func finish(thenReturn: Bool = false) async {
         returnInterceptor.stop()
         let text = await dictation.finish()
+        mediaPauser.resumeIfWePaused()
         // Switched off while the recognizer was finishing: nothing is typed.
         guard isEnabled else {
             hideHUD()
@@ -594,9 +612,13 @@ final class DictationController: ObservableObject {
             polishTask?.cancel()
             hideHUD()
         }
-        guard dictation.isActive else { return }
+        guard dictation.isActive else {
+            mediaPauser.resumeIfWePaused()
+            return
+        }
         Task {
             await dictation.cancel()
+            mediaPauser.resumeIfWePaused()
             hideHUD()
         }
     }

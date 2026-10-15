@@ -55,6 +55,17 @@ struct DictationSettingsView: View {
             }
             .disabled(!controller.isEnabled || controller.mode != .toggle)
             SettingsDivider()
+            SettingsRow(
+                title: "语音输入时暂停音乐",
+                subtitle: "开始说话时暂停正在播放的音乐或视频，结束后自动继续；只会恢复由它暂停的内容"
+            ) {
+                Toggle("语音输入时暂停音乐", isOn: $controller.pauseMediaEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+            .disabled(!controller.isEnabled)
+            SettingsDivider()
             DictationPolishSettingsRows(controller: controller)
             SettingsDivider()
             SettingsRow(
