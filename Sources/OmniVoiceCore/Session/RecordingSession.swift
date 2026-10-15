@@ -1215,6 +1215,7 @@ public final class RecordingSession: ObservableObject {
                 if adoptedTranslation == nil {
                     translation.unload()
                     translationProvider = nil
+                    loadedTranslationOnlyIDs = nil
                 }
                 // Not reached via `reusingLoaded`, so neither was true
                 // beforehand in the ordinary case — but reset both
@@ -1224,7 +1225,6 @@ public final class RecordingSession: ObservableObject {
                 // just nil-ing the providers above would read as "模型已就绪"
                 // while nothing is actually loaded.
                 loadedEngineIDs = nil
-                if adoptedTranslation == nil { loadedTranslationOnlyIDs = nil }
                 isModelLoaded = false
             }
             return

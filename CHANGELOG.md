@@ -11,7 +11,7 @@ The format is based on Keep a Changelog.
 ### Changed
 
 ### Fixed
-- fix(session): a recognizer or translation start failure no longer unloads a translation model that was preloaded on its own, so retrying doesn't reload it (#51)
+- fix(session): a recognizer or translation start failure no longer unloads a translation model that was preloaded on its own, so retrying doesn't reload it (#103, #51)
 
 ### Dependencies
 
