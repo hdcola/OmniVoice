@@ -16,7 +16,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
-- docs(settings): the 辅助功能 permission description (Settings, onboarding and READMEs) mentions pausing music and video while dictating (#104)
+- docs(settings): the permission descriptions (麦克风, 屏幕录制, 辅助功能, 输入监控) are worded once and shared by Settings and the onboarding wizard, which now also covers voice input and pausing music and video while dictating; the wizard's 系统音频录制 row is renamed 屏幕录制 to match Settings (#104)
 - docs(repo): add screenshots of live transcription with translation, history, voice-input translation and Quick Translate to README.md and README.zh-CN.md
 - docs(repo): README says the release build is self-signed with "OmniVoice Dev Signing" rather than ad-hoc signed
 
