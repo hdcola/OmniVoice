@@ -1,5 +1,7 @@
 # OmniVoice
 
+**English | [简体中文](README.zh-CN.md)**
+
 **Real-time transcription, translation and voice input for macOS — on-device by default.**
 
 OmniVoice is a menu-bar app for lectures, meetings and multilingual
