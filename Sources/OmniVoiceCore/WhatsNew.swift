@@ -37,6 +37,14 @@ public struct WhatsNewEntry: Equatable, Sendable, Identifiable {
 public enum WhatsNewCatalog {
     public static let entries: [WhatsNewEntry] = [
         WhatsNewEntry(
+            revision: 7,
+            title: "语音输入：自动暂停音乐和视频",
+            bullets: [
+                "开始说话时，正在播放的音乐（如 Music）或浏览器里的视频（如 YouTube）会自动暂停，文字输入完成后自动继续播放，声音不会被录进去；只会继续由它暂停的内容。",
+                "默认开启，可在「设置 › 语音输入」里关闭；需要「辅助功能」权限。同时有多个播放器在播放时，只会暂停当前的那一个。",
+            ]
+        ),
+        WhatsNewEntry(
             revision: 6,
             title: "语音输入：润色识别结果（可选）",
             bullets: [

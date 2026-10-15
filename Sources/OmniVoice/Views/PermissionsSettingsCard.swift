@@ -2,10 +2,20 @@ import AppKit
 import AVFoundation
 import SwiftUI
 
+/// What each system permission is for, worded once so Settings and the
+/// onboarding wizard can't drift apart.
+enum PermissionCopy {
+    static let microphone = "转录你的声音（实时转录、语音输入）"
+    static let screenRecording = "捕获系统声音（会议、网课）和截图翻译；截图只在本机识别，不会上传"
+    static let accessibility = "读取其他应用中选中的文字，把语音输入的文字粘贴到光标处，并在语音输入时暂停、恢复音乐和视频（发送播放/暂停键）；未授权时划词可复制后在翻译面板里粘贴，也不会暂停音乐"
+    static let inputMonitoring = "识别连按两次 ⌘C 和语音输入的触发键；只检测这些按键，不记录其他输入"
+}
+
 /// Every system permission the app asks for, in one card at the top of
-/// Settings' "通用" tab: Microphone (live transcription), Screen Recording
-/// (system audio + screenshot translation) and Accessibility (reading the
-/// selection in other apps) and Input Monitoring (the ⌘C ⌘C shortcut).
+/// Settings' "通用" tab: Microphone (live transcription, voice input),
+/// Screen Recording (system audio + screenshot translation), Accessibility
+/// (reading the selection, typing dictated text, pausing media) and Input
+/// Monitoring (the ⌘C ⌘C shortcut and the voice-input key).
 struct PermissionsSettingsCard: View {
     @ObservedObject var controller: SelectionTranslationController
     @State private var microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
@@ -16,14 +26,14 @@ struct PermissionsSettingsCard: View {
     var body: some View {
         SettingsCard(title: "权限", icon: "lock.shield") {
             PermissionRow(
-                icon: "mic", title: "麦克风", detail: "转录你的声音（实时转录、语音输入）",
+                icon: "mic", title: "麦克风", detail: PermissionCopy.microphone,
                 isGranted: microphoneStatus == .authorized,
                 open: requestMicrophone
             )
             SettingsDivider()
             PermissionRow(
                 icon: "rectangle.dashed.badge.record", title: "屏幕录制",
-                detail: "捕获系统声音（会议、网课）和截图翻译；截图只在本机识别，不会上传",
+                detail: PermissionCopy.screenRecording,
                 isGranted: hasScreenRecordingPermission,
                 open: {
                     ScreenFreezer.requestPermission()
@@ -33,14 +43,14 @@ struct PermissionsSettingsCard: View {
             SettingsDivider()
             PermissionRow(
                 icon: "figure.wave", title: "辅助功能",
-                detail: "读取其他应用中选中的文字，并把语音输入的文字粘贴到光标处；未授权时划词可复制后在翻译面板里粘贴",
+                detail: PermissionCopy.accessibility,
                 isGranted: isAccessibilityTrusted,
                 open: controller.openAccessibilitySettings
             )
             SettingsDivider()
             PermissionRow(
                 icon: "keyboard", title: "输入监控",
-                detail: "识别连按两次 ⌘C 和语音输入的触发键；只检测这些按键，不记录其他输入",
+                detail: PermissionCopy.inputMonitoring,
                 isGranted: hasInputMonitoringPermission,
                 open: controller.openInputMonitoringSettings
             )

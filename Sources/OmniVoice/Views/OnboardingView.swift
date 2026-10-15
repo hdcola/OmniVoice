@@ -180,17 +180,17 @@ struct OnboardingView: View {
     private var permissionsCard: some View {
         SettingsCard(title: "1 · 基础系统授权", icon: "lock.shield") {
             PermissionRow(
-                icon: "mic", title: "麦克风", detail: "转录你的声音",
+                icon: "mic", title: "麦克风", detail: PermissionCopy.microphone,
                 isGranted: microphoneAuthorized, open: requestMicrophonePermission
             )
             SettingsDivider()
             PermissionRow(
-                icon: "rectangle.dashed.badge.record", title: "系统音频录制", detail: "捕获会议、网课的声音",
+                icon: "rectangle.dashed.badge.record", title: "屏幕录制", detail: PermissionCopy.screenRecording,
                 isGranted: screenRecordingAuthorized, open: requestScreenRecordingPermission
             )
             SettingsDivider()
             PermissionRow(
-                icon: "figure.wave", title: "辅助功能", detail: "读取其他应用中选中的文字（划词翻译）",
+                icon: "figure.wave", title: "辅助功能", detail: PermissionCopy.accessibility,
                 isGranted: accessibilityAuthorized, open: requestAccessibilityPermission
             )
             SettingsDivider()
@@ -208,7 +208,7 @@ struct OnboardingView: View {
             if selectionController.isDoubleCopyEnabled {
                 SettingsDivider()
                 PermissionRow(
-                    icon: "keyboard", title: "输入监控", detail: "只检测 ⌘C 连按这个组合，不记录其他按键",
+                    icon: "keyboard", title: "输入监控", detail: PermissionCopy.inputMonitoring,
                     isGranted: inputMonitoringAuthorized, open: requestInputMonitoringPermission
                 )
             }
