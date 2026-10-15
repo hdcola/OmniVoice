@@ -21,7 +21,11 @@ final class DoubleCopyMonitor {
     /// Caps Lock, Fn and the numeric-pad flag don't change what ⌘C means.
     private static let relevantModifiers: NSEvent.ModifierFlags = [.command, .shift, .control, .option]
 
-    static var hasPermission: Bool { CGPreflightListenEventAccess() }
+    /// Asks IOHID for the Input Monitoring state itself.
+    /// `CGPreflightListenEventAccess` can report true on the strength of
+    /// Accessibility alone, which hid the 去授权 button while the app was
+    /// still missing from System Settings → Input Monitoring.
+    static var hasPermission: Bool { IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted }
 
     /// Shows the system's Input Monitoring prompt (macOS shows it once) and
     /// makes sure the app is listed in System Settings → Input Monitoring.

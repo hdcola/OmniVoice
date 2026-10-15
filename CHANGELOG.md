@@ -12,6 +12,7 @@ The format is based on Keep a Changelog.
 
 ### Fixed
 - fix(permissions): the 去授权 button for Input Monitoring now also registers OmniVoice through IOHID and a listen-only event tap, so the app appears in System Settings → Input Monitoring even when ⌘C ⌘C already works through Accessibility (#90)
+- fix(permissions): the Input Monitoring row no longer shows 已授权 when only Accessibility is granted — the status now comes from IOHIDCheckAccess, so 去授权 stays available until OmniVoice is really listed and enabled (#90)
 - fix(session): a recognizer or translation start (or full preload) failure no longer unloads a translation model that was preloaded on its own, so retrying doesn't reload it (#103, #51)
 
 ### Dependencies
