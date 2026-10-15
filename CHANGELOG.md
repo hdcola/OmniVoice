@@ -15,6 +15,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(repo): README says the release build is self-signed with "OmniVoice Dev Signing" rather than ad-hoc signed
 
 ### Tests
 

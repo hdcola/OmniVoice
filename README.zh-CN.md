@@ -20,7 +20,7 @@ brew trust hdcola/tap      # 仅 Homebrew 7+ 需要
 brew install --cask omnivoice
 ```
 
-此版本为 **ad-hoc 签名，未经公证**：macOS 会拒绝直接打开，需要先清除隔离标记
+此版本使用**自签名证书（OmniVoice Dev Signing）签名，未经公证**：macOS 会拒绝直接打开，需要先清除隔离标记
 （`xattr -cr /path/to/OmniVoice.app`）。详见
 [`Docs/RELEASE_TESTING.md`](Docs/RELEASE_TESTING.md)，其中也列出了需要的权限。
 
