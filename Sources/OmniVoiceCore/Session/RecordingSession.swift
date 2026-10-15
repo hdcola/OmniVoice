@@ -1204,14 +1204,18 @@ public final class RecordingSession: ObservableObject {
             // alone, so leave it loaded for a retry instead of discarding
             // a perfectly good load.
             if !reusingLoaded {
-                translation.unload()
                 // Symmetric with the `transcription.loadModel()`/`start(config:)`
                 // catch below, even though `transcription` hasn't been
                 // touched yet at this point — see `preloadModel()`'s
                 // matching catch for the same reasoning.
                 transcription.unload()
                 transcriptionProvider = nil
-                translationProvider = nil
+                // An adopted translation-only preload was loaded before this
+                // `start()`, so (like `reusingLoaded`) keep it for a retry.
+                if adoptedTranslation == nil {
+                    translation.unload()
+                    translationProvider = nil
+                }
                 // Not reached via `reusingLoaded`, so neither was true
                 // beforehand in the ordinary case — but reset both
                 // defensively anyway: if `isModelLoaded` were ever `true`
@@ -1220,7 +1224,7 @@ public final class RecordingSession: ObservableObject {
                 // just nil-ing the providers above would read as "模型已就绪"
                 // while nothing is actually loaded.
                 loadedEngineIDs = nil
-                loadedTranslationOnlyIDs = nil
+                if adoptedTranslation == nil { loadedTranslationOnlyIDs = nil }
                 isModelLoaded = false
             }
             return
@@ -1241,14 +1245,19 @@ public final class RecordingSession: ObservableObject {
             await translation.stop()
             // Same reasoning as the translation catch above.
             if !reusingLoaded {
-                translation.unload()
                 transcription.unload()
                 transcriptionProvider = nil
-                translationProvider = nil
-                // Same defensive reset as the translation catch above.
                 loadedEngineIDs = nil
-                loadedTranslationOnlyIDs = nil
                 isModelLoaded = false
+                // An adopted translation-only preload was loaded before
+                // this `start()` and is still good (`stop()` above leaves it
+                // reusable) — keep it, and its `loadedTranslationOnlyIDs`
+                // record, for the retry.
+                if adoptedTranslation == nil {
+                    translation.unload()
+                    translationProvider = nil
+                    loadedTranslationOnlyIDs = nil
+                }
             }
             return
         }
