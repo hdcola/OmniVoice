@@ -87,6 +87,8 @@ to stop, in any app. Speak, and the text is typed at the cursor.
   (for chat apps and prompts).
 - **Translate before typing** — review the translation into your foreign language in the
   bubble, then type it or the original.
+
+  ![Voice input bubble showing the translation to review before typing](Docs/images/dictation-translate.png)
 - **LLM polish** — optionally clean up punctuation, filler words and
   lists with your own OpenAI-compatible service (OpenAI, DeepSeek, Zhipu,
   Ollama or a custom Base URL). Off by default; the API key is kept in the

@@ -68,6 +68,8 @@ OmniVoice 没有主窗口，一切都在菜单栏、字幕悬浮窗和设置窗�
   也会自动关闭麦克风。
 - 点按模式下，按 Return 会结束听写、输入文字并再按一次 Return（适合聊天和发送提示词）。
 - **输入前翻译**——在气泡中确认翻译成外语的结果，再选择输入译文或原文。
+
+  ![语音输入气泡：输入前确认译文](Docs/images/dictation-translate.png)
 - **LLM 润色**——可选，用你自己的 OpenAI 兼容服务（OpenAI、DeepSeek、智谱、Ollama
   或自定义 Base URL）整理标点、去掉口癖、整理列表。默认关闭，API Key 保存在钥匙串，
   任何失败都会输入原文。如果使用本机大模型，试下来 Google 的
