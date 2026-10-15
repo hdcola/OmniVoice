@@ -35,6 +35,8 @@ translations of its labels.
 
 ### Live transcription & translation
 
+![Live transcription with translation in the caption panel](Docs/images/live-transcription.png)
+
 - **Caption panel** — a semi-transparent, draggable, resizable
   window that stays on top without stealing focus and remembers its position.
   Bilingual / translation-only / source-only display, three font sizes,
@@ -54,9 +56,13 @@ translations of its labels.
   searchable, grouped by date, renamable, multi-select delete, "delete older
   than 30/90 days", copy full text or translation only, Markdown export.
 
+![History window with a saved bilingual transcript](Docs/images/history.png)
+
 ### Quick Translate
 
 Runs fully on-device.
+
+![Quick Translate panel translating English to Simplified Chinese](Docs/images/quick-translate.png)
 
 - **Translate selection (⌥A)** — select text in any app and press
   ⌥A. Optionally, press ⌘C twice (⌘C ⌘C) to translate what you just copied.
@@ -83,6 +89,8 @@ to stop, in any app. Speak, and the text is typed at the cursor.
   (for chat apps and prompts).
 - **Translate before typing** — review the translation into your foreign language in the
   bubble, then type it or the original.
+
+  ![Voice input bubble showing the translation to review before typing](Docs/images/dictation-translate.png)
 - **LLM polish** — optionally clean up punctuation, filler words and
   lists with your own OpenAI-compatible service (OpenAI, DeepSeek, Zhipu,
   Ollama or a custom Base URL). Off by default; the API key is kept in the
