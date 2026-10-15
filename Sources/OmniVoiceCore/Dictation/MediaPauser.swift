@@ -1,5 +1,5 @@
-import AppKit
 import CoreAudio
+import Foundation
 
 /// Whether some other app is producing sound right now.
 public protocol MediaPlaybackProbe {
@@ -47,7 +47,7 @@ public final class MediaPauser {
 
     public init(
         probe: any MediaPlaybackProbe = CoreAudioPlaybackProbe(),
-        sender: any MediaKeySender = SystemMediaKeySender(),
+        sender: any MediaKeySender,
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
     ) {
         self.probe = probe
@@ -59,7 +59,15 @@ public final class MediaPauser {
         // Already paused by us: a second press would resume it.
         guard !didPause else { return }
         if let until = resumePendingUntil, now() < until {
-            startWatching()
+            // A resume may still be on its way, so no blind press — but if
+            // the music is already audible there is nothing to wait for.
+            if probe.isOtherAudioPlaying() {
+                press(producing: false)
+                didPause = true
+                resumePendingUntil = nil
+            } else {
+                startWatching()
+            }
             return
         }
         guard isPlaying() else { return }
@@ -166,28 +174,5 @@ public struct CoreAudioPlaybackProbe: MediaPlaybackProbe {
         var size = UInt32(MemoryLayout<UInt32>.size)
         guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &running) == noErr else { return false }
         return running != 0
-    }
-}
-
-/// Posts the Play/Pause key (`NX_KEYTYPE_PLAY`) as a system-defined event.
-public struct SystemMediaKeySender: MediaKeySender {
-    public init() {}
-
-    public func sendPlayPause() {
-        let keyType = 16 // NX_KEYTYPE_PLAY
-        for isDown in [true, false] {
-            let flags = isDown ? 0xA00 : 0xB00
-            NSEvent.otherEvent(
-                with: .systemDefined,
-                location: .zero,
-                modifierFlags: NSEvent.ModifierFlags(rawValue: UInt(flags)),
-                timestamp: 0,
-                windowNumber: 0,
-                context: nil,
-                subtype: 8,
-                data1: (keyType << 16) | flags,
-                data2: -1
-            )?.cgEvent?.post(tap: .cghidEventTap)
-        }
     }
 }

@@ -139,7 +139,7 @@ final class DictationController: ObservableObject {
     private var machine: DictationTriggerMachine
     private let hud = DictationHUDPanel()
     private let returnInterceptor = DictationReturnInterceptor()
-    private let mediaPauser = MediaPauser()
+    private let mediaPauser = MediaPauser(sender: SystemMediaKeySender())
     private let translator: SelectionTranslator
     /// The engine the user picked for translating (a `SelectionTranslationEngine` ID).
     private let translationEngineID: () -> String
@@ -307,8 +307,10 @@ final class DictationController: ObservableObject {
         noticeTask?.cancel()
         notice = nil
         let deviceID = deviceID()
-        // Before the microphone opens, so the music isn't recorded.
-        if pauseMediaEnabled { mediaPauser.pauseIfPlaying() }
+        // Before the microphone opens, so the music isn't recorded. Posting
+        // the media key needs Accessibility; without it the press would be
+        // silently dropped while the pauser believed it had paused.
+        if pauseMediaEnabled, SelectedTextReader.isAccessibilityTrusted { mediaPauser.pauseIfPlaying() }
         // Starting clears the last dictation's text, which has to be gone
         // before the bubble is shown again.
         dictation.start(

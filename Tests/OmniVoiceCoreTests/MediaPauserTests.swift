@@ -123,4 +123,20 @@ final class MediaPauserTests: XCTestCase {
         XCTAssertTrue(fake.playing)
         XCTAssertEqual(fake.presses, 2)
     }
+
+    /// Music already audible during the pending window: pause at once.
+    func testAudibleLateResumePausesImmediately() {
+        let fake = Fake()
+        fake.playing = true
+        let pauser = makePauser(fake)
+        pauser.pauseIfPlaying()
+        time = 5
+        fake.stale = nil
+        pauser.resumeIfWePaused()
+        time = 8 // past the settle window, music is back
+        fake.stale = nil
+        pauser.pauseIfPlaying()
+        XCTAssertFalse(fake.playing)
+        XCTAssertEqual(fake.presses, 3)
+    }
 }
