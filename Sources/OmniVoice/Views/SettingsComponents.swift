@@ -64,6 +64,7 @@ struct SettingsTabBar: View {
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .focusEffectDisabled()
                 .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
                 .accessibilityAddTraits(selection == tab ? .isSelected : [])
             }
