@@ -90,7 +90,14 @@ public struct PolishSettings: Equatable, Sendable {
     public var isEnabled = false
     public var preset: PolishPreset = .openAI
     public var baseURL: String = PolishPreset.openAI.baseURL
-    public var model: String = PolishPreset.openAI.defaultModel
+    /// A model id is a single line; pasted or stored line breaks are dropped
+    /// (see `singleLine`), or the service rejects it with a 400.
+    public var model: String = PolishPreset.openAI.defaultModel {
+        didSet {
+            let line = Self.singleLine(model)
+            if line != model { model = line }
+        }
+    }
     public var style: PolishStyle = .clean
     public var extra = ""
     /// Seconds; always within `timeoutRange`.
@@ -101,6 +108,16 @@ public struct PolishSettings: Equatable, Sendable {
     public var hasAcknowledgedPrivacy = false
 
     public init() {}
+
+    /// The first non-empty line of `text`, or `text` itself when it has no
+    /// line break — so a model id pasted twice, or with a trailing newline,
+    /// still names one model.
+    public static func singleLine(_ text: String) -> String {
+        guard text.contains(where: \.isNewline) else { return text }
+        return text.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty } ?? ""
+    }
 
     public static func clampTimeout(_ seconds: Int) -> Int {
         min(max(seconds, timeoutRange.lowerBound), timeoutRange.upperBound)
