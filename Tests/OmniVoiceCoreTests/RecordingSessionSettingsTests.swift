@@ -965,6 +965,57 @@ struct RecordingSessionSettingsTests {
         #expect(session.transcriptionEngineID == "model.r2t2")
     }
 
+    /// Guards #51: a recognizer failure in `start()` must tear down only the
+    /// recognizer it just built, not the translation-only preload it adopted.
+    /// The recognizer's "weights" are an empty stand-in file, so its
+    /// `loadModel()` throws before anything touches the microphone.
+    @Test func recognizerStartFailureKeepsAdoptedTranslationOnlyPreload() async throws {
+        defer {
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionModelVariantID)
+            defaults.removeObject(forKey: PersistedSettingsKey.includeSystemAudio)
+        }
+        let variant = try #require(ProviderCatalog.variant(forID: "r2t2-q8_0"))
+        let session = RecordingSession(modelDownloadManager: try makeDownloadManager(withDownloaded: variant))
+        await session.preloadModel(scope: .translationOnly)
+        #expect(session.loadedTranslationOnlyIDs != nil)
+
+        session.transcriptionEngineID = "model.r2t2"
+        session.transcriptionModelVariantID = "r2t2-q8_0"
+        // The test machine may have no microphone; system audio satisfies
+        // `start()`'s "any audio source" guard so it reaches the recognizer.
+        session.includeSystemAudio = true
+        await session.start()
+
+        #expect(!session.isRunning)
+        #expect(session.statusMessage.contains("识别引擎启动失败"), "\(session.statusMessage)")
+        #expect(session.loadedTranslationOnlyIDs?.engine == session.translationEngineID)
+        #expect(session.hasLoadedModels)
+        #expect(!session.isModelLoaded)
+    }
+
+    /// Same as above, for `preloadModel(scope: .all)`: its recognizer load
+    /// failing must not unload the translation-only preload it adopted.
+    @Test func fullPreloadRecognizerFailureKeepsAdoptedTranslationOnlyPreload() async throws {
+        defer {
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionModelVariantID)
+        }
+        let variant = try #require(ProviderCatalog.variant(forID: "r2t2-q8_0"))
+        let session = RecordingSession(modelDownloadManager: try makeDownloadManager(withDownloaded: variant))
+        await session.preloadModel(scope: .translationOnly)
+        #expect(session.loadedTranslationOnlyIDs != nil)
+
+        session.transcriptionEngineID = "model.r2t2"
+        session.transcriptionModelVariantID = "r2t2-q8_0"
+        await session.preloadModel(scope: .all)
+
+        #expect(session.statusMessage.contains("识别引擎预加载失败"), "\(session.statusMessage)")
+        #expect(session.loadedTranslationOnlyIDs?.engine == session.translationEngineID)
+        #expect(session.hasLoadedModels)
+        #expect(!session.isModelLoaded)
+    }
+
     /// The deletion gate in the history window keys off this; with nothing
     /// recording there must be no protected record.
     @Test func liveSessionIDIsNilWhenIdle() {

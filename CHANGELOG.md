@@ -11,6 +11,7 @@ The format is based on Keep a Changelog.
 ### Changed
 
 ### Fixed
+- fix(session): a recognizer or translation start (or full preload) failure no longer unloads a translation model that was preloaded on its own, so retrying doesn't reload it (#103, #51)
 
 ### Dependencies
 
@@ -19,6 +20,7 @@ The format is based on Keep a Changelog.
 - docs(repo): README says the release build is self-signed with "OmniVoice Dev Signing" rather than ad-hoc signed
 
 ### Tests
+- test(session): a recognizer start or full-preload failure keeps an adopted translation-only preload (#103, #51)
 
 ## [0.8.0] - 2026-10-14
 
