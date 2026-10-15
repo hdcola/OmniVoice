@@ -994,6 +994,28 @@ struct RecordingSessionSettingsTests {
         #expect(!session.isModelLoaded)
     }
 
+    /// Same as above, for `preloadModel(scope: .all)`: its recognizer load
+    /// failing must not unload the translation-only preload it adopted.
+    @Test func fullPreloadRecognizerFailureKeepsAdoptedTranslationOnlyPreload() async throws {
+        defer {
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID)
+            defaults.removeObject(forKey: PersistedSettingsKey.transcriptionModelVariantID)
+        }
+        let variant = try #require(ProviderCatalog.variant(forID: "r2t2-q8_0"))
+        let session = RecordingSession(modelDownloadManager: try makeDownloadManager(withDownloaded: variant))
+        await session.preloadModel(scope: .translationOnly)
+        #expect(session.loadedTranslationOnlyIDs != nil)
+
+        session.transcriptionEngineID = "model.r2t2"
+        session.transcriptionModelVariantID = "r2t2-q8_0"
+        await session.preloadModel(scope: .all)
+
+        #expect(session.statusMessage.contains("识别引擎预加载失败"), "\(session.statusMessage)")
+        #expect(session.loadedTranslationOnlyIDs?.engine == session.translationEngineID)
+        #expect(session.hasLoadedModels)
+        #expect(!session.isModelLoaded)
+    }
+
     /// The deletion gate in the history window keys off this; with nothing
     /// recording there must be no protected record.
     @Test func liveSessionIDIsNilWhenIdle() {

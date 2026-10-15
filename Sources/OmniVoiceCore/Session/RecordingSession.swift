@@ -896,11 +896,17 @@ public final class RecordingSession: ObservableObject {
             try await transcription.loadModel()
         } catch {
             statusMessage = "识别引擎预加载失败: \(error.localizedDescription)"
-            translation.unload()
             transcription.unload()
             transcriptionProvider = nil
-            translationProvider = nil
-            loadedTranslationOnlyIDs = nil
+            // An adopted translation-only preload was loaded by an earlier
+            // call and is still good — keep it (and its
+            // `loadedTranslationOnlyIDs` record) rather than make the retry
+            // reload it. Only a translation loaded by this call is torn down.
+            if adoptedTranslation == nil {
+                translation.unload()
+                translationProvider = nil
+                loadedTranslationOnlyIDs = nil
+            }
             return
         }
 
