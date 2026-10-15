@@ -66,8 +66,9 @@ final class MediaPauserTests: XCTestCase {
         XCTAssertEqual(fake.presses, 2)
     }
 
-    /// The resume hasn't reached the output yet when the next dictation starts.
-    func testQuickSecondDictationPausesAgain() {
+    /// The resume is slow to be heard when the next dictation starts: no
+    /// blind press, then a pause once the music turns up.
+    func testLateResumeIsPausedWhenHeard() {
         let fake = Fake()
         fake.playing = true
         let pauser = makePauser(fake)
@@ -76,14 +77,38 @@ final class MediaPauserTests: XCTestCase {
         fake.stale = nil
         pauser.resumeIfWePaused() // music coming back, probe still says silent
         time = 5.3
-        XCTAssertFalse(fake.isOtherAudioPlaying())
         pauser.pauseIfPlaying()
+        XCTAssertEqual(fake.presses, 2) // nothing pressed blindly
+        time = 5.6
+        XCTAssertTrue(pauser.poll()) // still silent: keep waiting
+        fake.stale = nil // the music is heard now
+        time = 7
+        XCTAssertFalse(pauser.poll())
         XCTAssertFalse(fake.playing)
         XCTAssertEqual(fake.presses, 3)
-        time = 9
+        time = 10
         fake.stale = nil
         pauser.resumeIfWePaused()
         XCTAssertTrue(fake.playing)
+        XCTAssertEqual(fake.presses, 4)
+    }
+
+    /// The dictation ended before the late music showed up: leave it be.
+    func testLateResumeAfterShortDictationIsLeftAlone() {
+        let fake = Fake()
+        fake.playing = true
+        let pauser = makePauser(fake)
+        pauser.pauseIfPlaying()
+        time = 5
+        fake.stale = nil
+        pauser.resumeIfWePaused()
+        time = 5.3
+        pauser.pauseIfPlaying()
+        pauser.resumeIfWePaused()
+        fake.stale = nil
+        time = 7
+        XCTAssertFalse(pauser.poll())
+        XCTAssertEqual(fake.presses, 2)
     }
 
     /// A very short dictation: the pause is still draining at the end.

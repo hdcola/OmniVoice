@@ -22,10 +22,18 @@ public protocol MediaKeySender {
 /// believed: the state the press was meant to produce is assumed instead.
 /// Without that, dictating twice in quick succession misreads the music's
 /// state and a press lands the wrong way round.
+///
+/// A resume can also take longer to be heard than that. If a dictation starts
+/// while one is still pending, nothing is pressed blindly (a press landing on
+/// a still-paused player would start it); the dictation watches instead, and
+/// pauses once the music is actually heard.
 @MainActor
 public final class MediaPauser {
     /// How long after our own key press the probe is not trusted.
     static let settleTime: TimeInterval = 1.5
+    /// How long after a resume press the music may still turn up.
+    static let resumePendingTime: TimeInterval = 6
+    static let pollInterval: Duration = .milliseconds(300)
 
     private let probe: any MediaPlaybackProbe
     private let sender: any MediaKeySender
@@ -33,6 +41,9 @@ public final class MediaPauser {
     private var didPause = false
     /// What our last press was meant to produce, and when it was sent.
     private var lastPress: (playing: Bool, at: TimeInterval)?
+    /// Until when a resume we sent may still start playing late.
+    private var resumePendingUntil: TimeInterval?
+    private var watchTask: Task<Void, Never>?
 
     public init(
         probe: any MediaPlaybackProbe = CoreAudioPlaybackProbe(),
@@ -46,16 +57,52 @@ public final class MediaPauser {
 
     public func pauseIfPlaying() {
         // Already paused by us: a second press would resume it.
-        guard !didPause, isPlaying() else { return }
+        guard !didPause else { return }
+        if let until = resumePendingUntil, now() < until {
+            startWatching()
+            return
+        }
+        guard isPlaying() else { return }
         press(producing: false)
         didPause = true
     }
 
     public func resumeIfWePaused() {
+        stopWatching()
         guard didPause else { return }
         didPause = false
         guard !isPlaying() else { return }
         press(producing: true)
+        resumePendingUntil = now() + Self.resumePendingTime
+    }
+
+    /// One look at whether a late resume has become audible; pauses it if so.
+    /// Returns false once there is nothing left to wait for.
+    @discardableResult
+    func poll() -> Bool {
+        guard !didPause, let until = resumePendingUntil, now() < until else { return false }
+        guard probe.isOtherAudioPlaying() else { return true }
+        press(producing: false)
+        didPause = true
+        resumePendingUntil = nil
+        return false
+    }
+
+    private func startWatching() {
+        guard watchTask == nil else { return }
+        watchTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.pollInterval)
+                guard !Task.isCancelled, let self, poll() else { break }
+            }
+        }
+    }
+
+    private func stopWatching() {
+        watchTask?.cancel()
+        watchTask = nil
+        // The dictation is over: a late resume is now just the music coming back.
+        resumePendingUntil = nil
     }
 
     private func press(producing playing: Bool) {
