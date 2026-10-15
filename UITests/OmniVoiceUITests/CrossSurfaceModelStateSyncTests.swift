@@ -31,14 +31,24 @@ final class CrossSurfaceModelStateSyncTests: XCTestCase {
         app.terminate()
     }
 
+    /// Opens Settings on the "语音识别" tab — the engine pickers and the
+    /// memory console live there, not on the default "通用" tab.
     private func openSettings() {
         app.activate()
         app.typeKey(",", modifierFlags: .command)
+        let tab = app.buttons["语音识别"].firstMatch
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "Settings tab 语音识别 should exist")
+        tab.click()
+        let selected = XCTWaiter.wait(
+            for: [expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: tab)],
+            timeout: 5
+        )
+        XCTAssertEqual(selected, .completed, "Settings tab 语音识别 should become selected")
     }
 
     /// Selecting an on-device ASR engine (R2T2, undownloaded on a fresh
     /// install) must surface the preload affordance on BOTH surfaces at
-    /// once — Settings' "通用" memory console section and the floating
+    /// once — Settings' "语音识别" memory console section and the floating
     /// panel's status-bar control — never just one of them.
     func testSelectingAnOnDeviceEngineShowsThePreloadControlOnBothSurfaces() {
         openSettings()

@@ -1,12 +1,16 @@
 import Foundation
 import SwiftUI
 
-/// One of `SettingsView`'s tabs — "通用" (permissions, 快捷翻译, 实时转录,
-/// 字幕悬浮窗), "模型库" and "关于". Raw values saved by older builds
+/// One of `SettingsView`'s tabs — "通用" (permissions, language, launch,
+/// notifications, 字幕悬浮窗), "语音识别" (engines and memory), "语音输入",
+/// "快捷翻译", "模型库" and "关于". Raw values saved by older builds
 /// ("engines", "language", "selection") no longer parse and fall back to
 /// "通用".
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
+    case recognition
+    case dictation
+    case quickTranslation
     case models
     case about
 
@@ -15,6 +19,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: return "通用"
+        case .recognition: return "语音识别"
+        case .dictation: return "语音输入"
+        case .quickTranslation: return "快捷翻译"
         case .models: return "模型库"
         case .about: return "关于"
         }
@@ -23,6 +30,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .general: return "gearshape"
+        case .recognition: return "waveform"
+        case .dictation: return "waveform.badge.mic"
+        case .quickTranslation: return "character.bubble"
         case .models: return "shippingbox"
         case .about: return "info.circle"
         }
@@ -88,6 +98,11 @@ final class SettingsNavigationState: ObservableObject {
     /// "模型库…" (menu bar and the in-form nudge next to an undownloaded
     /// engine) — jump straight to the "模型库" tab.
     func openModelLibrary() {
-        selectedTab = .models
+        open(.models)
+    }
+
+    /// Jump to any tab — e.g. the "去通用设语言" link on 语音输入 / 快捷翻译.
+    func open(_ tab: SettingsTab) {
+        selectedTab = tab
     }
 }

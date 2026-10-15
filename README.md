@@ -56,14 +56,14 @@ history and open items.
   recognized locally with Vision). The translation panel (翻译面板) translates it with the
   system Translation framework or HY-MT1.5 — text in "my language" goes to
   your foreign language, everything else comes into "my language". ⏎
-  translates, ⇧⏎ inserts a newline, Esc hides. Shortcuts, engine and
-  languages live in Settings → 通用. Reading the selection needs the
+  translates, ⇧⏎ inserts a newline, Esc hides. Shortcuts and engine live in
+  Settings → 快捷翻译, languages in Settings → 通用. Reading the selection needs the
   Accessibility permission (without it, copy and paste into the translation panel);
   ⌥S needs Screen Recording.
 - **Voice input (语音输入, opt-in)**: hold the right ⌥ Option key (or tap to
   start and tap again to stop) in any app, speak, and the text is typed at the
   cursor. Uses system speech recognition, or borrows the loaded R2T2 model when
-  实时转录 uses it. Turn it on in Settings → 通用 → 语音输入; it needs Input
+  实时转录 uses it. Turn it on in Settings → 语音输入; it needs Input
   Monitoring, Accessibility and Microphone.
 - **History (历史记录)**: past transcripts persisted locally (SwiftData), with
   a searchable history window and Markdown export.

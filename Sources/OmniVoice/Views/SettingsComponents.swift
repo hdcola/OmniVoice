@@ -58,12 +58,13 @@ struct SettingsTabBar: View {
                     Text(tab.title)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(selection == tab ? Color.primary : .secondary)
-                        .padding(.horizontal, 18)
+                        .padding(.horizontal, 14)
                         .padding(.vertical, 6)
                         .background(Capsule().fill(selection == tab ? Color.primary.opacity(0.14) : .clear))
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .focusEffectDisabled()
                 .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
                 .accessibilityAddTraits(selection == tab ? .isSelected : [])
             }
