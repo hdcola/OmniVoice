@@ -43,16 +43,19 @@ final class MediaPauserTests: XCTestCase {
         XCTAssertEqual(fake.presses, 0)
     }
 
-    func testDoesNotResumeWhenUserRestartedAudio() {
+    /// A paused browser keeps its output stream open: the probe still says
+    /// "playing", and the music has to come back all the same.
+    func testResumesEvenIfOutputStillReportsPlaying() {
         let fake = Fake()
         fake.playing = true
         let pauser = makePauser(fake)
         pauser.pauseIfPlaying()
+        XCTAssertFalse(fake.playing)
         time = 5
-        fake.stale = nil
-        fake.playing = true // the user hit play themselves
+        fake.stale = true // stream stays open while paused
         pauser.resumeIfWePaused()
-        XCTAssertEqual(fake.presses, 1)
+        XCTAssertTrue(fake.playing)
+        XCTAssertEqual(fake.presses, 2)
     }
 
     func testSecondPauseIsIgnoredAndResumeHappensOnce() {

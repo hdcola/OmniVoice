@@ -14,8 +14,7 @@ public protocol MediaKeySender {
 /// Pauses whatever is playing while the user dictates, and resumes it
 /// afterwards — but only if this paused it. The media key is a toggle, so it
 /// is never sent blind: starting needs something audibly playing, and
-/// resuming needs it to still be silent (the user may have restarted the
-/// music, or something else, in the meantime).
+/// resuming is unconditional once this has paused.
 ///
 /// A key press takes a moment to show up in the audio output (a pause
 /// drains, a resume fades in), so right after pressing one the probe is not
@@ -79,7 +78,10 @@ public final class MediaPauser {
         stopWatching()
         guard didPause else { return }
         didPause = false
-        guard !isPlaying() else { return }
+        // Never second-guessed with the probe: a paused browser keeps its
+        // audio output open, so "something is outputting" says nothing about
+        // whether the music is playing, and skipping this press would leave
+        // it paused (and make the next dictation's press start it).
         press(producing: true)
         resumePendingUntil = now() + Self.resumePendingTime
     }
