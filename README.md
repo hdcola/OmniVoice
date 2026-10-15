@@ -10,9 +10,9 @@ text and screenshots anywhere on screen, and types what you dictate into any
 app. Speech recognition and translation run on macOS's built-in frameworks
 or on local models — no cloud service is required.
 
-**Current version: 0.7.0 — internal test build.**
+**Current version: 0.8.0 — internal test build.**
 
-### [⬇ Download OmniVoice 0.7.0 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.7.0/OmniVoice-0.7.0.dmg)
+### [⬇ Download OmniVoice 0.8.0 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.8.0/OmniVoice-0.8.0.dmg)
 
 Or install with [Homebrew](https://brew.sh):
 
@@ -86,7 +86,9 @@ to stop, in any app. Speak, and the text is typed at the cursor.
 - **LLM polish** — optionally clean up punctuation, filler words and
   lists with your own OpenAI-compatible service (OpenAI, DeepSeek, Zhipu,
   Ollama or a custom Base URL). Off by default; the API key is kept in the
-  Keychain; any failure types the original text.
+  Keychain; any failure types the original text. For a local model, Google's
+  [Gemma 4 E2B](https://lmstudio.ai/models/google/gemma-4-e2b) (via LM Studio)
+  has tested well enough.
 
 ### Engines & models
 

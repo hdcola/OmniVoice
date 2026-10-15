@@ -7,6 +7,20 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.8.0] - 2026-10-14
+
+### Added
 - feat(dictation): optionally polish dictated text with a user-configured OpenAI-compatible LLM (OpenAI, DeepSeek, 智谱, local Ollama or a custom Base URL) before it is typed — adds punctuation, drops filler words, tidies lists; off by default with a first-use privacy notice, four styles (保持原话 / 清爽 (default) / 结构化 / 正式), an extra-requirements field, a 3–30 s timeout (default 8 s), 测试连接, the API key in the Keychain, URLs/paths/code kept intact via entity masking, and every failure, timeout, unreliable output, too-short text or Esc while polishing types the original; with translation on, polishing runs first and the review shows the polished text; the update's 新功能 window announces it (#92)
 
 ### Changed
@@ -28,6 +42,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(repo): README notes that Google's Gemma 4 E2B (via LM Studio) works well as a local LLM polish model
 - docs(repo): add a Simplified Chinese README (README.zh-CN.md) and a language switcher at the top of README.md
 - docs(repo): rewrite README.md around the full current feature set (live transcription, Quick Translate, voice input with translation and LLM polish, engines and Model Library)
 - docs(app): add a Dock-icon manual test checklist to Docs/RELEASE_TESTING.md (#94)

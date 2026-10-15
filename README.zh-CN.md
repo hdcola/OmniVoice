@@ -8,9 +8,9 @@ OmniVoice 是一款菜单栏应用，适用于听课、开会和多语言交流�
 字幕悬浮窗里，能翻译屏幕上任意位置的文字和截图，还能把你说的话输入到任何 App。
 语音识别和翻译既可以用 macOS 内置框架，也可以用本地模型，不依赖云服务。
 
-**当前版本：0.7.0——内部测试版。**
+**当前版本：0.8.0——内部测试版。**
 
-### [⬇ 下载 OmniVoice 0.7.0 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.7.0/OmniVoice-0.7.0.dmg)
+### [⬇ 下载 OmniVoice 0.8.0 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.8.0/OmniVoice-0.8.0.dmg)
 
 也可以用 [Homebrew](https://brew.sh) 安装：
 
@@ -66,7 +66,8 @@ OmniVoice 没有主窗口，一切都在菜单栏、字幕悬浮窗和设置窗�
 - **输入前翻译**——在气泡中确认翻译成外语的结果，再选择输入译文或原文。
 - **LLM 润色**——可选，用你自己的 OpenAI 兼容服务（OpenAI、DeepSeek、智谱、Ollama
   或自定义 Base URL）整理标点、去掉口癖、整理列表。默认关闭，API Key 保存在钥匙串，
-  任何失败都会输入原文。
+  任何失败都会输入原文。如果使用本机大模型，试下来 Google 的
+  [Gemma 4 E2B](https://lmstudio.ai/models/google/gemma-4-e2b)（通过 LM Studio）效果还不错。
 
 ### 引擎与模型
 

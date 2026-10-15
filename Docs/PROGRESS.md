@@ -341,6 +341,14 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       weights, and one-shot `HYMT15Translator.translateText` — plus floating
       panel toolbar/resize-cursor fixes (PR #41), the 启动时显示悬浮窗 toggle
       (PR #42), and the terminology unification pass (PR #43).
+- [x] **0.8.0 release cut** (2026-10-14, `chore/release-0.8.0`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.8.0,
+      `CFBundleVersion` 21), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.8.0]` section, `README.md` / `README.zh-CN.md` version and
+      download-link references bumped to match. Voice input can optionally
+      polish dictated text with a user-configured OpenAI-compatible LLM (PR
+      #92), Settings' tabs were split up (PR #95), and voice input starts
+      faster (PR #89). What's-new entry (revision 6) was already in place.
 - [x] **0.7.0 release cut** (2026-10-03, `chore/release-0.7.0`): version
       bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.7.0,
       `CFBundleVersion` 20), CHANGELOG's `[Unreleased]` cut into a dated
