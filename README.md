@@ -56,7 +56,7 @@ translations of its labels.
 
 ### Quick Translate
 
-Modeled on [Cida](https://github.com/Xuanwo/cida), but fully on-device.
+Runs fully on-device.
 
 - **Translate selection (⌥A)** — select text in any app and press
   ⌥A. Optionally, press ⌘C twice (⌘C ⌘C) to translate what you just copied.
@@ -155,3 +155,13 @@ Local model engines need their upstream sources built first — see
 ## License
 
 Apache License 2.0 — see [`LICENSE`](LICENSE).
+
+## Acknowledgements
+
+Thanks to these projects:
+
+- [Cida](https://github.com/Xuanwo/cida) — inspiration for Quick Translate
+- SnapTra Translator — inspiration for the card-style Settings
+- [audio.cpp](https://github.com/0xShug0/audio.cpp) and [llama.cpp](https://github.com/ggml-org/llama.cpp) — in-process local inference
+- [R2T2](https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf) and [T3PO](https://huggingface.co/netease-youdao/Confucius4-T3PO-GGUF) (NetEase Youdao Confucius4) — local speech recognition and translation models
+- [HY-MT1.5](https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF) (Tencent) — local translation model

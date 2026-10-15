@@ -44,7 +44,7 @@ OmniVoice 没有主窗口，一切都在菜单栏、字幕悬浮窗和设置窗�
 
 ### 快捷翻译
 
-参考 [Cida](https://github.com/Xuanwo/cida)，但完全在本机运行。
+完全在本机运行。
 
 - **划词翻译（⌥A）**——在任意 App 里选中文字后按 ⌥A。也可以开启连按两次 ⌘C
   翻译刚复制的内容。
@@ -128,3 +128,13 @@ swift test              # 单元测试
 ## 许可证
 
 Apache License 2.0——见 [`LICENSE`](LICENSE)。
+
+## 致谢
+
+感谢以下项目：
+
+- [Cida](https://github.com/Xuanwo/cida)——快捷翻译的灵感来源
+- SnapTra Translator——卡片式设置界面的灵感来源
+- [audio.cpp](https://github.com/0xShug0/audio.cpp) 与 [llama.cpp](https://github.com/ggml-org/llama.cpp)——本地进程内推理
+- [R2T2](https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf) 与 [T3PO](https://huggingface.co/netease-youdao/Confucius4-T3PO-GGUF)（网易有道 Confucius4）——本地语音识别与翻译模型
+- [HY-MT1.5](https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF)（腾讯）——本地翻译模型
