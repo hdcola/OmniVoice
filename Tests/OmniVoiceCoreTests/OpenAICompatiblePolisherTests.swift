@@ -121,7 +121,7 @@ struct OpenAICompatiblePolisherTests {
         }.testConnection()
         #expect(elapsed >= 0)
         let body = try bodyJSON(try #require(captured.request))
-        #expect(body["max_tokens"] as? Int == 8)
+        #expect(body["max_tokens"] as? Int == 64)
     }
 
     private func sentBody(baseURL: String, model: String = "m1") async throws -> [String: Any] {
@@ -199,9 +199,26 @@ struct OpenAICompatiblePolisherTests {
     func truncated() async {
         let body = #"{"choices":[{"finish_reason":"length","message":{"content":"","reasoning_content":"thinking"}}]}"#
         do {
-            _ = try await polisher { _ in self.response(200, body) }.testConnection()
+            _ = try await polisher { _ in self.response(200, body) }.polish("x")
             Issue.record("expected a throw")
         } catch { #expect(error as? PolishError == .truncated) }
+    }
+
+    @Test("testConnection succeeds when the small reply is cut off by max_tokens")
+    func connectionToleratesLength() async throws {
+        let empty = #"{"choices":[{"finish_reason":"length","message":{"content":"","reasoning_content":"thinking"}}]}"#
+        let partial = #"{"choices":[{"finish_reason":"length","message":{"content":"The ping command is a"}}]}"#
+        for body in [empty, partial] {
+            _ = try await polisher { _ in self.response(200, body) }.testConnection()
+        }
+    }
+
+    @Test("testConnection still fails on a malformed reply")
+    func connectionMalformed() async {
+        do {
+            _ = try await polisher { _ in self.response(200, "{}") }.testConnection()
+            Issue.record("expected a throw")
+        } catch { #expect(error as? PolishError == .emptyResponse) }
     }
 
     @Test("<think> blocks are stripped, and an unterminated one leaves nothing")
