@@ -35,6 +35,8 @@ translations of its labels.
 
 ### Live transcription & translation
 
+![Live transcription with translation in the caption panel](Docs/images/live-transcription.png)
+
 - **Caption panel** — a semi-transparent, draggable, resizable
   window that stays on top without stealing focus and remembers its position.
   Bilingual / translation-only / source-only display, three font sizes,

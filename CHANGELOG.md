@@ -15,6 +15,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(repo): add a live transcription + translation screenshot to README.md and README.zh-CN.md
 
 ### Tests
 
