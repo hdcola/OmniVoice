@@ -99,6 +99,10 @@ public final class MediaPauser {
     private func startWatching() {
         guard watchTask == nil else { return }
         watchTask = Task { [weak self] in
+            // Clear the handle once the loop is done on its own, so a later
+            // dictation can watch again. A cancelled task leaves it alone:
+            // `stopWatching` already cleared it, and a newer task may own it.
+            defer { if !Task.isCancelled { self?.watchTask = nil } }
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.pollInterval)
                 guard !Task.isCancelled, let self, poll() else { break }
@@ -131,7 +135,7 @@ public struct CoreAudioPlaybackProbe: MediaPlaybackProbe {
     public func isOtherAudioPlaying() -> Bool {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         for object in Self.processObjects() {
-            guard Self.pid(of: object) != ownPID, Self.isRunningOutput(object) else { continue }
+            guard let pid = Self.pid(of: object), pid != ownPID, Self.isRunningOutput(object) else { continue }
             return true
         }
         return false
