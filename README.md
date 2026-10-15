@@ -62,6 +62,8 @@ translations of its labels.
 
 Runs fully on-device.
 
+![Quick Translate panel translating English to Simplified Chinese](Docs/images/quick-translate.png)
+
 - **Translate selection (⌥A)** — select text in any app and press
   ⌥A. Optionally, press ⌘C twice (⌘C ⌘C) to translate what you just copied.
 - **Translate screenshot (⌥S)** — frame part of the screen; text is

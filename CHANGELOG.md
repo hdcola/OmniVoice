@@ -15,7 +15,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
-- docs(repo): add live transcription + translation history and voice-input translation screenshots to README.md and README.zh-CN.md
+- docs(repo): add live transcription + translation history, voice-input translation and Quick Translate screenshots to README.md and README.zh-CN.md
 
 ### Tests
 
