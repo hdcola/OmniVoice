@@ -28,6 +28,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(repo): add a Simplified Chinese README (README.zh-CN.md) and a language switcher at the top of README.md
 - docs(repo): rewrite README.md around the full current feature set (live transcription, Quick Translate, voice input with translation and LLM polish, engines and Model Library)
 - docs(app): add a Dock-icon manual test checklist to Docs/RELEASE_TESTING.md (#94)
 - docs(dictation): add a design draft for polishing dictated text with a user-configured OpenAI-compatible LLM, off by default (#91)

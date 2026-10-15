@@ -1,5 +1,7 @@
 # OmniVoice
 
+**English | [简体中文](README.zh-CN.md)**
+
 **Real-time transcription, translation and voice input for macOS — on-device by default.**
 
 OmniVoice is a menu-bar app for lectures, meetings and multilingual
@@ -28,46 +30,47 @@ permissions it asks for.
 ## Features
 
 OmniVoice has no main window; everything lives in the menu bar, the caption
-panel and the Settings window. The UI is currently Chinese-only.
+panel and the Settings window. The UI is currently Chinese-only; feature names here are English
+translations of its labels.
 
-### Live transcription & translation (实时转录)
+### Live transcription & translation
 
-- **Caption panel (字幕悬浮窗)** — a semi-transparent, draggable, resizable
+- **Caption panel** — a semi-transparent, draggable, resizable
   window that stays on top without stealing focus and remembers its position.
   Bilingual / translation-only / source-only display, three font sizes,
   adjustable background and content opacity, auto-scroll with a "latest"
   jump button, per-line and whole-transcript copy, live mic level and
   elapsed time. Controls fade out when the pointer leaves.
 - **Languages** — about 16 quick-pick languages (Chinese, English, Japanese,
-  Korean, French, German, Spanish, Italian, Portuguese, …). Set 我的语言 and
-  外语 once; recording, Quick Translate and voice input share them. A ⇄
-  button swaps the pair, and 自动 detects the source with a local model.
+  Korean, French, German, Spanish, Italian, Portuguese, …). Set "my language" and
+  "foreign language" once; recording, Quick Translate and voice input share them. A ⇄
+  button swaps the pair, and "auto" detects the source with a local model.
 - **Audio sources** — pick a microphone (or none), and optionally include
   system audio through ScreenCaptureKit to caption a meeting or video.
 - **Tunable segmentation** — pause length and silence threshold for
   splitting speech into utterances, plus when long sentences are translated
   early.
-- **History (历史记录)** — transcripts are saved locally with SwiftData:
+- **History** — transcripts are saved locally with SwiftData:
   searchable, grouped by date, renamable, multi-select delete, "delete older
   than 30/90 days", copy full text or translation only, Markdown export.
 
-### Quick Translate (快捷翻译)
+### Quick Translate
 
-Modeled on [Cida](https://github.com/Xuanwo/cida), but fully on-device.
+Runs fully on-device.
 
-- **Translate selection (划词翻译, ⌥A)** — select text in any app and press
+- **Translate selection (⌥A)** — select text in any app and press
   ⌥A. Optionally, press ⌘C twice (⌘C ⌘C) to translate what you just copied.
-- **Translate screenshot (截图翻译, ⌥S)** — frame part of the screen; text is
+- **Translate screenshot (⌥S)** — frame part of the screen; text is
   recognized locally with Vision.
-- **Translation panel (翻译面板)** — text in 我的语言 goes to your foreign
-  language, everything else comes into 我的语言. Long text fills in paragraph
+- **Translation panel** — text in your language goes to your foreign
+  language, everything else comes into your language. Long text fills in paragraph
   by paragraph and keeps its line breaks and list markers. ⏎ translates,
   ⇧⏎ adds a newline, Esc hides. Either pane can be read aloud with macOS
   system voices, optionally automatically.
 - URLs, paths, CLI flags and code identifiers are protected from translation
   distortion.
 
-### Voice input (语音输入, opt-in)
+### Voice input (opt-in)
 
 Hold the right ⌥ Option key (or right ⌘ / ⌃), or tap to start and tap again
 to stop, in any app. Speak, and the text is typed at the cursor.
@@ -78,10 +81,10 @@ to stop, in any app. Speak, and the text is typed at the cursor.
   closes the microphone if a key release is lost.
 - In tap mode, Return ends the dictation, types the text and presses Return
   (for chat apps and prompts).
-- **Translate before typing** — review the translation into 外语 in the
+- **Translate before typing** — review the translation into your foreign language in the
   bubble, then type it or the original.
-- **LLM polish (润色)** — optionally clean up punctuation, filler words and
-  lists with your own OpenAI-compatible service (OpenAI, DeepSeek, 智谱,
+- **LLM polish** — optionally clean up punctuation, filler words and
+  lists with your own OpenAI-compatible service (OpenAI, DeepSeek, Zhipu,
   Ollama or a custom Base URL). Off by default; the API key is kept in the
   Keychain; any failure types the original text.
 
@@ -93,9 +96,9 @@ to stop, in any app. Speak, and the text is typed at the cursor.
 | Translation | `Translation` framework | HY-MT1.5 1.8B (light), T3PO (high quality) |
 
 Choose the recognition and translation engines independently. Local models
-run in-process through `audio.cpp` and `llama.cpp`. The **Model Library
-(模型库)** downloads them with progress, disk-space checks and SHA-256
-verification, shows memory use, and can preload models at launch. The
+run in-process through `audio.cpp` and `llama.cpp`. The **Model Library**
+downloads them with progress, disk-space checks and SHA-256 verification,
+shows memory use, and can preload models at launch. The
 first-run wizard offers three run modes — lightweight (system engines),
 balanced (R2T2 + HY-MT1.5) and high-accuracy (all local).
 
@@ -103,9 +106,9 @@ balanced (R2T2 + HY-MT1.5) and high-accuracy (all local).
 
 Menu-bar start/stop with a pulsing recording indicator, launch at login,
 Dock icon only while Settings or the wizard is open, system notifications
-when a download finishes, a re-runnable first-run guide (新手引导), and a
-新功能 window after updates. Settings has six tabs (⌘1–⌘6): 通用, 语音识别,
-语音输入, 快捷翻译, 模型库, 关于.
+when a download finishes, a re-runnable first-run guide, and a
+what's-new window after updates. Settings has six tabs (⌘1–⌘6): General, Speech
+Recognition, Voice Input, Quick Translate, Model Library, About.
 
 ## Requirements
 
@@ -152,3 +155,13 @@ Local model engines need their upstream sources built first — see
 ## License
 
 Apache License 2.0 — see [`LICENSE`](LICENSE).
+
+## Acknowledgements
+
+Thanks to these projects:
+
+- [Cida](https://github.com/Xuanwo/cida) — inspiration for Quick Translate
+- SnapTra Translator — inspiration for the card-style Settings
+- [audio.cpp](https://github.com/0xShug0/audio.cpp) and [llama.cpp](https://github.com/ggml-org/llama.cpp) — in-process local inference
+- [R2T2](https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf) and [T3PO](https://huggingface.co/netease-youdao/Confucius4-T3PO-GGUF) (NetEase Youdao Confucius4) — local speech recognition and translation models
+- [HY-MT1.5](https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF) (Tencent) — local translation model
