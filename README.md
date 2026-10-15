@@ -86,7 +86,9 @@ to stop, in any app. Speak, and the text is typed at the cursor.
 - **LLM polish** — optionally clean up punctuation, filler words and
   lists with your own OpenAI-compatible service (OpenAI, DeepSeek, Zhipu,
   Ollama or a custom Base URL). Off by default; the API key is kept in the
-  Keychain; any failure types the original text.
+  Keychain; any failure types the original text. For a local model, Google's
+  [Gemma 4 E2B](https://lmstudio.ai/models/google/gemma-4-e2b) (via LM Studio)
+  has tested well enough.
 
 ### Engines & models
 

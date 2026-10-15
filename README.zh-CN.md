@@ -66,7 +66,8 @@ OmniVoice 没有主窗口，一切都在菜单栏、字幕悬浮窗和设置窗�
 - **输入前翻译**——在气泡中确认翻译成外语的结果，再选择输入译文或原文。
 - **LLM 润色**——可选，用你自己的 OpenAI 兼容服务（OpenAI、DeepSeek、智谱、Ollama
   或自定义 Base URL）整理标点、去掉口癖、整理列表。默认关闭，API Key 保存在钥匙串，
-  任何失败都会输入原文。
+  任何失败都会输入原文。如果使用本机大模型，试下来 Google 的
+  [Gemma 4 E2B](https://lmstudio.ai/models/google/gemma-4-e2b)（通过 LM Studio）效果还不错。
 
 ### 引擎与模型
 

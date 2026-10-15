@@ -42,6 +42,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(repo): README notes that Google's Gemma 4 E2B (via LM Studio) works well as a local LLM polish model
 - docs(repo): add a Simplified Chinese README (README.zh-CN.md) and a language switcher at the top of README.md
 - docs(repo): rewrite README.md around the full current feature set (live transcription, Quick Translate, voice input with translation and LLM polish, engines and Model Library)
 - docs(app): add a Dock-icon manual test checklist to Docs/RELEASE_TESTING.md (#94)
