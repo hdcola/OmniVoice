@@ -26,6 +26,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(repo): rewrite README.md around the full current feature set (live transcription, Quick Translate, voice input with translation and LLM polish, engines and Model Library)
 - docs(app): add a Dock-icon manual test checklist to Docs/RELEASE_TESTING.md (#94)
 - docs(dictation): add a design draft for polishing dictated text with a user-configured OpenAI-compatible LLM, off by default (#91)
 - docs(repo): remove the finished UX review round notes and the settings/model-management UX doc (Docs/UX-REVIEW-ROUND-1…4.md, Docs/UX-SETTINGS-MODEL-MANAGEMENT.md); they stay in git history
