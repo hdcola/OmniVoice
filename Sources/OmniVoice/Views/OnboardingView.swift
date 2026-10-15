@@ -190,7 +190,7 @@ struct OnboardingView: View {
             )
             SettingsDivider()
             PermissionRow(
-                icon: "figure.wave", title: "辅助功能", detail: "读取其他应用中选中的文字（划词翻译）",
+                icon: "figure.wave", title: "辅助功能", detail: "读取其他应用中选中的文字（划词翻译），把语音输入的文字粘贴到光标处，并在语音输入时暂停、恢复音乐和视频",
                 isGranted: accessibilityAuthorized, open: requestAccessibilityPermission
             )
             SettingsDivider()
