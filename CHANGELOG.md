@@ -16,6 +16,7 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(settings): the 辅助功能 permission description (Settings and READMEs) mentions pausing music and video while dictating (#104)
 - docs(repo): add screenshots of live transcription with translation, history, voice-input translation and Quick Translate to README.md and README.zh-CN.md
 - docs(repo): README says the release build is self-signed with "OmniVoice Dev Signing" rather than ad-hoc signed
 

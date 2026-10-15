@@ -33,7 +33,7 @@ struct PermissionsSettingsCard: View {
             SettingsDivider()
             PermissionRow(
                 icon: "figure.wave", title: "辅助功能",
-                detail: "读取其他应用中选中的文字，并把语音输入的文字粘贴到光标处；未授权时划词可复制后在翻译面板里粘贴",
+                detail: "读取其他应用中选中的文字，把语音输入的文字粘贴到光标处，并在语音输入时暂停、恢复音乐和视频（发送播放/暂停键）；未授权时划词可复制后在翻译面板里粘贴，也不会暂停音乐",
                 isGranted: isAccessibilityTrusted,
                 open: controller.openAccessibilitySettings
             )
