@@ -16,32 +16,56 @@ public protocol MediaKeySender {
 /// is never sent blind: starting needs something audibly playing, and
 /// resuming needs it to still be silent (the user may have restarted the
 /// music, or something else, in the meantime).
+///
+/// A key press takes a moment to show up in the audio output (a pause
+/// drains, a resume fades in), so right after pressing one the probe is not
+/// believed: the state the press was meant to produce is assumed instead.
+/// Without that, dictating twice in quick succession misreads the music's
+/// state and a press lands the wrong way round.
 @MainActor
 public final class MediaPauser {
+    /// How long after our own key press the probe is not trusted.
+    static let settleTime: TimeInterval = 1.5
+
     private let probe: any MediaPlaybackProbe
     private let sender: any MediaKeySender
+    private let now: () -> TimeInterval
     private var didPause = false
+    /// What our last press was meant to produce, and when it was sent.
+    private var lastPress: (playing: Bool, at: TimeInterval)?
 
     public init(
         probe: any MediaPlaybackProbe = CoreAudioPlaybackProbe(),
-        sender: any MediaKeySender = SystemMediaKeySender()
+        sender: any MediaKeySender = SystemMediaKeySender(),
+        now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
     ) {
         self.probe = probe
         self.sender = sender
+        self.now = now
     }
 
     public func pauseIfPlaying() {
         // Already paused by us: a second press would resume it.
-        guard !didPause, probe.isOtherAudioPlaying() else { return }
-        sender.sendPlayPause()
+        guard !didPause, isPlaying() else { return }
+        press(producing: false)
         didPause = true
     }
 
     public func resumeIfWePaused() {
         guard didPause else { return }
         didPause = false
-        guard !probe.isOtherAudioPlaying() else { return }
+        guard !isPlaying() else { return }
+        press(producing: true)
+    }
+
+    private func press(producing playing: Bool) {
         sender.sendPlayPause()
+        lastPress = (playing, now())
+    }
+
+    private func isPlaying() -> Bool {
+        if let lastPress, now() - lastPress.at < Self.settleTime { return lastPress.playing }
+        return probe.isOtherAudioPlaying()
     }
 }
 
