@@ -20,6 +20,7 @@ The format is based on Keep a Changelog.
 - docs(repo): README says the release build is self-signed with "OmniVoice Dev Signing" rather than ad-hoc signed
 
 ### Tests
+- test(session): a recognizer start failure keeps an adopted translation-only preload (#103, #51)
 
 ## [0.8.0] - 2026-10-14
 
