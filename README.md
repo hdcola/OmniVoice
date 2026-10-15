@@ -111,8 +111,8 @@ when a download finishes, a re-runnable first-run guide (新手引导), and a
 
 - macOS 26 or later (`SpeechAnalyzer`/`SpeechTranscriber` and the
   `Translation` framework APIs are macOS 26+).
-- Apple silicon is recommended for local models; the lightest local setup
-  needs about 3.4 GB of downloads and ~2–3 GB of memory.
+- Local models are optional downloads: the balanced bundle (R2T2 +
+  HY-MT1.5) is about 3.4 GB; the Model Library shows each model's memory use.
 - To build from source: a Swift 6.2+ toolchain.
 
 ## Permissions
