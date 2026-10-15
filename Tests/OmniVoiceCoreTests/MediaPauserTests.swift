@@ -142,4 +142,15 @@ final class MediaPauserTests: XCTestCase {
         XCTAssertFalse(fake.playing)
         XCTAssertEqual(fake.presses, 3)
     }
+
+    /// The real probe has no mock to hide behind: it must at least run.
+    func testCoreAudioProbeRunsAgainstTheRealSystem() {
+        _ = CoreAudioPlaybackProbe().isOtherAudioPlaying()
+    }
+
+    func testSystemServicesAreIgnoredButBrowsersAreNot() {
+        XCTAssertTrue(CoreAudioPlaybackProbe.ignoredBundleIDs.contains("systemsoundserverd"))
+        XCTAssertFalse(CoreAudioPlaybackProbe.ignoredBundleIDs.contains("com.apple.WebKit.GPU"))
+        XCTAssertFalse(CoreAudioPlaybackProbe.ignoredBundleIDs.contains("com.apple.Music"))
+    }
 }

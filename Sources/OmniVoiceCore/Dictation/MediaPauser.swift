@@ -134,10 +134,28 @@ public final class MediaPauser {
 public struct CoreAudioPlaybackProbe: MediaPlaybackProbe {
     public init() {}
 
+    /// System services that make sound (alert sounds, calls, the screen
+    /// recorder) without being something the Play/Pause key controls.
+    static let ignoredBundleIDs: Set<String> = [
+        "systemsoundserverd",
+        "com.apple.controlcenter",
+        "com.apple.controlstrip",
+        "com.apple.TelephonyUtilities",
+        "com.apple.avconferenced",
+        "com.apple.PowerChime",
+        "com.apple.universalaccessd",
+        "com.apple.accessibility.heard",
+        "com.apple.assistantd",
+        "com.apple.CoreSpeech",
+        "com.apple.replayd",
+    ]
+
     public func isOtherAudioPlaying() -> Bool {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         for object in Self.processObjects() {
-            guard let pid = Self.pid(of: object), pid != ownPID, Self.isRunningOutput(object) else { continue }
+            guard let pid = Self.pid(of: object), pid != ownPID else { continue }
+            if let bundleID = Self.bundleID(of: object), Self.ignoredBundleIDs.contains(bundleID) { continue }
+            guard Self.isRunningOutput(object) else { continue }
             return true
         }
         return false
@@ -155,7 +173,21 @@ public struct CoreAudioPlaybackProbe: MediaPlaybackProbe {
         var objects = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &objects) == noErr
         else { return [] }
-        return objects
+        // A process may have gone between the size query and the read.
+        return Array(objects.prefix(Int(size) / MemoryLayout<AudioObjectID>.size))
+    }
+
+    private static func bundleID(of object: AudioObjectID) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioProcessPropertyBundleID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var bundleID: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &bundleID) == noErr,
+              let bundleID else { return nil }
+        return bundleID.takeRetainedValue() as String
     }
 
     private static func pid(of object: AudioObjectID) -> pid_t? {
