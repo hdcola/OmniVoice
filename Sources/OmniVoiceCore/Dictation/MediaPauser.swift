@@ -133,9 +133,9 @@ public struct CoreAudioPlaybackProbe: MediaPlaybackProbe {
     public func isOtherAudioPlaying() -> Bool {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         for object in Self.processObjects() {
-            guard let pid = Self.pid(of: object), pid != ownPID else { continue }
             // Cheapest read first: nearly every process is silent.
             guard Self.isRunningOutput(object) else { continue }
+            guard let pid = Self.pid(of: object), pid > 0, pid != ownPID else { continue }
             if let bundleID = Self.bundleID(of: object), Self.ignoredBundleIDs.contains(bundleID) { continue }
             return true
         }
