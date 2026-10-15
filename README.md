@@ -56,6 +56,8 @@ translations of its labels.
   searchable, grouped by date, renamable, multi-select delete, "delete older
   than 30/90 days", copy full text or translation only, Markdown export.
 
+![History window with a saved bilingual transcript](Docs/images/history.png)
+
 ### Quick Translate
 
 Runs fully on-device.
