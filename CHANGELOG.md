@@ -7,7 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(dictation): voice input pauses music or video that is playing while you dictate and resumes it afterwards, only if it paused it (Play/Pause media key, playback detected via CoreAudio, not trusted for 1.5 s after its own key press so quick back-to-back dictations don't mix up the state); on by default, switch in Settings → 语音输入; system sounds and call services are not mistaken for playing music; the update's 新功能 window announces it (#104)
+- feat(dictation): voice input pauses music or video that is playing while you dictate and resumes it afterwards, only if it paused it (Play/Pause media key, playback detected via CoreAudio; a dictation that starts while an earlier resume may still be pending doesn't press blindly but pauses as soon as the music is heard); on by default, switch in Settings → 语音输入; system sounds and call services are not mistaken for playing music; the update's 新功能 window announces it (#104)
 
 ### Changed
 

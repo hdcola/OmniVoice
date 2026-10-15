@@ -16,20 +16,12 @@ public protocol MediaKeySender {
 /// is never sent blind: starting needs something audibly playing, and
 /// resuming is unconditional once this has paused.
 ///
-/// A key press takes a moment to show up in the audio output (a pause
-/// drains, a resume fades in), so right after pressing one the probe is not
-/// believed: the state the press was meant to produce is assumed instead.
-/// Without that, dictating twice in quick succession misreads the music's
-/// state and a press lands the wrong way round.
-///
-/// A resume can also take longer to be heard than that. If a dictation starts
-/// while one is still pending, nothing is pressed blindly (a press landing on
-/// a still-paused player would start it); the dictation watches instead, and
-/// pauses once the music is actually heard.
+/// A resume can take a moment to be heard. If a dictation starts while one is
+/// still pending (`resumePendingTime`), nothing is pressed blindly (a press
+/// landing on a still-paused player would start it): it pauses at once if the
+/// music is already audible, and otherwise watches and pauses once it is.
 @MainActor
 public final class MediaPauser {
-    /// How long after our own key press the probe is not trusted.
-    static let settleTime: TimeInterval = 1.5
     /// How long after a resume press the music may still turn up.
     static let resumePendingTime: TimeInterval = 6
     static let pollInterval: Duration = .milliseconds(300)
@@ -38,8 +30,6 @@ public final class MediaPauser {
     private let sender: any MediaKeySender
     private let now: () -> TimeInterval
     private var didPause = false
-    /// What our last press was meant to produce, and when it was sent.
-    private var lastPress: (playing: Bool, at: TimeInterval)?
     /// Until when a resume we sent may still start playing late.
     private var resumePendingUntil: TimeInterval?
     private var watchTask: Task<Void, Never>?
@@ -61,7 +51,7 @@ public final class MediaPauser {
             // A resume may still be on its way, so no blind press — but if
             // the music is already audible there is nothing to wait for.
             if probe.isOtherAudioPlaying() {
-                press(producing: false)
+                sender.sendPlayPause()
                 didPause = true
                 resumePendingUntil = nil
             } else {
@@ -69,8 +59,8 @@ public final class MediaPauser {
             }
             return
         }
-        guard isPlaying() else { return }
-        press(producing: false)
+        guard probe.isOtherAudioPlaying() else { return }
+        sender.sendPlayPause()
         didPause = true
     }
 
@@ -82,7 +72,7 @@ public final class MediaPauser {
         // audio output open, so "something is outputting" says nothing about
         // whether the music is playing, and skipping this press would leave
         // it paused (and make the next dictation's press start it).
-        press(producing: true)
+        sender.sendPlayPause()
         resumePendingUntil = now() + Self.resumePendingTime
     }
 
@@ -92,7 +82,7 @@ public final class MediaPauser {
     func poll() -> Bool {
         guard !didPause, let until = resumePendingUntil, now() < until else { return false }
         guard probe.isOtherAudioPlaying() else { return true }
-        press(producing: false)
+        sender.sendPlayPause()
         didPause = true
         resumePendingUntil = nil
         return false
@@ -117,16 +107,6 @@ public final class MediaPauser {
         watchTask = nil
         // The dictation is over: a late resume is now just the music coming back.
         resumePendingUntil = nil
-    }
-
-    private func press(producing playing: Bool) {
-        sender.sendPlayPause()
-        lastPress = (playing, now())
-    }
-
-    private func isPlaying() -> Bool {
-        if let lastPress, now() - lastPress.at < Self.settleTime { return lastPress.playing }
-        return probe.isOtherAudioPlaying()
     }
 }
 
@@ -154,8 +134,9 @@ public struct CoreAudioPlaybackProbe: MediaPlaybackProbe {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         for object in Self.processObjects() {
             guard let pid = Self.pid(of: object), pid != ownPID else { continue }
-            if let bundleID = Self.bundleID(of: object), Self.ignoredBundleIDs.contains(bundleID) { continue }
+            // Cheapest read first: nearly every process is silent.
             guard Self.isRunningOutput(object) else { continue }
+            if let bundleID = Self.bundleID(of: object), Self.ignoredBundleIDs.contains(bundleID) { continue }
             return true
         }
         return false
