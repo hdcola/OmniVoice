@@ -197,7 +197,7 @@ struct DictationHUDView: View {
         }
     }
 
-    /// The quick translate switch while listening in 按一下开始 mode; String(localized: "Type Original")
+    /// The quick translate switch while listening in 按一下开始 mode; "输入原文"
     /// once there is a translation to look at.
     @ViewBuilder
     private var headerButton: some View {

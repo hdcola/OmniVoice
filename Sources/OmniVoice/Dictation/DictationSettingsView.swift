@@ -1,19 +1,19 @@
 import SwiftUI
 import OmniVoiceCore
 
-/// The String(localized: "Voice input") card of Settings' String(localized: "Voice input") tab. Permissions live in
+/// The "语音输入" card of Settings' "语音输入" tab. Permissions live in
 /// `PermissionsSettingsCard`.
 struct DictationSettingsView: View {
     @ObservedObject var controller: DictationController
     @EnvironmentObject private var session: RecordingSession
 
     var body: some View {
-        SettingsCard(title: String(localized: "Voice input"), icon: "waveform.badge.mic") {
+        SettingsCard(title: String(localized: "Dictation"), icon: "waveform.badge.mic") {
             SettingsRow(
-                title: String(localized: "Enable voice input"),
+                title: String(localized: "Enable dictation"),
                 subtitle: String(localized: "Hold the trigger key in any app and speak; the text is typed at the cursor when you release it. Requires Input Monitoring, Accessibility and Microphone permissions.")
             ) {
-                Toggle("Enable voice input", isOn: $controller.isEnabled)
+                Toggle("Enable dictation", isOn: $controller.isEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
@@ -56,10 +56,10 @@ struct DictationSettingsView: View {
             .disabled(!controller.isEnabled || controller.mode != .toggle)
             SettingsDivider()
             SettingsRow(
-                title: String(localized: "Pause music during voice input"),
+                title: String(localized: "Pause music during dictation"),
                 subtitle: String(localized: "Pauses playing music or video when you start speaking and resumes it afterwards; only content paused by this feature is resumed.")
             ) {
-                Toggle("Pause music during voice input", isOn: $controller.pauseMediaEnabled)
+                Toggle("Pause music during dictation", isOn: $controller.pauseMediaEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
@@ -104,7 +104,7 @@ struct DictationSettingsView: View {
                 SettingsNote(text: warmup)
             }
             SettingsDivider()
-            SettingsNote(text: String(localized: "The recognition engine and microphone follow the Speech Recognition tab: if a local model is selected and loaded (turn on “Load model at launch” in the General tab), it is reused; otherwise System speech recognition is used, and also while recording captions. Press Esc to cancel; in “Press once to start” mode, press Return to finish and send with Return automatically. The clipboard is borrowed while typing and restored afterwards."))
+            SettingsNote(text: String(localized: "The recognition engine and microphone follow the Speech Recognition tab: if a local model is selected and loaded (turn on “Load models at launch” in the General tab), it is reused; otherwise System speech recognition is used, and also while recording captions. Press Esc to cancel; in “Press once to start” mode, press Return to finish and send with Return automatically. The clipboard is borrowed while typing and restored afterwards."))
         }
     }
 

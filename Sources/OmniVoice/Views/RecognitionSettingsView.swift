@@ -336,7 +336,7 @@ struct RecognitionSettingsView: View {
             Button("Got It", role: .cancel) { inlineDiskSpaceWarning = nil }
         } message: {
             if let inlineDiskSpaceWarning {
-                Text("Downloading “\(inlineDiskSpaceWarning.variant.displayName)” \(inlineDiskSpaceWarning.error.errorDescription ?? ""). Free up some disk space and try again.")
+                Text("Couldn’t download “\(inlineDiskSpaceWarning.variant.displayName)”: \(inlineDiskSpaceWarning.error.errorDescription ?? ""). Free up some disk space and try again.")
             }
         }
     }

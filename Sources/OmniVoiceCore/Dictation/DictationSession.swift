@@ -181,9 +181,9 @@ public final class DictationSession: ObservableObject {
             releaseRecognizer(provider)
             if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized {
                 microphonePermissionNeeded = true
-                fail(String(localized: "Microphone access is not granted. Allow it in System Settings"))
+                fail(String(localized: "Microphone access is not authorized. Allow microphone access in System Settings."))
             } else {
-                fail(String(localized: "Failed to start the microphone: \(error.localizedDescription)"))
+                fail(String(localized: "Microphone failed to start: \(error.localizedDescription)"))
             }
             return
         }

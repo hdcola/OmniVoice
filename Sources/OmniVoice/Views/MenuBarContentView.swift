@@ -97,7 +97,7 @@ struct MenuBarContentView: View {
         Button(menuTitle(String(localized: "Open Translation Panel"), for: .translateSelection)) {
             selectionController.showPanel()
         }
-        Button(menuTitle(String(localized: "Translate Screenshot"), for: .captureText)) {
+        Button(menuTitle(String(localized: "Translate screenshot"), for: .captureText)) {
             selectionController.perform(.captureText)
         }
 

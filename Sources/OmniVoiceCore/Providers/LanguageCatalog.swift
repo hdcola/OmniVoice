@@ -1,6 +1,6 @@
 import Foundation
 
-/// A BCP-47-ish language tag paired with a Chinese display name, for the
+/// A BCP-47-ish language tag paired with a localized display name, for the
 /// quick-pick lists in the floating panel/menu bar.
 public struct LanguageOption: Identifiable, Hashable, Sendable {
     public let code: String
@@ -63,7 +63,7 @@ public enum LanguageCatalog {
         LanguageOption(code: "th-TH", displayName: String(localized: "Thai"), supportsSystemASRSource: false),
     ]
 
-    /// The Chinese display name for `code`, or `code` itself for a custom
+    /// The localized display name for `code`, or `code` itself for a custom
     /// locale outside `common`.
     public static func displayName(for code: String) -> String {
         common.first { $0.code == code }?.displayName ?? code
@@ -72,7 +72,7 @@ public enum LanguageCatalog {
     /// Like `displayName(for:)`, but also names the tags `NLLanguageRecognizer`
     /// produces — `en`, `zh-Hant`, `nl`, ... — instead of echoing them back:
     /// the catalog's name when it lists the language, else the system's
-    /// Chinese name for it.
+    /// name for it in the app's UI language.
     public static func localizedName(for code: String) -> String {
         if let exact = common.first(where: { $0.code == code }) {
             return exact.displayName
@@ -91,6 +91,9 @@ public enum LanguageCatalog {
         if let sameLanguage = common.first(where: { SelectionLanguageDirection.isSameLanguage($0.code, code) }) {
             return sameLanguage.displayName
         }
-        return Locale.current.localizedString(forIdentifier: code) ?? code
+        // The app's UI language (what `String(localized:)` resolved to), which
+        // can differ from `Locale.current` when the UI falls back to English.
+        let uiLanguage = Bundle.main.preferredLocalizations.first ?? "en"
+        return Locale(identifier: uiLanguage).localizedString(forIdentifier: code) ?? code
     }
 }

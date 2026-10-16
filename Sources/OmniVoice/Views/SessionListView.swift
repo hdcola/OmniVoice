@@ -304,7 +304,7 @@ struct SessionListView: View {
             }
             Text(
                 [
-                    isLive(session) ? String(localized: "Recording") : Self.durationLabel(from: session.startedAt, to: Self.endDate(of: session)),
+                    isLive(session) ? String(localized: "Transcribing") : Self.durationLabel(from: session.startedAt, to: Self.endDate(of: session)),
                     String(localized: "Sentences: \(session.utterances.count)"),
                     Self.compactLanguagePair(for: session),
                 ].joined(separator: " · ")

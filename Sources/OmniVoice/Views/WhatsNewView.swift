@@ -49,7 +49,7 @@ struct WhatsNewView: View {
             Divider().opacity(0.5)
             HStack {
                 Spacer()
-                PrimaryPillButton(title: String(localized: "Got it"), action: onDismiss)
+                PrimaryPillButton(title: String(localized: "Got It"), action: onDismiss)
                     .keyboardShortcut(.defaultAction)
                 // A button takes one shortcut, so Esc rides on an invisible one.
                 Button("Close", action: onDismiss)
@@ -99,7 +99,7 @@ struct WhatsNewView: View {
         switch entry.action {
         case .enableDoubleCopyTranslate:
             if !selectionController.isDoubleCopyEnabled {
-                PillButton(title: entry.actionTitle ?? String(localized: "Turn on")) {
+                PillButton(title: entry.actionTitle ?? String(localized: "Turn On")) {
                     selectionController.isDoubleCopyEnabled = true
                 }
             } else if hasInputMonitoring {
@@ -112,7 +112,7 @@ struct WhatsNewView: View {
             }
         case .enableDictation:
             if !dictationController.isEnabled {
-                PillButton(title: entry.actionTitle ?? String(localized: "Turn on")) {
+                PillButton(title: entry.actionTitle ?? String(localized: "Turn On")) {
                     dictationController.isEnabled = true
                 }
             } else if hasInputMonitoring {

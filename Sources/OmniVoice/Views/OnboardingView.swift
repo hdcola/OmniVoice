@@ -150,14 +150,14 @@ struct OnboardingView: View {
             }
         }
         .alert(
-            "Not enough disk space",
+            "Not Enough Disk Space",
             isPresented: Binding(get: { diskSpaceWarningMessage != nil }, set: { if !$0 { diskSpaceWarningMessage = nil } })
         ) {
             Button("Open Storage Management") {
                 NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.settings.Storage")!)
                 diskSpaceWarningMessage = nil
             }
-            Button("Got it", role: .cancel) { diskSpaceWarningMessage = nil }
+            Button("Got It", role: .cancel) { diskSpaceWarningMessage = nil }
         } message: {
             Text(diskSpaceWarningMessage ?? "")
         }
@@ -477,7 +477,7 @@ struct OnboardingView: View {
         let totalMB = variants.reduce(0) { $0 + $1.approximateSizeMB }
         if let warning = downloadManager.insufficientDiskSpaceWarning(forTotalMB: totalMB) {
             diskSpaceWarningMessage =
-                String(localized: "Downloading “\(bundle.displayName)” \(warning.errorDescription ?? ""). Free up some disk space and try again.")
+                String(localized: "Couldn’t download “\(bundle.displayName)”: \(warning.errorDescription ?? ""). Free up some disk space and try again.")
             return false
         }
 
@@ -496,14 +496,14 @@ struct OnboardingView: View {
                     {
                         completionNotice.notified = true
                         SystemNotifier.notify(
-                            title: String(localized: "Model download complete"),
-                            body: String(localized: "“\(bundle.displayName)” has been downloaded and enabled automatically"))
+                            title: String(localized: "Model Download Complete"),
+                            body: String(localized: "“\(bundle.displayName)” was downloaded and enabled automatically"))
                     }
                     preloadOnceBundleIsReady(bundle, replacingEngines: replacingEngines)
                 } catch is CancellationError {
                 } catch {
                     SystemNotifier.notify(
-                        title: String(localized: "Model download failed"),
+                        title: String(localized: "Model Download Failed"),
                         body: String(localized: "“\(variant.displayName)”: \(error.localizedDescription). You can retry in Settings → Model Library."))
                     // Best-effort background download — a failure here still
                     // leaves this variant's own inline retry card reachable

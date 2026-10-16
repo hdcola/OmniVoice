@@ -46,7 +46,7 @@ struct DictationPolishSettingsRows: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("When on, the text recognized by each voice input (not window titles or anything else) is sent to the OpenAI-compatible service configured below for polishing. With a local Ollama it never leaves this Mac.")
+            Text("When on, the text recognized by each dictation (not window titles or anything else) is sent to the OpenAI-compatible service configured below for polishing. With a local Ollama it never leaves this Mac.")
         }
 
         if controller.polish.isEnabled {

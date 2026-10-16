@@ -5,14 +5,14 @@ import SwiftUI
 /// What each system permission is for, worded once so Settings and the
 /// onboarding wizard can't drift apart.
 enum PermissionCopy {
-    static let microphone = String(localized: "Transcribes your voice (live transcription, voice input)")
+    static let microphone = String(localized: "Transcribes your voice (live transcription, dictation)")
     static let screenRecording = String(localized: "Captures system audio (meetings, online classes) and powers screenshot translation; screenshots are recognized on this Mac only and never uploaded")
-    static let accessibility = String(localized: "Reads selected text in other apps, pastes voice-input text at the cursor, and pauses and resumes music and video during voice input (by sending the play/pause key); without it you can copy the selection and paste it into the Translation panel, and music is not paused")
-    static let inputMonitoring = String(localized: "Detects the double ⌘C press and the voice-input trigger key; only those keys are checked, nothing else is recorded")
+    static let accessibility = String(localized: "Reads selected text in other apps, pastes dictated text at the cursor, and pauses and resumes music and video during dictation (by sending the play/pause key); without it you can copy the selection and paste it into the Translation panel, and music is not paused")
+    static let inputMonitoring = String(localized: "Detects the double ⌘C press and the dictation trigger key; only those keys are checked, nothing else is recorded")
 }
 
 /// Every system permission the app asks for, in one card at the top of
-/// Settings' "通用" tab: Microphone (live transcription, voice input),
+/// Settings' "通用" tab: Microphone (live transcription, dictation),
 /// Screen Recording (system audio + screenshot translation), Accessibility
 /// (reading the selection, typing dictated text, pausing media) and Input
 /// Monitoring (the ⌘C ⌘C shortcut and the voice-input key).

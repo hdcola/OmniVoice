@@ -49,14 +49,14 @@ public enum WhatsNewCatalog {
             title: String(localized: "Dictation: polish recognized text (optional)"),
             bullets: [
                 String(localized: "When on, what you said is first handed to an LLM you configure yourself (an OpenAI-compatible API, or Ollama on this Mac) to add punctuation, remove filler words, and tidy lists before it is entered. The recognized text is sent to that service. Off by default."),
-                String(localized: "Enter the service, model, and API key (stored in the Keychain) in “Settings › Dictation”, choose one of four styles (Keep my words, Clean, Structured, Formal), and adjust the timeout. If it fails, times out, or the result looks unreliable, your original text is entered; pressing Esc while polishing also enters the original text. When translation is on too, text is polished first and then translated."),
+                String(localized: "Enter the service, model, and API key (stored in the Keychain) in “Settings › Dictation”, choose one of four styles (Keep original, Clean, Structured, Professional), and adjust the timeout. If it fails, times out, or the result looks unreliable, your original text is entered; pressing Esc while polishing also enters the original text. When translation is on too, text is polished first and then translated."),
             ]
         ),
         WhatsNewEntry(
             revision: 5,
             title: String(localized: "Dictation: translate before entering"),
             bullets: [
-                String(localized: "With the “press once to start, press again to stop” trigger, what you say can be translated into a foreign language before it is entered: review the translation in the bubble, then press Return to enter and send, press the trigger key to only enter, press Esc to discard, or click “Enter original”."),
+                String(localized: "With the “press once to start, press again to stop” trigger, what you say can be translated into a foreign language before it is entered: review the translation in the bubble, then press Return to enter and send, press the trigger key to only enter, press Esc to discard, or click “Type Original”."),
                 String(localized: "Click the “Translate to…” button on the bubble while dictating to turn it on or off at any time. Translation uses the engine chosen under “Translate selection and screenshot”, and the target language is your “Foreign language”. The bubble grows taller for long text."),
             ]
         ),
@@ -83,7 +83,7 @@ public enum WhatsNewCatalog {
                 String(localized: "In any app, hold the right ⌥ Option key and speak; when you let go, the text is entered at the cursor. You can also switch to press once to start and press again to stop, and press Esc to cancel."),
                 String(localized: "Off by default. Turning it on requires “Input Monitoring”, “Accessibility”, and Microphone permissions; if live transcription uses a local model that is already loaded, it is reused directly."),
             ],
-            actionTitle: String(localized: "Turn on"),
+            actionTitle: String(localized: "Turn On"),
             action: .enableDictation
         ),
         WhatsNewEntry(
@@ -93,7 +93,7 @@ public enum WhatsNewCatalog {
                 String(localized: "After selecting text in another app, press ⌘C twice quickly to translate what you just copied; it also works where ⌥A can't read the selection, such as web pages."),
                 String(localized: "Off by default. Turning it on requires “Input Monitoring” permission; it only detects this combination and doesn't record other keys."),
             ],
-            actionTitle: String(localized: "Turn on"),
+            actionTitle: String(localized: "Turn On"),
             action: .enableDoubleCopyTranslate
         ),
         WhatsNewEntry(

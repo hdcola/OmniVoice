@@ -102,7 +102,7 @@ struct ModelManagementView: View {
         } message: {
             if let diskSpaceWarning {
                 Text(
-                    "Downloading “\(diskSpaceWarning.variant.displayName)” \(diskSpaceWarning.error.errorDescription ?? ""). Free up some disk space and try again."
+                    "Couldn’t download “\(diskSpaceWarning.variant.displayName)”: \(diskSpaceWarning.error.errorDescription ?? ""). Free up some disk space and try again."
                 )
             }
         }
