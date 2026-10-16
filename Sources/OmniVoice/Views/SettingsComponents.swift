@@ -252,7 +252,12 @@ struct PillButton: View {
                 if isWorking {
                     ProgressView().controlSize(.small)
                 }
+                // One line at its natural width: a capsule with a wrapped label
+                // ("Restar|t Now") looks broken, and the row's text column is the
+                // part that can give way.
                 Text(LocalizedStringKey(isWorking ? workingTitle : title))
+                    .lineLimit(1)
+                    .fixedSize()
             }
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(tint)
