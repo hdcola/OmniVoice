@@ -195,5 +195,6 @@ name, English name, code identifier) and for banned words.
   PR. In `.strings` files the left-hand key uses plain specifiers (`%@`,
   `%lld`) exactly as Swift's interpolation generates them; positional
   specifiers (`%1$@`) belong only in the translated value.
+- A new UI string whose wording depends on a count ("1 transcript" vs "2 transcripts") needs a plural entry in `Resources/en.lproj/Localizable.stringsdict` keyed by the same `%lld` format key; Chinese needs none.
 - Before opening a PR that touches user-facing text, check it against the
   glossary and state in the PR description that you did.

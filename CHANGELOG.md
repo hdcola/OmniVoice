@@ -7,7 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(i18n): the app UI is now localized in English and 简体中文 and follows the system language; English source strings are the keys, translations live in `Resources/<lang>.lproj` and are copied into the app bundle by `Scripts/build_app.sh`, microphone/speech permission prompts are localized via `InfoPlist.strings` (#107)
+- feat(i18n): the app UI is now localized in English and 简体中文 and follows the system language; English source strings are the keys, translations live in `Resources/<lang>.lproj` and are copied into the app bundle by `Scripts/build_app.sh`, microphone/speech permission prompts are localized via `InfoPlist.strings`, English count-dependent texts ("1 transcript" / "2 transcripts") are pluralized through `Resources/en.lproj/Localizable.stringsdict` (#107)
 
 ### Changed
 - fix(ui): Settings tab bar is now icon-over-label with equal-width columns so longer English tab names wrap evenly, and the Quick Translate engine picker no longer widens the page in English (#107)
