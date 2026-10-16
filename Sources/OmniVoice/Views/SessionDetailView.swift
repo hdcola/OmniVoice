@@ -45,13 +45,13 @@ struct SessionDetailView: View {
         .navigationTitle(session.displayTitle(maxLength: nil))
         .toolbar {
             ToolbarItem {
-                Button("复制全文") { copyToClipboard(Self.plainText(for: session)) }
+                Button("Copy All") { copyToClipboard(Self.plainText(for: session)) }
             }
             ToolbarItem {
-                Button("仅复制译文") { copyToClipboard(Self.translationOnlyText(for: session)) }
+                Button("Copy Translation Only") { copyToClipboard(Self.translationOnlyText(for: session)) }
             }
             ToolbarItem {
-                Button("导出…") {
+                Button("Export…") {
                     exportDocument = TextFileDocument(text: SessionExporter.markdown(for: session))
                     isExporting = true
                 }

@@ -48,24 +48,24 @@ struct SessionListView: View {
             .toolbar {
                 ToolbarItem {
                     Menu {
-                        Button("删除所选 \(selectedDeletable.count) 条…", role: .destructive) {
+                        Button("Delete \(selectedDeletable.count) Selected…", role: .destructive) {
                             requestDeletion(of: selectedSessions)
                         }
                         .disabled(selectedDeletable.isEmpty)
                         Divider()
-                        Button("清理空记录（0 句）…") { pendingRequest = .empty }
+                        Button("Clean Up Empty Transcripts…") { pendingRequest = .empty }
                             .disabled(!sessions.contains(where: isEmptyAndDeletable))
-                        Button("删除 30 天前的记录…") { pendingRequest = .olderThan(days: 30) }
+                        Button("Delete Transcripts Older Than 30 Days…") { pendingRequest = .olderThan(days: 30) }
                             .disabled(!sessions.contains { isStale($0, olderThanDays: 30) })
-                        Button("删除 90 天前的记录…") { pendingRequest = .olderThan(days: 90) }
+                        Button("Delete Transcripts Older Than 90 Days…") { pendingRequest = .olderThan(days: 90) }
                             .disabled(!sessions.contains { isStale($0, olderThanDays: 90) })
                     } label: {
-                        Label("管理", systemImage: "trash")
+                        Label("Manage", systemImage: "trash")
                     }
                 }
             }
-            .searchable(text: $searchText, prompt: "搜索转录或翻译内容")
-            .navigationTitle("历史记录")
+            .searchable(text: $searchText, prompt: "Search transcripts or translations")
+            .navigationTitle("History")
         } detail: {
             // Detail is driven straight from the selection: a `NavigationLink`
             // inside a multi-selection `List` doesn't reliably fire on the
@@ -76,15 +76,15 @@ struct SessionListView: View {
                     .id(session.id)
             } else if visibleSelection.count > 1 {
                 ContentUnavailableView(
-                    "已选择 \(visibleSelection.count) 条记录",
+                    "\(visibleSelection.count) transcripts selected",
                     systemImage: "checkmark.circle",
-                    description: Text("按 ⌫ 或使用工具栏“管理”菜单批量删除")
+                    description: Text("Press ⌫ or use the toolbar Manage menu to delete them in bulk")
                 )
             } else {
                 ContentUnavailableView(
-                    "选择一条转录记录",
+                    "Select a transcript",
                     systemImage: "text.bubble",
-                    description: Text("在左侧列表中选择一条转录记录查看详情")
+                    description: Text("Select a transcript in the list to view its details")
                 )
             }
         }
@@ -97,18 +97,18 @@ struct SessionListView: View {
             titleVisibility: .visible,
             presenting: pendingRequest
         ) { request in
-            Button("删除", role: .destructive) { performDeletion(targets(for: request)) }
-            Button("取消", role: .cancel) {}
+            Button("Delete", role: .destructive) { performDeletion(targets(for: request)) }
+            Button("Cancel", role: .cancel) {}
         } message: { request in
             Text(message(for: request))
         }
         .alert(
-            "重命名转录记录",
+            "Rename Transcript",
             isPresented: Binding(get: { renamingSession != nil }, set: { if !$0 { renamingSession = nil } })
         ) {
-            TextField("转录记录标题", text: $renameText)
-            Button("保存") { commitRename() }
-            Button("取消", role: .cancel) { renamingSession = nil }
+            TextField("Transcript title", text: $renameText)
+            Button("Save") { commitRename() }
+            Button("Cancel", role: .cancel) { renamingSession = nil }
         }
     }
 
@@ -132,18 +132,18 @@ struct SessionListView: View {
 
     private func title(for request: DeletionRequest) -> String {
         switch request {
-        case .sessions(let sessions): return "删除 \(sessions.count) 条转录记录？"
-        case .empty: return "清理 \(targets(for: request).count) 条空记录？"
-        case .olderThan(let days): return "删除 \(days) 天前的记录？"
+        case .sessions(let sessions): return String(localized: "Delete \(sessions.count) transcripts?")
+        case .empty: return String(localized: "Clean up \(targets(for: request).count) empty transcripts?")
+        case .olderThan(let days): return String(localized: "Delete transcripts older than \(days) days?")
         }
     }
 
     private func message(for request: DeletionRequest) -> String {
         switch request {
-        case .sessions: return "删除后无法恢复。录制中的记录不会被删除。"
-        case .empty: return "这些记录没有任何转录内容，删除后无法恢复。"
+        case .sessions: return String(localized: "This can't be undone. A transcript being transcribed won't be deleted.")
+        case .empty: return String(localized: "These transcripts have no content. This can't be undone.")
         case .olderThan(let days):
-            return "将删除 \(targets(for: request).count) 条开始于 \(days) 天前的转录记录，无法恢复。"
+            return String(localized: "\(targets(for: request).count) transcripts started more than \(days) days ago will be deleted. This can\'t be undone.")
         }
     }
 
@@ -169,14 +169,16 @@ struct SessionListView: View {
 
     @ViewBuilder
     private func contextMenu(for session: RecordingSessionRecord) -> some View {
-        Button("重命名…") { beginRename(session) }
+        Button("Rename…") { beginRename(session) }
         // Right-clicking a row inside a multi-selection acts on the whole
         // selection, like Finder; otherwise just that row.
         let targets = selection.contains(session.id) ? selectedSessions : [session]
         let deletable = targets.filter(isDeletable)
         if !deletable.isEmpty {
             Button(
-                deletable.count > 1 ? "删除所选 \(deletable.count) 条…" : "删除转录记录…",
+                deletable.count > 1
+                    ? String(localized: "Delete \(deletable.count) Selected…")
+                    : String(localized: "Delete Transcript…"),
                 role: .destructive
             ) { requestDeletion(of: targets) }
         }
@@ -237,16 +239,22 @@ struct SessionListView: View {
 
     private static func groupTitle(for date: Date) -> String {
         let calendar = Calendar.current
-        if calendar.isDateInToday(date) { return "今天" }
-        if calendar.isDateInYesterday(date) { return "昨天" }
-        if calendar.isDate(date, equalTo: .now, toGranularity: .weekOfYear) { return "本周" }
-        if calendar.isDate(date, equalTo: .now, toGranularity: .month) { return "本月" }
+        if calendar.isDateInToday(date) { return String(localized: "Today") }
+        if calendar.isDateInYesterday(date) { return String(localized: "Yesterday") }
+        if calendar.isDate(date, equalTo: .now, toGranularity: .weekOfYear) { return String(localized: "This Week") }
+        if calendar.isDate(date, equalTo: .now, toGranularity: .month) { return String(localized: "This Month") }
         return yearMonthFormatter.string(from: date)
     }
 
+    /// The app's UI language, so month/weekday names match the localized
+    /// date formats (which fall back to English when the system language is
+    /// neither English nor 简体中文) instead of following `Locale.current`.
+    private static let uiLocale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en")
+
     private static let yearMonthFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年M月"
+        formatter.locale = uiLocale
+        formatter.dateFormat = String(localized: "MMMM yyyy")
         return formatter
     }()
 
@@ -302,8 +310,8 @@ struct SessionListView: View {
             }
             Text(
                 [
-                    isLive(session) ? "录制中" : Self.durationLabel(from: session.startedAt, to: Self.endDate(of: session)),
-                    "\(session.utterances.count) 句",
+                    isLive(session) ? String(localized: "Transcribing") : Self.durationLabel(from: session.startedAt, to: Self.endDate(of: session)),
+                    String(localized: "Sentences: \(session.utterances.count)"),
                     Self.compactLanguagePair(for: session),
                 ].joined(separator: " · ")
             )
@@ -321,22 +329,26 @@ struct SessionListView: View {
     /// `SessionExporter.dateFormatter` already uses elsewhere.
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = uiLocale
         formatter.dateFormat = "HH:mm"
         return formatter
     }()
     private static let weekdayFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = uiLocale
         formatter.dateFormat = "EEE"
         return formatter
     }()
     private static let monthDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "M月d日 HH:mm"
+        formatter.locale = uiLocale
+        formatter.dateFormat = String(localized: "MMM d, HH:mm")
         return formatter
     }()
     private static let yearMonthDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年M月d日 HH:mm"
+        formatter.locale = uiLocale
+        formatter.dateFormat = String(localized: "MMM d, yyyy, HH:mm")
         return formatter
     }()
 
@@ -372,9 +384,9 @@ struct SessionListView: View {
         // Floored at 0 so a clock adjustment can't produce "-1 秒".
         let seconds = max(0, (end ?? .now).timeIntervalSince(start))
         if seconds < 60 {
-            return "\(Int(seconds.rounded())) 秒"
+            return String(localized: "\(Int(seconds.rounded())) sec")
         }
-        return "\(Int((seconds / 60).rounded())) 分钟"
+        return String(localized: "\(Int((seconds / 60).rounded())) min")
     }
 
     /// "EN→ZH" (`AUTO→ZH` when the source is auto-detected, i.e. a nil

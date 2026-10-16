@@ -18,12 +18,12 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .general: return "通用"
-        case .recognition: return "语音识别"
-        case .dictation: return "语音输入"
-        case .quickTranslation: return "快捷翻译"
-        case .models: return "模型库"
-        case .about: return "关于"
+        case .general: return String(localized: "General")
+        case .recognition: return String(localized: "Speech Recognition")
+        case .dictation: return String(localized: "Dictation")
+        case .quickTranslation: return String(localized: "Quick Translate")
+        case .models: return String(localized: "Model Library")
+        case .about: return String(localized: "About")
         }
     }
 

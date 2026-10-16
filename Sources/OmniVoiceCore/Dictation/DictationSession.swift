@@ -52,8 +52,8 @@ public final class DictationSession: ObservableObject {
         Self.log.info("start +\(ms)ms: \(step)")
     }
 
-    private static let preparingMessage = "正在准备识别引擎…"
-    private static let speakNowMessage = "请说话…"
+    private static var preparingMessage: String { String(localized: "Preparing the recognition engine…") }
+    private static var speakNowMessage: String { String(localized: "Speak now…") }
 
     private var transcript = DictationTranscript()
     private var provider: TranscriptionProvider?
@@ -145,7 +145,7 @@ public final class DictationSession: ObservableObject {
         } else {
             let system = SystemTranscriptionProvider()
             system.onInstallingAssets = { [weak self] in
-                Task { @MainActor in self?.statusDetail = "正在下载语言识别资源，首次使用需要一点时间…" }
+                Task { @MainActor in self?.statusDetail = String(localized: "Downloading language recognition resources. This takes a moment the first time…") }
             }
             system.onAssetsReady = { [weak self] in
                 guard let self, self.state == .starting else { return }
@@ -181,9 +181,9 @@ public final class DictationSession: ObservableObject {
             releaseRecognizer(provider)
             if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized {
                 microphonePermissionNeeded = true
-                fail("麦克风权限未授权，请在系统设置中允许访问麦克风")
+                fail(String(localized: "Microphone access is not authorized. Allow microphone access in System Settings."))
             } else {
-                fail("麦克风启动失败: \(error.localizedDescription)")
+                fail(String(localized: "Microphone failed to start: \(error.localizedDescription)"))
             }
             return
         }
@@ -204,7 +204,7 @@ public final class DictationSession: ObservableObject {
             await provider.stop()
             releaseRecognizer(provider)
             // Cancelled while starting is the user's own doing, not a failure.
-            if Task.isCancelled { abandonStart() } else { fail("听写启动失败: \(error.localizedDescription)") }
+            if Task.isCancelled { abandonStart() } else { fail(String(localized: "Failed to start dictation: \(error.localizedDescription)")) }
             return
         }
         if Task.isCancelled {

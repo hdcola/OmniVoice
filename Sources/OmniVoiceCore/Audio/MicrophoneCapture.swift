@@ -7,9 +7,9 @@ enum CaptureError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .noDevice: return "找不到可用的麦克风设备"
-        case .cannotAddInput: return "无法添加麦克风输入到采集会话"
-        case .cannotAddOutput: return "无法添加音频输出到采集会话"
+        case .noDevice: return String(localized: "No available microphone device found")
+        case .cannotAddInput: return String(localized: "Could not add the microphone input to the capture session")
+        case .cannotAddOutput: return String(localized: "Could not add the audio output to the capture session")
         }
     }
 }

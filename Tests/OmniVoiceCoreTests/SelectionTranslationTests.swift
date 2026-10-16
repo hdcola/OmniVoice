@@ -291,7 +291,7 @@ private final class FakeModelBackend: SelectionModelTranslating {
             Issue.record("expected failure, got \(translator.phase)")
             return
         }
-        #expect(message.contains("法语"))
+        #expect(message.contains("French"))
     }
 
     @Test func missingModelFailsWithDownloadHint() async {
@@ -302,7 +302,7 @@ private final class FakeModelBackend: SelectionModelTranslating {
             Issue.record("expected failure, got \(translator.phase)")
             return
         }
-        #expect(message.contains("模型库"))
+        #expect(message.contains("Model Library"))
     }
 
     @Test func backendErrorSurfacesAsFailure() async {
@@ -311,7 +311,7 @@ private final class FakeModelBackend: SelectionModelTranslating {
         let translator = makeTranslator(backend: backend)
         translator.load("The quick brown fox jumps over the lazy dog.")
         await waitUntilSettled(translator)
-        #expect(translator.phase == .failed("翻译失败：\(TranslatorError.textTooLong.localizedDescription)"))
+        #expect(translator.phase == .failed("Translation failed: \(TranslatorError.textTooLong.localizedDescription)"))
     }
 
     @Test func systemEnginePublishesConfigurationAndRunsThroughBridge() async {
@@ -473,26 +473,26 @@ private final class FakeModelBackend: SelectionModelTranslating {
     }
 
     @Test func localizedNameResolvesCatalogAndRecognizerCodes() {
-        #expect(LanguageCatalog.localizedName(for: "zh-CN") == "简体中文")
-        #expect(LanguageCatalog.localizedName(for: "zh-Hans") == "简体中文")
-        #expect(LanguageCatalog.localizedName(for: "zh-TW") == "繁体中文")
-        #expect(LanguageCatalog.localizedName(for: "zh-Hant") == "繁体中文")
-        #expect(LanguageCatalog.localizedName(for: "yue-CN") == "粤语")
-        #expect(LanguageCatalog.localizedName(for: "yue") == "粤语")
-        #expect(LanguageCatalog.localizedName(for: "en-US") == "英语")
-        #expect(LanguageCatalog.localizedName(for: "en") == "英语")
-        #expect(LanguageCatalog.localizedName(for: "ja") == "日语")
+        #expect(LanguageCatalog.localizedName(for: "zh-CN") == "Simplified Chinese")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hans") == "Simplified Chinese")
+        #expect(LanguageCatalog.localizedName(for: "zh-TW") == "Traditional Chinese")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hant") == "Traditional Chinese")
+        #expect(LanguageCatalog.localizedName(for: "yue-CN") == "Cantonese")
+        #expect(LanguageCatalog.localizedName(for: "yue") == "Cantonese")
+        #expect(LanguageCatalog.localizedName(for: "en-US") == "English")
+        #expect(LanguageCatalog.localizedName(for: "en") == "English")
+        #expect(LanguageCatalog.localizedName(for: "ja") == "Japanese")
     }
 }
 
 @Suite struct LanguageCatalogLocalizedNameTests {
     @Test func namesTagsOutsideTheCatalogExactly() {
-        #expect(LanguageCatalog.localizedName(for: "en-US") == "英语")
-        #expect(LanguageCatalog.localizedName(for: "en") == "英语")
-        #expect(LanguageCatalog.localizedName(for: "zh-Hans") == "简体中文")
-        #expect(LanguageCatalog.localizedName(for: "zh-Hant") == "繁体中文")
-        #expect(LanguageCatalog.localizedName(for: "zh-Hant-TW") == "繁体中文")
-        #expect(LanguageCatalog.localizedName(for: "zh-HK") == "粤语")
-        #expect(LanguageCatalog.localizedName(for: "yue") == "粤语")
+        #expect(LanguageCatalog.localizedName(for: "en-US") == "English")
+        #expect(LanguageCatalog.localizedName(for: "en") == "English")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hans") == "Simplified Chinese")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hant") == "Traditional Chinese")
+        #expect(LanguageCatalog.localizedName(for: "zh-Hant-TW") == "Traditional Chinese")
+        #expect(LanguageCatalog.localizedName(for: "zh-HK") == "Cantonese")
+        #expect(LanguageCatalog.localizedName(for: "yue") == "Cantonese")
     }
 }

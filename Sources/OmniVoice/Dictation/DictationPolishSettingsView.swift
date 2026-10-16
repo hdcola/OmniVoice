@@ -28,43 +28,43 @@ struct DictationPolishSettingsRows: View {
 
     var body: some View {
         SettingsRow(
-            title: "润色识别结果",
+            title: String(localized: "Polish recognized text"),
             subtitle: controller.polish.isEnabled && !configured
-                ? "还没配置完：请填写下面的服务、模型和 API Key，否则会直接输入原文"
-                : "输入前先交给你配置的 LLM 补标点、去口癖、整理列表；识别出的文字会发送到该服务。失败、超时或结果不可靠时输入原文，润色中按 Esc 也输入原文。先润色，再翻译"
+                ? String(localized: "Setup is incomplete: fill in the service, model and API Key below, otherwise the original text is typed.")
+                : String(localized: "Before typing, the text is handed to the LLM you configured to add punctuation, remove filler words and tidy lists; the recognized text is sent to that service. If it fails, times out or the result looks unreliable, the original is typed; pressing Esc while polishing also types the original. Polishing happens before translation.")
         ) {
-            Toggle("润色识别结果", isOn: enabledBinding)
+            Toggle("Polish recognized text", isOn: enabledBinding)
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .controlSize(.small)
         }
         .disabled(!controller.isEnabled)
-        .alert("文字会发送到你配置的服务", isPresented: $showingPrivacyNotice) {
-            Button("开启") {
+        .alert("Text will be sent to the service you configured", isPresented: $showingPrivacyNotice) {
+            Button("Turn On") {
                 controller.polish.hasAcknowledgedPrivacy = true
                 controller.polish.isEnabled = true
             }
-            Button("取消", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("开启后，每次语音输入识别出的文字（不含窗口标题或其他内容）会发送到下面配置的 OpenAI 兼容服务进行润色。选用本地的 Ollama 则不会离开这台 Mac。")
+            Text("When on, the text recognized by each dictation (not window titles or anything else) is sent to the OpenAI-compatible service configured below for polishing. With a local Ollama it never leaves this Mac.")
         }
 
         if controller.polish.isEnabled {
             SettingsDivider()
-            SettingsRow(title: "服务") {
-                Picker("服务", selection: presetBinding) {
+            SettingsRow(title: String(localized: "Service")) {
+                Picker("Service", selection: presetBinding) {
                     ForEach(PolishPreset.allCases) { Text($0.title).tag($0) }
                 }
                 .labelsHidden()
-                .accessibilityLabel("润色服务")
+                .accessibilityLabel("Polish service")
                 .fixedSize()
             }
             SettingsDivider()
             SettingsRow(
                 title: "Base URL",
                 subtitle: controller.polish.usesInsecureRemoteEndpoint
-                    ? "警告：这是非加密的 http 地址，识别的文字会明文发送；只有本机（localhost）建议用 http"
-                    : "OpenAI 兼容接口，请求发到 {Base URL}/chat/completions"
+                    ? String(localized: "Warning: this is an unencrypted http address and the recognized text will be sent in plain text; only use http for this Mac (localhost).")
+                    : String(localized: "OpenAI-compatible API; requests go to {Base URL}/chat/completions")
             ) {
                 TextField("https://…/v1", text: $controller.polish.baseURL)
                     .textFieldStyle(.roundedBorder)
@@ -72,11 +72,11 @@ struct DictationPolishSettingsRows: View {
                     .accessibilityLabel("Base URL")
             }
             SettingsDivider()
-            SettingsRow(title: "模型") {
-                TextField("模型名", text: $controller.polish.model)
+            SettingsRow(title: String(localized: "Model")) {
+                TextField("Model name", text: $controller.polish.model)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 240)
-                    .accessibilityLabel("润色模型")
+                    .accessibilityLabel("Polish model")
             }
             SettingsDivider()
             SettingsRow(
@@ -85,57 +85,57 @@ struct DictationPolishSettingsRows: View {
                 subtitleTint: controller.polishKeyRejected ? .red : .secondary
             ) {
                 HStack {
-                    SecureField(hasKey ? "已保存" : "粘贴后回车", text: $keyDraft)
+                    SecureField(hasKey ? String(localized: "Saved") : String(localized: "Paste, then press Return"), text: $keyDraft)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 170)
                         .accessibilityLabel("API Key")
                         .onSubmit(saveKey)
-                    Button("保存", action: saveKey)
+                    Button("Save", action: saveKey)
                         .disabled(keyDraft.isEmpty)
                     if hasKey {
-                        Button("清除") { controller.setPolishAPIKey(nil) }
+                        Button("Clear") { controller.setPolishAPIKey(nil) }
                     }
                 }
             }
             SettingsDivider()
-            SettingsRow(title: "润色风格") {
-                Picker("润色风格", selection: $controller.polish.style) {
+            SettingsRow(title: String(localized: "Polish style")) {
+                Picker("Polish style", selection: $controller.polish.style) {
                     ForEach(PolishStyle.allCases) { Text($0.title).tag($0) }
                 }
                 .labelsHidden()
-                .accessibilityLabel("润色风格")
+                .accessibilityLabel("Polish style")
                 .fixedSize()
             }
             SettingsDivider()
             SettingsRow(
-                title: "额外要求",
-                subtitle: "最多 \(PolishSettings.maxExtraLength) 字，只影响风格，例如「称呼用您」"
+                title: String(localized: "Extra instructions"),
+                subtitle: String(localized: "Up to \(PolishSettings.maxExtraLength) characters; affects style only, e.g. “address me formally”")
             ) {
-                TextField("可留空", text: extraBinding)
+                TextField("Optional", text: extraBinding)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 240)
-                    .accessibilityLabel("额外要求")
+                    .accessibilityLabel("Extra instructions")
             }
             SettingsDivider()
-            SettingsRow(title: "超时", subtitle: "超过这个时间就输入原文") {
+            SettingsRow(title: String(localized: "Timeout"), subtitle: String(localized: "The original text is typed after this time.")) {
                 Stepper(
-                    "\(controller.polish.timeoutSeconds) 秒",
+                    "\(controller.polish.timeoutSeconds) s",
                     value: $controller.polish.timeoutSeconds, in: PolishSettings.timeoutRange, step: 1
                 )
                 .fixedSize()
             }
             SettingsDivider()
-            SettingsRow(title: "测试连接", subtitle: testResult) {
-                Button(testing ? "测试中…" : "测试") { runTest() }
+            SettingsRow(title: String(localized: "Test connection"), subtitle: testResult) {
+                Button(testing ? String(localized: "Testing…") : String(localized: "Test")) { runTest() }
                     .disabled(testing || !configured)
             }
         }
     }
 
     private var keySubtitle: String {
-        if controller.polishKeyRejected { return "服务拒绝了这个 Key（401/403），请检查" }
-        if controller.polish.isLocalEndpoint { return "本机服务（如 Ollama）不需要 Key；Key 存在钥匙串里" }
-        return "存在钥匙串里，不会显示完整内容"
+        if controller.polishKeyRejected { return String(localized: "The service rejected this Key (401/403); please check it.") }
+        if controller.polish.isLocalEndpoint { return String(localized: "A local service (such as Ollama) does not need a Key; the Key is stored in the Keychain.") }
+        return String(localized: "Stored in the Keychain; the full value is not shown.")
     }
 
     private var presetBinding: Binding<PolishPreset> {
@@ -166,9 +166,9 @@ struct DictationPolishSettingsRows: View {
             testing = false
             switch result {
             case .success(let elapsed):
-                testResult = String(format: "连接成功，用时 %.1f 秒", elapsed)
+                testResult = String(format: String(localized: "Connected in %.1f s"), elapsed)
             case .failure(let error):
-                testResult = "失败：\(error.message)"
+                testResult = String(localized: "Failed: \(error.message)")
             }
         }
     }

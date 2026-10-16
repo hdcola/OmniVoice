@@ -93,6 +93,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     var modelContainer: ModelContainer? { sessionStore?.container }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Pin which UI language this launch resolved, before Settings can
+        // change the stored override (see `AppLanguage`).
+        _ = AppLanguage.runningCode
         session.refreshDevices()
         SystemNotifier.installClickHandler()
 
@@ -208,7 +211,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         )
         let window = NSWindow(contentViewController: hosting)
         window.styleMask = [.titled, .closable]
-        window.title = "新功能"
+        window.title = String(localized: "What's New")
         window.isReleasedWhenClosed = false
         window.center()
         window.delegate = self
@@ -238,7 +241,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             styleMask: [.titled, .closable],
             backing: .buffered, defer: false
         )
-        window.title = "欢迎使用 OmniVoice"
+        window.title = String(localized: "Welcome to OmniVoice")
         window.isReleasedWhenClosed = false
         window.center()
         window.contentView = NSHostingView(

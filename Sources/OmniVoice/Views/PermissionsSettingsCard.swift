@@ -5,14 +5,14 @@ import SwiftUI
 /// What each system permission is for, worded once so Settings and the
 /// onboarding wizard can't drift apart.
 enum PermissionCopy {
-    static let microphone = "转录你的声音（实时转录、语音输入）"
-    static let screenRecording = "捕获系统声音（会议、网课）和截图翻译；截图只在本机识别，不会上传"
-    static let accessibility = "读取其他应用中选中的文字，把语音输入的文字粘贴到光标处，并在语音输入时暂停、恢复音乐和视频（发送播放/暂停键）；未授权时划词可复制后在翻译面板里粘贴，也不会暂停音乐"
-    static let inputMonitoring = "识别连按两次 ⌘C 和语音输入的触发键；只检测这些按键，不记录其他输入"
+    static let microphone = String(localized: "Transcribes your voice (live transcription, dictation)")
+    static let screenRecording = String(localized: "Captures system audio (meetings, online classes) and powers screenshot translation; screenshots are recognized on this Mac only and never uploaded")
+    static let accessibility = String(localized: "Reads selected text in other apps, pastes dictated text at the cursor, and pauses and resumes music and video during dictation (by sending the play/pause key); without it you can copy the selection and paste it into the Translation panel, and music is not paused")
+    static let inputMonitoring = String(localized: "Detects the double ⌘C press and the dictation trigger key; only those keys are checked, nothing else is recorded")
 }
 
 /// Every system permission the app asks for, in one card at the top of
-/// Settings' "通用" tab: Microphone (live transcription, voice input),
+/// Settings' "通用" tab: Microphone (live transcription, dictation),
 /// Screen Recording (system audio + screenshot translation), Accessibility
 /// (reading the selection, typing dictated text, pausing media) and Input
 /// Monitoring (the ⌘C ⌘C shortcut and the voice-input key).
@@ -24,15 +24,15 @@ struct PermissionsSettingsCard: View {
     @State private var hasInputMonitoringPermission = DoubleCopyMonitor.hasPermission
 
     var body: some View {
-        SettingsCard(title: "权限", icon: "lock.shield") {
+        SettingsCard(title: "Permissions", icon: "lock.shield") {
             PermissionRow(
-                icon: "mic", title: "麦克风", detail: PermissionCopy.microphone,
+                icon: "mic", title: "Microphone", detail: PermissionCopy.microphone,
                 isGranted: microphoneStatus == .authorized,
                 open: requestMicrophone
             )
             SettingsDivider()
             PermissionRow(
-                icon: "rectangle.dashed.badge.record", title: "屏幕录制",
+                icon: "rectangle.dashed.badge.record", title: "Screen Recording",
                 detail: PermissionCopy.screenRecording,
                 isGranted: hasScreenRecordingPermission,
                 open: {
@@ -42,14 +42,14 @@ struct PermissionsSettingsCard: View {
             )
             SettingsDivider()
             PermissionRow(
-                icon: "figure.wave", title: "辅助功能",
+                icon: "figure.wave", title: "Accessibility",
                 detail: PermissionCopy.accessibility,
                 isGranted: isAccessibilityTrusted,
                 open: controller.openAccessibilitySettings
             )
             SettingsDivider()
             PermissionRow(
-                icon: "keyboard", title: "输入监控",
+                icon: "keyboard", title: "Input Monitoring",
                 detail: PermissionCopy.inputMonitoring,
                 isGranted: hasInputMonitoringPermission,
                 open: controller.openInputMonitoringSettings

@@ -146,15 +146,15 @@ enum GlobalShortcutAction: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .translateSelection: return "划词翻译"
-        case .captureText: return "截图翻译"
+        case .translateSelection: return String(localized: "Translate selection")
+        case .captureText: return String(localized: "Translate screenshot")
         }
     }
 
     var subtitle: String {
         switch self {
-        case .translateSelection: return "翻译任意应用中选中的文字"
-        case .captureText: return "框选屏幕上的文字并翻译"
+        case .translateSelection: return String(localized: "Translate selected text in any app")
+        case .captureText: return String(localized: "Select text on screen and translate it")
         }
     }
 

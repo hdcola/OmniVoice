@@ -21,7 +21,7 @@ struct SettingsCard<Content: View>: View {
                     if let icon {
                         Image(systemName: icon)
                     }
-                    Text(title)
+                    Text(LocalizedStringKey(title))
                 }
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -45,7 +45,10 @@ struct SettingsCard<Content: View>: View {
     }
 }
 
-/// Pill-style tab switcher shown at the top of the Settings window.
+/// Icon-over-label tab switcher shown at the top of the Settings window: six
+/// equal-width columns, so a long English label ("Speech Recognition") wraps
+/// to two lines in a reserved two-line slot instead of making its tab taller
+/// than the others.
 struct SettingsTabBar: View {
     @Binding var selection: SettingsTab
 
@@ -55,13 +58,25 @@ struct SettingsTabBar: View {
                 Button {
                     selection = tab
                 } label: {
-                    Text(tab.title)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(selection == tab ? Color.primary : .secondary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(selection == tab ? Color.primary.opacity(0.14) : .clear))
-                        .contentShape(Capsule())
+                    VStack(spacing: 3) {
+                        Image(systemName: tab.systemImage)
+                            .font(.system(size: 16, weight: .regular))
+                            .frame(height: 20)
+                            .accessibilityHidden(true)
+                        Text(tab.title)
+                            .font(.system(size: 11, weight: .medium))
+                            .lineLimit(2, reservesSpace: true)
+                            .multilineTextAlignment(.center)
+                    }
+                    .foregroundStyle(selection == tab ? Color.primary : .secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(selection == tab ? Color.primary.opacity(0.14) : .clear)
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .focusEffectDisabled()
@@ -70,8 +85,9 @@ struct SettingsTabBar: View {
             }
         }
         .padding(3)
-        .background(Capsule().fill(Color.primary.opacity(0.06)))
-        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Color.primary.opacity(0.06)))
+        .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+        .padding(.horizontal, 16)
         .animation(.easeInOut(duration: 0.15), value: selection)
     }
 }
@@ -122,10 +138,10 @@ struct SettingsRow<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.system(size: 13))
                 if let subtitle {
-                    Text(subtitle)
+                    Text(LocalizedStringKey(subtitle))
                         .font(.system(size: 11))
                         .foregroundStyle(subtitleTint)
                         .fixedSize(horizontal: false, vertical: true)
@@ -146,7 +162,7 @@ struct SettingsNote: View {
     var tint: Color = .secondary
 
     var body: some View {
-        Text(text)
+        Text(LocalizedStringKey(text))
             .font(.system(size: 11))
             .foregroundStyle(tint)
             .fixedSize(horizontal: false, vertical: true)
@@ -176,7 +192,7 @@ struct StatusPill: View {
     var body: some View {
         HStack(spacing: 5) {
             Circle().fill(tone.color).frame(width: 6, height: 6)
-            Text(text)
+            Text(LocalizedStringKey(text))
         }
         .font(.system(size: 12, weight: .medium))
         .foregroundStyle(tone.color)
@@ -202,17 +218,17 @@ struct PermissionRow: View {
                 .foregroundStyle(isGranted ? Color.green : Color.orange)
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 13, weight: .medium))
-                Text(detail)
+                Text(LocalizedStringKey(title)).font(.system(size: 13, weight: .medium))
+                Text(LocalizedStringKey(detail))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             if isGranted {
-                StatusPill(text: "已授权", tone: .good)
+                StatusPill(text: "Granted", tone: .good)
             } else {
-                PillButton(title: "去授权", action: open)
+                PillButton(title: "Grant", action: open)
             }
         }
         .padding(.horizontal, 14)
@@ -236,7 +252,12 @@ struct PillButton: View {
                 if isWorking {
                     ProgressView().controlSize(.small)
                 }
-                Text(isWorking ? workingTitle : title)
+                // One line at its natural width: a capsule with a wrapped label
+                // ("Restar|t Now") looks broken, and the row's text column is the
+                // part that can give way.
+                Text(LocalizedStringKey(isWorking ? workingTitle : title))
+                    .lineLimit(1)
+                    .fixedSize()
             }
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(tint)
@@ -259,7 +280,7 @@ struct PrimaryPillButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(title, action: action)
+        Button(LocalizedStringKey(title), action: action)
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.capsule)
             .controlSize(.large)

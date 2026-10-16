@@ -15,11 +15,14 @@ struct GeneralSettingsView: View {
     @StateObject private var loginItem = LaunchAtLoginController()
     @AppStorage(PersistedLaunchKey.preloadMode) private var launchPreloadMode = LaunchPreloadMode.off
     @AppStorage(SystemNotifier.enabledKey) private var notificationsEnabled = true
+    @State private var interfaceLanguage = AppLanguage.stored()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 PermissionsSettingsCard(controller: selectionController)
+
+                interfaceLanguageCard
 
                 languageCard
 
@@ -34,48 +37,82 @@ struct GeneralSettingsView: View {
         }
     }
 
+    /// 界面语言 — the app's own UI language. Resolved once at launch (see
+    /// `AppLanguage`), so a change only shows after a restart.
+    private var interfaceLanguageCard: some View {
+        let needsRestart = AppLanguage.needsRestart(stored: interfaceLanguage)
+        return SettingsCard(title: String(localized: "Interface language"), icon: "textformat") {
+            SettingsRow(
+                title: String(localized: "Interface language"),
+                subtitle: needsRestart
+                    ? String(localized: "Restart OmniVoice to apply the new language.")
+                    : String(localized: "Language of menus and windows. Takes effect after restarting OmniVoice."),
+                subtitleTint: needsRestart ? .orange : .secondary
+            ) {
+                HStack(spacing: 8) {
+                    if needsRestart && AppRelauncher.canRelaunch {
+                        PillButton(title: String(localized: "Restart Now")) { AppRelauncher.relaunch() }
+                    }
+                    Picker("Interface language", selection: Binding(
+                        get: { interfaceLanguage },
+                        set: { interfaceLanguage = $0; AppLanguage.store($0) }
+                    )) {
+                        Text("Follow system").tag(AppLanguage.system)
+                        // Each language is named in itself, so it stays readable
+                        // when the UI is in the other one.
+                        Text(verbatim: "English").tag(AppLanguage.english)
+                        Text(verbatim: "简体中文").tag(AppLanguage.simplifiedChinese)
+                    }
+                    .labelsHidden()
+                    .accessibilityLabel("Interface language")
+                    .fixedSize()
+                }
+            }
+        }
+    }
+
     /// 我的语言 / 外语 — the one pair of languages recording, 快捷翻译 and
     /// 语音输入 all share (see `LanguagePreferences`). The side that is
     /// currently the recognizer's source is locked while a recording runs.
     private var languageCard: some View {
         let languages = session.languages
         let isListening = languages.transcriptionDirection == .listenForeign
-        return SettingsCard(title: "语言", icon: "globe") {
-            SettingsRow(title: "我的语言", subtitle: "你自己的语言：字幕和快捷翻译都会把外语译成它") {
-                LanguagePicker("我的语言", selection: Binding(get: { session.languages.myLanguageCode }, set: { session.languages.myLanguageCode = $0 }), isSourceSide: !isListening)
+        return SettingsCard(title: String(localized: "Language"), icon: "globe") {
+            SettingsRow(title: String(localized: "My language"), subtitle: String(localized: "Your own language: captions and Quick Translate translate foreign text into it")) {
+                LanguagePicker(String(localized: "My language"), selection: Binding(get: { session.languages.myLanguageCode }, set: { session.languages.myLanguageCode = $0 }), isSourceSide: !isListening)
             }
             SettingsDivider()
-            SettingsRow(title: "外语", subtitle: "你要听、要读的外语；快捷翻译里「我的语言」的文字会译成它") {
-                LanguagePicker("外语", selection: Binding(get: { session.languages.foreignLanguageCode }, set: { session.languages.foreignLanguageCode = $0 }), isSourceSide: isListening)
+            SettingsRow(title: String(localized: "Foreign language"), subtitle: String(localized: "The foreign language you listen to or read; in Quick Translate, text in your language is translated into it")) {
+                LanguagePicker(String(localized: "Foreign language"), selection: Binding(get: { session.languages.foreignLanguageCode }, set: { session.languages.foreignLanguageCode = $0 }), isSourceSide: isListening)
             }
             SettingsDivider()
             SettingsRow(
-                title: "转录方向",
+                title: String(localized: "Transcription direction"),
                 subtitle: session.swapBlockedReason
-                    ?? "听外语：字幕把外语译成我的语言；说我的语言：把我说的话译成外语。悬浮窗里的 ⇄ 也能切换",
+                    ?? String(localized: "Listen to foreign: captions translate foreign speech into my language; Speak my language: what I say is translated into the foreign language. The ⇄ in the Caption panel also switches it"),
                 subtitleTint: session.swapBlockedReason == nil ? .secondary : .orange
             ) {
-                Picker("转录方向", selection: Binding(
+                Picker("Transcription direction", selection: Binding(
                     get: { languages.transcriptionDirection },
                     set: { if $0 != languages.transcriptionDirection { session.swapTranscriptionDirection() } }
                 )) {
-                    Text("听外语").tag(TranscriptionDirection.listenForeign)
-                    Text("说我的语言").tag(TranscriptionDirection.speakMine)
+                    Text("Listen to foreign").tag(TranscriptionDirection.listenForeign)
+                    Text("Speak my language").tag(TranscriptionDirection.speakMine)
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
-                .accessibilityLabel("转录方向")
+                .accessibilityLabel("Transcription direction")
                 .fixedSize()
                 .disabled(!session.canSwapTranscriptionDirection)
             }
             SettingsDivider()
             SettingsRow(
-                title: "自动检测外语",
+                title: String(localized: "Auto-detect foreign language"),
                 subtitle: session.transcriptionEngineKind == .model
-                    ? "听外语时由本地模型判断对方说的语种"
-                    : "需要本地识别模型；系统语音识别必须指定语种"
+                    ? String(localized: "When listening to foreign speech, the local model detects the language being spoken")
+                    : String(localized: "Requires a local recognition model; System speech recognition needs a fixed language")
             ) {
-                Toggle("自动检测外语", isOn: Binding(get: { session.languages.foreignLanguageAutoDetect }, set: { session.languages.foreignLanguageAutoDetect = $0 }))
+                Toggle("Auto-detect foreign language", isOn: Binding(get: { session.languages.foreignLanguageAutoDetect }, set: { session.languages.foreignLanguageAutoDetect = $0 }))
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
@@ -83,8 +120,8 @@ struct GeneralSettingsView: View {
             }
             if let note = localTranslationLanguageNote {
                 SettingsDivider()
-                SettingsRow(title: "本地翻译模型可能回退为中文", subtitle: note) {
-                    PillButton(title: "切换为系统翻译") { session.translationEngineID = "system.translation" }
+                SettingsRow(title: String(localized: "Local translation model may fall back to Chinese"), subtitle: note) {
+                    PillButton(title: String(localized: "Switch to System translation")) { session.translationEngineID = "system.translation" }
                         .disabled(session.isSettingsBusy)
                 }
             }
@@ -98,7 +135,7 @@ struct GeneralSettingsView: View {
               !ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: session.targetLanguageCode)
         else { return nil }
         let name = LanguageCatalog.displayName(for: session.targetLanguageCode)
-        return "当前翻译引擎是本地模型，针对中、英、日、韩训练；翻译成「\(name)」可能会静默回退为中文。"
+        return String(localized: "The current translation engine is a local model trained for Chinese, English, Japanese, and Korean; translating into “\(name)” may silently fall back to Chinese.")
     }
 
     // MARK: - 启动
@@ -112,9 +149,9 @@ struct GeneralSettingsView: View {
             preloadAvailable: session.usesOnDeviceModelEngine,
             memoryNote: session.translationEngineKind == .model
                 ? (session.transcriptionEngineKind == .model
-                    ? "仅翻译约 \(session.settingsTranslationMemoryGB) GB；翻译和识别约 \(session.settingsEstimatedMemoryGB) GB"
-                    : "翻译模型约 \(session.settingsTranslationMemoryGB) GB；识别为系统引擎，无需加载")
-                : "翻译为系统引擎，「仅翻译模型」不会加载任何内容；识别模型约 \(session.settingsEstimatedMemoryGB) GB",
+                    ? String(localized: "Translation only: about \(session.settingsTranslationMemoryGB) GB; translation and recognition: about \(session.settingsEstimatedMemoryGB) GB")
+                    : String(localized: "Translation model: about \(session.settingsTranslationMemoryGB) GB; recognition uses the system engine, nothing to load"))
+                : String(localized: "Translation uses the system engine, so “Translation model only” loads nothing; the recognition model is about \(session.settingsEstimatedMemoryGB) GB"),
             translationOnlyAvailable: session.translationEngineKind == .model,
             onOpenLoginItems: { loginItem.openLoginItemsSettings() }
         )
@@ -127,12 +164,12 @@ struct GeneralSettingsView: View {
     }
 
     private var notificationCard: some View {
-        SettingsCard(title: "通知", icon: "bell") {
+        SettingsCard(title: String(localized: "Notifications"), icon: "bell") {
             SettingsRow(
-                title: "完成时发送系统通知",
-                subtitle: "模型下载完成或失败时，如果 OmniVoice 不在前台，用系统通知提醒"
+                title: String(localized: "Send a system notification when finished"),
+                subtitle: String(localized: "When a model download finishes or fails while OmniVoice is in the background, notify you with a system notification")
             ) {
-                Toggle("完成时发送系统通知", isOn: $notificationsEnabled)
+                Toggle("Send a system notification when finished", isOn: $notificationsEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
@@ -144,12 +181,12 @@ struct GeneralSettingsView: View {
     }
 
     private var onboardingCard: some View {
-        SettingsCard(title: "新手引导", icon: "sparkles") {
+        SettingsCard(title: String(localized: "Onboarding"), icon: "sparkles") {
             SettingsRow(
-                title: "重新运行引导",
-                subtitle: "再次查看权限授权、运行模式和可选功能（如连按两次 ⌘C 翻译）；已有的设置和已下载的模型不会被清除"
+                title: String(localized: "Re-run onboarding"),
+                subtitle: String(localized: "Review permissions, run mode, and optional features (such as double ⌘C translate) again; your existing settings and downloaded models are kept")
             ) {
-                PillButton(title: "重新运行") { appDelegate.showOnboarding() }
+                PillButton(title: String(localized: "Re-run")) { appDelegate.showOnboarding() }
                     // Changing the run mode swaps engines, which Settings
                     // refuses mid-recording / while a model loads.
                     .disabled(session.isSettingsBusy)
@@ -171,23 +208,23 @@ struct GeneralSettingsView: View {
     /// background, so a panel transparent enough to not block the view
     /// behind it also made the text hard to read.
     private var panelCard: some View {
-        SettingsCard(title: "字幕悬浮窗", icon: "macwindow") {
+        SettingsCard(title: String(localized: "Caption panel"), icon: "macwindow") {
             SettingsRow(
-                title: "启动时显示字幕悬浮窗",
-                subtitle: "关闭后启动时不再自动弹出；开始转录时仍会显示，也可从菜单栏打开"
+                title: String(localized: "Show the Caption panel at launch"),
+                subtitle: String(localized: "When off, it no longer appears automatically at launch; it still shows when live transcription starts, and can be opened from the Menu bar")
             ) {
-                Toggle("启动时显示字幕悬浮窗", isOn: $showFloatingPanelOnLaunch)
+                Toggle("Show the Caption panel at launch", isOn: $showFloatingPanelOnLaunch)
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
             }
             SettingsDivider()
-            opacitySlider("背景透明度", value: $session.panelBackgroundOpacity, range: 0.1...1.0)
+            opacitySlider(String(localized: "Background opacity"), value: $session.panelBackgroundOpacity, range: 0.1...1.0)
             SettingsDivider()
             // "内容透明度", not "文字透明度" — `panelContentOpacity` fades the
             // whole panel content stack (buttons/pickers/dividers/status bar
             // too), not just the transcript text.
-            opacitySlider("内容透明度", value: $session.panelContentOpacity, range: 0.4...1.0)
+            opacitySlider(String(localized: "Content opacity"), value: $session.panelContentOpacity, range: 0.4...1.0)
         }
     }
 

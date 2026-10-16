@@ -34,9 +34,9 @@ struct WhatsNewView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("OmniVoice 有新变化")
+                        Text("What's new in OmniVoice")
                             .font(.system(size: 20, weight: .semibold))
-                        Text("这次更新里值得你看一眼的内容")
+                        Text("Highlights from this update")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
@@ -49,10 +49,10 @@ struct WhatsNewView: View {
             Divider().opacity(0.5)
             HStack {
                 Spacer()
-                PrimaryPillButton(title: "知道了", action: onDismiss)
+                PrimaryPillButton(title: String(localized: "Got It"), action: onDismiss)
                     .keyboardShortcut(.defaultAction)
                 // A button takes one shortcut, so Esc rides on an invisible one.
-                Button("关闭", action: onDismiss)
+                Button("Close", action: onDismiss)
                     .keyboardShortcut(.cancelAction)
                     .opacity(0)
                     .frame(width: 0, height: 0)
@@ -99,32 +99,32 @@ struct WhatsNewView: View {
         switch entry.action {
         case .enableDoubleCopyTranslate:
             if !selectionController.isDoubleCopyEnabled {
-                PillButton(title: entry.actionTitle ?? "开启") {
+                PillButton(title: entry.actionTitle ?? String(localized: "Turn On")) {
                     selectionController.isDoubleCopyEnabled = true
                 }
             } else if hasInputMonitoring {
-                StatusPill(text: "已开启", tone: .good)
+                StatusPill(text: String(localized: "On"), tone: .good)
             } else {
                 // Switched on, but without the permission it hears nothing.
-                PillButton(title: "需要授权输入监控", tint: .orange) {
+                PillButton(title: String(localized: "Input Monitoring permission needed"), tint: .orange) {
                     selectionController.openInputMonitoringSettings()
                 }
             }
         case .enableDictation:
             if !dictationController.isEnabled {
-                PillButton(title: entry.actionTitle ?? "开启") {
+                PillButton(title: entry.actionTitle ?? String(localized: "Turn On")) {
                     dictationController.isEnabled = true
                 }
             } else if hasInputMonitoring {
-                StatusPill(text: "已开启", tone: .good)
+                StatusPill(text: String(localized: "On"), tone: .good)
             } else {
                 // Same as ⌘C ⌘C: the trigger key is never heard without it.
-                PillButton(title: "需要授权输入监控", tint: .orange) {
+                PillButton(title: String(localized: "Input Monitoring permission needed"), tint: .orange) {
                     selectionController.openInputMonitoringSettings()
                 }
             }
         case .rerunOnboarding:
-            PillButton(title: entry.actionTitle ?? "重新运行") {
+            PillButton(title: entry.actionTitle ?? String(localized: "Re-run")) {
                 onDismiss()
                 onRerunOnboarding()
             }

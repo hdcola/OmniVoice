@@ -37,7 +37,7 @@ final class SelectionTranslationPanel: NSPanel {
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
         minSize = NSSize(width: 420, height: 280)
-        title = "快捷翻译"
+        title = String(localized: "Quick Translate")
     }
 
     /// Top-centre of the screen under the pointer — where the user's

@@ -48,7 +48,7 @@ struct ShortcutRecorderRow: View {
                     ShortcutCaptureView(
                         isRecording: $isRecording,
                         onCapture: { shortcut in message = controller.setShortcut(shortcut, for: action) },
-                        onInvalidPress: { message = "快捷键需要包含 ⌘、⌥ 或 ⌃" }
+                        onInvalidPress: { message = String(localized: "The shortcut must include ⌘, ⌥ or ⌃") }
                     )
                 )
                 Button {
@@ -57,7 +57,7 @@ struct ShortcutRecorderRow: View {
                     Image(systemName: "arrow.counterclockwise")
                 }
                 .buttonStyle(.borderless)
-                .help("恢复默认")
+                .help("Restore default")
                 .disabled(controller.shortcuts[action] == action.defaultShortcut)
             }
         }
@@ -67,8 +67,8 @@ struct ShortcutRecorderRow: View {
     }
 
     private var chipText: String {
-        if isRecording { return "按下新快捷键…" }
-        return controller.shortcuts[action]?.displayText ?? "未设置"
+        if isRecording { return String(localized: "Press new shortcut…") }
+        return controller.shortcuts[action]?.displayText ?? String(localized: "Not set")
     }
 }
 

@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "OmniVoice needs microphone access for live speech recognition and translation.";
+"NSSpeechRecognitionUsageDescription" = "When the system speech recognition engine is selected, OmniVoice needs speech recognition to transcribe microphone/system audio into text.";

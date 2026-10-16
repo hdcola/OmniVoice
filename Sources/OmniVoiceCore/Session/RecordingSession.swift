@@ -74,7 +74,7 @@ public final class RecordingSession: ObservableObject {
     /// One row per ASR utterance/segment, source and translation aligned
     /// side by side.
     @Published public var lines: [TranscriptLine] = []
-    @Published public var statusMessage: String = "未启动"
+    @Published public var statusMessage: String = String(localized: "Not started")
     @Published public var inputLevel: Float = 0
     /// Mix in system/output audio (ScreenCaptureKit) alongside the mic. Only
     /// changeable while stopped — the mixer/capture are constructed once in
@@ -278,12 +278,12 @@ public final class RecordingSession: ObservableObject {
     /// the system recognizer not when the other side's language can't be
     /// recognized there (e.g. 俄语 as 我的语言).
     public var swapBlockedReason: String? {
-        if isSessionActive { return "录制中不能互换，停止后再试" }
+        if isSessionActive { return String(localized: "Cannot swap while transcribing. Stop first and try again.") }
         guard transcriptionEngineKind == .system else { return nil }
         let nextSource = languages.transcriptionDirection == .listenForeign
             ? languages.myLanguageCode
             : languages.foreignLanguageCode
-        return Self.isUnsupportedForSystemASR(nextSource) ? "系统语音识别不支持互换后的源语言" : nil
+        return Self.isUnsupportedForSystemASR(nextSource) ? String(localized: "System speech recognition does not support the source language after swapping") : nil
     }
 
     public var canSwapTranscriptionDirection: Bool { swapBlockedReason == nil }
@@ -819,7 +819,7 @@ public final class RecordingSession: ObservableObject {
                     kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant
                 )
             } catch {
-                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「设置 → 模型库」中下载"
+                statusMessage = String(localized: "“\(error.variant.displayName)” has not been downloaded. Download it first in Settings → Model Library.")
                 return
             }
         } else {
@@ -831,7 +831,7 @@ public final class RecordingSession: ObservableObject {
                 kind: translationEngineKind, variant: currentTranslationModelVariant
             )
         } catch {
-            statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「设置 → 模型库」中下载"
+            statusMessage = String(localized: "“\(error.variant.displayName)” has not been downloaded. Download it first in Settings → Model Library.")
             return
         }
 
@@ -843,17 +843,17 @@ public final class RecordingSession: ObservableObject {
 
         if scope == .translationOnly {
             translationProvider = translation
-            statusMessage = "预加载翻译引擎中…"
+            statusMessage = String(localized: "Preloading translation engine…")
             do {
                 try await translation.loadModel()
             } catch {
-                statusMessage = "翻译引擎预加载失败: \(error.localizedDescription)"
+                statusMessage = String(localized: "Translation engine preload failed: \(error.localizedDescription)")
                 translation.unload()
                 translationProvider = nil
                 return
             }
             loadedTranslationOnlyIDs = (translationEngineID, currentTranslationModelVariant?.id)
-            statusMessage = "翻译模型已预加载"
+            statusMessage = String(localized: "Translation model preloaded")
             return
         }
 
@@ -868,13 +868,13 @@ public final class RecordingSession: ObservableObject {
         transcriptionProvider = transcription
         translationProvider = translation
 
-        statusMessage = "预加载翻译引擎中…"
+        statusMessage = String(localized: "Preloading translation engine…")
         do {
             if adoptedTranslation == nil {
                 try await translation.loadModel()
             }
         } catch {
-            statusMessage = "翻译引擎预加载失败: \(error.localizedDescription)"
+            statusMessage = String(localized: "Translation engine preload failed: \(error.localizedDescription)")
             translation.unload()
             loadedTranslationOnlyIDs = nil
             // `transcription.loadModel()` was never even called at this
@@ -891,11 +891,11 @@ public final class RecordingSession: ObservableObject {
             return
         }
 
-        statusMessage = "预加载识别引擎中…"
+        statusMessage = String(localized: "Preloading recognition engine…")
         do {
             try await transcription.loadModel()
         } catch {
-            statusMessage = "识别引擎预加载失败: \(error.localizedDescription)"
+            statusMessage = String(localized: "Recognition engine preload failed: \(error.localizedDescription)")
             transcription.unload()
             transcriptionProvider = nil
             // An adopted translation-only preload was loaded by an earlier
@@ -916,7 +916,7 @@ public final class RecordingSession: ObservableObject {
             translationEngineID, currentTranslationModelVariant?.id
         )
         isModelLoaded = true
-        statusMessage = "模型已预加载"
+        statusMessage = String(localized: "Model preloaded")
     }
 
     private var translationOnlyLoadMatchesSelection: Bool {
@@ -942,7 +942,7 @@ public final class RecordingSession: ObservableObject {
             translationProvider?.unload()
             translationProvider = nil
             loadedTranslationOnlyIDs = nil
-            if statusMessage == "翻译模型已预加载" { statusMessage = "未启动" }
+            if statusMessage == String(localized: "Translation model preloaded") { statusMessage = String(localized: "Not started") }
         }
         guard let loaded = loadedEngineIDs else { return }
         // Re-assigning the *same* engine ID (or the same variant ID) a
@@ -971,8 +971,8 @@ public final class RecordingSession: ObservableObject {
         // Without this, switching engines right after a successful preload
         // left the panel's status bar reading "模型已预加载" indefinitely,
         // even though that model was just unloaded.
-        if statusMessage == "模型已预加载" {
-            statusMessage = "未启动"
+        if statusMessage == String(localized: "Model preloaded") {
+            statusMessage = String(localized: "Not started")
         }
     }
 
@@ -1033,15 +1033,15 @@ public final class RecordingSession: ObservableObject {
         loadedEngineIDs = nil
         loadedTranslationOnlyIDs = nil
         isModelLoaded = false
-        if statusMessage == "模型已预加载" || statusMessage == "翻译模型已预加载" {
-            statusMessage = "未启动"
+        if statusMessage == String(localized: "Model preloaded") || statusMessage == String(localized: "Translation model preloaded") {
+            statusMessage = String(localized: "Not started")
         }
     }
 
     public func start() async {
         guard !isRunning, !isStopping, !isStarting, !isPreloadingModel else { return }
         guard !isRecognizerLentToDictation else {
-            statusMessage = "正在语音输入，请稍后再开始"
+            statusMessage = String(localized: "Dictation is in progress. Try again in a moment.")
             return
         }
         // Reset at the very top, before any of the early-return guards below
@@ -1057,7 +1057,7 @@ public final class RecordingSession: ObservableObject {
         // fail fast with a friendly message rather than silently starting a
         // session that will never produce a single transcribed word.
         guard selectedDeviceID != AudioInputDevice.noneID || includeSystemAudio else {
-            statusMessage = "麦克风已设为「无」，请先开启「包含系统声音」，否则没有可用的音频来源"
+            statusMessage = String(localized: "The microphone is set to “None”. Turn on “Include system audio” first, otherwise there is no audio source.")
             return
         }
         isStarting = true
@@ -1137,7 +1137,7 @@ public final class RecordingSession: ObservableObject {
                     kind: transcriptionEngineKind, variant: currentTranscriptionModelVariant
                 )
             } catch {
-                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「设置 → 模型库」中下载"
+                statusMessage = String(localized: "“\(error.variant.displayName)” has not been downloaded. Download it first in Settings → Model Library.")
                 return
             }
             let translationModelPath: URL?
@@ -1146,7 +1146,7 @@ public final class RecordingSession: ObservableObject {
                     kind: translationEngineKind, variant: currentTranslationModelVariant
                 )
             } catch {
-                statusMessage = "「\(error.variant.displayName)」尚未下载，请先在「设置 → 模型库」中下载"
+                statusMessage = String(localized: "“\(error.variant.displayName)” has not been downloaded. Download it first in Settings → Model Library.")
                 return
             }
             transcription = Self.makeTranscriptionProvider(engineID: transcriptionEngineID, modelPath: transcriptionModelPath)
@@ -1191,7 +1191,7 @@ public final class RecordingSession: ObservableObject {
             Task { @MainActor in self?.advanceTranslationRow() }
         }
 
-        statusMessage = reusingLoaded ? "启动翻译引擎中…" : "加载翻译引擎中…"
+        statusMessage = reusingLoaded ? String(localized: "Starting translation engine…") : String(localized: "Loading translation engine…")
         do {
             if !reusingLoaded, adoptedTranslation == nil {
                 try await translation.loadModel()
@@ -1203,7 +1203,7 @@ public final class RecordingSession: ObservableObject {
                 earlyTranslateThreshold: translationEarlyTranslateThreshold
             ))
         } catch {
-            statusMessage = "翻译引擎启动失败: \(error.localizedDescription)"
+            statusMessage = String(localized: "Translation engine failed to start: \(error.localizedDescription)")
             // Only tear down a load this call itself just performed — if
             // `reusingLoaded`, the model was already loaded fine before
             // this `start()` even ran; this failure is `start(config:)`'s
@@ -1240,14 +1240,14 @@ public final class RecordingSession: ObservableObject {
             Task { @MainActor in self?.handle(event) }
         }
 
-        statusMessage = reusingLoaded ? "启动识别引擎中…" : "加载识别引擎中…"
+        statusMessage = reusingLoaded ? String(localized: "Starting recognition engine…") : String(localized: "Loading recognition engine…")
         do {
             if !reusingLoaded {
                 try await transcription.loadModel()
             }
             try await transcription.start(config: TranscriptionConfig(languageCode: sourceLanguageCode))
         } catch {
-            statusMessage = "识别引擎启动失败: \(error.localizedDescription)"
+            statusMessage = String(localized: "Recognition engine failed to start: \(error.localizedDescription)")
             await translation.stop()
             // Same reasoning as the translation catch above.
             if !reusingLoaded {
@@ -1316,9 +1316,9 @@ public final class RecordingSession: ObservableObject {
             } catch {
                 if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized {
                     microphonePermissionNeeded = true
-                    statusMessage = "麦克风权限未授权，请在系统设置中允许访问麦克风"
+                    statusMessage = String(localized: "Microphone access is not authorized. Allow microphone access in System Settings.")
                 } else {
-                    statusMessage = "麦克风启动失败: \(error.localizedDescription)"
+                    statusMessage = String(localized: "Microphone failed to start: \(error.localizedDescription)")
                 }
                 await transcription.stop()
                 await translation.stop()
@@ -1342,7 +1342,7 @@ public final class RecordingSession: ObservableObject {
                 systemAudioCapture = sys
             } catch {
                 screenRecordingPermissionNeeded = true
-                statusMessage = "系统音频启动失败（可能需要在系统设置里授权屏幕录制权限）: \(error.localizedDescription)"
+                statusMessage = String(localized: "System audio failed to start (you may need to grant Screen Recording permission in System Settings): \(error.localizedDescription)")
                 // Unlike the normal mic+system-audio case (where a failed
                 // system-audio start just quietly falls back to mic-only
                 // transcription), with no mic there is now no audio source
@@ -1359,7 +1359,7 @@ public final class RecordingSession: ObservableObject {
 
         isRunning = true
         if !screenRecordingPermissionNeeded {
-            statusMessage = "转录中…"
+            statusMessage = String(localized: "Transcribing…")
         }
 
         elapsedSeconds = 0
@@ -1414,7 +1414,7 @@ public final class RecordingSession: ObservableObject {
 
         isRunning = false
         isStopping = false
-        statusMessage = "已停止"
+        statusMessage = String(localized: "Stopped")
         inputLevel = 0
     }
 

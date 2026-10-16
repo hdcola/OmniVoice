@@ -27,9 +27,9 @@ public enum TranslationCommitEagerness: String, CaseIterable, Codable, Sendable 
 
     public var displayName: String {
         switch self {
-        case .fast: return "更快出结果（可能不够准确）"
-        case .balanced: return "标准"
-        case .thorough: return "更准确（等待更多上下文）"
+        case .fast: return String(localized: "Faster results (may be less accurate)")
+        case .balanced: return String(localized: "Standard")
+        case .thorough: return String(localized: "More accurate (waits for more context)")
         }
     }
 }

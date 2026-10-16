@@ -63,8 +63,12 @@ struct MenuBarContentView: View {
         }
 
         Button(
-            session.isRunning ? "停止转录"
-                : (session.isStarting ? "启动中…" : (session.isPreloadingModel ? "预加载中…" : "开始转录"))
+            session.isRunning ? String(localized: "Stop Transcription")
+                : (session.isStarting
+                    ? String(localized: "Starting…")
+                    : (session.isPreloadingModel
+                        ? String(localized: "Preloading…")
+                        : String(localized: "Start Transcription")))
         ) {
             Task {
                 if session.isRunning {
@@ -80,7 +84,7 @@ struct MenuBarContentView: View {
         // rather than the button visibly reflecting why.
         .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
 
-        Button("显示/隐藏字幕悬浮窗") {
+        Button("Show/Hide Caption Panel") {
             appDelegate.toggleFloatingPanel()
         }
 
@@ -90,10 +94,10 @@ struct MenuBarContentView: View {
         // feature discoverable and show which keys to press. The panel
         // opens as it was left rather than reading a selection — by the time
         // a menu row is clicked, the menu itself holds the focus.
-        Button(menuTitle("打开翻译面板", for: .translateSelection)) {
+        Button(menuTitle(String(localized: "Open Translation Panel"), for: .translateSelection)) {
             selectionController.showPanel()
         }
-        Button(menuTitle("截图翻译", for: .captureText)) {
+        Button(menuTitle(String(localized: "Translate screenshot"), for: .captureText)) {
             selectionController.perform(.captureText)
         }
 
@@ -107,7 +111,7 @@ struct MenuBarContentView: View {
         // reads these once, at the top, to configure that recording's audio
         // pipeline — changing them during setup would either race that read
         // or silently not apply to the run in progress.
-        Picker("麦克风", selection: $session.selectedDeviceID) {
+        Picker("Microphone", selection: $session.selectedDeviceID) {
             ForEach(session.inputDevices) { device in
                 Text(device.name).tag(Optional(device.id))
             }
@@ -120,12 +124,12 @@ struct MenuBarContentView: View {
         // this label so it doesn't wrap/get cut off, and out of this menu
         // entirely so the panel stays the one place status text lives (see
         // `FloatingTranscriptView.statusBar`).
-        Toggle("包含系统声音", isOn: $session.includeSystemAudio)
+        Toggle("Include system audio", isOn: $session.includeSystemAudio)
             .disabled(session.isSessionActive)
 
         Divider()
 
-        Button("历史记录…") {
+        Button("History…") {
             // OmniVoice runs as an accessory app (`LSUIElement`, no Dock
             // icon) — opening a window without activating first creates it
             // behind whatever app currently has focus, since this app never
@@ -143,14 +147,14 @@ struct MenuBarContentView: View {
             openSettings()
         }
 
-        Button("设置…") {
+        Button("Settings…") {
             NSApp.activate(ignoringOtherApps: true)
             openSettings()
         }
 
         Divider()
 
-        Button("退出 OmniVoice") {
+        Button("Quit OmniVoice") {
             NSApp.terminate(nil)
         }
         .keyboardShortcut("q")
@@ -158,7 +162,7 @@ struct MenuBarContentView: View {
 
     private func menuTitle(_ title: String, for action: GlobalShortcutAction) -> String {
         guard let shortcut = selectionController.shortcuts[action] else { return title }
-        return "\(title)（\(shortcut.displayText)）"
+        return String(localized: "\(title) (\(shortcut.displayText))")
     }
 
     /// "模型库…", plus a live progress readout once a download is running
@@ -168,9 +172,11 @@ struct MenuBarContentView: View {
     /// equivalent when the menu itself isn't even open).
     private var modelManagementLabel: String {
         guard let fraction = downloadManager.downloadProgress.values.max() else {
-            return downloadManager.hasActiveDownloads ? "模型库…（准备下载…）" : "模型库…"
+            return downloadManager.hasActiveDownloads
+                ? String(localized: "Model Library… (preparing download…)")
+                : String(localized: "Model Library…")
         }
-        return "模型库…（下载中 \(Int((fraction * 100).rounded()))%）"
+        return String(localized: "Model Library… (downloading \(Int((fraction * 100).rounded()))%)")
     }
 }
 
@@ -226,7 +232,7 @@ struct MenuBarLabel: View {
         } else if let fraction = downloadManager.downloadProgress.values.max() {
             Label("\(Int((fraction * 100).rounded()))%", systemImage: "arrow.down.circle")
         } else if downloadManager.hasActiveDownloads {
-            Label("下载中", systemImage: "arrow.down.circle")
+            Label("Downloading", systemImage: "arrow.down.circle")
         } else {
             Image(systemName: "waveform")
         }

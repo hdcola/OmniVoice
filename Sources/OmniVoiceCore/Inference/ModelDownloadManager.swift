@@ -17,13 +17,13 @@ public enum ModelDownloadError: LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .missingDownloadURL(let variantID):
-            return "模型 \(variantID) 尚未配置下载地址"
+            return String(localized: "Model \(variantID) has no download URL configured")
         case .httpError(let statusCode):
-            return "下载失败，服务器返回状态码 \(statusCode)"
+            return String(localized: "Download failed: the server returned status code \(statusCode)")
         case .checksumMismatch(let variantID):
-            return "模型 \(variantID) 校验和不匹配，下载文件可能已损坏，请重试"
+            return String(localized: "Model \(variantID) checksum mismatch. The downloaded file may be corrupted. Please try again.")
         case .insufficientDiskSpace(let requiredMB, let availableMB):
-            return "磁盘空间不足：需要约 \(requiredMB) MB，可用空间仅 \(availableMB) MB"
+            return String(localized: "Not enough disk space: about \(requiredMB) MB required, only \(availableMB) MB available")
         }
     }
 }
@@ -49,8 +49,8 @@ public struct DownloadStats: Sendable, Equatable {
         let speed = Self.formatBytes(bytesPerSecond) + "/s"
         let downloaded = Self.formatBytes(Double(bytesWritten))
         let total = Self.formatBytes(Double(totalBytes))
-        let etaText = etaSeconds.map(Self.formatDuration) ?? "计算中…"
-        return "速度：\(speed) | 已下载：\(downloaded) / \(total) | 剩余时间：约 \(etaText)"
+        let etaText = etaSeconds.map(Self.formatDuration) ?? String(localized: "Calculating…")
+        return String(localized: "Speed: \(speed) | Downloaded: \(downloaded) / \(total) | Time left: about \(etaText)")
     }
 
     private static func formatBytes(_ bytes: Double) -> String {
@@ -63,11 +63,11 @@ public struct DownloadStats: Sendable, Equatable {
     private static func formatDuration(_ seconds: Double) -> String {
         let totalSeconds = max(0, Int(seconds.rounded()))
         if totalSeconds >= 3600 {
-            return "\(totalSeconds / 3600) 小时 \((totalSeconds % 3600) / 60) 分钟"
+            return String(localized: "\(totalSeconds / 3600) h \((totalSeconds % 3600) / 60) min")
         } else if totalSeconds >= 60 {
-            return "\(totalSeconds / 60) 分 \(totalSeconds % 60) 秒"
+            return String(localized: "\(totalSeconds / 60) min \(totalSeconds % 60) s")
         }
-        return "\(totalSeconds) 秒"
+        return String(localized: "\(totalSeconds) s")
     }
 }
 

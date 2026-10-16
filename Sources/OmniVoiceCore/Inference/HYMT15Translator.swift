@@ -310,7 +310,7 @@ final class HYMT15Translator: @unchecked Sendable {
         modelParams.n_gpu_layers = -1 // negative = offload every layer (Metal)
         guard let mdl = path.withCString({ llama_model_load_from_file($0, modelParams) }) else {
             llama_backend_free()
-            throw TranslatorError.llamaCallFailed("加载 HY-MT1.5 模型失败")
+            throw TranslatorError.llamaCallFailed(String(localized: "Failed to load the HY-MT1.5 model"))
         }
 
         var ctxParams = llama_context_default_params()
@@ -323,7 +323,7 @@ final class HYMT15Translator: @unchecked Sendable {
         guard let context = llama_init_from_model(mdl, ctxParams) else {
             llama_model_free(mdl)
             llama_backend_free()
-            throw TranslatorError.llamaCallFailed("创建 HY-MT1.5 推理上下文失败")
+            throw TranslatorError.llamaCallFailed(String(localized: "Failed to create the HY-MT1.5 inference context"))
         }
         model = mdl
         ctx = context
@@ -491,14 +491,14 @@ final class HYMT15Translator: @unchecked Sendable {
             systemPrompt: nil,
             userText: Self.textUserTurn(source: maskedSource, targetLanguage: targetLanguage, sourceIsChinese: sourceIsChinese)
         ) else {
-            throw TranslatorError.llamaCallFailed("HY-MT1.5 提示词模板构建失败")
+            throw TranslatorError.llamaCallFailed(String(localized: "Failed to build the HY-MT1.5 prompt template"))
         }
         let budget = Int32(llama_n_ctx(ctx)) - Int32(Self.maxNewTokens)
         guard LlamaGeneration.tokenCount(of: prompt, vocab: vocab) <= budget else {
             throw TranslatorError.textTooLong
         }
         guard let sampler = Self.makeSamplerChain(vocab: vocab) else {
-            throw TranslatorError.llamaCallFailed("创建 HY-MT1.5 采样器失败")
+            throw TranslatorError.llamaCallFailed(String(localized: "Failed to create the HY-MT1.5 sampler"))
         }
         defer { llama_sampler_free(sampler) }
 

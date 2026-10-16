@@ -9,13 +9,13 @@ enum TranscriberError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .modelMissing(let path):
-            return "找不到模型权重: \(path)"
+            return String(localized: "Model weights not found: \(path)")
         case .status(let status, let context):
             let name = String(cString: audiocpp_status_string(status))
             let detail = String(cString: audiocpp_last_error())
             return "\(context): \(name) — \(detail)"
         case .notLoaded:
-            return "模型尚未加载"
+            return String(localized: "The model is not loaded yet")
         }
     }
 }
@@ -208,7 +208,7 @@ final class InProcessTranscriber: @unchecked Sendable {
         }
 
         var reg: OpaquePointer?
-        try check(audiocpp_registry_create(nil, &reg), "创建 registry 失败")
+        try check(audiocpp_registry_create(nil, &reg), String(localized: "Failed to create the registry"))
 
         // `reg` only gets assigned to the stored `registry` once `model`
         // load has *also* succeeded, below — not right after creation.
@@ -228,7 +228,7 @@ final class InProcessTranscriber: @unchecked Sendable {
                     weight_id: nil,
                     model_spec_override: nil
                 )
-                try check(audiocpp_model_load(reg, path, &config, nil, &mdl), "加载模型失败")
+                try check(audiocpp_model_load(reg, path, &config, nil, &mdl), String(localized: "Failed to load the model"))
             }
         } catch {
             audiocpp_registry_free(reg)
@@ -259,7 +259,7 @@ final class InProcessTranscriber: @unchecked Sendable {
             var backend = audiocpp_backend_config(backend: backendPtr, device: 0, threads: 4)
             try check(
                 audiocpp_session_create(model, "asr", "streaming", &backend, sessionOptions, &sess),
-                "创建流式会话失败"
+                String(localized: "Failed to create the streaming session")
             )
         }
         session = sess
@@ -293,16 +293,16 @@ final class InProcessTranscriber: @unchecked Sendable {
         committedThisUtterance = ""
 
         guard let requestLanguage = tuning.recognitionLanguage.requestValue else {
-            try check(audiocpp_stream_start(session, nil), "启动流失败")
+            try check(audiocpp_stream_start(session, nil), String(localized: "Failed to start the stream"))
             isStreamActive = true
             return
         }
         let request = audiocpp_request_create()
         defer { audiocpp_request_free(request) }
         try requestLanguage.withCString { languagePtr -> Void in
-            try check(audiocpp_request_set_text_language(request, languagePtr), "设置识别语言失败")
+            try check(audiocpp_request_set_text_language(request, languagePtr), String(localized: "Failed to set the recognition language"))
         }
-        try check(audiocpp_stream_start(session, request), "启动流失败")
+        try check(audiocpp_stream_start(session, request), String(localized: "Failed to start the stream"))
         isStreamActive = true
     }
 

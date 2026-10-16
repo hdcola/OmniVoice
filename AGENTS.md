@@ -7,6 +7,7 @@ This document defines the repository workflow rules for all contributors and cod
 - Never commit directly to `main`.
 - All changes must go through a feature or fix branch, followed by review (PR), before landing on `main`.
 - All user-facing changes must be recorded in `CHANGELOG.md`.
+- User-facing wording must follow `Docs/GLOSSARY.md`, and the glossary must be kept current (Section 11).
 
 ## 2. Branch Workflow
 
@@ -167,3 +168,33 @@ When in doubt:
 Cutting a version (version bump, changelog cut, DMG build, tag, GitHub
 Release, Homebrew cask) is described in `Docs/RELEASING.md`. A release cut is
 a `chore/release-X.Y.Z` branch and a PR like any other change.
+
+## 11. Terminology and Localization
+
+`Docs/GLOSSARY.md` is the single source of truth for product terms (中文 UI
+name, English name, code identifier) and for banned words.
+
+### Rules
+
+- Before writing or changing any user-facing text, read `Docs/GLOSSARY.md` and
+  use its names exactly. This covers UI strings (English keys in source and
+  the 简体中文 translations in `Resources/zh-Hans.lproj/Localizable.strings`),
+  `CHANGELOG.md` entries, `README*.md`, other docs, commit messages and PR
+  descriptions.
+- Never use a banned word or a bare form the glossary forbids (for example
+  plain "悬浮窗"/"面板", or "录音" for the transcription feature).
+- If a change adds, renames or removes a user-facing concept (a window, tab,
+  feature, engine, shortcut or setting), update `Docs/GLOSSARY.md` in the same
+  PR: add or change the row, and add any newly banned wording to its rules.
+  Do not change code identifiers just to match the glossary; the Code column
+  records them as they are.
+- If you find existing text that contradicts the glossary, fix the text, or
+  fix the glossary if the glossary is the outdated side, and say which in the
+  PR description.
+- New UI strings need an English key plus a zh-Hans translation in the same
+  PR. In `.strings` files the left-hand key uses plain specifiers (`%@`,
+  `%lld`) exactly as Swift's interpolation generates them; positional
+  specifiers (`%1$@`) belong only in the translated value.
+- A new UI string whose wording depends on a count ("1 transcript" vs "2 transcripts") needs a plural entry in `Resources/en.lproj/Localizable.stringsdict` keyed by the same `%lld` format key; Chinese needs none.
+- Before opening a PR that touches user-facing text, check it against the
+  glossary and state in the PR description that you did.

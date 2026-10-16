@@ -62,24 +62,24 @@ struct WhatsNewTests {
     @Test("someone who saw revision 3 is shown the dictation-translation and translation-speech notes")
     func translationSpeechIsNewForRevisionThreeUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 3)
-        #expect(shown.map(\.title) == ["语音输入：自动暂停音乐和视频", "语音输入：润色识别结果（可选）", "语音输入：翻译后再输入", "翻译朗读"])
+        #expect(shown.map(\.title) == ["Dictation: automatically pause music and video", "Dictation: polish recognized text (optional)", "Dictation: translate before entering", "Read translations aloud"])
     }
 
     @Test("someone who saw revision 4 is shown the polish and dictation-translation notes")
     func dictationTranslationIsNewForRevisionFourUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 4)
-        #expect(shown.map(\.title) == ["语音输入：自动暂停音乐和视频", "语音输入：润色识别结果（可选）", "语音输入：翻译后再输入"])
+        #expect(shown.map(\.title) == ["Dictation: automatically pause music and video", "Dictation: polish recognized text (optional)", "Dictation: translate before entering"])
     }
 
     @Test("someone who saw revision 5 is shown the media-pause and polish notes")
     func polishIsNewForRevisionFiveUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 5)
-        #expect(shown.map(\.title) == ["语音输入：自动暂停音乐和视频", "语音输入：润色识别结果（可选）"])
+        #expect(shown.map(\.title) == ["Dictation: automatically pause music and video", "Dictation: polish recognized text (optional)"])
     }
 
     @Test("someone who saw revision 6 is shown just the media-pause note")
     func mediaPauseIsNewForRevisionSixUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 6)
-        #expect(shown.map(\.title) == ["语音输入：自动暂停音乐和视频"])
+        #expect(shown.map(\.title) == ["Dictation: automatically pause music and video"])
     }
 }

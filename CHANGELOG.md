@@ -7,16 +7,22 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(i18n): Settings → General → Interface language picks Follow system / English / 简体中文 (stored as the app's own `AppleLanguages` override, applied after a restart with a Restart Now button) (#107)
+- feat(i18n): the app UI is now localized in English and 简体中文 and follows the system language; English source strings are the keys, translations live in `Resources/<lang>.lproj` and are copied into the app bundle by `Scripts/build_app.sh`, microphone/speech permission prompts are localized via `InfoPlist.strings`, English count-dependent texts ("1 transcript" / "2 transcripts") are pluralized through `Resources/en.lproj/Localizable.stringsdict` (#107)
 
 ### Changed
+- fix(ui): Settings tab bar is now icon-over-label with equal-width columns so longer English tab names wrap evenly, and the Quick Translate engine picker no longer widens the page in English (#107)
 
 ### Fixed
 
 ### Dependencies
 
 ### Documentation
+- docs(readme): localization is no longer a roadmap item (#107)
+- docs(repo): AGENTS.md requires user-facing wording to follow Docs/GLOSSARY.md and requires the glossary to be updated when user-facing concepts change (#107)
 
 ### Tests
+- test(i18n): core tests assert the English source strings; UI tests pin the app to zh-Hans (#107)
 
 ## [0.8.1] - 2026-10-15
 

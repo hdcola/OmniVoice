@@ -7,7 +7,7 @@ public struct AudioInputDevice: Identifiable, Hashable, Sendable {
     /// Sentinel id meaning "whatever macOS considers the default input
     /// device right now", rather than a specific pinned device.
     public static let systemDefaultID = "system-default"
-    public static let systemDefault = AudioInputDevice(id: systemDefaultID, name: "系统默认")
+    public static let systemDefault = AudioInputDevice(id: systemDefaultID, name: String(localized: "System default"))
 
     /// Sentinel id meaning "don't capture a microphone at all" — typically
     /// paired with "包含系统声音" on, for recording a meeting/lecture played
@@ -20,7 +20,7 @@ public struct AudioInputDevice: Identifiable, Hashable, Sendable {
     /// `AudioMixer.micEnabled = false`, VAD segmentation driven by system
     /// audio instead of mic samples).
     public static let noneID = "none"
-    public static let none = AudioInputDevice(id: noneID, name: "无")
+    public static let none = AudioInputDevice(id: noneID, name: String(localized: "None"))
 
     public init(id: String, name: String) {
         self.id = id

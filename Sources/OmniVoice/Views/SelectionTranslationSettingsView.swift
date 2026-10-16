@@ -26,37 +26,37 @@ struct SelectionTranslationSettingsView: View {
     }
 
     private var shortcutsCard: some View {
-        SettingsCard(title: "划词与截图翻译", icon: "keyboard") {
+        SettingsCard(title: "Translate selection and screenshot", icon: "keyboard") {
             ForEach(Array(GlobalShortcutAction.allCases.enumerated()), id: \.element.id) { index, action in
                 if index > 0 { SettingsDivider() }
                 ShortcutRecorderRow(controller: controller, action: action)
             }
             SettingsDivider()
             SettingsRow(
-                title: "连按两次 ⌘C 翻译",
-                subtitle: "在其他应用里选中文字后快速按两下 ⌘C，直接翻译刚复制的内容；需要「输入监控」权限"
+                title: "Translate on double ⌘C",
+                subtitle: "After selecting text in another app, press ⌘C twice quickly to translate what you just copied; requires the “Input Monitoring” permission"
             ) {
-                Toggle("连按两次 ⌘C 翻译", isOn: $controller.isDoubleCopyEnabled)
+                Toggle("Translate on double ⌘C", isOn: $controller.isDoubleCopyEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
             }
             SettingsDivider()
             SettingsRow(
-                title: "翻译完成后自动朗读译文",
-                subtitle: "也可以随时点原文、译文右上角的 ▶ 手动朗读，使用 macOS 系统语音"
+                title: "Read the translation aloud when done",
+                subtitle: "You can also click ▶ at the top right of the source or translation at any time to read it aloud, using the macOS system voice"
             ) {
-                Toggle("翻译完成后自动朗读译文", isOn: $speaker.autoSpeakResult)
+                Toggle("Read the translation aloud when done", isOn: $speaker.autoSpeakResult)
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
             }
             SettingsDivider()
-            SettingsRow(title: "朗读语速") {
+            SettingsRow(title: "Reading speed") {
                 HStack(spacing: 8) {
                     Slider(value: $speaker.rate, in: SelectionSpeaker.rateRange)
                         .frame(width: 140)
-                        .accessibilityLabel("朗读语速")
+                        .accessibilityLabel("Reading speed")
                     Text(String(format: "%.1f×", speaker.rate / SelectionSpeaker.defaultRate))
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
@@ -65,59 +65,59 @@ struct SelectionTranslationSettingsView: View {
             }
             SettingsDivider()
             SettingsRow(
-                title: "下载更多朗读语音",
-                subtitle: "更自然的声音或更多语言：打开后点「系统语音」旁的菜单下载"
+                title: "Download more voices",
+                subtitle: "For more natural voices or more languages: open it, then use the menu next to “System Voice” to download"
             ) {
-                PillButton(title: "打开系统语音设置") { controller.openSpokenContentSettings() }
+                PillButton(title: "Open Spoken Content Settings") { controller.openSpokenContentSettings() }
             }
             SettingsDivider()
-            SettingsNote(text: "翻译面板里 ⏎ 翻译、⇧⏎ 换行、Esc 关闭。")
+            SettingsNote(text: "In the Translation panel: ⏎ translates, ⇧⏎ inserts a line break, Esc closes.")
         }
     }
 
     private var engineCard: some View {
-        SettingsCard(title: "快捷翻译引擎", icon: "cpu") {
-            SettingsRow(title: "引擎", subtitle: "两种引擎都在本机运行；HY-MT1.5 闲置 5 分钟后自动释放内存") {
-                Picker("快捷翻译引擎", selection: $translator.engineID) {
+        SettingsCard(title: "Quick Translate engine", icon: "cpu") {
+            SettingsRow(title: "Engine", subtitle: "Both engines run on this Mac; HY-MT1.5 frees its memory after 5 idle minutes") {
+                Picker("Quick Translate engine", selection: $translator.engineID) {
                     Text(followRecordingLabel).tag(SelectionTranslationEngine.followRecording)
                     ForEach(SelectionTranslationEngine.all) { engine in
                         Text(engineLabel(for: engine)).tag(engine.id)
                     }
                 }
                 .labelsHidden()
-                .accessibilityLabel("快捷翻译引擎")
+                .accessibilityLabel("Quick Translate engine")
                 .fixedSize()
             }
             if session.translationEngineID == "model.t3po",
                translator.engineID == SelectionTranslationEngine.followRecording {
                 SettingsDivider()
-                SettingsNote(text: "转录使用的 T3PO 专为实时语音设计，不适合整段翻译，快捷翻译会改用\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID))。")
+                SettingsNote(text: String(localized: "T3PO, used for transcription, is designed for real-time speech and isn't suited to translating whole passages, so Quick Translate will use \(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID)) instead."))
             }
             // 我的语言 / 外语 are set in the "语言" card (shared with the
             // recording and voice input); only this engine's caveat lives here.
             if let unsupported = unsupportedLanguageNames {
                 SettingsDivider()
                 SettingsNote(
-                    text: "HY-MT1.5 暂时只能译成中文、英语、日语或韩语，译成\(unsupported)时会报错，可改用系统翻译。",
+                    text: String(localized: "HY-MT1.5 can currently only translate into Chinese, English, Japanese or Korean; translating into \(unsupported) will fail. Switch to System translation instead."),
                     tint: .orange
                 )
             }
             if translator.effectiveEngineID == SelectionTranslationEngine.hymt15, !translator.isModelEngineAvailable {
                 SettingsDivider()
-                SettingsRow(title: "HY-MT1.5 模型尚未下载") {
-                    PillButton(title: "前往模型库") { navigation.openModelLibrary() }
+                SettingsRow(title: "The HY-MT1.5 model hasn't been downloaded yet") {
+                    PillButton(title: "Go to Model Library") { navigation.openModelLibrary() }
                 }
             }
         }
     }
 
     private var followRecordingLabel: String {
-        "跟随语音识别设置（当前：\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID))）"
+        String(localized: "Follow speech recognition (\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID)))")
     }
 
     private func engineLabel(for engine: EngineDescriptor) -> String {
         engine.id == SelectionTranslationEngine.hymt15 && !translator.isModelEngineAvailable
-            ? "\(engine.displayName)（未下载）" : engine.displayName
+            ? String(localized: "\(engine.displayName) (not downloaded)") : engine.displayName
     }
 
     private var unsupportedLanguageNames: String? {
@@ -127,6 +127,6 @@ struct SelectionTranslationSettingsView: View {
             .map(LanguageCatalog.displayName(for:))
         // 我的语言 and 外语 can both be the same unsupported language.
         let unique = names.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
-        return unique.isEmpty ? nil : unique.joined(separator: "、")
+        return unique.isEmpty ? nil : unique.joined(separator: String(localized: ", "))
     }
 }

@@ -30,7 +30,7 @@ struct SelectionTranslationView: View {
                     PanelTextView(
                         text: $translator.sourceText,
                         isEditable: true,
-                        placeholder: "输入或粘贴要翻译的文字，按 ⏎ 翻译",
+                        placeholder: String(localized: "Type or paste text to translate, then press ⏎"),
                         fontSize: 13,
                         textColor: .secondaryLabelColor,
                         lineSpacing: 2,
@@ -96,7 +96,7 @@ struct SelectionTranslationView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .help("关闭（Esc）")
+            .help("Close (Esc)")
         }
         .font(.callout)
         .padding(.horizontal, 14)
@@ -108,7 +108,7 @@ struct SelectionTranslationView: View {
     /// goes back to the automatic direction for the next one.
     private var targetMenu: some View {
         Menu {
-            Button("自动（\(LanguageCatalog.localizedName(for: automaticTargetCode))）") {
+            Button("Automatic (\(LanguageCatalog.localizedName(for: automaticTargetCode)))") {
                 translator.targetOverrideCode = nil
                 translator.translate()
             }
@@ -124,12 +124,12 @@ struct SelectionTranslationView: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .help("译成哪种语言。默认：我的语言译成外语，其他语言译成我的语言")
+        .help("Language to translate into. Default: My language is translated into the foreign language, any other language into My language.")
     }
 
     private var sourceLanguageLabel: String {
-        guard translator.translatedSourceText != nil else { return "自动检测" }
-        guard let code = translator.detectedSourceCode else { return "未能识别" }
+        guard translator.translatedSourceText != nil else { return String(localized: "Auto-detect") }
+        guard let code = translator.detectedSourceCode else { return String(localized: "Not recognized") }
         return LanguageCatalog.localizedName(for: code)
     }
 
@@ -144,7 +144,7 @@ struct SelectionTranslationView: View {
 
     private var engineName: String {
         let name = SelectionTranslationEngine.displayName(for: translator.effectiveEngineID)
-        return translator.engineID == SelectionTranslationEngine.followRecording ? "跟随转录 · \(name)" : name
+        return translator.engineID == SelectionTranslationEngine.followRecording ? String(localized: "Follow transcription · \(name)") : name
     }
 
     // MARK: - Notice
@@ -156,26 +156,26 @@ struct SelectionTranslationView: View {
                 .foregroundStyle(.orange)
             switch notice {
             case .accessibilityNeeded:
-                Text("未授予「辅助功能」权限，无法自动读取选中的文字。可先 ⌘C 复制，再在上方 ⌘V 粘贴。")
+                Text("Accessibility permission is not granted, so selected text cannot be read automatically. Copy it with ⌘C first, then paste it above with ⌘V.")
                 Spacer(minLength: 4)
-                Button("去授权") { controller.openAccessibilitySettings() }
+                Button("Grant Access") { controller.openAccessibilitySettings() }
             case .screenRecordingNeeded:
-                Text("截图翻译需要「屏幕录制」权限。授权后请重新按一次快捷键。")
+                Text("Translate screenshot needs Screen Recording permission. After granting it, press the shortcut again.")
                 Spacer(minLength: 4)
-                Button("去授权") { controller.openScreenRecordingSettings() }
+                Button("Grant Access") { controller.openScreenRecordingSettings() }
             case .nothingRecognized:
-                Text("框选的区域里没有识别出文字。")
+                Text("No text was recognized in the selected area.")
                 Spacer(minLength: 4)
             case .captureFailed:
-                Text("截取屏幕失败，请重试。")
+                Text("Capturing the screen failed. Please try again.")
                 Spacer(minLength: 4)
             case .speechLanguageUnknown:
-                Text("无法判断这段文字的语言，没法选择朗读语音。")
+                Text("The language of this text could not be determined, so a voice for reading it aloud cannot be chosen.")
                 Spacer(minLength: 4)
             case .voiceUnavailable(let language):
-                Text("没有可用的「\(language)」朗读语音。点「去下载」打开系统设置，在「系统语音」旁的菜单里下载。")
+                Text("No reading voice is available for “\(language)”. Click “Get Language Pack” to open System Settings and download one from the menu next to “System Voice”.")
                 Spacer(minLength: 4)
-                Button("去下载") { controller.openSpokenContentSettings() }
+                Button("Get Language Pack") { controller.openSpokenContentSettings() }
             }
             Button {
                 controller.dismissNotice()
@@ -195,7 +195,7 @@ struct SelectionTranslationView: View {
 
     private func speakButton(_ target: SelectionSpeaker.Target, text: String, disabled: Bool = false) -> some View {
         let isSpeaking = speaker.speaking == target
-        let name = target == .source ? "原文" : "译文"
+        let name = target == .source ? String(localized: "Source text") : String(localized: "Translation")
         return Button {
             controller.speak(target)
         } label: {
@@ -206,8 +206,8 @@ struct SelectionTranslationView: View {
         .buttonStyle(.plain)
         // Stopping stays possible even if the source was emptied mid-reading.
         .disabled(!isSpeaking && (disabled || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
-        .help(isSpeaking ? "停止朗读" : "朗读\(name)")
-        .accessibilityLabel(isSpeaking ? "停止朗读" : "朗读\(name)")
+        .help(isSpeaking ? String(localized: "Stop reading aloud") : String(localized: "Read \(name) aloud"))
+        .accessibilityLabel(isSpeaking ? String(localized: "Stop reading aloud") : String(localized: "Read \(name) aloud"))
     }
 
     // MARK: - Result
@@ -245,20 +245,20 @@ struct SelectionTranslationView: View {
         case .loadingModel:
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text("正在加载 HY-MT1.5 模型…")
+                Text("Loading HY-MT1.5 model…")
             }
             .foregroundStyle(.secondary)
         case .translating:
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text("翻译中…")
+                Text("Translating…")
             }
             .foregroundStyle(.secondary)
         case .failed(let message):
             Text(message)
                 .foregroundStyle(.red)
         case .idle, .completed:
-            Text("译文会显示在这里")
+            Text("The translation will appear here")
                 .foregroundStyle(.tertiary)
         }
     }
@@ -273,11 +273,11 @@ struct SelectionTranslationView: View {
                 .lineLimit(1)
             Spacer()
             if translator.isBusy {
-                Button("停止") { translator.cancel() }
+                Button("Stop") { translator.cancel() }
             }
-            Button("复制译文") { copyResult() }
+            Button("Copy Translation") { copyResult() }
                 .disabled(translator.resultText.isEmpty)
-            Button("翻译") { translator.translate() }
+            Button("Translate") { translator.translate() }
                 .disabled(translator.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .controlSize(.small)
@@ -288,13 +288,13 @@ struct SelectionTranslationView: View {
     @ViewBuilder
     private var footerStatus: some View {
         if translator.isResultStale {
-            Text("原文已修改 · ⏎ 重新翻译")
+            Text("Source text changed · ⏎ to translate again")
         } else if case .failed(let message) = translator.phase, !translator.resultText.isEmpty {
             Text(message).foregroundStyle(.red)
         } else if translator.isBusy, !translator.resultText.isEmpty {
-            Text("翻译中…")
+            Text("Translating…")
         } else {
-            Text("⏎ 翻译 · ⇧⏎ 换行 · Esc 关闭")
+            Text("⏎ Translate · ⇧⏎ New line · Esc Close")
         }
     }
 

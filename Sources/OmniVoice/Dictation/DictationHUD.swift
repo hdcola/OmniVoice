@@ -203,13 +203,13 @@ struct DictationHUDView: View {
     private var headerButton: some View {
         if let review {
             if review.stage != .translating {
-                Button("输入原文") { controller.confirmReview(send: false, useOriginal: true) }
+                Button("Type Original") { controller.confirmReview(send: false, useOriginal: true) }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
             }
         } else if controller.notice == nil, dictation.state == .listening, controller.mode == .toggle {
             Toggle(isOn: $controller.translateEnabled) {
-                Label("译成\(LanguageCatalog.displayName(for: translator.foreignLanguageCode))", systemImage: "character.bubble")
+                Label("Translate to \(LanguageCatalog.displayName(for: translator.foreignLanguageCode))", systemImage: "character.bubble")
             }
             .toggleStyle(.button)
             .controlSize(.small)
@@ -236,28 +236,28 @@ struct DictationHUDView: View {
     }
 
     private var headline: String {
-        if controller.notice != nil { return "听写" }
-        if controller.isPolishing { return "润色中… · Esc 输入原文" }
+        if controller.notice != nil { return String(localized: "Dictation") }
+        if controller.isPolishing { return String(localized: "Polishing… · Esc types original") }
         if let review {
             let trigger = controller.triggerKey.title
             switch review.stage {
-            case .translating: return "翻译中… · Esc 放弃"
-            case .ready: return "译文 · Return 输入并发送 · \(trigger) 仅输入 · Esc 放弃"
-            case .failed: return "翻译失败 · Return 输入原文并发送 · \(trigger) 仅输入 · Esc 放弃"
+            case .translating: return String(localized: "Translating… · Esc to discard")
+            case .ready: return String(localized: "Translation · Return types and sends · \(trigger) types only · Esc to discard")
+            case .failed: return String(localized: "Translation failed · Return types original and sends · \(trigger) types only · Esc to discard")
             }
         }
         switch dictation.state {
-        case .idle, .starting: return dictation.statusDetail ?? "准备中…"
-        case .listening: return dictation.isUsingLocalModel ? "正在听写 · 本地模型" : "正在听写 · 系统识别"
-        case .finishing: return "识别中…"
+        case .idle, .starting: return dictation.statusDetail ?? String(localized: "Preparing…")
+        case .listening: return dictation.isUsingLocalModel ? String(localized: "Dictating · Local model") : String(localized: "Dictating · System recognition")
+        case .finishing: return String(localized: "Recognizing…")
         }
     }
 
     private var detail: String {
         if let notice = controller.notice { return notice }
         if dictation.state == .listening, dictation.previewText.isEmpty {
-            guard controller.mode == .toggle else { return "请说话" }
-            return controller.translateEnabled ? "请说话 · 按 Return 结束并翻译" : "请说话 · 按 Return 结束并发送"
+            guard controller.mode == .toggle else { return String(localized: "Speak now") }
+            return controller.translateEnabled ? String(localized: "Speak now · Press Return to finish and translate") : String(localized: "Speak now · Press Return to finish and send")
         }
         return dictation.previewText
     }
