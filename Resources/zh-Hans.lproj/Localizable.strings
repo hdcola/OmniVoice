@@ -76,7 +76,7 @@
 "Copy this sentence" = "复制本句";
 "Could not add the audio output to the capture session" = "无法添加音频输出到音频采集";
 "Could not add the microphone input to the capture session" = "无法添加麦克风输入到音频采集";
-"Couldn’t download “%@”: %@. Free up some disk space and try again." = "下载「%@」%@。请清理磁盘空间后重试。";
+"Couldn’t download “%@”: %@. Free up some disk space and try again." = "未能下载「%@」：%@。请清理磁盘空间后重试。";
 "Custom" = "自定义";
 "Delete %lld Selected…" = "删除所选 %lld 条…";
 "Delete %lld transcripts?" = "删除 %lld 条转录记录？";
