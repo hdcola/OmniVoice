@@ -94,6 +94,9 @@ enum OmniVoiceUITestApp {
             return XCUIApplication(url: appBundleURL)
         }
         let app = XCUIApplication(url: appBundleURL)
+        // The suite's queries are written against the zh-Hans UI strings;
+        // pin the language so the result doesn't depend on the host's locale.
+        app.launchArguments += ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         return app
     }

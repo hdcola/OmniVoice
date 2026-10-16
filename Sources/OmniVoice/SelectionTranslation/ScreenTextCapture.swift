@@ -125,7 +125,7 @@ final class CaptureOverlayPanel: NSPanel {
         animationBehavior = .none
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
-        title = "截图框选"
+        title = String(localized: "Screenshot selection")
     }
 }
 
@@ -140,7 +140,7 @@ final class CaptureOverlayView: NSView {
 
     private let veilLayer = CALayer()
     private let selectionLayer = CALayer()
-    private let hint = NSTextField(labelWithString: "拖动框选要翻译的文字 · Esc 取消")
+    private let hint = NSTextField(labelWithString: String(localized: "Drag to select the text to translate · Esc to cancel"))
 
     init(frame: NSRect, image: CGImage) {
         self.image = image

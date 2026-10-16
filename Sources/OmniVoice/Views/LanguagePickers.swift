@@ -40,13 +40,15 @@ struct SourceLanguagePicker: View {
     /// concluding OmniVoice has no auto-detect at all.
     private var isAutoAvailable: Bool { transcriptionEngineKind == .model && allowsAuto }
     private var autoLabel: String {
-        if isAutoAvailable { return "✨ 自动检测语种 (Auto)" }
-        return allowsAuto ? "✨ 自动检测（需本地 R2T2 引擎）" : "✨ 自动检测（仅听外语时可用）"
+        if isAutoAvailable { return String(localized: "✨ Auto-detect language (Auto)") }
+        return allowsAuto
+            ? String(localized: "✨ Auto-detect (requires the local R2T2 engine)")
+            : String(localized: "✨ Auto-detect (only available when listening to a foreign language)")
     }
 
     var body: some View {
         HStack(spacing: 4) {
-            Picker("源语言", selection: $sourceLanguageCode) {
+            Picker("Source language", selection: $sourceLanguageCode) {
                 Text(autoLabel)
                     .tag(String?.none)
                     // Kept in the list (not filtered out) so the feature
@@ -64,7 +66,7 @@ struct SourceLanguagePicker: View {
                 // looking blank/broken.
                 if let custom = sourceLanguageCode,
                    !options.contains(where: { $0.code == custom }) {
-                    Text("\(custom)（自定义）").tag(Optional(custom))
+                    Text("\(custom) (custom)").tag(Optional(custom))
                 }
             }
             // A disabled `Picker` can't be reasoned about via its own tap —
@@ -79,9 +81,9 @@ struct SourceLanguagePicker: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("为什么“自动检测”不可用")
+                .help("Why is “Auto-detect” unavailable?")
                 .popover(isPresented: $isAutoExplanationPresented) {
-                    Text("macOS 系统语音识别引擎要求指定固定语种。如需自动识别混合语种，请在设置中切换为 R2T2 本地模型。")
+                    Text("The macOS system speech recognition engine requires a fixed language. To auto-detect mixed languages, switch to the local R2T2 model in Settings.")
                         .font(.callout)
                         .frame(width: 260)
                         .padding()
@@ -157,14 +159,14 @@ struct TargetLanguagePicker: View {
     }
 
     private var picker: some View {
-        Picker("目标语言", selection: $targetLanguageCode) {
+        Picker("Target language", selection: $targetLanguageCode) {
             if isLocalModelEngine {
-                Section("★ 原生流式推荐 (T3PO 完美支持)") {
+                Section("★ Recommended for native streaming (fully supported by T3PO)") {
                     ForEach(nativeOptions) { option in
                         Text(option.displayName).tag(option.code)
                     }
                 }
-                Section("⚠️ 其他语言（需系统翻译引擎支持）") {
+                Section("⚠️ Other languages (require the system translation engine)") {
                     ForEach(otherOptions) { option in
                         Text(option.displayName).tag(option.code)
                     }
@@ -175,7 +177,7 @@ struct TargetLanguagePicker: View {
                 }
             }
             if !LanguageCatalog.common.contains(where: { $0.code == targetLanguageCode }) {
-                Text("\(targetLanguageCode)（自定义）").tag(targetLanguageCode)
+                Text("\(targetLanguageCode) (custom)").tag(targetLanguageCode)
             }
         }
     }
@@ -196,7 +198,7 @@ struct TargetLanguagePicker: View {
                 .foregroundStyle(.orange)
         }
         .buttonStyle(.plain)
-        .help("语言支持提示")
+        .help("Language support notice")
         .popover(isPresented: $isWarningPresented) {
             warningContent
                 .frame(width: 260)
@@ -206,11 +208,11 @@ struct TargetLanguagePicker: View {
 
     private var warningContent: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("语言支持提示", systemImage: "exclamationmark.triangle.fill")
+            Label("Language support notice", systemImage: "exclamationmark.triangle.fill")
                 .font(.caption.bold())
                 .foregroundStyle(.orange)
             Text(
-                "当前选中的本地模型针对中、英、日、韩进行了专门训练。翻译至「\(targetDisplayName)」可能会静默回退为中文。"
+                "The selected local model is specifically trained for Chinese, English, Japanese and Korean. Translating to “\(targetDisplayName)” may silently fall back to Chinese."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -229,8 +231,8 @@ struct TargetLanguagePicker: View {
 
     private var switchButtonTitle: String {
         isSessionActive
-            ? "一键将翻译引擎切换为「系统翻译」（转录结束后生效）"
-            : "一键将翻译引擎切换为「系统翻译」"
+            ? String(localized: "Switch translation engine to “System translation” in one click (takes effect after transcription ends)")
+            : String(localized: "Switch translation engine to “System translation” in one click")
     }
 
     private var targetDisplayName: String {

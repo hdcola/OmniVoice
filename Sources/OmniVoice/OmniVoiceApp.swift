@@ -24,7 +24,7 @@ struct OmniVoiceApp: App {
         }
         .menuBarExtraStyle(.menu)
 
-        WindowGroup("历史记录", id: "history") {
+        WindowGroup("History", id: "history") {
             SessionListView()
                 .environmentObject(appDelegate.session)
                 .modelContainerIfAvailable(appDelegate.modelContainer)

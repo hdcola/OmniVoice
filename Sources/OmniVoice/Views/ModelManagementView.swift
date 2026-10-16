@@ -18,7 +18,7 @@ struct ModelManagementView: View {
     /// during an active recording/preload (see `actionButton(for:)`) and,
     /// per Task 2.1, to auto-activate a freshly-downloaded engine.
     @EnvironmentObject private var session: RecordingSession
-    @State private var errorTitle = "操作失败"
+    @State private var errorTitle = String(localized: "Operation Failed")
     @State private var errorMessage: String?
     @State private var pendingDeletion: ModelVariant?
     /// Task 2.1 (下载后自动激活与反馈) — set right after a download this view
@@ -58,10 +58,10 @@ struct ModelManagementView: View {
                     activationBannerView(activationBanner)
                 }
                 bundleSection
-                SettingsCard(title: "识别引擎模型", icon: "waveform") {
+                SettingsCard(title: "Speech recognition models", icon: "waveform") {
                     modelRows(for: ProviderCatalog.transcriptionEngines)
                 }
-                SettingsCard(title: "翻译引擎模型", icon: "character.bubble") {
+                SettingsCard(title: "Translation models", icon: "character.bubble") {
                     modelRows(for: ProviderCatalog.translationEngines)
                 }
             }
@@ -71,7 +71,7 @@ struct ModelManagementView: View {
             errorTitle,
             isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
         ) {
-            Button("好", role: .cancel) { errorMessage = nil }
+            Button("OK", role: .cancel) { errorMessage = nil }
         } message: {
             Text(errorMessage ?? "")
         }
@@ -80,29 +80,29 @@ struct ModelManagementView: View {
             isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
             titleVisibility: .visible
         ) {
-            Button("删除", role: .destructive) {
+            Button("Delete", role: .destructive) {
                 if let variant = pendingDeletion {
                     delete(variant)
                 }
                 pendingDeletion = nil
             }
-            Button("取消", role: .cancel) { pendingDeletion = nil }
+            Button("Cancel", role: .cancel) { pendingDeletion = nil }
         }
         // Task 4.2 — pre-flight disk-space warning, copy per
         // Docs/UX-SETTINGS-MODEL-MANAGEMENT.md §4.6.1.
         .alert(
-            "磁盘空间不足",
+            "Not Enough Disk Space",
             isPresented: Binding(get: { diskSpaceWarning != nil }, set: { if !$0 { diskSpaceWarning = nil } })
         ) {
-            Button("打开存储空间管理") {
+            Button("Open Storage Management") {
                 NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.settings.Storage")!)
                 diskSpaceWarning = nil
             }
-            Button("知道了", role: .cancel) { diskSpaceWarning = nil }
+            Button("Got It", role: .cancel) { diskSpaceWarning = nil }
         } message: {
             if let diskSpaceWarning {
                 Text(
-                    "下载「\(diskSpaceWarning.variant.displayName)」\(diskSpaceWarning.error.errorDescription ?? "")。请清理磁盘空间后重试。"
+                    "Downloading “\(diskSpaceWarning.variant.displayName)” \(diskSpaceWarning.error.errorDescription ?? ""). Free up some disk space and try again."
                 )
             }
         }
@@ -110,7 +110,7 @@ struct ModelManagementView: View {
 
     private var deleteConfirmationTitle: String {
         guard let pendingDeletion else { return "" }
-        return "确定要删除「\(pendingDeletion.displayName)」吗？"
+        return String(localized: "Delete “\(pendingDeletion.displayName)”?")
     }
 
     // MARK: - Task 2.1 — Auto-activation banner
@@ -130,7 +130,7 @@ struct ModelManagementView: View {
                     .font(.system(size: 12))
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                PillButton(title: "撤销切换") {
+                PillButton(title: "Undo Switch") {
                     banner.undo()
                     activationBanner = nil
                 }
@@ -143,7 +143,7 @@ struct ModelManagementView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
-                    PillButton(title: "下载 \(companion.variant.displayName)（约 \(companion.variant.approximateSizeMB) MB）") {
+                    PillButton(title: String(localized: "Download \(companion.variant.displayName) (about \(companion.variant.approximateSizeMB) MB)")) {
                         download(companion.variant)
                     }
                 }
@@ -180,7 +180,7 @@ struct ModelManagementView: View {
             session.transcriptionEngineID = variant.engineID
             session.transcriptionModelVariantID = variant.id
             activationBanner = ActivationBanner(
-                message: "「\(variant.displayName)」已下载完成！已自动将识别引擎切换为\(variant.displayName)。",
+                message: String(localized: "“\(variant.displayName)” has finished downloading! The speech recognition engine was switched to \(variant.displayName) automatically."),
                 companionSuggestion: companionSuggestion(forDownloadedTranscription: variant),
                 undo: { session.transcriptionEngineID = previousEngineID }
             )
@@ -190,7 +190,7 @@ struct ModelManagementView: View {
             session.translationEngineID = variant.engineID
             session.translationModelVariantID = variant.id
             activationBanner = ActivationBanner(
-                message: "「\(variant.displayName)」已下载完成！已自动将翻译引擎切换为\(variant.displayName)。",
+                message: String(localized: "“\(variant.displayName)” has finished downloading! The translation engine was switched to \(variant.displayName) automatically."),
                 companionSuggestion: companionSuggestion(forDownloadedTranslation: variant),
                 undo: { session.translationEngineID = previousEngineID }
             )
@@ -211,13 +211,13 @@ struct ModelManagementView: View {
         ) else {
             return nil
         }
-        return ("搭配 R2T2 识别引擎可获得最佳实时打字机体验", r2t2)
+        return (String(localized: "Pair it with the R2T2 speech recognition engine for the best real-time typewriter experience"), r2t2)
     }
 
     // MARK: - Task 2.3 — Recommended bundles
 
     private var bundleSection: some View {
-        SettingsCard(title: "推荐方案快速配置", icon: "sparkles") {
+        SettingsCard(title: "Recommended setups", icon: "sparkles") {
             ForEach(Array(ProviderCatalog.bundles.enumerated()), id: \.element.id) { index, bundle in
                 if index > 0 { SettingsDivider() }
                 bundleCard(for: bundle)
@@ -264,10 +264,10 @@ struct ModelManagementView: View {
                 Text(bundle.displayName).font(.system(size: 13, weight: .semibold))
                 Spacer(minLength: 8)
                 if status.isFullyDownloaded {
-                    StatusPill(text: "已全部下载", tone: .good)
+                    StatusPill(text: "All downloaded", tone: .good)
                 } else {
                     StatusPill(
-                        text: "已下载 \(status.downloadedVariants.count)/\(status.variants.count)",
+                        text: String(localized: "Downloaded \(status.downloadedVariants.count)/\(status.variants.count)"),
                         tone: status.downloadedVariants.isEmpty ? .neutral : .warning
                     )
                 }
@@ -285,10 +285,10 @@ struct ModelManagementView: View {
                     Spacer()
                     PillButton(
                         title: status.downloadedVariants.isEmpty
-                            ? "一键配置此方案（约 \(status.remainingSizeMB) MB）"
-                            : "一键下载剩余组件（约 \(status.remainingSizeMB) MB）",
+                            ? String(localized: "Set Up This Plan (about \(status.remainingSizeMB) MB)")
+                            : String(localized: "Download Remaining Components (about \(status.remainingSizeMB) MB)"),
                         isWorking: isBundleDownloading,
-                        workingTitle: "下载中…"
+                        workingTitle: "Downloading…"
                     ) {
                         downloadBundle(bundle)
                     }
@@ -330,7 +330,7 @@ struct ModelManagementView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(variant.displayName).font(.system(size: 13, weight: .semibold))
-                Text("\(variant.quantization) · 约 \(variant.approximateSizeMB) MB · 内存约 \(variant.recommendedMemoryGB) GB")
+                Text("\(variant.quantization) · about \(variant.approximateSizeMB) MB · about \(variant.recommendedMemoryGB) GB memory")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 if !variant.summary.isEmpty {
@@ -354,11 +354,11 @@ struct ModelManagementView: View {
         if downloadManager.isDownloading(variant) {
             downloadingStatus(for: variant)
         } else if downloadManager.isDownloaded(variant) {
-            StatusPill(text: "校验通过，就绪", tone: .good)
+            StatusPill(text: "Verified, ready", tone: .good)
         } else if let message = failedVariants[variant.id] {
             inlineFailureCard(for: variant, message: message)
         } else {
-            StatusPill(text: "尚未下载", tone: .neutral)
+            StatusPill(text: "Not downloaded yet", tone: .neutral)
         }
     }
 
@@ -370,14 +370,14 @@ struct ModelManagementView: View {
     /// §4.6.2).
     private func inlineFailureCard(for variant: ModelVariant, message: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("下载中断：\(message)")
+            Text("Download interrupted: \(message)")
                 .font(.system(size: 11))
                 .foregroundStyle(.red)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
-                PillButton(title: "立即重试") { download(variant) }
+                PillButton(title: "Retry Now") { download(variant) }
                 if variant.downloadURL != nil {
-                    PillButton(title: "复制下载链接") { copyDownloadLink(for: variant) }
+                    PillButton(title: "Copy Download Link") { copyDownloadLink(for: variant) }
                 }
             }
         }
@@ -403,7 +403,7 @@ struct ModelManagementView: View {
             // `SettingsView`'s `opacitySlider` doc for why (binary
             // floating-point rounding can land a hair under a "clean"
             // percentage).
-            Text("下载中 \(Int((fraction * 100).rounded()))%")
+            Text("Downloading \(Int((fraction * 100).rounded()))%")
                 .foregroundStyle(.secondary)
                 .font(.system(size: 11))
             ProgressView(value: fraction)
@@ -413,7 +413,7 @@ struct ModelManagementView: View {
                     .foregroundStyle(.secondary)
             }
         } else {
-            Text("准备下载…")
+            Text("Preparing download…")
                 .foregroundStyle(.secondary)
                 .font(.system(size: 11))
             // `.linear`, not the default circular spinner — this state
@@ -429,7 +429,7 @@ struct ModelManagementView: View {
     @ViewBuilder
     private func actionButton(for variant: ModelVariant) -> some View {
         if downloadManager.isDownloading(variant) {
-            PillButton(title: "取消") { downloadManager.cancelDownload(for: variant) }
+            PillButton(title: "Cancel") { downloadManager.cancelDownload(for: variant) }
         } else if downloadManager.isDownloaded(variant) {
             // Guards against deleting the weights out from under an active
             // recording/preload — an in-flight `loadModel()`/an already
@@ -437,10 +437,10 @@ struct ModelManagementView: View {
             // very next preload/start attempt for this variant would find
             // nothing there and fail confusingly rather than with the clear
             // "尚未下载" message a deliberate re-download produces.
-            PillButton(title: "删除", tint: .red) { pendingDeletion = variant }
+            PillButton(title: "Delete", tint: .red) { pendingDeletion = variant }
                 .disabled(session.isSessionActive || session.isPreloadingModel)
         } else {
-            PillButton(title: "下载") { download(variant) }
+            PillButton(title: "Download") { download(variant) }
         }
     }
 
@@ -461,7 +461,8 @@ struct ModelManagementView: View {
                 _ = try await downloadManager.ensureDownloaded(variant)
                 autoActivateIfSystemEngineStillSelected(variant)
                 SystemNotifier.notify(
-                    title: "模型下载完成", body: "「\(variant.displayName)」已下载，可以使用了")
+                    title: String(localized: "Model Download Complete"),
+                    body: String(localized: "“\(variant.displayName)” was downloaded and is ready to use"))
             } catch is CancellationError {
                 // The user's own "取消" tap — not a failure worth an alert.
             } catch {
@@ -469,8 +470,8 @@ struct ModelManagementView: View {
                 // `.alert` (see `inlineFailureCard(for:message:)`'s doc).
                 failedVariants[variant.id] = error.localizedDescription
                 SystemNotifier.notify(
-                    title: "模型下载失败",
-                    body: "「\(variant.displayName)」：\(error.localizedDescription)")
+                    title: String(localized: "Model Download Failed"),
+                    body: String(localized: "“\(variant.displayName)”: \(error.localizedDescription)"))
             }
         }
     }
@@ -504,7 +505,7 @@ struct ModelManagementView: View {
             // nothing was ever downloaded.
             session.fallBackToSystemEngineIfModelUnavailable()
         } catch {
-            errorTitle = "删除失败"
+            errorTitle = String(localized: "Delete Failed")
             errorMessage = error.localizedDescription
         }
     }

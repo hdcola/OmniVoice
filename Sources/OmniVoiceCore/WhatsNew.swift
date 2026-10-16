@@ -38,71 +38,71 @@ public enum WhatsNewCatalog {
     public static let entries: [WhatsNewEntry] = [
         WhatsNewEntry(
             revision: 7,
-            title: "语音输入：自动暂停音乐和视频",
+            title: String(localized: "Dictation: automatically pause music and video"),
             bullets: [
-                "开始说话时，正在播放的音乐（如 Music）或浏览器里的视频（如 YouTube）会自动暂停，文字输入完成后自动继续播放，声音不会被录进去；只会继续由它暂停的内容。",
-                "默认开启，可在「设置 › 语音输入」里关闭；需要「辅助功能」权限。同时有多个播放器在播放时，只会暂停当前的那一个。",
+                String(localized: "When you start speaking, music that is playing (such as Music) or video in your browser (such as YouTube) pauses automatically, and resumes once your text has been entered, so the audio isn't recorded. It only resumes what it paused itself."),
+                String(localized: "On by default; you can turn it off in “Settings › Dictation”. Requires “Accessibility” permission. If several players are playing at once, only the current one is paused."),
             ]
         ),
         WhatsNewEntry(
             revision: 6,
-            title: "语音输入：润色识别结果（可选）",
+            title: String(localized: "Dictation: polish recognized text (optional)"),
             bullets: [
-                "开启后，说完的话在输入前先交给你自己配置的 LLM（OpenAI 兼容接口，也可用本机 Ollama）补标点、去口癖、整理列表；识别出的文字会发送到该服务，默认关闭。",
-                "在「设置 › 语音输入」里填写服务、模型和 API Key（存在钥匙串），可选保持原话、清爽、结构化、正式四种风格，并调整超时。失败、超时或结果不可靠时一律输入原文，润色中按 Esc 也输入原文；同时开着翻译时先润色再翻译。",
+                String(localized: "When on, what you said is first handed to an LLM you configure yourself (an OpenAI-compatible API, or Ollama on this Mac) to add punctuation, remove filler words, and tidy lists before it is entered. The recognized text is sent to that service. Off by default."),
+                String(localized: "Enter the service, model, and API key (stored in the Keychain) in “Settings › Dictation”, choose one of four styles (Keep my words, Clean, Structured, Formal), and adjust the timeout. If it fails, times out, or the result looks unreliable, your original text is entered; pressing Esc while polishing also enters the original text. When translation is on too, text is polished first and then translated."),
             ]
         ),
         WhatsNewEntry(
             revision: 5,
-            title: "语音输入：翻译后再输入",
+            title: String(localized: "Dictation: translate before entering"),
             bullets: [
-                "在「按一下开始，再按一下结束」的触发方式下，可以把你说的话先翻译成外语再输入：说完先在气泡里看译文，Return 输入并发送，触发键只输入，Esc 放弃，也可以点「输入原文」。",
-                "听写时点气泡上的「译成…」按钮就能随时开关；翻译用「划词与截图翻译」里选的引擎，目标语言是你的「外语」。长内容时气泡会随内容变高。",
+                String(localized: "With the “press once to start, press again to stop” trigger, what you say can be translated into a foreign language before it is entered: review the translation in the bubble, then press Return to enter and send, press the trigger key to only enter, press Esc to discard, or click “Enter original”."),
+                String(localized: "Click the “Translate to…” button on the bubble while dictating to turn it on or off at any time. Translation uses the engine chosen under “Translate selection and screenshot”, and the target language is your “Foreign language”. The bubble grows taller for long text."),
             ]
         ),
         WhatsNewEntry(
             revision: 4,
-            title: "翻译朗读",
+            title: String(localized: "Read translations aloud"),
             bullets: [
-                "翻译面板里，原文和译文旁边各有一个 ▶ 按钮，点一下用 macOS 系统语音朗读，再点一下停止，方便听发音、核对译文。",
-                "在「设置 › 通用 › 划词与截图翻译」里可以让译文翻译完成后自动朗读，并调节语速；想要更自然的声音或更多语言，可在系统设置的辅助功能里（「系统语音」旁的菜单）下载语音。",
+                String(localized: "In the Translation panel, the source text and the translation each have a ▶ button: click it to read the text aloud with the macOS system voice, and click again to stop. Handy for hearing pronunciation and checking translations."),
+                String(localized: "In “Settings › General › Translate selection and screenshot” you can have the translation read aloud automatically when it finishes, and adjust the speaking rate. For more natural voices or more languages, download voices in System Settings under Accessibility (the menu next to “System Voice”)."),
             ]
         ),
         WhatsNewEntry(
             revision: 3,
-            title: "语音输入：按 Return 结束并发送",
+            title: String(localized: "Dictation: press Return to finish and send"),
             bullets: [
-                "在「按一下开始，再按一下结束」的触发方式下，说完直接按 Return：文字输入后自动回车，聊天消息、提示词一步发出；按触发键结束则只输入文字，不回车。",
-                "在「设置 › 语音输入」里把触发方式设为按一下开始即可使用。",
+                String(localized: "With the “press once to start, press again to stop” trigger, press Return when you finish speaking: the text is entered and Return is pressed automatically, so chat messages and prompts go out in one step. Finishing with the trigger key only enters the text, without pressing Return."),
+                String(localized: "Set the trigger to press-once-to-start in “Settings › Dictation” to use it."),
             ]
         ),
         WhatsNewEntry(
             revision: 2,
-            title: "语音输入（可选）",
+            title: String(localized: "Dictation (optional)"),
             bullets: [
-                "在任何应用里按住右 ⌥ Option 说话，松开后文字自动输入到光标处；也可以改成按一下开始、再按一下结束，按 Esc 取消。",
-                "默认关闭。开启后需要「输入监控」「辅助功能」和麦克风权限；实时转录用本地模型且已加载时，会直接复用它。",
+                String(localized: "In any app, hold the right ⌥ Option key and speak; when you let go, the text is entered at the cursor. You can also switch to press once to start and press again to stop, and press Esc to cancel."),
+                String(localized: "Off by default. Turning it on requires “Input Monitoring”, “Accessibility”, and Microphone permissions; if live transcription uses a local model that is already loaded, it is reused directly."),
             ],
-            actionTitle: "开启",
+            actionTitle: String(localized: "Turn on"),
             action: .enableDictation
         ),
         WhatsNewEntry(
             revision: 1,
-            title: "连按两次 ⌘C 翻译（可选）",
+            title: String(localized: "Double ⌘C translate (optional)"),
             bullets: [
-                "在其他应用里选中文字后，快速按两下 ⌘C，直接翻译刚复制的内容；网页等 ⌥A 读不到选区的地方也能用。",
-                "默认关闭。开启后需要「输入监控」权限，只检测这个组合，不记录其他按键。",
+                String(localized: "After selecting text in another app, press ⌘C twice quickly to translate what you just copied; it also works where ⌥A can't read the selection, such as web pages."),
+                String(localized: "Off by default. Turning it on requires “Input Monitoring” permission; it only detects this combination and doesn't record other keys."),
             ],
-            actionTitle: "开启",
+            actionTitle: String(localized: "Turn on"),
             action: .enableDoubleCopyTranslate
         ),
         WhatsNewEntry(
             revision: 1,
-            title: "可以重新运行新手引导",
+            title: String(localized: "You can re-run onboarding"),
             bullets: [
-                "在「设置 › 通用 › 新手引导」里点「重新运行」，随时回头调整权限和运行模式。",
+                String(localized: "In “Settings › General › Onboarding”, click “Re-run” to revisit permissions and the run mode at any time."),
             ],
-            actionTitle: "重新运行",
+            actionTitle: String(localized: "Re-run"),
             action: .rerunOnboarding
         ),
     ]

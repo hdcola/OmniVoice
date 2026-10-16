@@ -23,6 +23,16 @@ if [ ! -f "$ROOT_DIR/Resources/AppIcon.icns" ]; then
 fi
 cp "$ROOT_DIR/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 
+# UI localization: English source strings are the keys (Text("Settings") etc.),
+# so en.lproj/Localizable.strings may stay empty; zh-Hans carries the
+# translations. The .app is hand-assembled (not an SPM resource bundle), so
+# the lproj folders are copied straight into Contents/Resources and resolved
+# through Bundle.main.
+for lproj in "$ROOT_DIR"/Resources/*.lproj; do
+  [ -d "$lproj" ] || continue
+  cp -R "$lproj" "$APP_BUNDLE/Contents/Resources/"
+done
+
 # Package.swift links CAudioCpp/llama against third_party/{audio.cpp,llama.cpp}
 # with absolute-path -rpath entries (see Package.swift's audioCppLibDir/
 # llamaCppLibDir) — those only resolve on this build machine, at this

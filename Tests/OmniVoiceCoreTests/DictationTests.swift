@@ -308,7 +308,7 @@ struct DictationRecognizerLeaseTests {
         await session.start()
         #expect(!session.isRunning)
         #expect(!session.isStarting)
-        #expect(session.statusMessage == "正在语音输入，请稍后再开始")
+        #expect(session.statusMessage == "Dictation is in progress. Try again in a moment.")
     }
 
     @Test("an engine switch made while lent discards the stale load once it is returned")

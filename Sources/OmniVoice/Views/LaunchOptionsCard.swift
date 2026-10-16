@@ -5,7 +5,7 @@ import SwiftUI
 /// than owning state, since Settings applies each change immediately while
 /// onboarding only applies them when the user finishes.
 struct LaunchOptionsCard: View {
-    var title = "启动"
+    var title = "Launch"
     @Binding var launchAtLogin: Bool
     @Binding var preloadMode: LaunchPreloadMode
     /// The login item was added but macOS still wants the user's approval.
@@ -22,15 +22,15 @@ struct LaunchOptionsCard: View {
     var body: some View {
         SettingsCard(title: title, icon: "power") {
             SettingsRow(
-                title: "开机时自动启动",
+                title: "Launch at login",
                 subtitle: loginSubtitle,
                 subtitleTint: loginError == nil ? .secondary : .red
             ) {
                 HStack(spacing: 8) {
                     if needsLoginApproval {
-                        PillButton(title: "去允许", action: onOpenLoginItems)
+                        PillButton(title: "Allow", action: onOpenLoginItems)
                     }
-                    Toggle("开机时自动启动", isOn: $launchAtLogin)
+                    Toggle("Launch at login", isOn: $launchAtLogin)
                         .labelsHidden()
                         .toggleStyle(.switch)
                         .controlSize(.small)
@@ -38,12 +38,12 @@ struct LaunchOptionsCard: View {
             }
             SettingsDivider()
             SettingsRow(
-                title: "启动时加载模型",
+                title: "Load models at launch",
                 subtitle: preloadAvailable
-                    ? (memoryNote ?? "提前载入内存，首次翻译/转录无需等待")
-                    : "当前引擎均为系统内置，无需加载"
+                    ? (memoryNote ?? String(localized: "Load into memory ahead of time so the first translation or transcription doesn't wait"))
+                    : String(localized: "The current engines are built into macOS; there is nothing to load")
             ) {
-                Picker("启动时加载模型", selection: $preloadMode) {
+                Picker("Load models at launch", selection: $preloadMode) {
                     ForEach(LaunchPreloadMode.allCases.filter {
                         $0 != .translationOnly || translationOnlyAvailable || preloadMode == .translationOnly
                     }) { mode in
@@ -51,7 +51,7 @@ struct LaunchOptionsCard: View {
                     }
                 }
                 .labelsHidden()
-                .accessibilityLabel("启动时加载模型")
+                .accessibilityLabel("Load models at launch")
                 .fixedSize()
                 .disabled(!preloadAvailable)
             }
@@ -59,8 +59,8 @@ struct LaunchOptionsCard: View {
     }
 
     private var loginSubtitle: String {
-        if let loginError { return "设置失败：\(loginError)" }
-        if needsLoginApproval { return "需要在「系统设置 → 登录项」中允许" }
-        return "登录 macOS 后自动在菜单栏运行"
+        if let loginError { return String(localized: "Setup failed: \(loginError)") }
+        if needsLoginApproval { return String(localized: "Needs approval in System Settings → Login Items") }
+        return String(localized: "Runs automatically in the menu bar after you log in to macOS")
     }
 }

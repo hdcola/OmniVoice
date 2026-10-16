@@ -20,11 +20,11 @@ enum DictationMaxDuration: Int, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .oneMinute: return "1 分钟"
-        case .twoMinutes: return "2 分钟"
-        case .fiveMinutes: return "5 分钟"
-        case .tenMinutes: return "10 分钟"
-        case .unlimited: return "不限制"
+        case .oneMinute: return String(localized: "1 minute")
+        case .twoMinutes: return String(localized: "2 minutes")
+        case .fiveMinutes: return String(localized: "5 minutes")
+        case .tenMinutes: return String(localized: "10 minutes")
+        case .unlimited: return String(localized: "Unlimited")
         }
     }
 
@@ -373,7 +373,7 @@ final class DictationController: ObservableObject {
         if polished.failed, notice == nil { showNotice(Self.polishFailedNotice) }
     }
 
-    private static let polishFailedNotice = "润色失败，已输入原文"
+    private static let polishFailedNotice = String(localized: "Polishing failed; the original text was typed")
 
     // MARK: - Polish
 
@@ -479,7 +479,7 @@ final class DictationController: ObservableObject {
                 case .completed:
                     let translation = translator.resultText
                     review?.translation = translation.isEmpty ? nil : translation
-                    review?.stage = translation.isEmpty ? .failed("没有得到译文") : .ready
+                    review?.stage = translation.isEmpty ? .failed(String(localized: "No translation was produced")) : .ready
                     return
                 case .failed(let message):
                     review?.stage = .failed(message)
@@ -579,7 +579,7 @@ final class DictationController: ObservableObject {
         warmupTask = Task { [weak self] in
             do {
                 try await SystemTranscriptionProvider.prepareAssets(languageCode: code) {
-                    Task { @MainActor in self?.warmupMessage = "正在下载语言识别资源，完成后首次听写会更快…" }
+                    Task { @MainActor in self?.warmupMessage = String(localized: "Downloading speech recognition resources; the first dictation will be faster once done…") }
                 }
             } catch {}
             guard !Task.isCancelled else { return }

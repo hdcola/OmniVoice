@@ -65,19 +65,19 @@ struct OnboardingView: View {
     // a scroll the user had no reason to expect.
     private let modeOptions: [ModeOption] = [
         ModeOption(
-            mode: .lightweight, title: "极速轻量模式",
-            bullets: ["基于系统语音识别与系统翻译", "即开即用", "适合轻度记录与快速尝鲜"],
-            sizeNote: "零磁盘占用"
+            mode: .lightweight, title: String(localized: "Fast & Lightweight mode"),
+            bullets: [String(localized: "Uses System speech recognition and System translation"), String(localized: "Ready to use right away"), String(localized: "Good for light note-taking and a quick try")],
+            sizeNote: String(localized: "Uses no disk space")
         ),
         ModeOption(
-            mode: .balanced, title: "均衡低内存模式",
-            bullets: ["R2T2 识别 + HY-MT1.5 翻译", "混合语种自动识别，整句翻译", "适合 8GB 设备", "翻译无逐字预览"],
-            sizeNote: "约 3.4 GB"
+            mode: .balanced, title: String(localized: "Balanced Low-Memory mode"),
+            bullets: [String(localized: "R2T2 recognition + HY-MT1.5 translation"), String(localized: "Automatic mixed-language detection, sentence-level translation"), String(localized: "Good for 8GB devices"), String(localized: "No word-by-word translation preview")],
+            sizeNote: String(localized: "About 3.4 GB")
         ),
         ModeOption(
-            mode: .offlineModel, title: "高精离线大模型模式",
-            bullets: ["基于 R2T2 + T3PO 离线大模型", "混合语种自动判别，打字机流式"],
-            sizeNote: "约 12.4 GB", isRecommended: true
+            mode: .offlineModel, title: String(localized: "High-Accuracy Offline Model mode"),
+            bullets: [String(localized: "Offline large models: R2T2 + T3PO"), String(localized: "Automatic mixed-language detection, typewriter-style streaming")],
+            sizeNote: String(localized: "About 12.4 GB"), isRecommended: true
         ),
     ]
 
@@ -115,7 +115,7 @@ struct OnboardingView: View {
                     permissionsCard
                     modeCard
                     LaunchOptionsCard(
-                        title: "3 · 启动偏好",
+                        title: String(localized: "3 · Startup preferences"),
                         launchAtLogin: $launchAtLogin,
                         preloadMode: Binding(
                             get: { preloadMode },
@@ -150,14 +150,14 @@ struct OnboardingView: View {
             }
         }
         .alert(
-            "磁盘空间不足",
+            "Not enough disk space",
             isPresented: Binding(get: { diskSpaceWarningMessage != nil }, set: { if !$0 { diskSpaceWarningMessage = nil } })
         ) {
-            Button("打开存储空间管理") {
+            Button("Open Storage Management") {
                 NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.settings.Storage")!)
                 diskSpaceWarningMessage = nil
             }
-            Button("知道了", role: .cancel) { diskSpaceWarningMessage = nil }
+            Button("Got it", role: .cancel) { diskSpaceWarningMessage = nil }
         } message: {
             Text(diskSpaceWarningMessage ?? "")
         }
@@ -168,8 +168,8 @@ struct OnboardingView: View {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
                 .frame(width: 64, height: 64)
-            Text("欢迎使用 OmniVoice").font(.system(size: 22, weight: .bold))
-            Text("macOS 离线实时双语字幕、转录与快捷翻译")
+            Text("Welcome to OmniVoice").font(.system(size: 22, weight: .bold))
+            Text("Offline live bilingual captions, transcription, and quick translation for macOS")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
@@ -178,29 +178,29 @@ struct OnboardingView: View {
     }
 
     private var permissionsCard: some View {
-        SettingsCard(title: "1 · 基础系统授权", icon: "lock.shield") {
+        SettingsCard(title: String(localized: "1 · Basic system permissions"), icon: "lock.shield") {
             PermissionRow(
-                icon: "mic", title: "麦克风", detail: PermissionCopy.microphone,
+                icon: "mic", title: String(localized: "Microphone"), detail: PermissionCopy.microphone,
                 isGranted: microphoneAuthorized, open: requestMicrophonePermission
             )
             SettingsDivider()
             PermissionRow(
-                icon: "rectangle.dashed.badge.record", title: "屏幕录制", detail: PermissionCopy.screenRecording,
+                icon: "rectangle.dashed.badge.record", title: String(localized: "Screen Recording"), detail: PermissionCopy.screenRecording,
                 isGranted: screenRecordingAuthorized, open: requestScreenRecordingPermission
             )
             SettingsDivider()
             PermissionRow(
-                icon: "figure.wave", title: "辅助功能", detail: PermissionCopy.accessibility,
+                icon: "figure.wave", title: String(localized: "Accessibility"), detail: PermissionCopy.accessibility,
                 isGranted: accessibilityAuthorized, open: requestAccessibilityPermission
             )
             SettingsDivider()
             // Opt-in: the system's Input Monitoring prompt reads as alarming,
             // so it only appears once the user asks for this shortcut.
             SettingsRow(
-                title: "连按两次 ⌘C 翻译（可选）",
-                subtitle: "选中文字后快速按两下 ⌘C 即可翻译；开启后需要授予「输入监控」，之后可在设置里关闭"
+                title: String(localized: "Double ⌘C translate (optional)"),
+                subtitle: String(localized: "Select text, then press ⌘C twice quickly to translate it; turning this on requires “Input Monitoring” permission, and you can turn it off later in Settings")
             ) {
-                Toggle("连按两次 ⌘C 翻译", isOn: $selectionController.isDoubleCopyEnabled)
+                Toggle("Double ⌘C translate", isOn: $selectionController.isDoubleCopyEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
@@ -208,7 +208,7 @@ struct OnboardingView: View {
             if selectionController.isDoubleCopyEnabled {
                 SettingsDivider()
                 PermissionRow(
-                    icon: "keyboard", title: "输入监控", detail: PermissionCopy.inputMonitoring,
+                    icon: "keyboard", title: String(localized: "Input Monitoring"), detail: PermissionCopy.inputMonitoring,
                     isGranted: inputMonitoringAuthorized, open: requestInputMonitoringPermission
                 )
             }
@@ -216,14 +216,14 @@ struct OnboardingView: View {
     }
 
     private var modeCard: some View {
-        SettingsCard(title: "2 · 选择适合您的运行模式", icon: "cpu") {
+        SettingsCard(title: String(localized: "2 · Choose the run mode that suits you"), icon: "cpu") {
             ForEach(Array(modeOptions.enumerated()), id: \.element.id) { index, option in
                 if index > 0 { SettingsDivider() }
                 modeRow(option)
             }
             if isModeLocked {
                 SettingsDivider()
-                SettingsNote(text: "录音或模型加载进行中，暂时无法更换运行模式；完成后再试。", tint: .orange)
+                SettingsNote(text: String(localized: "Recording or model loading is in progress, so the run mode can't be changed right now; try again when it finishes."), tint: .orange)
             }
         }
         .disabled(isModeLocked)
@@ -244,7 +244,7 @@ struct OnboardingView: View {
                     HStack(spacing: 6) {
                         Text(option.title).font(.system(size: 13, weight: .semibold))
                         if option.isRecommended {
-                            Text("推荐")
+                            Text("Recommended")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundStyle(Color.accentColor)
                                 .padding(.horizontal, 6)
@@ -311,11 +311,11 @@ struct OnboardingView: View {
     private var actionBar: some View {
         HStack {
             // A re-run has nothing to skip: this just closes the wizard.
-            Button(isRerun ? "取消" : "跳过向导") { skip() }
+            Button(isRerun ? String(localized: "Cancel") : String(localized: "Skip Setup")) { skip() }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             Spacer()
-            PrimaryPillButton(title: willDownload ? "一键开启并下载" : "完成") {
+            PrimaryPillButton(title: willDownload ? String(localized: "Enable & Download") : String(localized: "Done")) {
                 finish(startDownload: appliesMode && selectedMode != .lightweight)
             }
             .disabled(isModeLocked && modeChosen)
@@ -477,7 +477,7 @@ struct OnboardingView: View {
         let totalMB = variants.reduce(0) { $0 + $1.approximateSizeMB }
         if let warning = downloadManager.insufficientDiskSpaceWarning(forTotalMB: totalMB) {
             diskSpaceWarningMessage =
-                "下载「\(bundle.displayName)」\(warning.errorDescription ?? "")。请清理磁盘空间后重试。"
+                String(localized: "Downloading “\(bundle.displayName)” \(warning.errorDescription ?? ""). Free up some disk space and try again.")
             return false
         }
 
@@ -496,15 +496,15 @@ struct OnboardingView: View {
                     {
                         completionNotice.notified = true
                         SystemNotifier.notify(
-                            title: "模型下载完成",
-                            body: "「\(bundle.displayName)」已下载并自动启用")
+                            title: String(localized: "Model download complete"),
+                            body: String(localized: "“\(bundle.displayName)” has been downloaded and enabled automatically"))
                     }
                     preloadOnceBundleIsReady(bundle, replacingEngines: replacingEngines)
                 } catch is CancellationError {
                 } catch {
                     SystemNotifier.notify(
-                        title: "模型下载失败",
-                        body: "「\(variant.displayName)」：\(error.localizedDescription)。可在「设置 → 模型库」重试")
+                        title: String(localized: "Model download failed"),
+                        body: String(localized: "“\(variant.displayName)”: \(error.localizedDescription). You can retry in Settings → Model Library."))
                     // Best-effort background download — a failure here still
                     // leaves this variant's own inline retry card reachable
                     // from "模型库"/"通用" (Task 4.3) once the user
@@ -513,7 +513,7 @@ struct OnboardingView: View {
                 }
             }
         }
-        session.statusMessage = "模型正在后台下载中，下载完成后将自动为您无缝启用"
+        session.statusMessage = String(localized: "The model is downloading in the background and will be enabled automatically when it finishes")
         return true
     }
 

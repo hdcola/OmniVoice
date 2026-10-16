@@ -189,7 +189,7 @@ struct RecordingSessionSettingsTests {
             #expect(session.languages.myLanguageCode == "ru-RU")
             #expect(session.sourceLanguageCode == "en-US")
             #expect(!session.canSwapTranscriptionDirection)
-            #expect(session.swapBlockedReason == "系统语音识别不支持互换后的源语言")
+            #expect(session.swapBlockedReason == "System speech recognition does not support the source language after swapping")
             session.swapTranscriptionDirection()
             #expect(session.sourceLanguageCode == "en-US")
         }
@@ -200,7 +200,7 @@ struct RecordingSessionSettingsTests {
             let session = RecordingSession()
             session.languages.transcriptionDirection = .speakMine
             session.languages.foreignLanguageCode = "ru-RU"
-            #expect(session.swapBlockedReason == "系统语音识别不支持互换后的源语言")
+            #expect(session.swapBlockedReason == "System speech recognition does not support the source language after swapping")
             session.swapTranscriptionDirection()
             #expect(session.languages.transcriptionDirection == .speakMine)
         }
@@ -211,7 +211,7 @@ struct RecordingSessionSettingsTests {
             let session = RecordingSession()
             #expect(session.swapBlockedReason == nil)
             session.isRunning = true
-            #expect(session.swapBlockedReason == "录制中不能互换，停止后再试")
+            #expect(session.swapBlockedReason == "Cannot swap while recording. Stop first and try again.")
             #expect(!session.canSwapTranscriptionDirection)
         }
     }
@@ -529,16 +529,16 @@ struct RecordingSessionSettingsTests {
 
     /// Guards `discardLoadedModelsIfStale()`'s `statusMessage` cleanup —
     /// without it, switching engines right after a successful preload left
-    /// the panel's status bar permanently reading "模型已预加载" even though
+    /// the panel's status bar permanently reading "Model preloaded" even though
     /// that model was just unloaded.
     @Test func switchingEngineAfterPreloadResetsTheStaleStatusMessage() async {
         defer { defaults.removeObject(forKey: PersistedSettingsKey.transcriptionEngineID) }
         let session = RecordingSession()
         await session.preloadModel()
-        #expect(session.statusMessage == "模型已预加载")
+        #expect(session.statusMessage == "Model preloaded")
 
         session.transcriptionEngineID = "model.r2t2"
-        #expect(session.statusMessage == "未启动")
+        #expect(session.statusMessage == "Not started")
     }
 
     /// Guards `discardLoadedModelsIfStale()`'s staleness check — a
@@ -563,10 +563,10 @@ struct RecordingSessionSettingsTests {
         await session.preloadModel()
         #expect(session.isModelLoaded)
 
-        session.statusMessage = "未启动"
+        session.statusMessage = "Not started"
         await session.preloadModel()
         // Didn't re-run the "预加载…" messaging path a second time.
-        #expect(session.statusMessage == "未启动")
+        #expect(session.statusMessage == "Not started")
     }
 
     @Test func unloadModelsReleasesAPreloadedModel() async {
@@ -576,7 +576,7 @@ struct RecordingSessionSettingsTests {
 
         session.unloadModels()
         #expect(!session.isModelLoaded)
-        #expect(session.statusMessage == "未启动")
+        #expect(session.statusMessage == "Not started")
     }
 
     /// Guards the one thing that makes `unloadModels()` (a user-initiated
@@ -649,7 +649,7 @@ struct RecordingSessionSettingsTests {
 
         #expect(session.isModelLoaded)
         #expect(session.transcriptionEngineID == "system.speech")
-        #expect(!session.statusMessage.contains("尚未下载"))
+        #expect(!session.statusMessage.localizedCaseInsensitiveContains("downloaded yet"))
     }
 
     /// Complements `recognizedPersistedTranscriptionEngineIDWithNothingDownloadedFallsBackToSystem`
@@ -673,7 +673,7 @@ struct RecordingSessionSettingsTests {
 
         #expect(session.isModelLoaded)
         #expect(session.translationEngineID == "system.translation")
-        #expect(!session.statusMessage.contains("尚未下载"))
+        #expect(!session.statusMessage.localizedCaseInsensitiveContains("downloaded yet"))
     }
 
     // MARK: - Floating panel opacity
@@ -872,7 +872,7 @@ struct RecordingSessionSettingsTests {
         await session.start()
 
         #expect(!session.isRunning)
-        #expect(session.statusMessage.contains("包含系统声音"))
+        #expect(session.statusMessage.contains("Include system audio"))
     }
 
     @Test func appendTranslationInsertsASpaceBetweenFragmentsForASpaceSeparatedTargetLanguage() {
@@ -988,7 +988,7 @@ struct RecordingSessionSettingsTests {
         await session.start()
 
         #expect(!session.isRunning)
-        #expect(session.statusMessage.contains("识别引擎启动失败"), "\(session.statusMessage)")
+        #expect(session.statusMessage.contains("Recognition engine failed to start"), "\(session.statusMessage)")
         #expect(session.loadedTranslationOnlyIDs?.engine == session.translationEngineID)
         #expect(session.hasLoadedModels)
         #expect(!session.isModelLoaded)
@@ -1010,7 +1010,7 @@ struct RecordingSessionSettingsTests {
         session.transcriptionModelVariantID = "r2t2-q8_0"
         await session.preloadModel(scope: .all)
 
-        #expect(session.statusMessage.contains("识别引擎预加载失败"), "\(session.statusMessage)")
+        #expect(session.statusMessage.contains("Recognition engine preload failed"), "\(session.statusMessage)")
         #expect(session.loadedTranslationOnlyIDs?.engine == session.translationEngineID)
         #expect(session.hasLoadedModels)
         #expect(!session.isModelLoaded)

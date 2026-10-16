@@ -113,7 +113,7 @@ struct SettingsView: View {
                 Text("v\(appVersionString)")
                     .font(.system(size: 13, design: .monospaced))
                     .foregroundStyle(.secondary)
-                Text("macOS 离线实时双语字幕、转录与快捷翻译")
+                Text("Offline live bilingual captions, transcription, and quick translation for macOS")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -122,8 +122,8 @@ struct SettingsView: View {
 
             Link(destination: Self.repositoryURL) {
                 VStack(spacing: 3) {
-                    Text("⭐ 在 GitHub 点个 Star").font(.system(size: 14, weight: .semibold))
-                    Text("如果 OmniVoice 对你有帮助，在 GitHub 点个 ⭐ 吧！")
+                    Text("⭐ Star us on GitHub").font(.system(size: 14, weight: .semibold))
+                    Text("If OmniVoice helps you, give it a ⭐ on GitHub!")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -142,16 +142,16 @@ struct SettingsView: View {
             .buttonStyle(.plain)
 
             SettingsCard {
-                aboutButton("查看新功能", icon: "sparkles") { appDelegate.showAllWhatsNew() }
+                aboutButton("See What's New", icon: "sparkles") { appDelegate.showAllWhatsNew() }
                 SettingsDivider()
                 aboutLink("GitHub", icon: "chevron.left.forwardslash.chevron.right", url: Self.repositoryURL)
                 SettingsDivider()
-                aboutLink("版本发布", icon: "shippingbox", url: Self.repositoryURL.appendingPathComponent("releases"))
+                aboutLink("Releases", icon: "shippingbox", url: Self.repositoryURL.appendingPathComponent("releases"))
                 SettingsDivider()
-                aboutLink("反馈问题", icon: "exclamationmark.bubble", url: Self.repositoryURL.appendingPathComponent("issues"))
+                aboutLink("Report an Issue", icon: "exclamationmark.bubble", url: Self.repositoryURL.appendingPathComponent("issues"))
             }
 
-            Text("系统引擎基于 macOS Speech / Translation 框架；本地引擎基于 audio.cpp（R2T2）与 llama.cpp（T3PO / HY-MT1.5），完全离线运行。")
+            Text("System engines use the macOS Speech / Translation frameworks; local engines use audio.cpp (R2T2) and llama.cpp (T3PO / HY-MT1.5) and run fully offline.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -163,7 +163,7 @@ struct SettingsView: View {
         .padding(16)
     }
 
-    private func aboutLink(_ title: String, icon: String, url: URL) -> some View {
+    private func aboutLink(_ title: LocalizedStringKey, icon: String, url: URL) -> some View {
         Link(destination: url) {
             HStack(spacing: 12) {
                 Image(systemName: icon)
@@ -183,7 +183,7 @@ struct SettingsView: View {
         .buttonStyle(.plain)
     }
 
-    private func aboutButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+    private func aboutButton(_ title: LocalizedStringKey, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: icon)

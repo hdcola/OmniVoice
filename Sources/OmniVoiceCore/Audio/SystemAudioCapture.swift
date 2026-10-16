@@ -6,7 +6,7 @@ enum SystemAudioError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .noDisplay: return "找不到可捕获的屏幕/显示器,无法建立系统音频采集"
+        case .noDisplay: return String(localized: "No capturable screen/display found; cannot start system audio capture")
         }
     }
 }

@@ -17,9 +17,9 @@ enum LaunchPreloadMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .off: return "不加载"
-        case .translationOnly: return "仅翻译模型"
-        case .all: return "翻译和识别模型"
+        case .off: return String(localized: "Don't load")
+        case .translationOnly: return String(localized: "Translation model only")
+        case .all: return String(localized: "Translation and recognition models")
         }
     }
 

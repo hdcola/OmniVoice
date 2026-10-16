@@ -259,11 +259,11 @@ public final class SelectionTranslator: ObservableObject {
     private func startModelJob(_ job: Job) {
         guard ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: job.targetCode) else {
             let name = LanguageCatalog.displayName(for: job.targetCode)
-            phase = .failed("HY-MT1.5 暂时只能译成中文、英语、日语或韩语，无法译成\(name)。可以在设置里改用系统翻译。")
+            phase = .failed(String(localized: "HY-MT1.5 can only translate into Chinese, English, Japanese or Korean for now, not \(name). You can switch to System translation in Settings."))
             return
         }
         guard let modelURL = modelURLProvider() else {
-            phase = .failed("HY-MT1.5 模型尚未下载。请在「设置 → 模型库」中下载，或改用系统翻译。")
+            phase = .failed(String(localized: "The HY-MT1.5 model is not downloaded yet. Download it in Settings → Model Library, or switch to System translation."))
             return
         }
         let target = ModelLanguageMapping.hyMT15TargetLanguage(forCode: job.targetCode)
@@ -315,7 +315,7 @@ public final class SelectionTranslator: ObservableObject {
                     output += try await translate(text)
                 } catch {
                     guard job.generation == generation, !(error is CancellationError) else { return }
-                    phase = .failed("翻译失败：\(error.localizedDescription)")
+                    phase = .failed(String(localized: "Translation failed: \(error.localizedDescription)"))
                     return
                 }
                 guard job.generation == generation else { return }

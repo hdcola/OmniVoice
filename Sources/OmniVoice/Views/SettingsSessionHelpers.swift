@@ -42,10 +42,10 @@ struct LanguageSettingsHint: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Text("语言在「通用 → 语言」中设置。")
+            Text("Set languages in General → Language.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-            Button("去通用设语言") { navigation.open(.general) }
+            Button("Go to General to set languages") { navigation.open(.general) }
                 .buttonStyle(.link)
                 .font(.system(size: 11))
         }

@@ -44,23 +44,23 @@ public struct LanguageOption: Identifiable, Hashable, Sendable {
 /// restriction for that engine.
 public enum LanguageCatalog {
     public static let common: [LanguageOption] = [
-        LanguageOption(code: "zh-CN", displayName: "简体中文"),
-        LanguageOption(code: "zh-TW", displayName: "繁体中文"),
-        LanguageOption(code: "yue-CN", displayName: "粤语"),
-        LanguageOption(code: "en-US", displayName: "英语"),
-        LanguageOption(code: "ja-JP", displayName: "日语"),
-        LanguageOption(code: "ko-KR", displayName: "韩语"),
-        LanguageOption(code: "fr-FR", displayName: "法语"),
-        LanguageOption(code: "de-DE", displayName: "德语"),
-        LanguageOption(code: "es-ES", displayName: "西班牙语"),
-        LanguageOption(code: "it-IT", displayName: "意大利语"),
-        LanguageOption(code: "pt-PT", displayName: "葡萄牙语"),
-        LanguageOption(code: "hi-IN", displayName: "印地语"),
+        LanguageOption(code: "zh-CN", displayName: String(localized: "Simplified Chinese")),
+        LanguageOption(code: "zh-TW", displayName: String(localized: "Traditional Chinese")),
+        LanguageOption(code: "yue-CN", displayName: String(localized: "Cantonese")),
+        LanguageOption(code: "en-US", displayName: String(localized: "English")),
+        LanguageOption(code: "ja-JP", displayName: String(localized: "Japanese")),
+        LanguageOption(code: "ko-KR", displayName: String(localized: "Korean")),
+        LanguageOption(code: "fr-FR", displayName: String(localized: "French")),
+        LanguageOption(code: "de-DE", displayName: String(localized: "German")),
+        LanguageOption(code: "es-ES", displayName: String(localized: "Spanish")),
+        LanguageOption(code: "it-IT", displayName: String(localized: "Italian")),
+        LanguageOption(code: "pt-PT", displayName: String(localized: "Portuguese")),
+        LanguageOption(code: "hi-IN", displayName: String(localized: "Hindi")),
         // Verified target-only for the system engines — see this enum's doc.
-        LanguageOption(code: "ru-RU", displayName: "俄语", supportsSystemASRSource: false),
-        LanguageOption(code: "ar-SA", displayName: "阿拉伯语", supportsSystemASRSource: false),
-        LanguageOption(code: "vi-VN", displayName: "越南语", supportsSystemASRSource: false),
-        LanguageOption(code: "th-TH", displayName: "泰语", supportsSystemASRSource: false),
+        LanguageOption(code: "ru-RU", displayName: String(localized: "Russian"), supportsSystemASRSource: false),
+        LanguageOption(code: "ar-SA", displayName: String(localized: "Arabic"), supportsSystemASRSource: false),
+        LanguageOption(code: "vi-VN", displayName: String(localized: "Vietnamese"), supportsSystemASRSource: false),
+        LanguageOption(code: "th-TH", displayName: String(localized: "Thai"), supportsSystemASRSource: false),
     ]
 
     /// The Chinese display name for `code`, or `code` itself for a custom
@@ -81,7 +81,7 @@ public enum LanguageCatalog {
         // by region (`zh-TW`).
         let lowered = code.lowercased().replacingOccurrences(of: "_", with: "-")
         if lowered.contains("hant") || lowered == "zh-tw" {
-            return "繁体中文"
+            return String(localized: "Traditional Chinese")
         }
         // Cantonese counts as Chinese for `isSameLanguage`, but has a
         // catalog entry of its own.
@@ -91,6 +91,6 @@ public enum LanguageCatalog {
         if let sameLanguage = common.first(where: { SelectionLanguageDirection.isSameLanguage($0.code, code) }) {
             return sameLanguage.displayName
         }
-        return Locale(identifier: "zh-Hans").localizedString(forIdentifier: code) ?? code
+        return Locale.current.localizedString(forIdentifier: code) ?? code
     }
 }

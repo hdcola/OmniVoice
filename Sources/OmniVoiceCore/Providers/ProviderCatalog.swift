@@ -111,32 +111,32 @@ public struct ModelBundle: Identifiable, Hashable, Codable, Sendable {
 public enum ProviderCatalog {
     public static let transcriptionEngines: [EngineDescriptor] = [
         EngineDescriptor(
-            id: "system.speech", displayName: "系统语音识别", kind: .system,
-            badge: "系统原生 · 零内存占用",
-            summary: "macOS 系统级语音识别，即开即用，无需额外下载。"
+            id: "system.speech", displayName: String(localized: "System speech recognition"), kind: .system,
+            badge: String(localized: "Built into macOS · Zero memory use"),
+            summary: String(localized: "macOS system speech recognition. Ready to use, no extra download.")
         ),
         EngineDescriptor(
-            id: "model.r2t2", displayName: "R2T2 离线大模型", kind: .model,
-            badge: "推荐 · 支持自动语种检测",
-            summary: "支持流式实时转录、标点预测与混合语种自动检测。"
+            id: "model.r2t2", displayName: String(localized: "R2T2 offline model"), kind: .model,
+            badge: String(localized: "Recommended · Automatic language detection"),
+            summary: String(localized: "Supports streaming live transcription, punctuation prediction and automatic detection of mixed languages.")
         ),
     ]
 
     public static let translationEngines: [EngineDescriptor] = [
         EngineDescriptor(
-            id: "system.translation", displayName: "系统翻译", kind: .system,
-            badge: "系统原生 · 整句翻译",
-            summary: "macOS 内置翻译，按句子标点翻译，不支持实时打字机预览。"
+            id: "system.translation", displayName: String(localized: "System translation"), kind: .system,
+            badge: String(localized: "Built into macOS · Sentence-by-sentence translation"),
+            summary: String(localized: "Built-in macOS translation. Translates by sentence punctuation; no live typewriter preview.")
         ),
         EngineDescriptor(
-            id: "model.t3po", displayName: "T3PO 离线大模型", kind: .model,
-            badge: "推荐 · 支持实时预览",
-            summary: "高性能双语翻译大模型，支持打字机式逐字流式预览与自动纠错。"
+            id: "model.t3po", displayName: String(localized: "T3PO offline model"), kind: .model,
+            badge: String(localized: "Recommended · Live preview"),
+            summary: String(localized: "High-performance bilingual translation model with typewriter-style character-by-character streaming preview and automatic correction.")
         ),
         EngineDescriptor(
-            id: "model.hymt15", displayName: "HY-MT1.5 1.8B 模型", kind: .model,
-            badge: "轻量级 · 低内存",
-            summary: "腾讯混元轻量翻译模型，内存开销小，整句翻译（无流式预览）。"
+            id: "model.hymt15", displayName: String(localized: "HY-MT1.5 1.8B model"), kind: .model,
+            badge: String(localized: "Lightweight · Low memory"),
+            summary: String(localized: "Tencent Hunyuan lightweight translation model. Low memory use, whole-sentence translation (no streaming preview).")
         ),
     ]
 
@@ -154,7 +154,7 @@ public enum ProviderCatalog {
             // (`GET /api/models/davidxifeng/Confucius4-R2T2-gguf?blobs=true`),
             // which matches the `resolve/main` response's `X-Linked-ETag`.
             sha256: "19f5ccd624484bcb5d44301437de41560b0ecc40c430e8850dfeefefbe82ccf5",
-            summary: "针对中英文混合演讲、专业会议优化，支持多语种自动判别与断句标点补全。",
+            summary: String(localized: "Optimized for mixed Chinese-English talks and professional meetings, with automatic language detection and sentence/punctuation completion."),
             recommendedMemoryGB: 3
         ),
         // Smaller/faster R2T2 — a community Q4_K_M quantization (Q4_K with
@@ -173,7 +173,7 @@ public enum ProviderCatalog {
                 string: "https://huggingface.co/Nairod785/Confucius4-R2T2-Q4_K_M-GGUF/resolve/main/r2t2-q4_k_m.gguf"
             )!,
             sha256: "d740d6636f2ea2f3736800c3c88a6e22ecb6c0f26c567fe22b0572ae9c2c4ec8",
-            summary: "社区量化版（非官方发布）：体积约为 Q8_0 的一半，运行时峰值内存约 1.8GB，解码更快，适合内存紧张的设备；精度略低于 Q8_0。",
+            summary: String(localized: "Community quantization (unofficial release): about half the size of Q8_0, about 1.8GB peak memory at runtime, faster decoding, suited to memory-constrained devices; slightly lower accuracy than Q8_0."),
             recommendedMemoryGB: 2
         ),
         // Same publisher/repo as `r2t2-q8_0`; sha256 verified against HF's
@@ -186,7 +186,7 @@ public enum ProviderCatalog {
                 string: "https://huggingface.co/davidxifeng/Confucius4-R2T2-gguf/resolve/main/r2t2-f16.gguf"
             )!,
             sha256: "d1b531ceaf5640d98352d3a9180238d99d36d393e160afd4692031077e7bae2c",
-            summary: "未量化的完整精度版本，质量最高；运行时峰值内存约 4.7GB（Q8_0 约 3.1GB），适合内存充裕的设备。",
+            summary: String(localized: "Unquantized full-precision version with the highest quality; about 4.7GB peak memory at runtime (Q8_0 is about 3.1GB), suited to devices with plenty of memory."),
             recommendedMemoryGB: 5
         ),
         ModelVariant(
@@ -197,7 +197,7 @@ public enum ProviderCatalog {
                     "https://huggingface.co/netease-youdao/Confucius4-T3PO-GGUF/resolve/main/Confucius4-T3PO-Q5_K_M.gguf"
             )!,
             sha256: "019b162a8fdff3edb1e2469445043fc2ebb0de0fbda9ca6454bc86b5898fac35",
-            summary: "流式 WAIT/TRANS 实时逐字预览，中/粤/英/日/韩之间的翻译效果最佳，建议 16GB+ 统一内存设备使用。",
+            summary: String(localized: "Streaming WAIT/TRANS live character-by-character preview, best for translating between Chinese/Cantonese/English/Japanese/Korean; recommended for devices with 16GB+ unified memory."),
             recommendedMemoryGB: 11
         ),
         // Tencent's HY-MT1.5-1.8B — the low-memory translation option: no
@@ -214,7 +214,7 @@ public enum ProviderCatalog {
                 string: "https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/main/HY-MT1.5-1.8B-Q4_K_M.gguf"
             )!,
             sha256: "4383ac0c3c8e476de98ff979c2a3f069f8c4fb385e7860cf2d28da896cc477c7",
-            summary: "一次性整句翻译，无实时打字机预览，内存开销极小，适合 8GB 内存设备。",
+            summary: String(localized: "One-shot whole-sentence translation with no live typewriter preview and minimal memory use; suited to 8GB devices."),
             recommendedMemoryGB: 2
         ),
         ModelVariant(
@@ -224,7 +224,7 @@ public enum ProviderCatalog {
                 string: "https://huggingface.co/tencent/HY-MT1.5-1.8B-GGUF/resolve/main/HY-MT1.5-1.8B-Q8_0.gguf"
             )!,
             sha256: "6789b06d0902f2f5312c0e1703d56ccbddfcfb6c653d22519b7c720f7db9a98e",
-            summary: "一次性整句翻译，无实时打字机预览，比 Q4_K_M 略高的精度，内存开销依然很小。",
+            summary: String(localized: "One-shot whole-sentence translation with no live typewriter preview; slightly higher accuracy than Q4_K_M with still-minimal memory use."),
             recommendedMemoryGB: 3
         ),
     ]
@@ -236,15 +236,15 @@ public enum ProviderCatalog {
     public static let bundles: [ModelBundle] = [
         ModelBundle(
             id: "bundle.standard-realtime",
-            displayName: "方案 A：标准实时双语字幕（推荐）",
-            summary: "R2T2 语音识别 + T3PO 实时流式翻译。自动检测语种、逐字打字机流式显示、完全离线私密。建议 16GB+ 统一内存 Mac。",
+            displayName: String(localized: "Plan A: Standard live bilingual captions (recommended)"),
+            summary: String(localized: "R2T2 speech recognition + T3PO live streaming translation. Automatic language detection, character-by-character typewriter display, fully offline and private. Recommended for Macs with 16GB+ unified memory."),
             variantIDs: ["r2t2-q8_0", "t3po-q5_k_m"],
             recommendedMemoryGB: 14
         ),
         ModelBundle(
             id: "bundle.lightweight",
-            displayName: "方案 B：轻量低内存方案",
-            summary: "R2T2 语音识别 + HY-MT1.5 翻译。占用内存极小，整句翻译输出。适合 8GB 内存设备。",
+            displayName: String(localized: "Plan B: Lightweight, low-memory"),
+            summary: String(localized: "R2T2 speech recognition + HY-MT1.5 translation. Minimal memory use, whole-sentence translation output. Suited to 8GB devices."),
             variantIDs: ["r2t2-q8_0", "hymt15-1.8b-q4_k_m"],
             recommendedMemoryGB: 5
         ),

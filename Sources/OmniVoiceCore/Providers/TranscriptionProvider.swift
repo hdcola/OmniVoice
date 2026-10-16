@@ -52,9 +52,9 @@ public enum ProviderError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .notImplemented(let detail): return "尚未实现: \(detail)"
-        case .notLoaded: return "模型尚未加载"
-        case .localeNotSupported: return "所选语言在本机不受支持"
+        case .notImplemented(let detail): return String(localized: "Not implemented: \(detail)")
+        case .notLoaded: return String(localized: "The model is not loaded yet")
+        case .localeNotSupported: return String(localized: "The selected language is not supported on this Mac")
         }
     }
 }

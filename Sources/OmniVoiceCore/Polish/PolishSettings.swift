@@ -15,10 +15,10 @@ public enum PolishStyle: String, CaseIterable, Identifiable, Sendable {
 
     public var title: String {
         switch self {
-        case .minimal: return "保持原话"
-        case .clean: return "清爽"
-        case .structured: return "结构化"
-        case .professional: return "正式"
+        case .minimal: return String(localized: "Keep original")
+        case .clean: return String(localized: "Clean")
+        case .structured: return String(localized: "Structured")
+        case .professional: return String(localized: "Professional")
         }
     }
 
@@ -43,9 +43,9 @@ public enum PolishPreset: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .openAI: return "OpenAI"
         case .deepSeek: return "DeepSeek"
-        case .zhipu: return "智谱"
-        case .ollama: return "Ollama（本地）"
-        case .custom: return "自定义"
+        case .zhipu: return String(localized: "Zhipu")
+        case .ollama: return String(localized: "Ollama (local)")
+        case .custom: return String(localized: "Custom")
         }
     }
 

@@ -15,13 +15,13 @@ enum TranslatorError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .modelMissing(let path):
-            return "找不到模型权重: \(path)"
+            return String(localized: "Model weights not found: \(path)")
         case .notLoaded:
-            return "模型尚未加载"
+            return String(localized: "The model is not loaded yet")
         case .llamaCallFailed(let context):
             return context
         case .textTooLong:
-            return "这段文字太长，超出了模型一次能翻译的长度"
+            return String(localized: "This text is too long for the model to translate in one go")
         }
     }
 }
@@ -255,7 +255,7 @@ final class InProcessTranslator: @unchecked Sendable {
             // — see its own doc — leaving this `llama_backend_init()`
             // permanently unpaired.
             llama_backend_free()
-            throw TranslatorError.llamaCallFailed("加载 T3PO 模型失败")
+            throw TranslatorError.llamaCallFailed(String(localized: "Failed to load the T3PO model"))
         }
 
         var ctxParams = llama_context_default_params()
@@ -282,7 +282,7 @@ final class InProcessTranslator: @unchecked Sendable {
             // failure above — `model`/`ctx` are still both `nil` here too.
             llama_model_free(mdl)
             llama_backend_free()
-            throw TranslatorError.llamaCallFailed("创建 T3PO 推理上下文失败")
+            throw TranslatorError.llamaCallFailed(String(localized: "Failed to create the T3PO inference context"))
         }
         model = mdl
         ctx = context

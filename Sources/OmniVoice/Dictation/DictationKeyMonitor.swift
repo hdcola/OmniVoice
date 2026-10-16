@@ -14,9 +14,9 @@ enum DictationTriggerKey: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .rightOption: return "右 ⌥ Option"
-        case .rightCommand: return "右 ⌘ Command"
-        case .rightControl: return "右 ⌃ Control"
+        case .rightOption: return String(localized: "Right ⌥ Option")
+        case .rightCommand: return String(localized: "Right ⌘ Command")
+        case .rightControl: return String(localized: "Right ⌃ Control")
         }
     }
 

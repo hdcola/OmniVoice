@@ -28,10 +28,10 @@ enum DictationTextInserter {
         let ownChangeCount = pasteboard.changeCount
 
         guard SelectedTextReader.isAccessibilityTrusted else {
-            return .copiedOnly("需要「辅助功能」权限才能自动输入，文字已复制，可手动粘贴")
+            return .copiedOnly(String(localized: "Accessibility permission is needed to type automatically; the text was copied, so you can paste it manually."))
         }
         guard postPaste() else {
-            return .copiedOnly("当前输入框不允许自动输入（如密码框），文字已复制，可手动粘贴")
+            return .copiedOnly(String(localized: "This field does not allow automatic typing (such as a password field); the text was copied, so you can paste it manually."))
         }
         try? await Task.sleep(for: pasteSettleDelay)
         if thenReturn { pressReturn() }

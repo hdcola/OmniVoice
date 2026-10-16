@@ -238,7 +238,7 @@ public final class SystemTranscriptionProvider: TranscriptionProvider {
         let key = locale.identifier(.bcp47)
         if let cached = analyzerFormats[key] { return cached }
         guard let best = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
-            throw ProviderError.notImplemented("SpeechAnalyzer 无可用音频格式")
+            throw ProviderError.notImplemented(String(localized: "SpeechAnalyzer has no available audio format"))
         }
         analyzerFormats[key] = best
         return best

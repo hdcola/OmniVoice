@@ -151,7 +151,6 @@ Local model engines need their upstream sources built first — see
 
 ## Not yet implemented
 
-- Localization (UI strings are Chinese-only)
 - Notarized release, auto-update and crash reporting
 
 ## Documentation

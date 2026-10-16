@@ -7,6 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(i18n): the app UI is now localized in English and 简体中文 and follows the system language; English source strings are the keys, translations live in `Resources/<lang>.lproj` and are copied into the app bundle by `Scripts/build_app.sh`, microphone/speech permission prompts are localized via `InfoPlist.strings`
 
 ### Changed
 
@@ -15,8 +16,10 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(readme): localization is no longer a roadmap item
 
 ### Tests
+- test(i18n): core tests assert the English source strings; UI tests pin the app to zh-Hans
 
 ## [0.8.1] - 2026-10-15
 

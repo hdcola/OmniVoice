@@ -128,11 +128,11 @@ final class SelectionTranslationController: ObservableObject {
     /// Returns an error message when `shortcut` can't be used for `action`.
     func setShortcut(_ shortcut: GlobalShortcut?, for action: GlobalShortcutAction) -> String? {
         if let shortcut, let other = shortcuts.first(where: { $0.key != action && $0.value == shortcut })?.key {
-            return "\(shortcut.displayText) 已用于「\(other.title)」"
+            return String(localized: "\(shortcut.displayText) is already used for “\(other.title)”")
         }
-        guard let hotKey = hotKeys[action] else { return "无法注册全局快捷键" }
+        guard let hotKey = hotKeys[action] else { return String(localized: "Unable to register the global shortcut") }
         guard hotKey.update(to: shortcut) else {
-            return "\(shortcut?.displayText ?? "") 已被系统或其他应用占用"
+            return String(localized: "\(shortcut?.displayText ?? "") is already taken by the system or another app")
         }
         shortcuts[action] = shortcut
         let defaults = UserDefaults.standard

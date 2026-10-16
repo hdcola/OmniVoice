@@ -1,54 +1,54 @@
 import SwiftUI
 import OmniVoiceCore
 
-/// The "语音输入" card of Settings' "语音输入" tab. Permissions live in
+/// The String(localized: "Voice input") card of Settings' String(localized: "Voice input") tab. Permissions live in
 /// `PermissionsSettingsCard`.
 struct DictationSettingsView: View {
     @ObservedObject var controller: DictationController
     @EnvironmentObject private var session: RecordingSession
 
     var body: some View {
-        SettingsCard(title: "语音输入", icon: "waveform.badge.mic") {
+        SettingsCard(title: String(localized: "Voice input"), icon: "waveform.badge.mic") {
             SettingsRow(
-                title: "启用语音输入",
-                subtitle: "在任何应用里按住触发键说话，松开后文字自动输入到光标处；需要「输入监控」「辅助功能」和麦克风权限"
+                title: String(localized: "Enable voice input"),
+                subtitle: String(localized: "Hold the trigger key in any app and speak; the text is typed at the cursor when you release it. Requires Input Monitoring, Accessibility and Microphone permissions.")
             ) {
-                Toggle("启用语音输入", isOn: $controller.isEnabled)
+                Toggle("Enable voice input", isOn: $controller.isEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
             }
             SettingsDivider()
-            SettingsRow(title: "触发键", subtitle: "单独按下不会输入字符；和别的键一起按时不会触发") {
-                Picker("触发键", selection: $controller.triggerKey) {
+            SettingsRow(title: String(localized: "Trigger key"), subtitle: String(localized: "Pressing it alone types nothing; it does not trigger when pressed together with another key.")) {
+                Picker("Trigger key", selection: $controller.triggerKey) {
                     ForEach(DictationTriggerKey.allCases) { key in
                         Text(key.title).tag(key)
                     }
                 }
                 .labelsHidden()
-                .accessibilityLabel("触发键")
+                .accessibilityLabel("Trigger key")
                 .fixedSize()
             }
             .disabled(!controller.isEnabled || controller.dictation.isActive || controller.isPolishing || controller.review != nil)
             SettingsDivider()
-            SettingsRow(title: "触发方式") {
-                Picker("触发方式", selection: $controller.mode) {
-                    Text("按住说话").tag(DictationTriggerMachine.Mode.hold)
-                    Text("按一下开始，再按一下结束").tag(DictationTriggerMachine.Mode.toggle)
+            SettingsRow(title: String(localized: "Trigger mode")) {
+                Picker("Trigger mode", selection: $controller.mode) {
+                    Text("Hold to talk").tag(DictationTriggerMachine.Mode.hold)
+                    Text("Press once to start, press again to stop").tag(DictationTriggerMachine.Mode.toggle)
                 }
                 .labelsHidden()
-                .accessibilityLabel("触发方式")
+                .accessibilityLabel("Trigger mode")
                 .fixedSize()
             }
             .disabled(!controller.isEnabled || controller.dictation.isActive || controller.isPolishing || controller.review != nil)
             SettingsDivider()
             SettingsRow(
-                title: "输入前翻译成外语（\(languageName(session.languages.foreignLanguageCode))）",
+                title: String(localized: "Translate to foreign language before typing (\(languageName(session.languages.foreignLanguageCode)))"),
                 subtitle: controller.mode == .toggle
-                    ? "说完后先显示译文供你确认：Return 输入并发送，触发键仅输入，Esc 放弃，也可以改输原文；用「快捷翻译」页里选的翻译引擎，说的已是外语时直接输入。听写时点气泡上的按钮也能随时开关"
-                    : "需要先把触发方式设为「按一下开始，再按一下结束」——按住说话没有地方让你确认译文"
+                    ? String(localized: "After you finish speaking, the translation is shown for confirmation: Return types and sends, the trigger key only types, Esc discards, and you can type the original instead. Uses the translation engine chosen in the Quick Translate tab; if you spoke the foreign language, it is typed directly. You can also toggle this at any time from the button on the bubble while dictating.")
+                    : String(localized: "Set the trigger mode to “Press once to start, press again to stop” first — with Hold to talk there is no place to confirm the translation.")
             ) {
-                Toggle("输入前翻译成外语", isOn: $controller.translateEnabled)
+                Toggle("Translate to foreign language before typing", isOn: $controller.translateEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
@@ -56,10 +56,10 @@ struct DictationSettingsView: View {
             .disabled(!controller.isEnabled || controller.mode != .toggle)
             SettingsDivider()
             SettingsRow(
-                title: "语音输入时暂停音乐",
-                subtitle: "开始说话时暂停正在播放的音乐或视频，结束后自动继续；只会恢复由它暂停的内容"
+                title: String(localized: "Pause music during voice input"),
+                subtitle: String(localized: "Pauses playing music or video when you start speaking and resumes it afterwards; only content paused by this feature is resumed.")
             ) {
-                Toggle("语音输入时暂停音乐", isOn: $controller.pauseMediaEnabled)
+                Toggle("Pause music during voice input", isOn: $controller.pauseMediaEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
@@ -69,33 +69,33 @@ struct DictationSettingsView: View {
             DictationPolishSettingsRows(controller: controller)
             SettingsDivider()
             SettingsRow(
-                title: "听写语言",
-                subtitle: "按哪种语言识别；自动检测只在本地识别模型已加载时可用"
+                title: String(localized: "Dictation language"),
+                subtitle: String(localized: "The language to recognize; Auto-detect is only available when a local recognition model is loaded.")
             ) {
-                Picker("听写语言", selection: dictationLanguageSelection) {
-                    Text("我的语言（\(languageName(session.languages.myLanguageCode))）").tag(DictationLanguageChoice.mine)
-                    Text("外语（\(languageName(session.languages.foreignLanguageCode))）").tag(DictationLanguageChoice.foreign)
-                    Text(session.transcriptionEngineKind == .model ? "自动检测" : "自动检测（需本地模型）")
+                Picker("Dictation language", selection: dictationLanguageSelection) {
+                    Text("My language (\(languageName(session.languages.myLanguageCode)))").tag(DictationLanguageChoice.mine)
+                    Text("Foreign language (\(languageName(session.languages.foreignLanguageCode)))").tag(DictationLanguageChoice.foreign)
+                    Text(session.transcriptionEngineKind == .model ? String(localized: "Auto-detect") : String(localized: "Auto-detect (requires local model)"))
                         .tag(DictationLanguageChoice.auto)
                         .disabled(session.transcriptionEngineKind != .model)
                 }
                 .labelsHidden()
-                .accessibilityLabel("听写语言")
+                .accessibilityLabel("Dictation language")
                 .fixedSize()
             }
             .disabled(!controller.isEnabled || controller.dictation.isActive || controller.isPolishing || controller.review != nil)
             SettingsDivider()
             SettingsRow(
-                title: "单次最长时长",
-                subtitle: "到时自动结束并输入已识别的内容，防止忘记结束时麦克风一直开着；说长段内容可以调长"
+                title: String(localized: "Maximum duration per dictation"),
+                subtitle: String(localized: "Ends automatically at this limit and types what was recognized, so the microphone is not left on if you forget to stop; raise it for long passages.")
             ) {
-                Picker("单次最长时长", selection: $controller.maxDuration) {
+                Picker("Maximum duration per dictation", selection: $controller.maxDuration) {
                     ForEach(DictationMaxDuration.allCases) { limit in
                         Text(limit.title).tag(limit)
                     }
                 }
                 .labelsHidden()
-                .accessibilityLabel("单次最长时长")
+                .accessibilityLabel("Maximum duration per dictation")
                 .fixedSize()
             }
             .disabled(!controller.isEnabled)
@@ -104,7 +104,7 @@ struct DictationSettingsView: View {
                 SettingsNote(text: warmup)
             }
             SettingsDivider()
-            SettingsNote(text: "识别引擎和麦克风跟随「语音识别」页的设置：选了本地模型且已加载（可在「通用」页开启「启动时加载模型」），就直接复用它，否则用系统语音识别；录制字幕期间也用系统识别。按 Esc 可取消；「按一下开始」时，再按 Return 可结束并自动回车发送；输入时会借用剪贴板，随后自动恢复。")
+            SettingsNote(text: String(localized: "The recognition engine and microphone follow the Speech Recognition tab: if a local model is selected and loaded (turn on “Load model at launch” in the General tab), it is reused; otherwise System speech recognition is used, and also while recording captions. Press Esc to cancel; in “Press once to start” mode, press Return to finish and send with Return automatically. The clipboard is borrowed while typing and restored afterwards."))
         }
     }
 

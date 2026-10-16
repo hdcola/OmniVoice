@@ -47,9 +47,9 @@ struct RecognitionSettingsView: View {
     }
 
     private var transcriptionEngineCard: some View {
-        SettingsCard(title: "识别引擎 (ASR)", icon: "waveform") {
-            SettingsRow(title: "引擎") {
-                Picker("识别引擎", selection: $session.transcriptionEngineID) {
+        SettingsCard(title: "Speech recognition engine (ASR)", icon: "waveform") {
+            SettingsRow(title: "Engine") {
+                Picker("Speech recognition engine", selection: $session.transcriptionEngineID) {
                     // Every catalog engine is always listed, downloaded or
                     // not; an undownloaded `.model` engine is labeled rather
                     // than filtered out (see `engineLabel(for:)`), so it
@@ -59,13 +59,13 @@ struct RecognitionSettingsView: View {
                     }
                 }
                 .labelsHidden()
-                .accessibilityLabel("识别引擎")
+                .accessibilityLabel("Speech recognition engine")
                 .fixedSize()
                 .disabled(session.isSettingsBusy)
             }
             modelVariantPicker(
                 for: session.transcriptionEngineID,
-                accessibilityName: "识别模型",
+                accessibilityName: String(localized: "Speech recognition model"),
                 selection: Binding(
                     get: { session.currentTranscriptionModelVariant?.id },
                     set: { session.transcriptionModelVariantID = $0 }
@@ -80,15 +80,15 @@ struct RecognitionSettingsView: View {
             if session.transcriptionEngineKind == .model {
                 SettingsDivider()
                 SettingsRow(
-                    title: "断句停顿时长",
-                    subtitle: "说话后静音超过该时长就结束当前句；越长越不易被拆句，但出字更慢"
+                    title: "Sentence pause length",
+                    subtitle: "Silence longer than this ends the current sentence; longer values split sentences less often but make text appear more slowly"
                 ) {
                     HStack(spacing: 8) {
                         Slider(value: $session.vadSilenceSeconds, in: 0.3...3.0, step: 0.1)
                             .frame(width: 140)
-                            .accessibilityLabel("断句停顿时长")
-                            .accessibilityValue(String(format: "%.1f 秒", session.vadSilenceSeconds))
-                        Text(String(format: "%.1f 秒", session.vadSilenceSeconds))
+                            .accessibilityLabel("Sentence pause length")
+                            .accessibilityValue(String(format: String(localized: "%.1f s"), session.vadSilenceSeconds))
+                        Text(String(format: String(localized: "%.1f s"), session.vadSilenceSeconds))
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
                             .frame(width: 52, alignment: .trailing)
@@ -96,13 +96,13 @@ struct RecognitionSettingsView: View {
                 }
                 SettingsDivider()
                 SettingsRow(
-                    title: "静音电平阈值",
-                    subtitle: "低于该音量视为静音；麦克风音量小、轻声说话时调低（更负）"
+                    title: "Silence level threshold",
+                    subtitle: "Audio quieter than this counts as silence; lower it (more negative) if your microphone is quiet or you speak softly"
                 ) {
                     HStack(spacing: 8) {
                         Slider(value: $session.vadSilenceDBFS, in: -70...(-20), step: 1)
                             .frame(width: 140)
-                            .accessibilityLabel("静音电平阈值")
+                            .accessibilityLabel("Silence level threshold")
                             .accessibilityValue(String(format: "%.0f dB", session.vadSilenceDBFS))
                         Text(String(format: "%.0f dB", session.vadSilenceDBFS))
                             .monospacedDigit()
@@ -115,21 +115,21 @@ struct RecognitionSettingsView: View {
     }
 
     private var translationEngineCard: some View {
-        SettingsCard(title: "转录翻译引擎", icon: "character.bubble") {
-            SettingsRow(title: "引擎") {
-                Picker("转录翻译引擎", selection: $session.translationEngineID) {
+        SettingsCard(title: "Transcription translation engine", icon: "character.bubble") {
+            SettingsRow(title: "Engine") {
+                Picker("Transcription translation engine", selection: $session.translationEngineID) {
                     ForEach(ProviderCatalog.translationEngines) { engine in
                         Text(engineLabel(for: engine)).tag(engine.id)
                     }
                 }
                 .labelsHidden()
-                .accessibilityLabel("转录翻译引擎")
+                .accessibilityLabel("Transcription translation engine")
                 .fixedSize()
                 .disabled(session.isSettingsBusy)
             }
             modelVariantPicker(
                 for: session.translationEngineID,
-                accessibilityName: "转录翻译模型",
+                accessibilityName: String(localized: "Transcription translation model"),
                 selection: Binding(
                     get: { session.currentTranslationModelVariant?.id },
                     set: { session.translationModelVariantID = $0 }
@@ -144,14 +144,14 @@ struct RecognitionSettingsView: View {
             // as `targetLanguageCode`'s picker.
             if session.translationEngineID == "model.t3po" {
                 SettingsDivider()
-                SettingsRow(title: "翻译提交策略") {
-                    Picker("翻译提交策略", selection: $session.translationCommitEagerness) {
+                SettingsRow(title: "Translation commit strategy") {
+                    Picker("Translation commit strategy", selection: $session.translationCommitEagerness) {
                         ForEach(TranslationCommitEagerness.allCases, id: \.self) { eagerness in
                             Text(eagerness.displayName).tag(eagerness)
                         }
                     }
                     .labelsHidden()
-                    .accessibilityLabel("翻译提交策略")
+                    .accessibilityLabel("Translation commit strategy")
                     .fixedSize()
                 }
             }
@@ -176,15 +176,15 @@ struct RecognitionSettingsView: View {
         // there's nothing "early" left to translate by then).
         if session.translationEngineID != "model.t3po", session.transcriptionEngineKind != .system {
             SettingsRow(
-                title: "长句提前翻译阈值",
-                subtitle: "数值越低出字越快，但长句更容易被拆成多段"
+                title: "Early-translation threshold for long sentences",
+                subtitle: "Lower values show text sooner, but long sentences are more likely to be split into several parts"
             ) {
                 HStack(spacing: 6) {
                     // No range clamp here — `RecordingSession
                     // .translationEarlyTranslateThreshold`'s own `didSet`
                     // already clamps to 20...1000 and persists it.
                     TextField(
-                        "长句提前翻译阈值",
+                        "Early-translation threshold for long sentences",
                         value: $session.translationEarlyTranslateThreshold,
                         format: .number
                     )
@@ -192,18 +192,16 @@ struct RecognitionSettingsView: View {
                     .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 64)
-                    Text("字").foregroundStyle(.secondary)
+                    Text("characters").foregroundStyle(.secondary)
                     Image(systemName: "questionmark.circle")
                         .foregroundStyle(.secondary)
                         .help(
-                            "缓存的原文达到该字数的一半、且遇到句号/问号/换行等断句点时，会提前把已缓存内容翻译一次；"
-                                + "达到完整阈值后，即使还没遇到断句点也会强制翻译，避免长句迟迟不出字。"
-                                + "数值越低出字越快，但长句越容易被拆成更多段；数值越高单段更完整，但可能等得更久。"
+                            String(localized: "When the cached source text reaches half this many characters and hits a sentence break (period, question mark, line break), the cached text is translated early; once it reaches the full threshold it is translated even without a break, so long sentences don't stall. Lower values show text sooner but split long sentences into more parts; higher values keep each part more complete but may wait longer.")
                         )
                 }
             }
         } else {
-            SettingsNote(text: "当前引擎无需设置长句提前翻译阈值（仅对分段实时输出的翻译引擎有效）。")
+            SettingsNote(text: "The current engine doesn't need an early-translation threshold (it only applies to translation engines that output in segments in real time).")
         }
     }
 
@@ -219,7 +217,7 @@ struct RecognitionSettingsView: View {
     }
 
     private func engineLabel(for engine: EngineDescriptor) -> String {
-        hasDownloadedVariant(engine) ? engine.displayName : "\(engine.displayName)（未下载 · 点击配置）"
+        hasDownloadedVariant(engine) ? engine.displayName : String(localized: "\(engine.displayName) (not downloaded · click to set up)")
     }
 
     /// Lists *downloaded* variants — plus the currently-selected one even if
@@ -238,8 +236,8 @@ struct RecognitionSettingsView: View {
         let shown = variants.filter { downloadManager.isDownloaded($0) || $0.id == selectedID }
         if !shown.isEmpty {
             SettingsDivider()
-            SettingsRow(title: "模型") {
-                Picker("模型", selection: selection) {
+            SettingsRow(title: "Model") {
+                Picker("Model", selection: selection) {
                     ForEach(shown) { variant in
                         Text(variantLabel(for: variant)).tag(Optional(variant.id))
                     }
@@ -253,8 +251,8 @@ struct RecognitionSettingsView: View {
 
     private func variantLabel(for variant: ModelVariant) -> String {
         downloadManager.isDownloaded(variant)
-            ? "\(variant.displayName) · 约 \(variant.approximateSizeMB) MB"
-            : "\(variant.displayName)（未下载）"
+            ? String(localized: "\(variant.displayName) · about \(variant.approximateSizeMB) MB")
+            : String(localized: "\(variant.displayName) (not downloaded)")
     }
 
     /// Task 3.2 — an undownloaded `.model` engine that's currently selected
@@ -284,7 +282,7 @@ struct RecognitionSettingsView: View {
                 Text(variant.displayName).font(.callout)
                 if downloadManager.isDownloading(variant) {
                     if let fraction = downloadManager.downloadProgress[variant.id] {
-                        Text("下载中 \(Int((fraction * 100).rounded()))%")
+                        Text("Downloading \(Int((fraction * 100).rounded()))%")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         ProgressView(value: fraction)
@@ -294,51 +292,51 @@ struct RecognitionSettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                     } else {
-                        Text("准备下载…")
+                        Text("Preparing download…")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         ProgressView().progressViewStyle(.linear)
                     }
                 } else if let message = inlineDownloadFailures[variant.id] {
-                    Text("下载中断：\(message)")
+                    Text("Download interrupted: \(message)")
                         .font(.caption)
                         .foregroundStyle(.red)
                     HStack {
-                        PillButton(title: "立即重试") { downloadInline(variant) }
+                        PillButton(title: "Retry Now") { downloadInline(variant) }
                         if variant.downloadURL != nil {
-                            PillButton(title: "复制下载链接") { copyDownloadLink(for: variant) }
+                            PillButton(title: "Copy Download Link") { copyDownloadLink(for: variant) }
                         }
                     }
                 } else {
-                    Text("约 \(variant.approximateSizeMB) MB · 尚未下载")
+                    Text("About \(variant.approximateSizeMB) MB · not downloaded yet")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             Spacer()
             if downloadManager.isDownloading(variant) {
-                PillButton(title: "取消") { downloadManager.cancelDownload(for: variant) }
+                PillButton(title: "Cancel") { downloadManager.cancelDownload(for: variant) }
             } else {
-                PillButton(title: "下载并启用") { downloadInline(variant) }
+                PillButton(title: "Download and Enable") { downloadInline(variant) }
             }
         }
         // Task 4.2 — same copy as `ModelManagementView`'s own disk-space
         // alert (Docs/UX-SETTINGS-MODEL-MANAGEMENT.md §4.6.1).
         .alert(
-            "磁盘空间不足",
+            "Not Enough Disk Space",
             isPresented: Binding(
                 get: { inlineDiskSpaceWarning?.variant.id == variant.id },
                 set: { if !$0 { inlineDiskSpaceWarning = nil } }
             )
         ) {
-            Button("打开存储空间管理") {
+            Button("Open Storage Management") {
                 NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.settings.Storage")!)
                 inlineDiskSpaceWarning = nil
             }
-            Button("知道了", role: .cancel) { inlineDiskSpaceWarning = nil }
+            Button("Got It", role: .cancel) { inlineDiskSpaceWarning = nil }
         } message: {
             if let inlineDiskSpaceWarning {
-                Text("下载「\(inlineDiskSpaceWarning.variant.displayName)」\(inlineDiskSpaceWarning.error.errorDescription ?? "")。请清理磁盘空间后重试。")
+                Text("Downloading “\(inlineDiskSpaceWarning.variant.displayName)” \(inlineDiskSpaceWarning.error.errorDescription ?? ""). Free up some disk space and try again.")
             }
         }
     }
@@ -375,15 +373,16 @@ struct RecognitionSettingsView: View {
                     session.translationModelVariantID = variant.id
                 }
                 SystemNotifier.notify(
-                    title: "模型下载完成", body: "「\(variant.displayName)」已下载并自动启用")
+                    title: String(localized: "Model Download Complete"),
+                    body: String(localized: "“\(variant.displayName)” was downloaded and enabled automatically"))
             } catch is CancellationError {
                 // The user's own "取消" tap — not a failure worth surfacing.
             } catch {
                 // Task 4.3 — inline on this row, not just `statusMessage`.
                 inlineDownloadFailures[variant.id] = error.localizedDescription
                 SystemNotifier.notify(
-                    title: "模型下载失败",
-                    body: "「\(variant.displayName)」：\(error.localizedDescription)")
+                    title: String(localized: "Model Download Failed"),
+                    body: String(localized: "“\(variant.displayName)”: \(error.localizedDescription)"))
             }
         }
     }
@@ -403,24 +402,24 @@ struct RecognitionSettingsView: View {
     /// above) keeps the jump to the size of the content difference instead
     /// of a full section.
     private var memoryConsole: some View {
-        SettingsCard(title: "引擎运行与内存状态", icon: "memorychip") {
+        SettingsCard(title: "Engine status and memory", icon: "memorychip") {
             if session.usesOnDeviceModelEngine {
-                SettingsRow(title: "模型状态", subtitle: "预计占用内存：约 \(session.settingsEstimatedMemoryGB) GB") {
+                SettingsRow(title: "Model status", subtitle: String(localized: "Estimated memory use: about \(session.settingsEstimatedMemoryGB) GB")) {
                     StatusPill(text: memoryStatusText, tone: memoryStatusTone)
                 }
                 SettingsDivider()
                 HStack {
                     Spacer()
                     PillButton(
-                        title: "⚡ 预加载到内存",
+                        title: "⚡ Preload into Memory",
                         isWorking: session.isPreloadingModel,
-                        workingTitle: "加载中…"
+                        workingTitle: "Loading…"
                     ) {
                         Task { await session.preloadModel() }
                     }
                     .disabled(session.isSessionActive || session.isPreloadingModel || session.isModelLoaded)
 
-                    PillButton(title: "🧹 释放内存占用") {
+                    PillButton(title: "🧹 Free Memory") {
                         session.unloadModels()
                     }
                     .disabled(!session.hasLoadedModels || session.isSessionActive || session.isPreloadingModel)
@@ -428,7 +427,7 @@ struct RecognitionSettingsView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
             } else {
-                SettingsNote(text: "当前引擎均为系统内置，无需预加载或释放内存。")
+                SettingsNote(text: "The current engines are built into macOS; there is nothing to preload or free.")
             }
         }
     }
@@ -439,8 +438,8 @@ struct RecognitionSettingsView: View {
     }
 
     private var memoryStatusText: String {
-        if session.isPreloadingModel { return "正在加载中…" }
-        if session.isModelLoaded { return "已载入内存（就绪）" }
-        return session.hasLoadedModels ? "仅翻译模型已载入" : "空闲（未载入内存）"
+        if session.isPreloadingModel { return String(localized: "Loading…") }
+        if session.isModelLoaded { return String(localized: "Loaded in memory (ready)") }
+        return session.hasLoadedModels ? String(localized: "Only the translation model is loaded") : String(localized: "Idle (not loaded in memory)")
     }
 }

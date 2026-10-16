@@ -21,7 +21,7 @@ struct SettingsCard<Content: View>: View {
                     if let icon {
                         Image(systemName: icon)
                     }
-                    Text(title)
+                    Text(LocalizedStringKey(title))
                 }
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -122,10 +122,10 @@ struct SettingsRow<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.system(size: 13))
                 if let subtitle {
-                    Text(subtitle)
+                    Text(LocalizedStringKey(subtitle))
                         .font(.system(size: 11))
                         .foregroundStyle(subtitleTint)
                         .fixedSize(horizontal: false, vertical: true)
@@ -146,7 +146,7 @@ struct SettingsNote: View {
     var tint: Color = .secondary
 
     var body: some View {
-        Text(text)
+        Text(LocalizedStringKey(text))
             .font(.system(size: 11))
             .foregroundStyle(tint)
             .fixedSize(horizontal: false, vertical: true)
@@ -176,7 +176,7 @@ struct StatusPill: View {
     var body: some View {
         HStack(spacing: 5) {
             Circle().fill(tone.color).frame(width: 6, height: 6)
-            Text(text)
+            Text(LocalizedStringKey(text))
         }
         .font(.system(size: 12, weight: .medium))
         .foregroundStyle(tone.color)
@@ -202,17 +202,17 @@ struct PermissionRow: View {
                 .foregroundStyle(isGranted ? Color.green : Color.orange)
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 13, weight: .medium))
-                Text(detail)
+                Text(LocalizedStringKey(title)).font(.system(size: 13, weight: .medium))
+                Text(LocalizedStringKey(detail))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             if isGranted {
-                StatusPill(text: "已授权", tone: .good)
+                StatusPill(text: "Granted", tone: .good)
             } else {
-                PillButton(title: "去授权", action: open)
+                PillButton(title: "Grant", action: open)
             }
         }
         .padding(.horizontal, 14)
@@ -236,7 +236,7 @@ struct PillButton: View {
                 if isWorking {
                     ProgressView().controlSize(.small)
                 }
-                Text(isWorking ? workingTitle : title)
+                Text(LocalizedStringKey(isWorking ? workingTitle : title))
             }
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(tint)
@@ -259,7 +259,7 @@ struct PrimaryPillButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(title, action: action)
+        Button(LocalizedStringKey(title), action: action)
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.capsule)
             .controlSize(.large)

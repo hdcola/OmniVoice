@@ -20,16 +20,16 @@ struct LanguagePicker: View {
     var body: some View {
         let restricted = isSourceSide && session.transcriptionEngineKind == .system
         let options = restricted ? LanguageCatalog.common.filter(\.supportsSystemASRSource) : LanguageCatalog.common
-        Picker(title, selection: selection) {
+        Picker(LocalizedStringKey(title), selection: selection) {
             ForEach(options) { option in
                 Text(option.displayName).tag(option.code)
             }
             if !options.contains(where: { $0.code == selection.wrappedValue }) {
-                Text("\(selection.wrappedValue)（自定义）").tag(selection.wrappedValue)
+                Text("\(selection.wrappedValue) (custom)").tag(selection.wrappedValue)
             }
         }
         .labelsHidden()
-        .accessibilityLabel(title)
+        .accessibilityLabel(LocalizedStringKey(title))
         .fixedSize()
         .disabled(isSourceSide && session.isSessionActive)
     }

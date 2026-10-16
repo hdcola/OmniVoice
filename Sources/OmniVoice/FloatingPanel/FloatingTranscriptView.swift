@@ -195,7 +195,7 @@ struct FloatingTranscriptView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("复制全文")
+            .help("Copy All")
             .disabled(session.lines.allSatisfy(\.displaySource.isEmpty))
 
             PanelCloseButton(action: onClose)
@@ -204,7 +204,7 @@ struct FloatingTranscriptView: View {
     }
 
     /// Tooltip for the ⇄ button — says why it is greyed out.
-    private var swapHelp: String { session.swapBlockedReason ?? "互换源语言和目标语言" }
+    private var swapHelp: String { session.swapBlockedReason ?? String(localized: "Swap source and target languages") }
 
     /// Start/stop, the source ⇄ target language pickers, and the timer.
     /// The language pickers are flexible views that would otherwise stretch
@@ -237,7 +237,11 @@ struct FloatingTranscriptView: View {
                     ProgressView()
                         .controlSize(.small)
                 }
-                Text(session.isRunning ? "停止" : (session.isStarting ? "启动中…" : "开始"))
+                Text(
+                    session.isRunning
+                        ? String(localized: "Stop")
+                        : (session.isStarting ? String(localized: "Starting…") : String(localized: "Start"))
+                )
             }
         }
         .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
@@ -282,7 +286,7 @@ struct FloatingTranscriptView: View {
         }
         .buttonStyle(.plain)
         .help(swapHelp)
-        .accessibilityLabel("互换源语言和目标语言")
+        .accessibilityLabel("Swap source and target languages")
         .accessibilityHint(session.swapBlockedReason ?? "")
         .preference(key: PanelPopoverOpenKey.self, value: isSwapHintPresented)
         // The reason ending (e.g. the recording stops) must not leave an empty
@@ -354,11 +358,11 @@ struct FloatingTranscriptView: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("显示选项")
+        .help("Display options")
     }
 
     private var displayModePicker: some View {
-        Picker("显示模式", selection: $session.panelDisplayMode) {
+        Picker("Display mode", selection: $session.panelDisplayMode) {
             ForEach(PanelDisplayMode.allCases, id: \.self) { mode in
                 Text(mode.displayName).tag(mode)
             }
@@ -366,7 +370,7 @@ struct FloatingTranscriptView: View {
     }
 
     private var fontScalePicker: some View {
-        Picker("字号", selection: $session.panelFontScale) {
+        Picker("Font size", selection: $session.panelFontScale) {
             ForEach(PanelFontScale.allCases, id: \.self) { scale in
                 Text(scale.displayName).tag(scale)
             }
@@ -425,14 +429,14 @@ struct FloatingTranscriptView: View {
                 permissionSettingsButton(
                     urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
                     systemImage: "mic.slash",
-                    tooltip: "前往系统设置授权麦克风"
+                    tooltip: "Grant microphone access in System Settings"
                 )
             }
             if session.screenRecordingPermissionNeeded {
                 permissionSettingsButton(
                     urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
                     systemImage: "display",
-                    tooltip: "前往系统设置授权屏幕录制"
+                    tooltip: "Grant screen recording access in System Settings"
                 )
             }
 
@@ -472,7 +476,7 @@ struct FloatingTranscriptView: View {
                         .foregroundStyle(.green)
                     // A translation-only launch preload leaves the recognizer
                     // unloaded (`start()` loads it); still releasable here.
-                    Text(session.isModelLoaded ? "模型已就绪" : "翻译模型已就绪")
+                    Text(session.isModelLoaded ? String(localized: "Model ready") : String(localized: "Translation model ready"))
                     // A `.model`-kind engine otherwise only ever unloads on
                     // an engine switch or app quit (see `isModelLoaded`'s
                     // doc) — this is the escape hatch for reclaiming that
@@ -490,7 +494,7 @@ struct FloatingTranscriptView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     .disabled(session.isSessionActive)
-                    .help("释放模型")
+                    .help("Unload model")
                 }
                 .font(.caption)
             } else {
@@ -513,7 +517,7 @@ struct FloatingTranscriptView: View {
                             ProgressView()
                                 .controlSize(.small)
                         }
-                        Text(session.isPreloadingModel ? "加载中…" : "预加载模型")
+                        Text(session.isPreloadingModel ? String(localized: "Loading…") : String(localized: "Preload Model"))
                     }
                     .font(.caption)
                 }
@@ -529,7 +533,7 @@ struct FloatingTranscriptView: View {
     /// distinct `systemImage`/`tooltip` per call site: with both permissions
     /// missing at once, two identical gear icons with the same tooltip gave
     /// no way to tell which one addressed which permission.
-    private func permissionSettingsButton(urlString: String, systemImage: String, tooltip: String) -> some View {
+    private func permissionSettingsButton(urlString: String, systemImage: String, tooltip: LocalizedStringKey) -> some View {
         Button {
             NSWorkspace.shared.open(URL(string: urlString)!)
         } label: {
@@ -553,7 +557,7 @@ struct FloatingTranscriptView: View {
             .foregroundStyle(.red)
             .scaleEffect(1 + CGFloat(session.inputLevel) * 0.5)
             .animation(.easeOut(duration: 0.1), value: session.inputLevel)
-            .accessibilityLabel("麦克风输入中")
+            .accessibilityLabel("Microphone is receiving audio")
     }
 
     private func rebuildConfiguration() {
@@ -641,7 +645,7 @@ private struct TranscriptListView: View, Equatable {
                     // would leave the panel looking blank instead of showing
                     // this.
                     if lines.allSatisfy(\.displaySource.isEmpty) {
-                        Text("等待开始…")
+                        Text("Waiting to start…")
                             .foregroundStyle(.secondary)
                     }
                     ForEach(lines) { line in
@@ -730,7 +734,7 @@ private struct TranscriptListView: View, Equatable {
                 isProgrammaticScrollInFlight = false
             }
         } label: {
-            Label("最新内容", systemImage: "arrow.down.circle.fill")
+            Label("Latest", systemImage: "arrow.down.circle.fill")
                 .font(.caption)
                 .labelStyle(.titleAndIcon)
         }
@@ -785,7 +789,7 @@ private struct TranscriptLineRow: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help("复制本句")
+                .help("Copy this sentence")
             }
         }
         .onHover { isHovering = $0 }
@@ -863,7 +867,7 @@ private struct PanelCloseButton: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
-        .help("隐藏字幕悬浮窗")
-        .accessibilityLabel("隐藏字幕悬浮窗")
+        .help("Hide Caption Panel")
+        .accessibilityLabel("Hide Caption Panel")
     }
 }

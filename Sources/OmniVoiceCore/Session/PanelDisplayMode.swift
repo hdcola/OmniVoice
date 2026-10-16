@@ -9,9 +9,9 @@ public enum PanelDisplayMode: String, CaseIterable, Codable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .bilingual: return "双语对照"
-        case .translationOnly: return "仅译文"
-        case .sourceOnly: return "仅原文"
+        case .bilingual: return String(localized: "Bilingual")
+        case .translationOnly: return String(localized: "Translation only")
+        case .sourceOnly: return String(localized: "Source only")
         }
     }
 }
@@ -25,9 +25,9 @@ public enum PanelFontScale: String, CaseIterable, Codable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .standard: return "标准"
-        case .large: return "大"
-        case .extraLarge: return "特大"
+        case .standard: return String(localized: "Standard")
+        case .large: return String(localized: "Large")
+        case .extraLarge: return String(localized: "Extra large")
         }
     }
 

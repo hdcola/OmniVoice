@@ -16,14 +16,14 @@ public enum PolishError: Error, Equatable, Sendable {
 
     public var message: String {
         switch self {
-        case .notConfigured: return "还没配置完"
-        case .unauthorized: return "请检查 API Key"
-        case .http(let code): return "服务返回 HTTP \(code)"
-        case .timeout: return "请求超时"
-        case .network: return "网络错误"
-        case .emptyResponse: return "服务没有返回内容"
-        case .truncated: return "输出被截断，可能是推理模型：请换非推理模型，或在服务端关闭思考"
-        case .rejected: return "输出没有通过校验"
+        case .notConfigured: return String(localized: "Setup is incomplete")
+        case .unauthorized: return String(localized: "Check your API key")
+        case .http(let code): return String(localized: "The service returned HTTP \(code)")
+        case .timeout: return String(localized: "Request timed out")
+        case .network: return String(localized: "Network error")
+        case .emptyResponse: return String(localized: "The service returned no content")
+        case .truncated: return String(localized: "Output was cut off. This may be a reasoning model: switch to a non-reasoning model, or turn off thinking on the server")
+        case .rejected: return String(localized: "Output failed validation")
         }
     }
 }
