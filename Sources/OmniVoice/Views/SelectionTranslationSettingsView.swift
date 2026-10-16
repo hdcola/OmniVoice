@@ -112,7 +112,7 @@ struct SelectionTranslationSettingsView: View {
     }
 
     private var followRecordingLabel: String {
-        String(localized: "Follow speech recognition settings (currently: \(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID)))")
+        String(localized: "Follow speech recognition (\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID)))")
     }
 
     private func engineLabel(for engine: EngineDescriptor) -> String {

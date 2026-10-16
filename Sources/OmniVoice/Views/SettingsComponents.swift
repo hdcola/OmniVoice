@@ -45,7 +45,10 @@ struct SettingsCard<Content: View>: View {
     }
 }
 
-/// Pill-style tab switcher shown at the top of the Settings window.
+/// Icon-over-label tab switcher shown at the top of the Settings window: six
+/// equal-width columns, so a long English label ("Speech Recognition") wraps
+/// to two lines in a reserved two-line slot instead of making its tab taller
+/// than the others.
 struct SettingsTabBar: View {
     @Binding var selection: SettingsTab
 
@@ -55,13 +58,25 @@ struct SettingsTabBar: View {
                 Button {
                     selection = tab
                 } label: {
-                    Text(tab.title)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(selection == tab ? Color.primary : .secondary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(selection == tab ? Color.primary.opacity(0.14) : .clear))
-                        .contentShape(Capsule())
+                    VStack(spacing: 3) {
+                        Image(systemName: tab.systemImage)
+                            .font(.system(size: 16, weight: .regular))
+                            .frame(height: 20)
+                            .accessibilityHidden(true)
+                        Text(tab.title)
+                            .font(.system(size: 11, weight: .medium))
+                            .lineLimit(2, reservesSpace: true)
+                            .multilineTextAlignment(.center)
+                    }
+                    .foregroundStyle(selection == tab ? Color.primary : .secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(selection == tab ? Color.primary.opacity(0.14) : .clear)
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .focusEffectDisabled()
@@ -70,8 +85,9 @@ struct SettingsTabBar: View {
             }
         }
         .padding(3)
-        .background(Capsule().fill(Color.primary.opacity(0.06)))
-        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Color.primary.opacity(0.06)))
+        .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+        .padding(.horizontal, 16)
         .animation(.easeInOut(duration: 0.15), value: selection)
     }
 }
