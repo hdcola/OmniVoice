@@ -278,7 +278,7 @@ public final class RecordingSession: ObservableObject {
     /// the system recognizer not when the other side's language can't be
     /// recognized there (e.g. 俄语 as 我的语言).
     public var swapBlockedReason: String? {
-        if isSessionActive { return String(localized: "Cannot swap while recording. Stop first and try again.") }
+        if isSessionActive { return String(localized: "Cannot swap while transcribing. Stop first and try again.") }
         guard transcriptionEngineKind == .system else { return nil }
         let nextSource = languages.transcriptionDirection == .listenForeign
             ? languages.myLanguageCode

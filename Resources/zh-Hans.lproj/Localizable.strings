@@ -32,7 +32,7 @@
 "Accessibility" = "辅助功能";
 "After selecting text in another app, press ⌘C twice quickly to translate what you just copied; it also works where ⌥A can't read the selection, such as web pages." = "在其他应用里选中文字后，快速按两下 ⌘C，直接翻译刚复制的内容；网页等 ⌥A 读不到选区的地方也能用。";
 "After selecting text in another app, press ⌘C twice quickly to translate what you just copied; requires the “Input Monitoring” permission" = "在其他应用里选中文字后快速按两下 ⌘C，直接翻译刚复制的内容；需要「输入监控」权限";
-"After you finish speaking, the translation is shown for confirmation: Return types and sends, the trigger key only types, Esc discards, and you can type the original instead. Uses the translation engine chosen in the Quick Translate tab; if you spoke the foreign language, it is typed directly. You can also toggle this at any time from the button on the bubble while dictating." = "说完后先显示译文供你确认：Return 输入并发送，触发键仅输入，Esc 放弃，也可以改输原文；用「快捷翻译」页里选的翻译引擎，说的已是外语时直接输入。听写时点气泡上的按钮也能随时开关";
+"After you finish speaking, the translation is shown for confirmation: Return types and sends, the trigger key only types, Esc discards, and you can type the original instead. Uses the translation engine chosen in the Quick Translate tab; if you spoke the foreign language, it is typed directly. You can also toggle this at any time from the button on the bubble while dictating." = "说完后先显示译文供你确认：Return 输入并发送，触发键仅输入，Esc 放弃，也可以改输原文；用「快捷翻译」页里选的翻译引擎，说的已是外语时直接输入。语音输入时点气泡上的按钮也能随时开关";
 "All downloaded" = "已全部下载";
 "Allow" = "去允许";
 "Arabic" = "阿拉伯语";
@@ -53,7 +53,7 @@
 "Built-in macOS translation. Translates by sentence punctuation; no live typewriter preview." = "macOS 内置翻译，按句子标点翻译，不支持实时打字机预览。";
 "Calculating…" = "计算中…";
 "Cancel" = "取消";
-"Cannot swap while recording. Stop first and try again." = "录制中不能互换，停止后再试";
+"Cannot swap while transcribing. Stop first and try again." = "转录中不能互换，停止后再试";
 "Cantonese" = "粤语";
 "Caption panel" = "字幕悬浮窗";
 "Captures system audio (meetings, online classes) and powers screenshot translation; screenshots are recognized on this Mac only and never uploaded" = "捕获系统声音（会议、网课）和截图翻译；截图只在本机识别，不会上传";
@@ -63,7 +63,7 @@
 "Clean up %lld empty transcripts?" = "清理 %lld 条空记录？";
 "Clean" = "清爽";
 "Clear" = "清除";
-"Click the “Translate to…” button on the bubble while dictating to turn it on or off at any time. Translation uses the engine chosen under “Translate selection and screenshot”, and the target language is your “Foreign language”. The bubble grows taller for long text." = "听写时点气泡上的「译成…」按钮就能随时开关；翻译用「划词与截图翻译」里选的引擎，目标语言是你的「外语」。长内容时气泡会随内容变高。";
+"Click the “Translate to…” button on the bubble while dictating to turn it on or off at any time. Translation uses the engine chosen under “Translate selection and screenshot”, and the target language is your “Foreign language”. The bubble grows taller for long text." = "语音输入时点气泡上的「译成…」按钮就能随时开关；翻译用「划词与截图翻译」里选的引擎，目标语言是你的「外语」。长内容时气泡会随内容变高。";
 "Close (Esc)" = "关闭（Esc）";
 "Close" = "关闭";
 "Community quantization (unofficial release): about half the size of Q8_0, about 1.8GB peak memory at runtime, faster decoding, suited to memory-constrained devices; slightly lower accuracy than Q8_0." = "社区量化版（非官方发布）：体积约为 Q8_0 的一半，运行时峰值内存约 1.8GB，解码更快，适合内存紧张的设备；精度略低于 Q8_0。";
@@ -88,11 +88,11 @@
 "Delete “%@”?" = "确定要删除「%@」吗？";
 "Delete" = "删除";
 "Detects the double ⌘C press and the dictation trigger key; only those keys are checked, nothing else is recorded" = "识别连按两次 ⌘C 和语音输入的触发键；只检测这些按键，不记录其他输入";
-"Dictating · Local model" = "正在听写 · 本地模型";
-"Dictating · System recognition" = "正在听写 · 系统识别";
+"Dictating · Local model" = "正在语音输入 · 本地模型";
+"Dictating · System recognition" = "正在语音输入 · 系统识别";
 "Dictation (optional)" = "语音输入（可选）";
 "Dictation is in progress. Try again in a moment." = "正在语音输入，请稍后再开始";
-"Dictation language" = "听写语言";
+"Dictation language" = "语音输入语言";
 "Dictation" = "语音输入";
 "Dictation: automatically pause music and video" = "语音输入：自动暂停音乐和视频";
 "Dictation: polish recognized text (optional)" = "语音输入：润色识别结果（可选）";
@@ -114,7 +114,7 @@
 "Downloaded %lld/%lld" = "已下载 %lld/%lld";
 "Downloading %lld%%" = "下载中 %lld%%";
 "Downloading language recognition resources. This takes a moment the first time…" = "正在下载语言识别资源，首次使用需要一点时间…";
-"Downloading speech recognition resources; the first dictation will be faster once done…" = "正在下载语言识别资源，完成后首次听写会更快…";
+"Downloading speech recognition resources; the first dictation will be faster once done…" = "正在下载语言识别资源，完成后首次语音输入会更快…";
 "Downloading" = "下载中";
 "Downloading…" = "下载中…";
 "Drag to select the text to translate · Esc to cancel" = "拖动框选要翻译的文字 · Esc 取消";
@@ -140,7 +140,7 @@
 "Failed to load the T3PO model" = "加载 T3PO 模型失败";
 "Failed to load the model" = "加载模型失败";
 "Failed to set the recognition language" = "设置识别语言失败";
-"Failed to start dictation: %@" = "听写启动失败: %@";
+"Failed to start dictation: %@" = "语音输入启动失败: %@";
 "Failed to start the stream" = "启动流失败";
 "Failed: %@" = "失败：%@";
 "Fast & Lightweight mode" = "极速轻量模式";
@@ -429,7 +429,7 @@
 "The model is downloading in the background and will be enabled automatically when it finishes" = "模型正在后台下载中，下载完成后将自动为您无缝启用";
 "The model is not loaded yet" = "模型尚未加载";
 "The original text is typed after this time." = "超过这个时间就输入原文";
-"The recognition engine and microphone follow the Speech Recognition tab: if a local model is selected and loaded (turn on “Load models at launch” in the General tab), it is reused; otherwise System speech recognition is used, and also while recording captions. Press Esc to cancel; in “Press once to start” mode, press Return to finish and send with Return automatically. The clipboard is borrowed while typing and restored afterwards." = "识别引擎和麦克风跟随「语音识别」页的设置：选了本地模型且已加载（可在「通用」页开启「启动时加载模型」），就直接复用它，否则用系统语音识别；录制字幕期间也用系统识别。按 Esc 可取消；「按一下开始」时，再按 Return 可结束并自动回车发送；输入时会借用剪贴板，随后自动恢复。";
+"The recognition engine and microphone follow the Speech Recognition tab: if a local model is selected and loaded (turn on “Load models at launch” in the General tab), it is reused; otherwise System speech recognition is used, and also during live transcription. Press Esc to cancel; in “Press once to start” mode, press Return to finish and send with Return automatically. The clipboard is borrowed while typing and restored afterwards." = "识别引擎和麦克风跟随「语音识别」页的设置：选了本地模型且已加载（可在「通用」页开启「启动时加载模型」），就直接复用它，否则用系统语音识别；实时转录期间也用系统识别。按 Esc 可取消；「按一下开始」时，再按 Return 可结束并自动回车发送；输入时会借用剪贴板，随后自动恢复。";
 "The selected language is not supported on this Mac" = "所选语言在本机不受支持";
 "The selected local model is specifically trained for Chinese, English, Japanese and Korean. Translating to “%@” may silently fall back to Chinese." = "当前选中的本地模型针对中、英、日、韩进行了专门训练。翻译至「%@」可能会静默回退为中文。";
 "The service rejected this Key (401/403); please check it." = "服务拒绝了这个 Key（401/403），请检查";
@@ -440,7 +440,7 @@
 "These transcripts have no content. This can't be undone." = "这些记录没有任何转录内容，删除后无法恢复。";
 "This Month" = "本月";
 "This Week" = "本周";
-"This can't be undone. A transcript being recorded won't be deleted." = "删除后无法恢复。录制中的记录不会被删除。";
+"This can't be undone. A transcript being transcribed won't be deleted." = "删除后无法恢复。转录中的记录不会被删除。";
 "This field does not allow automatic typing (such as a password field); the text was copied, so you can paste it manually." = "当前输入框不允许自动输入（如密码框），文字已复制，可手动粘贴";
 "This text is too long for the model to translate in one go" = "这段文字太长，超出了模型一次能翻译的长度";
 "Timeout" = "超时";

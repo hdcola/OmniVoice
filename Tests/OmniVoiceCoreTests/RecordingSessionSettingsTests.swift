@@ -211,7 +211,7 @@ struct RecordingSessionSettingsTests {
             let session = RecordingSession()
             #expect(session.swapBlockedReason == nil)
             session.isRunning = true
-            #expect(session.swapBlockedReason == "Cannot swap while recording. Stop first and try again.")
+            #expect(session.swapBlockedReason == "Cannot swap while transcribing. Stop first and try again.")
             #expect(!session.canSwapTranscriptionDirection)
         }
     }

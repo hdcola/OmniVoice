@@ -140,7 +140,7 @@ struct SessionListView: View {
 
     private func message(for request: DeletionRequest) -> String {
         switch request {
-        case .sessions: return String(localized: "This can't be undone. A transcript being recorded won't be deleted.")
+        case .sessions: return String(localized: "This can't be undone. A transcript being transcribed won't be deleted.")
         case .empty: return String(localized: "These transcripts have no content. This can't be undone.")
         case .olderThan(let days):
             return String(localized: "\(targets(for: request).count) transcripts started more than \(days) days ago will be deleted. This can\'t be undone.")
@@ -246,8 +246,14 @@ struct SessionListView: View {
         return yearMonthFormatter.string(from: date)
     }
 
+    /// The app's UI language, so month/weekday names match the localized
+    /// date formats (which fall back to English when the system language is
+    /// neither English nor 简体中文) instead of following `Locale.current`.
+    private static let uiLocale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en")
+
     private static let yearMonthFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = uiLocale
         formatter.dateFormat = String(localized: "MMMM yyyy")
         return formatter
     }()
@@ -323,21 +329,25 @@ struct SessionListView: View {
     /// `SessionExporter.dateFormatter` already uses elsewhere.
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = uiLocale
         formatter.dateFormat = "HH:mm"
         return formatter
     }()
     private static let weekdayFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = uiLocale
         formatter.dateFormat = "EEE"
         return formatter
     }()
     private static let monthDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = uiLocale
         formatter.dateFormat = String(localized: "MMM d, HH:mm")
         return formatter
     }()
     private static let yearMonthDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = uiLocale
         formatter.dateFormat = String(localized: "MMM d, yyyy, HH:mm")
         return formatter
     }()

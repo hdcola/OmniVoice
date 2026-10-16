@@ -104,7 +104,7 @@ struct DictationSettingsView: View {
                 SettingsNote(text: warmup)
             }
             SettingsDivider()
-            SettingsNote(text: String(localized: "The recognition engine and microphone follow the Speech Recognition tab: if a local model is selected and loaded (turn on “Load models at launch” in the General tab), it is reused; otherwise System speech recognition is used, and also while recording captions. Press Esc to cancel; in “Press once to start” mode, press Return to finish and send with Return automatically. The clipboard is borrowed while typing and restored afterwards."))
+            SettingsNote(text: String(localized: "The recognition engine and microphone follow the Speech Recognition tab: if a local model is selected and loaded (turn on “Load models at launch” in the General tab), it is reused; otherwise System speech recognition is used, and also during live transcription. Press Esc to cancel; in “Press once to start” mode, press Return to finish and send with Return automatically. The clipboard is borrowed while typing and restored afterwards."))
         }
     }
 
