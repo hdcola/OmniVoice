@@ -1,7 +1,7 @@
 "%.1f s" = "%.1f 秒";
-"%1$@ is already used for “%2$@”" = "%1$@ 已用于「%2$@」";
-"%1$lld h %2$lld min" = "%1$lld 小时 %2$lld 分钟";
-"%1$lld min %2$lld s" = "%1$lld 分 %2$lld 秒";
+"%@ is already used for “%@”" = "%1$@ 已用于「%2$@」";
+"%lld h %lld min" = "%1$lld 小时 %2$lld 分钟";
+"%lld min %lld s" = "%1$lld 分 %2$lld 秒";
 "%@ (%@)" = "%1$@（%2$@）";
 "%@ (custom)" = "%@（自定义）";
 "%@ (not downloaded · click to set up)" = "%@（未下载 · 点击配置）";
@@ -253,7 +253,7 @@
 "Not Enough Disk Space" = "磁盘空间不足";
 "Not downloaded yet" = "尚未下载";
 "Not enough disk space" = "磁盘空间不足";
-"Not enough disk space: about %1$lld MB required, only %2$lld MB available" = "磁盘空间不足：需要约 %1$lld MB，可用空间仅 %2$lld MB";
+"Not enough disk space: about %lld MB required, only %lld MB available" = "磁盘空间不足：需要约 %1$lld MB，可用空间仅 %2$lld MB";
 "Not implemented: %@" = "尚未实现: %@";
 "Not recognized" = "未能识别";
 "Not set" = "未设置";
@@ -388,7 +388,7 @@
 "Speech recognition model" = "识别模型";
 "Speech recognition models" = "识别引擎模型";
 "SpeechAnalyzer has no available audio format" = "SpeechAnalyzer 无可用音频格式";
-"Speed: %1$@ | Downloaded: %2$@ / %3$@ | Time left: about %4$@" = "速度：%1$@ | 已下载：%2$@ / %3$@ | 剩余时间：约 %4$@";
+"Speed: %@ | Downloaded: %@ / %@ | Time left: about %@" = "速度：%1$@ | 已下载：%2$@ / %3$@ | 剩余时间：约 %4$@";
 "Standard" = "标准";
 "Start" = "开始";
 "Start Transcription" = "开始转录";
