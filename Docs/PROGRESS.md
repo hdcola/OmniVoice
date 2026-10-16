@@ -341,6 +341,17 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       weights, and one-shot `HYMT15Translator.translateText` — plus floating
       panel toolbar/resize-cursor fixes (PR #41), the 启动时显示悬浮窗 toggle
       (PR #42), and the terminology unification pass (PR #43).
+- [x] **0.8.2 release cut** (2026-10-16, `chore/release-0.8.2`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.8.2,
+      `CFBundleVersion` 23), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.8.2]` section, `README.md` / `README.zh-CN.md` version and
+      download-link references bumped to match. The UI is localized in
+      English and 简体中文 (English source strings as keys, zh-Hans
+      `.strings`, English plurals via `.stringsdict`) with an Interface
+      language picker in Settings → General that applies after a restart
+      (PR #107); the Settings tab bar was reworked to fit longer English
+      labels, and AGENTS.md section 11 now ties user-facing wording to
+      `Docs/GLOSSARY.md`. No what's-new entry: nothing to opt into or grant.
 - [x] **0.8.1 release cut** (2026-10-15, `chore/release-0.8.1`): version
       bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.8.1,
       `CFBundleVersion` 22), CHANGELOG's `[Unreleased]` cut into a dated
