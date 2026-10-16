@@ -17,6 +17,7 @@ The format is based on Keep a Changelog.
 
 ### Documentation
 - docs(readme): localization is no longer a roadmap item (#107)
+- docs(repo): AGENTS.md requires user-facing wording to follow Docs/GLOSSARY.md and requires the glossary to be updated when user-facing concepts change (#107)
 
 ### Tests
 - test(i18n): core tests assert the English source strings; UI tests pin the app to zh-Hans (#107)
