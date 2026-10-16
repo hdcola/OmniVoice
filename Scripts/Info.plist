@@ -16,9 +16,9 @@
     <key>CFBundleIdentifier</key>
     <string>org.hdcola.omnivoice</string>
     <key>CFBundleVersion</key>
-    <string>22</string>
+    <string>23</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.8.1</string>
+    <string>0.8.2</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>

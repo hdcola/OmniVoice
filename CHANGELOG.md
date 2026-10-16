@@ -7,6 +7,20 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.8.2] - 2026-10-16
+
+### Added
 - feat(i18n): Settings → General → Interface language picks Follow system / English / 简体中文 (stored as the app's own `AppleLanguages` override, applied after a restart with a Restart Now button) (#107)
 - feat(i18n): the app UI is now localized in English and 简体中文 and follows the system language; English source strings are the keys, translations live in `Resources/<lang>.lproj` and are copied into the app bundle by `Scripts/build_app.sh`, microphone/speech permission prompts are localized via `InfoPlist.strings`, English count-dependent texts ("1 transcript" / "2 transcripts") are pluralized through `Resources/en.lproj/Localizable.stringsdict` (#107)
 
