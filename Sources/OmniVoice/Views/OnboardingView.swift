@@ -223,7 +223,7 @@ struct OnboardingView: View {
             }
             if isModeLocked {
                 SettingsDivider()
-                SettingsNote(text: String(localized: "Recording or model loading is in progress, so the run mode can't be changed right now; try again when it finishes."), tint: .orange)
+                SettingsNote(text: String(localized: "Transcription or model loading is in progress, so the run mode can't be changed right now; try again when it finishes."), tint: .orange)
             }
         }
         .disabled(isModeLocked)

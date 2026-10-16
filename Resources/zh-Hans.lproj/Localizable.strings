@@ -202,7 +202,7 @@
 "Launch at login" = "开机时自动启动";
 "Lightweight · Low memory" = "轻量级 · 低内存";
 "Listen to foreign" = "听外语";
-"Listen to foreign: captions translate foreign speech into my language; Speak my language: what I say is translated into the foreign language. The ⇄ in the Caption panel also switches it" = "听外语：字幕把外语译成我的语言；说我的语言：把我说的话译成外语。悬浮窗里的 ⇄ 也能切换";
+"Listen to foreign: captions translate foreign speech into my language; Speak my language: what I say is translated into the foreign language. The ⇄ in the Caption panel also switches it" = "听外语：字幕把外语译成我的语言；说我的语言：把我说的话译成外语。字幕悬浮窗里的 ⇄ 也能切换";
 "Load into memory ahead of time so the first translation or transcription doesn't wait" = "提前载入内存，首次翻译/转录无需等待";
 "Load models at launch" = "启动时加载模型";
 "Loaded in memory (ready)" = "已载入内存（就绪）";
@@ -329,7 +329,7 @@
 "Recommended · Automatic language detection" = "推荐 · 支持自动语种检测";
 "Recommended · Live preview" = "推荐 · 支持实时预览";
 "Recording" = "录制中";
-"Recording or model loading is in progress, so the run mode can't be changed right now; try again when it finishes." = "录音或模型加载进行中，暂时无法更换运行模式；完成后再试。";
+"Transcription or model loading is in progress, so the run mode can't be changed right now; try again when it finishes." = "转录或模型加载进行中，暂时无法更换运行模式；完成后再试。";
 "Releases" = "版本发布";
 "Rename Transcript" = "重命名转录记录";
 "Rename…" = "重命名…";
