@@ -15,11 +15,14 @@ struct GeneralSettingsView: View {
     @StateObject private var loginItem = LaunchAtLoginController()
     @AppStorage(PersistedLaunchKey.preloadMode) private var launchPreloadMode = LaunchPreloadMode.off
     @AppStorage(SystemNotifier.enabledKey) private var notificationsEnabled = true
+    @State private var interfaceLanguage = AppLanguage.stored()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 PermissionsSettingsCard(controller: selectionController)
+
+                interfaceLanguageCard
 
                 languageCard
 
@@ -31,6 +34,40 @@ struct GeneralSettingsView: View {
                 onboardingCard
             }
             .padding(16)
+        }
+    }
+
+    /// 界面语言 — the app's own UI language. Resolved once at launch (see
+    /// `AppLanguage`), so a change only shows after a restart.
+    private var interfaceLanguageCard: some View {
+        let needsRestart = AppLanguage.needsRestart(stored: interfaceLanguage)
+        return SettingsCard(title: String(localized: "Interface language"), icon: "textformat") {
+            SettingsRow(
+                title: String(localized: "Interface language"),
+                subtitle: needsRestart
+                    ? String(localized: "Restart OmniVoice to apply the new language.")
+                    : String(localized: "Language of menus and windows. Takes effect after restarting OmniVoice."),
+                subtitleTint: needsRestart ? .orange : .secondary
+            ) {
+                HStack(spacing: 8) {
+                    if needsRestart && AppRelauncher.canRelaunch {
+                        PillButton(title: String(localized: "Restart Now")) { AppRelauncher.relaunch() }
+                    }
+                    Picker("Interface language", selection: Binding(
+                        get: { interfaceLanguage },
+                        set: { interfaceLanguage = $0; AppLanguage.store($0) }
+                    )) {
+                        Text("Follow system").tag(AppLanguage.system)
+                        // Each language is named in itself, so it stays readable
+                        // when the UI is in the other one.
+                        Text(verbatim: "English").tag(AppLanguage.english)
+                        Text(verbatim: "简体中文").tag(AppLanguage.simplifiedChinese)
+                    }
+                    .labelsHidden()
+                    .accessibilityLabel("Interface language")
+                    .fixedSize()
+                }
+            }
         }
     }
 

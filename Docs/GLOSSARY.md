@@ -22,6 +22,7 @@ intentionally unchanged (renaming them would break persisted settings).
 | Memory used by loaded models | 内存 | Memory | — |
 | Global key bindings | 快捷键 | Shortcuts | `GlobalShortcut` |
 | Status-bar icon + menu | 菜单栏 | Menu bar | `MenuBarExtra` |
+| Language the app UI is shown in (Settings → General) | 界面语言（跟随系统 / English / 简体中文；重启后生效） | Interface language (Follow system) | `AppLanguage` |
 | Settings tabs | 通用 · 语音识别 · 语音输入 · 快捷翻译 · 模型库 · 关于 | General · Speech Recognition · Dictation · Quick Translate · Model Library · About | `SettingsTab` |
 
 Rules: never say plain "floating panel" / "悬浮窗" / "面板" without the

@@ -93,6 +93,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     var modelContainer: ModelContainer? { sessionStore?.container }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Pin which UI language this launch resolved, before Settings can
+        // change the stored override (see `AppLanguage`).
+        _ = AppLanguage.runningCode
         session.refreshDevices()
         SystemNotifier.installClickHandler()
 

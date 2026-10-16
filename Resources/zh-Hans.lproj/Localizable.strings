@@ -146,6 +146,7 @@
 "Fast & Lightweight mode" = "极速轻量模式";
 "Faster results (may be less accurate)" = "更快出结果（可能不够准确）";
 "Follow speech recognition (%@)" = "跟随语音识别设置（当前：%@）";
+"Follow system" = "跟随系统";
 "Follow transcription · %@" = "跟随转录 · %@";
 "Font size" = "字号";
 "For more natural voices or more languages: open it, then use the menu next to “System Voice” to download" = "更自然的声音或更多语言：打开后点「系统语音」旁的菜单下载";
@@ -187,10 +188,12 @@
 "Include system audio" = "包含系统声音";
 "Input Monitoring permission needed" = "需要授权输入监控";
 "Input Monitoring" = "输入监控";
+"Interface language" = "界面语言";
 "Italian" = "意大利语";
 "Japanese" = "日语";
 "Keep original" = "保持原话";
 "Korean" = "韩语";
+"Language of menus and windows. Takes effect after restarting OmniVoice." = "菜单和窗口使用的语言，重启 OmniVoice 后生效。";
 "Language support notice" = "语言支持提示";
 "Language to translate into. Default: My language is translated into the foreign language, any other language into My language." = "译成哪种语言。默认：我的语言译成外语，其他语言译成我的语言";
 "Language" = "语言";
@@ -322,13 +325,14 @@
 "Recommended · Automatic language detection" = "推荐 · 支持自动语种检测";
 "Recommended · Live preview" = "推荐 · 支持实时预览";
 "Recommended" = "推荐";
-"Transcribing" = "转录中";
 "Releases" = "版本发布";
 "Rename Transcript" = "重命名转录记录";
 "Rename…" = "重命名…";
 "Report an Issue" = "反馈问题";
 "Request timed out" = "请求超时";
 "Requires a local recognition model; System speech recognition needs a fixed language" = "需要本地识别模型；系统语音识别必须指定语种";
+"Restart Now" = "立即重启";
+"Restart OmniVoice to apply the new language." = "重启 OmniVoice 后应用新语言。";
 "Restore default" = "恢复默认";
 "Retry Now" = "立即重试";
 "Review permissions, run mode, and optional features (such as double ⌘C translate) again; your existing settings and downloaded models are kept" = "再次查看权限授权、运行模式和可选功能（如连按两次 ⌘C 翻译）；已有的设置和已下载的模型不会被清除";
@@ -447,6 +451,7 @@
 "Today" = "今天";
 "Traditional Chinese" = "繁体中文";
 "Transcribes your voice (live transcription, dictation)" = "转录你的声音（实时转录、语音输入）";
+"Transcribing" = "转录中";
 "Transcribing…" = "转录中…";
 "Transcript title" = "转录记录标题";
 "Transcription direction" = "转录方向";
