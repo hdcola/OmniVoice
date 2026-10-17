@@ -148,7 +148,7 @@ final class MediaPauserTests: XCTestCase {
         _ = CoreAudioPlaybackProbe().isOtherAudioPlaying()
     }
 
-    func testSystemServicesAreIgnoredButBrowsersAreNot() {
+    func testOnlyDedicatedPlayersCount() {
         XCTAssertTrue(CoreAudioPlaybackProbe.playerBundleIDs.contains("com.apple.Music"))
         XCTAssertTrue(CoreAudioPlaybackProbe.playerBundleIDs.contains("com.spotify.client"))
         XCTAssertFalse(CoreAudioPlaybackProbe.playerBundleIDs.contains("com.google.Chrome.helper"))
