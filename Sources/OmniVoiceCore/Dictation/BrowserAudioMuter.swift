@@ -47,6 +47,10 @@ public final class CoreAudioBrowserMuter: AudioMuter {
 
     public init() {}
 
+    /// Released while muted, the tap and device would keep the browser muted
+    /// until the process exits.
+    deinit { unmute() }
+
     /// Muting a silent tab costs nothing, so an open output is enough. One
     /// that is also recording is in a call, and the other side must stay
     /// audible.

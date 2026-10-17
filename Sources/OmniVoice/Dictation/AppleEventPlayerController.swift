@@ -85,6 +85,8 @@ struct AppleEventPlayerController: PlayerController {
             guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: player.bundleID) else { continue }
             var launched: NSRunningApplication?
             if pid(of: player) == nil {
+                // Already answered: starting it would only re-read that answer.
+                guard lastKnownAccess(player) == nil else { continue }
                 let configuration = NSWorkspace.OpenConfiguration()
                 configuration.activates = false
                 configuration.hides = true
@@ -101,6 +103,15 @@ struct AppleEventPlayerController: PlayerController {
             let access = await Task.detached { access(pid: pid, ask: true) }.value
             remember(access, for: player)
             launched?.terminate()
+        }
+    }
+
+    /// A closed player's denial can't be re-checked, so it would stand even
+    /// after the user turns it on in System Settings. Forgotten, it shows as
+    /// not running and `requestAccess` starts it to check again.
+    static func forgetDeniedAccessOfClosedPlayers() {
+        for player in players where pid(of: player) == nil && lastKnownAccess(player) == .denied {
+            UserDefaults.standard.removeObject(forKey: lastKnownAccessKey(player))
         }
     }
 

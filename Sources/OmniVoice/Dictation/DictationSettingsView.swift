@@ -162,6 +162,9 @@ private struct PlayerAccessRow: View {
     private func allow() {
         guard statuses.contains(where: { $0.access == .notDetermined || $0.access == .notRunning }) else {
             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!)
+            // A closed one can't be re-checked; the next click starts it to.
+            AppleEventPlayerController.forgetDeniedAccessOfClosedPlayers()
+            statuses = AppleEventPlayerController.accessStatus()
             return
         }
         isRequesting = true
