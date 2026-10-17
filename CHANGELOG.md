@@ -7,21 +7,21 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(asr): new Streaming Zipformer model speech recognition engine (sherpa-onnx, bilingual Chinese-English, about 360MB), selectable in Settings → Speech Recognition and downloadable from the Model Library; works for Live transcription and Dictation, whose Polish recognized text can tidy its unpunctuated output
-- feat(models): model packages made of several files can be downloaded and verified file by file, with one overall progress bar and a retry that skips files already fetched
+- feat(asr): new Streaming Zipformer model speech recognition engine (sherpa-onnx, bilingual Chinese-English, about 360MB), selectable in Settings → Speech Recognition and downloadable from the Model Library; works for Live transcription and Dictation, whose Polish recognized text can tidy its unpunctuated output (#114)
+- feat(models): model packages made of several files can be downloaded and verified file by file, with one overall progress bar and a retry that skips files already fetched (#114)
 
 ### Changed
 
 ### Fixed
 
 ### Dependencies
-- chore(deps): link prebuilt sherpa-onnx v1.13.8 (macOS arm64) from `third_party/sherpa-onnx`, fetched by `Scripts/setup_third_party.sh`
+- chore(deps): link prebuilt sherpa-onnx v1.13.8 (macOS arm64) from `third_party/sherpa-onnx`, fetched by `Scripts/setup_third_party.sh` (#114)
 
 ### Documentation
-- docs(setup): describe the sherpa-onnx setup step in `Docs/MODEL_ENGINE_SETUP.md`; add the Streaming Zipformer model to `Docs/GLOSSARY.md`
+- docs(setup): describe the sherpa-onnx setup step in `Docs/MODEL_ENGINE_SETUP.md`; add the Streaming Zipformer model to `Docs/GLOSSARY.md` (#114)
 
 ### Tests
-- test(asr): smoke test for the sherpa-onnx provider, skipped when the model is absent
+- test(asr): smoke test for the sherpa-onnx provider, skipped when the model is absent (#114)
 
 ## [0.8.2] - 2026-10-16
 
