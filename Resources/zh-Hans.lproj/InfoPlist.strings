@@ -1,2 +1,3 @@
 "NSMicrophoneUsageDescription" = "需要访问麦克风以进行实时语音识别与翻译。";
 "NSSpeechRecognitionUsageDescription" = "选择系统语音识别引擎时，需要使用语音识别以将麦克风/系统音频转录为文字。";
+"NSAppleEventsUsageDescription" = "语音输入时需要控制 Music 和 Spotify，以便暂停播放并在结束后恢复。";

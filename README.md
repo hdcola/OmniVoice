@@ -132,8 +132,8 @@ Recognition, Voice Input, Quick Translate, Model Library, About.
 
 Requested only when the feature needs them: Microphone and Speech
 Recognition (transcription), Screen Recording (system audio, ⌥S),
-Accessibility (⌥A, typing dictated text, pausing music and video while dictating), Input Monitoring (voice input,
-⌘C ⌘C).
+Accessibility (⌥A, typing dictated text, pausing music with the play/pause key during dictation), Input
+Monitoring (Dictation, ⌘C ⌘C).
 
 ## Building from source
 

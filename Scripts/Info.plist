@@ -35,6 +35,8 @@
     <string>OmniVoice needs microphone access for live speech recognition and translation.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>When the system speech recognition engine is selected, OmniVoice needs speech recognition to transcribe microphone/system audio into text.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>OmniVoice controls Music and Spotify to pause them while you dictate and resume them afterwards.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>
