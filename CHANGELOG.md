@@ -11,7 +11,7 @@ The format is based on Keep a Changelog.
 ### Changed
 
 ### Fixed
-- fix(dictation): starting a dictation no longer leaves Music open when nothing was playing — a Play/Pause press that launches Music is undone by quitting it again
+- fix(dictation): starting a dictation no longer launches Music (and steals the focus) when nothing was playing — music is only paused when a dedicated player app (Music, Spotify, …) is outputting audio; browser tabs no longer trigger the pause
 
 ### Dependencies
 

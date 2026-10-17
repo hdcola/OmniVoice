@@ -149,8 +149,9 @@ final class MediaPauserTests: XCTestCase {
     }
 
     func testSystemServicesAreIgnoredButBrowsersAreNot() {
-        XCTAssertTrue(CoreAudioPlaybackProbe.ignoredBundleIDs.contains("systemsoundserverd"))
-        XCTAssertFalse(CoreAudioPlaybackProbe.ignoredBundleIDs.contains("com.apple.WebKit.GPU"))
-        XCTAssertFalse(CoreAudioPlaybackProbe.ignoredBundleIDs.contains("com.apple.Music"))
+        XCTAssertTrue(CoreAudioPlaybackProbe.playerBundleIDs.contains("com.apple.Music"))
+        XCTAssertTrue(CoreAudioPlaybackProbe.playerBundleIDs.contains("com.spotify.client"))
+        XCTAssertFalse(CoreAudioPlaybackProbe.playerBundleIDs.contains("com.google.Chrome.helper"))
+        XCTAssertFalse(CoreAudioPlaybackProbe.playerBundleIDs.contains("systemsoundserverd"))
     }
 }

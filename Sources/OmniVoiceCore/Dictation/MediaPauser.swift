@@ -114,20 +114,29 @@ public final class MediaPauser {
 public struct CoreAudioPlaybackProbe: MediaPlaybackProbe {
     public init() {}
 
-    /// System services that make sound (alert sounds, calls, the screen
-    /// recorder) without being something the Play/Pause key controls.
-    static let ignoredBundleIDs: Set<String> = [
-        "systemsoundserverd",
-        "com.apple.controlcenter",
-        "com.apple.controlstrip",
-        "com.apple.TelephonyUtilities",
-        "com.apple.avconferenced",
-        "com.apple.PowerChime",
-        "com.apple.universalaccessd",
-        "com.apple.accessibility.heard",
-        "com.apple.assistantd",
-        "com.apple.CoreSpeech",
-        "com.apple.replayd",
+    /// Dedicated players that own "now playing". Only these count: with no
+    /// such app, the Play/Pause key makes macOS launch Music, which steals
+    /// the focus and breaks the typing. Browsers are left out — a tab can
+    /// hold an audio output open in silence, and the system's now-playing
+    /// state is closed to third-party apps, so playback can't be confirmed.
+    static let playerBundleIDs: Set<String> = [
+        "com.apple.Music",
+        "com.apple.iTunes",
+        "com.apple.podcasts",
+        "com.apple.TV",
+        "com.spotify.client",
+        "org.videolan.vlc",
+        "com.colliderli.iina",
+        "com.netease.163music",
+        "com.tencent.QQMusicMac",
+        "com.tencent.QQMusic",
+        "com.kugou.mac.KuGou",
+        "com.coppertino.Vox",
+        "com.tidal.desktop",
+        "com.amazon.music",
+        "com.deezer.Deezer",
+        "fm.last.Last.fm",
+        "io.mpv",
     ]
 
     public func isOtherAudioPlaying() -> Bool {
@@ -136,8 +145,7 @@ public struct CoreAudioPlaybackProbe: MediaPlaybackProbe {
             // Cheapest read first: nearly every process is silent.
             guard Self.isRunningOutput(object) else { continue }
             guard let pid = Self.pid(of: object), pid > 0, pid != ownPID else { continue }
-            if let bundleID = Self.bundleID(of: object), Self.ignoredBundleIDs.contains(bundleID) { continue }
-            return true
+            if let bundleID = Self.bundleID(of: object), Self.playerBundleIDs.contains(bundleID) { return true }
         }
         return false
     }
