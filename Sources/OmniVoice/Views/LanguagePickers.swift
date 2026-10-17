@@ -18,19 +18,18 @@ struct PanelPopoverOpenKey: PreferenceKey {
 struct SourceLanguagePicker: View {
     @Binding var sourceLanguageCode: String?
     let transcriptionEngineKind: EngineKind?
+    let transcriptionEngineID: String
     /// False while speaking in the user's own language — there is no
     /// "自动" for that side (see `LanguagePreferences.sourceLanguageCode`).
     var allowsAuto: Bool = true
     @State private var isAutoExplanationPresented = false
 
-    /// The system ASR engine can't recognize a handful of `LanguageCatalog`
-    /// entries at all (`supportsSystemASRSource == false`) — offering them
-    /// here while `.system` is selected would be a guaranteed-to-fail trap,
-    /// since picking one and hitting start throws every time.
+    /// An engine can't recognize every `LanguageCatalog` entry: the system
+    /// one drops a handful (`supportsSystemASRSource == false`), the
+    /// Streaming Zipformer model only knows Chinese and English. Offering
+    /// the rest would be a trap — picking one fails or produces nonsense.
     private var options: [LanguageOption] {
-        transcriptionEngineKind == .system
-            ? LanguageCatalog.common.filter(\.supportsSystemASRSource)
-            : LanguageCatalog.common
+        ProviderCatalog.sourceLanguageOptions(forEngineID: transcriptionEngineID)
     }
 
     /// Task 1.2 (源语言自动检测显性化) — "自动" stays in the list even under

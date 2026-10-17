@@ -541,5 +541,6 @@
 "✨ Auto-detect language (Auto)" = "✨ 自动检测语种 (Auto)";
 "⭐ Star us on GitHub" = "⭐ 在 GitHub 点个 Star";
 "🧹 Free Memory" = "🧹 释放内存占用";
-"Small streaming model with very low latency and little memory use. Text appears as you speak, without punctuation; Dictation’s “Polish recognized text” can tidy it up." = "延迟极低、内存占用很小的流式小模型。边说边出字，不带标点；语音输入的「润色识别结果」可以帮忙整理。";
+"Chinese and English streaming model with very low latency and little memory use. Text appears as you speak, without punctuation; Dictation’s “Polish recognized text” can tidy it up." = "只支持中文和英文的流式小模型，延迟极低、内存占用很小。边说边出字，不带标点；语音输入的「润色识别结果」可以帮忙整理。";
 "Chinese and English with code-switching, real-time streaming. About 360MB; English comes out in capitals without punctuation, which Dictation’s “Polish recognized text” can clean up." = "中英文混说，实时流式。约 360MB；英文为大写、不带标点，语音输入的「润色识别结果」可以帮忙整理。";
+"The Streaming Zipformer model does not support the source language after swapping" = "流式 Zipformer 模型不支持交换后的来源语言";

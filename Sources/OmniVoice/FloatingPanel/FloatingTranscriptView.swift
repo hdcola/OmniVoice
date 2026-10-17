@@ -255,6 +255,7 @@ struct FloatingTranscriptView: View {
         SourceLanguagePicker(
             sourceLanguageCode: $session.sourceLanguageCode,
             transcriptionEngineKind: session.transcriptionEngineKind,
+            transcriptionEngineID: session.transcriptionEngineID,
             allowsAuto: session.languages.transcriptionDirection == .listenForeign
         )
         .labelsHidden()

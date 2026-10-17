@@ -74,7 +74,9 @@ struct DictationSettingsView: View {
             ) {
                 Picker("Dictation language", selection: dictationLanguageSelection) {
                     Text("My language (\(languageName(session.languages.myLanguageCode)))").tag(DictationLanguageChoice.mine)
+                        .disabled(isUnsupportedForEngine(session.languages.myLanguageCode))
                     Text("Foreign language (\(languageName(session.languages.foreignLanguageCode)))").tag(DictationLanguageChoice.foreign)
+                        .disabled(isUnsupportedForEngine(session.languages.foreignLanguageCode))
                     Text(session.transcriptionEngineKind == .model ? String(localized: "Auto-detect") : String(localized: "Auto-detect (requires local model)"))
                         .tag(DictationLanguageChoice.auto)
                         .disabled(session.transcriptionEngineKind != .model)
@@ -115,10 +117,30 @@ struct DictationSettingsView: View {
         Binding(
             get: {
                 let choice = session.languages.dictationLanguage
-                return choice == .auto && session.transcriptionEngineKind != .model ? .mine : choice
+                if choice == .auto && session.transcriptionEngineKind != .model { return .mine }
+                // A side the engine can't recognize reads as auto-detect,
+                // which is what `dictationLanguageCode` then does.
+                if let code = side(of: choice), isUnsupportedForEngine(code) { return .auto }
+                return choice
             },
             set: { session.languages.dictationLanguage = $0 }
         )
+    }
+
+    private func side(of choice: DictationLanguageChoice) -> String? {
+        switch choice {
+        case .mine: return session.languages.myLanguageCode
+        case .foreign: return session.languages.foreignLanguageCode
+        case .auto: return nil
+        }
+    }
+
+    /// Only an engine with a short language list (the Streaming Zipformer
+    /// model) rules languages out here; the system engine's own gaps are
+    /// already handled by `RecordingSession.dictationLanguageCode`.
+    private func isUnsupportedForEngine(_ code: String) -> Bool {
+        ProviderCatalog.hasRestrictedSources(engineID: session.transcriptionEngineID)
+            && ProviderCatalog.isUnsupportedSource(code, engineID: session.transcriptionEngineID)
     }
 
     private func languageName(_ code: String) -> String {

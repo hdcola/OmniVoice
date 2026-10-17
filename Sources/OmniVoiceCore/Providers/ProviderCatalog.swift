@@ -144,7 +144,7 @@ public enum ProviderCatalog {
         EngineDescriptor(
             id: "model.sherpa", displayName: String(localized: "Streaming Zipformer model"), kind: .model,
             badge: String(localized: "Lightweight · Low latency"),
-            summary: String(localized: "Small streaming model with very low latency and little memory use. Text appears as you speak, without punctuation; Dictation’s “Polish recognized text” can tidy it up.")
+            summary: String(localized: "Chinese and English streaming model with very low latency and little memory use. Text appears as you speak, without punctuation; Dictation’s “Polish recognized text” can tidy it up.")
         ),
     ]
 
@@ -301,6 +301,42 @@ public enum ProviderCatalog {
             recommendedMemoryGB: 5
         ),
     ]
+
+    /// Source languages a local engine can recognize, for engines that cover
+    /// only a few (the sherpa bilingual model: Mandarin + English; Traditional
+    /// Chinese and Cantonese are different models). An engine absent here has
+    /// no restriction of its own.
+    private static let restrictedSourceCodes: [String: Set<String>] = [
+        "model.sherpa": ["zh-CN", "en-US"],
+    ]
+
+    /// Whether `code` can't be the recognizer's source with `engineID`.
+    /// `nil` is "auto": unsupported by the system engine (it needs a fixed
+    /// language), fine for a local model. Codes outside `LanguageCatalog`
+    /// (custom locales) are left to the system engine to accept or reject,
+    /// but are never in a restricted engine's list.
+    public static func isUnsupportedSource(_ code: String?, engineID: String) -> Bool {
+        if let allowed = restrictedSourceCodes[engineID] {
+            guard let code else { return false }
+            return !allowed.contains(code)
+        }
+        if transcriptionEngines.first(where: { $0.id == engineID })?.kind == .system {
+            guard let code else { return true }
+            return LanguageCatalog.common.first { $0.code == code }?.supportsSystemASRSource == false
+        }
+        return false
+    }
+
+    /// The `LanguageCatalog` entries `engineID` can recognize as a source.
+    public static func sourceLanguageOptions(forEngineID engineID: String) -> [LanguageOption] {
+        LanguageCatalog.common.filter { !isUnsupportedSource($0.code, engineID: engineID) }
+    }
+
+    /// Whether the engine has its own short list of recognizable languages,
+    /// as opposed to following the catalog (local R2T2) or the system.
+    public static func hasRestrictedSources(engineID: String) -> Bool {
+        restrictedSourceCodes[engineID] != nil
+    }
 
     /// Whether the engine reports a pause boundary the app should feed it
     /// (VAD → `notifyUtteranceBoundary()`). System ASR and the sherpa model

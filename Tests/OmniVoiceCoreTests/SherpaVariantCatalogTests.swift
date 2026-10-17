@@ -31,4 +31,32 @@ struct SherpaVariantCatalogTests {
         #expect(!ProviderCatalog.usesVADBoundary(engineID: "model.sherpa"))
         #expect(!ProviderCatalog.usesVADBoundary(engineID: "system.speech"))
     }
+
+    @Test func sourceLanguageSupportFollowsTheEngine() {
+        // Sherpa: Mandarin + English, and "auto" (it detects between them).
+        #expect(!ProviderCatalog.isUnsupportedSource("zh-CN", engineID: "model.sherpa"))
+        #expect(!ProviderCatalog.isUnsupportedSource("en-US", engineID: "model.sherpa"))
+        #expect(!ProviderCatalog.isUnsupportedSource(nil, engineID: "model.sherpa"))
+        #expect(ProviderCatalog.isUnsupportedSource("ja-JP", engineID: "model.sherpa"))
+        #expect(ProviderCatalog.isUnsupportedSource("zh-TW", engineID: "model.sherpa"))
+        #expect(ProviderCatalog.isUnsupportedSource("yue-CN", engineID: "model.sherpa"))
+        #expect(ProviderCatalog.sourceLanguageOptions(forEngineID: "model.sherpa").map(\.code) == ["zh-CN", "en-US"])
+        // System: the existing rule — no "auto", a few catalog languages out.
+        #expect(ProviderCatalog.isUnsupportedSource(nil, engineID: "system.speech"))
+        #expect(ProviderCatalog.isUnsupportedSource("ru-RU", engineID: "system.speech"))
+        #expect(!ProviderCatalog.isUnsupportedSource("ja-JP", engineID: "system.speech"))
+        // R2T2: no restriction of its own.
+        #expect(!ProviderCatalog.isUnsupportedSource("ru-RU", engineID: "model.r2t2"))
+        #expect(ProviderCatalog.sourceLanguageOptions(forEngineID: "model.r2t2") == LanguageCatalog.common)
+    }
+
+    @Test @MainActor func dictationLeavesAnUnsupportedLanguageToTheSherpaEnginesOwnDetection() {
+        typealias Session = RecordingSession
+        #expect(Session.resolveDictationLanguage(
+            choice: .mine, mine: "ja-JP", foreign: "en-US", isModelEngine: true, engineID: "model.sherpa") == nil)
+        #expect(Session.resolveDictationLanguage(
+            choice: .foreign, mine: "ja-JP", foreign: "en-US", isModelEngine: true, engineID: "model.sherpa") == "en-US")
+        #expect(Session.resolveDictationLanguage(
+            choice: .mine, mine: "ja-JP", foreign: "en-US", isModelEngine: true, engineID: "model.r2t2") == "ja-JP")
+    }
 }
