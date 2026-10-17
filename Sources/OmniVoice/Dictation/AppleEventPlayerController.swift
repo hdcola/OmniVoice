@@ -69,9 +69,9 @@ struct AppleEventPlayerController: PlayerController {
             guard isInstalled(player) else { return (player, .notInstalled) }
             // Not running, macOS won't say; the last answer seen stands in.
             guard let pid = pid(of: player) else { return (player, lastKnownAccess(player) ?? .notRunning) }
-            let access = access(pid: pid, ask: false)
-            remember(access, for: player)
-            return (player, access)
+            let answer = Self.access(pid: pid, ask: false)
+            remember(answer, for: player)
+            return (player, answer)
         }
     }
 
@@ -100,8 +100,8 @@ struct AppleEventPlayerController: PlayerController {
             }
             guard let pid = launched?.processIdentifier ?? pid(of: player) else { continue }
             // Blocks until answered (at once if already decided).
-            let access = await Task.detached { access(pid: pid, ask: true) }.value
-            remember(access, for: player)
+            let answer: Access = await Task.detached { Self.access(pid: pid, ask: true) }.value
+            remember(answer, for: player)
             launched?.terminate()
         }
     }
