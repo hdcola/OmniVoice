@@ -44,12 +44,74 @@ final class MediaPauserTests: XCTestCase {
         }
     }
 
+    private final class FakeMuter: AudioMuter {
+        var hasSomethingToMute = true
+        var mutes = 0
+        var unmutes = 0
+        func mute() -> Bool {
+            mutes += 1
+            return hasSomethingToMute
+        }
+        func unmute() { unmutes += 1 }
+    }
+
     private let music = PlayerHandle(bundleID: "com.apple.Music", pid: 101)
     private let spotify = PlayerHandle(bundleID: "com.spotify.client", pid: 102)
 
     private var time: TimeInterval = 0
-    private func makePauser(_ fake: Fake, players: FakePlayers = FakePlayers()) -> MediaPauser {
-        MediaPauser(probe: fake, sender: fake, players: players, now: { [unowned self] in time })
+    private func makePauser(_ fake: Fake, players: FakePlayers = FakePlayers(), muter: FakeMuter = FakeMuter()) -> MediaPauser {
+        MediaPauser(probe: fake, sender: fake, players: players, muter: muter, now: { [unowned self] in time })
+    }
+
+    func testBrowsersAreMutedAndUnmutedOnce() {
+        let fake = Fake()
+        let muter = FakeMuter()
+        let pauser = makePauser(fake, muter: muter)
+        pauser.pauseIfPlaying()
+        pauser.pauseIfPlaying()
+        XCTAssertEqual(muter.mutes, 1)
+        pauser.resumeIfWePaused()
+        pauser.resumeIfWePaused()
+        XCTAssertEqual(muter.unmutes, 1)
+        XCTAssertEqual(fake.presses, 0)
+    }
+
+    func testNothingMutedMeansNothingToUnmute() {
+        let muter = FakeMuter()
+        muter.hasSomethingToMute = false
+        let pauser = makePauser(Fake(), muter: muter)
+        pauser.pauseIfPlaying()
+        pauser.resumeIfWePaused()
+        XCTAssertEqual(muter.unmutes, 0)
+    }
+
+    /// Muting needs no Accessibility, unlike the key.
+    func testBrowsersAreMutedWithoutTheKey() {
+        let muter = FakeMuter()
+        let pauser = makePauser(Fake(), muter: muter)
+        pauser.pauseIfPlaying(useKey: false)
+        pauser.resumeIfWePaused()
+        XCTAssertEqual(muter.mutes, 1)
+        XCTAssertEqual(muter.unmutes, 1)
+    }
+
+    func testMutingCommandsAndKeyWorkTogether() {
+        let fake = Fake()
+        fake.playing = true
+        let players = FakePlayers()
+        players.playing = [spotify: true]
+        let muter = FakeMuter()
+        let pauser = makePauser(fake, players: players, muter: muter)
+        pauser.pauseIfPlaying()
+        XCTAssertEqual(players.pauses, [spotify])
+        XCTAssertEqual(muter.mutes, 1)
+        XCTAssertEqual(fake.presses, 1)
+        time = 5
+        fake.stale = nil
+        pauser.resumeIfWePaused()
+        XCTAssertEqual(players.plays, [spotify])
+        XCTAssertEqual(muter.unmutes, 1)
+        XCTAssertEqual(fake.presses, 2)
     }
 
     func testCommandedPlayerIsPausedAndResumedWithoutTheKey() {

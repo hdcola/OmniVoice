@@ -54,7 +54,8 @@ public struct NoPlayerController: PlayerController {
 /// afterwards — but only if this paused it.
 ///
 /// Players the `PlayerController` reaches are paused and resumed by their own
-/// commands, each exactly the one it paused. Everything else falls back to
+/// commands, each exactly the one it paused. Browsers are muted by the
+/// `AudioMuter` instead of paused. Everything else falls back to
 /// the media key, which goes to whichever app owns "now playing" and is a
 /// toggle, so it
 /// is never sent blind: starting needs something audibly playing, and
@@ -73,6 +74,8 @@ public final class MediaPauser {
     private let probe: any MediaPlaybackProbe
     private let sender: any MediaKeySender
     private let players: any PlayerController
+    private let muter: any AudioMuter
+    private var didMute = false
     /// Players this paused by command, to resume by command.
     private var pausedPlayers: [PlayerHandle] = []
     /// Players the controller handles, left out of the media key's probe so
@@ -88,18 +91,21 @@ public final class MediaPauser {
         probe: any MediaPlaybackProbe = CoreAudioPlaybackProbe(),
         sender: any MediaKeySender,
         players: any PlayerController = NoPlayerController(),
+        muter: any AudioMuter = NoAudioMuter(),
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
     ) {
         self.probe = probe
         self.sender = sender
         self.players = players
+        self.muter = muter
         self.now = now
     }
 
-    /// `useKey` false leaves the media key out (it can't be posted) and
-    /// pauses only the players controlled directly.
+    /// `useKey` false leaves the media key out (it can't be posted): only
+    /// the players controlled directly are paused, and browsers muted.
     public func pauseIfPlaying(useKey: Bool = true) {
         pauseControlledPlayers()
+        if !didMute { didMute = muter.mute() }
         if useKey { pauseByKey() }
     }
 
@@ -137,6 +143,10 @@ public final class MediaPauser {
         // By process: a player quit meanwhile stays quit.
         for player in pausedPlayers { players.play(player) }
         pausedPlayers = []
+        if didMute {
+            muter.unmute()
+            didMute = false
+        }
         guard didPause else { return }
         didPause = false
         // Never second-guessed with the probe: a paused browser keeps its
@@ -212,66 +222,13 @@ public struct CoreAudioPlaybackProbe: MediaPlaybackProbe {
 
     public func isOtherAudioPlaying(excluding excluded: Set<String>) -> Bool {
         let ownPID = ProcessInfo.processInfo.processIdentifier
-        for object in Self.processObjects() {
+        for object in AudioProcesses.objects() {
             // Cheapest read first: nearly every process is silent.
-            guard Self.isRunningOutput(object) else { continue }
-            guard let pid = Self.pid(of: object), pid > 0, pid != ownPID else { continue }
-            if let bundleID = Self.bundleID(of: object), Self.playerBundleIDs.contains(bundleID),
+            guard AudioProcesses.isRunningOutput(object) else { continue }
+            guard let pid = AudioProcesses.pid(of: object), pid > 0, pid != ownPID else { continue }
+            if let bundleID = AudioProcesses.bundleID(of: object), Self.playerBundleIDs.contains(bundleID),
                !excluded.contains(bundleID) { return true }
         }
         return false
-    }
-
-    private static func processObjects() -> [AudioObjectID] {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyProcessObjectList,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var size: UInt32 = 0
-        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr,
-              size > 0 else { return [] }
-        var objects = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
-        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &objects) == noErr
-        else { return [] }
-        // A process may have gone between the size query and the read.
-        return Array(objects.prefix(Int(size) / MemoryLayout<AudioObjectID>.size))
-    }
-
-    private static func bundleID(of object: AudioObjectID) -> String? {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioProcessPropertyBundleID,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var bundleID: Unmanaged<CFString>?
-        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
-        guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &bundleID) == noErr,
-              let bundleID else { return nil }
-        return bundleID.takeRetainedValue() as String
-    }
-
-    private static func pid(of object: AudioObjectID) -> pid_t? {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioProcessPropertyPID,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var pid: pid_t = 0
-        var size = UInt32(MemoryLayout<pid_t>.size)
-        guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &pid) == noErr else { return nil }
-        return pid
-    }
-
-    private static func isRunningOutput(_ object: AudioObjectID) -> Bool {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioProcessPropertyIsRunningOutput,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var running: UInt32 = 0
-        var size = UInt32(MemoryLayout<UInt32>.size)
-        guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &running) == noErr else { return false }
-        return running != 0
     }
 }

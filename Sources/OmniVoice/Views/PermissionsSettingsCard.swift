@@ -7,7 +7,7 @@ import SwiftUI
 enum PermissionCopy {
     static let microphone = String(localized: "Transcribes your voice (live transcription, dictation)")
     static let screenRecording = String(localized: "Captures system audio (meetings, online classes) and powers screenshot translation; screenshots are recognized on this Mac only and never uploaded")
-    static let accessibility = String(localized: "Reads selected text in other apps, pastes dictated text at the cursor, and pauses and resumes music and video during dictation (by sending the play/pause key); without it you can copy the selection and paste it into the Translation panel, and music is only paused in Music and Spotify, if you allowed controlling them")
+    static let accessibility = String(localized: "Reads selected text in other apps, pastes dictated text at the cursor, and pauses and resumes music during dictation (by sending the play/pause key); without it you can copy the selection and paste it into the Translation panel, and music is only paused in Music and Spotify, if you allowed controlling them (browsers are still muted)")
     static let inputMonitoring = String(localized: "Detects the double ⌘C press and the dictation trigger key; only those keys are checked, nothing else is recorded")
 }
 

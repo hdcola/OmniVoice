@@ -139,7 +139,11 @@ final class DictationController: ObservableObject {
     private var machine: DictationTriggerMachine
     private let hud = DictationHUDPanel()
     private let returnInterceptor = DictationReturnInterceptor()
-    private let mediaPauser = MediaPauser(sender: SystemMediaKeySender(), players: AppleEventPlayerController())
+    private let mediaPauser = MediaPauser(
+        sender: SystemMediaKeySender(),
+        players: AppleEventPlayerController(),
+        muter: CoreAudioBrowserMuter()
+    )
     private let translator: SelectionTranslator
     /// The engine the user picked for translating (a `SelectionTranslationEngine` ID).
     private let translationEngineID: () -> String

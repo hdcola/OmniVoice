@@ -57,7 +57,7 @@ struct DictationSettingsView: View {
             SettingsDivider()
             SettingsRow(
                 title: String(localized: "Pause music during dictation"),
-                subtitle: String(localized: "Pauses playing music or video when you start speaking and resumes it afterwards; only content paused by this feature is resumed.")
+                subtitle: String(localized: "Pauses playing music when you start speaking and resumes it afterwards; browser audio, such as a video, is muted instead and keeps playing. Only what this feature paused or muted is restored.")
             ) {
                 Toggle("Pause music during dictation", isOn: $controller.pauseMediaEnabled)
                     .labelsHidden()
