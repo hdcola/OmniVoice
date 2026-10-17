@@ -8,7 +8,8 @@ The format is based on Keep a Changelog.
 
 ### Added
 - feat(asr): new Streaming Zipformer model speech recognition engine (sherpa-onnx, bilingual Chinese-English, about 360MB), selectable in Settings → Speech Recognition and downloadable from the Model Library; works for Live transcription and Dictation, whose Polish recognized text can tidy its unpunctuated output (#114)
-- feat(asr): the Streaming Zipformer model only offers Chinese and English as source languages (source picker in the Caption panel, My language / Foreign language, ⇄ swap, Dictation language), and switching to it repairs a language it cannot recognize, as System speech recognition already does (#114)
+- feat(asr): the Streaming Zipformer model engine now offers nine models to choose from in Settings → Speech Recognition and the Model Library: Zipformer bilingual (zh-en), Chinese 2025 (transducer and CTC), Chinese small CTC, Chinese multi-dataset, Chinese 14M, Paraformer bilingual (zh-en), Paraformer trilingual (Mandarin, Cantonese, English) and a Zipformer covering eight languages; sizes from about 25MB to 360MB (#114)
+- feat(asr): each Streaming Zipformer model only offers the source languages it can recognize (for example Chinese only, or Mandarin, Cantonese and English) (source picker in the Caption panel, My language / Foreign language, ⇄ swap, Dictation language), and switching to it repairs a language it cannot recognize, as System speech recognition already does (#114)
 - feat(models): model packages made of several files can be downloaded and verified file by file, with one overall progress bar and a retry that skips files already fetched (#114)
 
 ### Changed

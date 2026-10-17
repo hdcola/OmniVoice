@@ -18,7 +18,14 @@ enum SherpaTranscriberError: LocalizedError {
     }
 }
 
-/// Streaming transducer ASR (e.g. the bilingual zh-en Zipformer) in-process
+/// How a streaming model package is wired into sherpa's config.
+private enum ModelLayout {
+    case transducer(String, String, String)
+    case paraformer(String, String)
+    case zipformer2Ctc(String)
+}
+
+/// Streaming ASR (Zipformer transducer or CTC, Paraformer) in-process
 /// via sherpa-onnx's C API. Unlike `InProcessTranscriber` (R2T2, append-only
 /// deltas), sherpa reports the *whole current utterance* on every decode, so
 /// this surfaces `onPartial` (full-replace hypothesis) and `onSegmentFinal`
@@ -37,9 +44,11 @@ final class SherpaOnnxTranscriber: @unchecked Sendable {
     private var lastPartial = ""
     private let sampleRate = 16_000
 
-    /// `modelDir` holds `encoder*.onnx`, `decoder*.onnx`, `joiner*.onnx` and
-    /// `tokens.txt` — the layout of the `sherpa-onnx-streaming-zipformer-*`
-    /// packages. int8 encoder/joiner files win when both precisions exist.
+    /// `modelDir` holds one streaming model package, whose kind is read from
+    /// its files: `encoder`/`decoder`/`joiner` `.onnx` is a transducer
+    /// (Zipformer), `encoder`/`decoder` alone a Paraformer, a single `model*.onnx`
+    /// a Zipformer2 CTC; all with `tokens.txt`. int8 files win when both
+    /// precisions exist.
     func loadModel(modelDir: URL) throws {
         try queue.sync {
             guard recognizer == nil else { return }
@@ -49,9 +58,17 @@ final class SherpaOnnxTranscriber: @unchecked Sendable {
                 return (hits.first { $0.contains("int8") } ?? hits.first).map { modelDir.appendingPathComponent($0).path }
             }
             let tokens = modelDir.appendingPathComponent("tokens.txt").path
-            guard let encoder = pick("encoder"), let decoder = pick("decoder"), let joiner = pick("joiner"),
-                  FileManager.default.fileExists(atPath: tokens)
-            else { throw SherpaTranscriberError.modelMissing(modelDir.path) }
+            guard FileManager.default.fileExists(atPath: tokens) else {
+                throw SherpaTranscriberError.modelMissing(modelDir.path)
+            }
+            let layout: ModelLayout
+            if let encoder = pick("encoder"), let decoder = pick("decoder") {
+                layout = pick("joiner").map { .transducer(encoder, decoder, $0) } ?? .paraformer(encoder, decoder)
+            } else if let model = pick("model") {
+                layout = .zipformer2Ctc(model)
+            } else {
+                throw SherpaTranscriberError.modelMissing(modelDir.path)
+            }
 
             // The C config holds borrowed pointers, so keep the strdup'd
             // strings alive until the recognizer has copied what it needs.
@@ -66,9 +83,17 @@ final class SherpaOnnxTranscriber: @unchecked Sendable {
             var config = SherpaOnnxOnlineRecognizerConfig()
             config.feat_config.sample_rate = Int32(sampleRate)
             config.feat_config.feature_dim = 80
-            config.model_config.transducer.encoder = cstr(encoder)
-            config.model_config.transducer.decoder = cstr(decoder)
-            config.model_config.transducer.joiner = cstr(joiner)
+            switch layout {
+            case .transducer(let encoder, let decoder, let joiner):
+                config.model_config.transducer.encoder = cstr(encoder)
+                config.model_config.transducer.decoder = cstr(decoder)
+                config.model_config.transducer.joiner = cstr(joiner)
+            case .paraformer(let encoder, let decoder):
+                config.model_config.paraformer.encoder = cstr(encoder)
+                config.model_config.paraformer.decoder = cstr(decoder)
+            case .zipformer2Ctc(let model):
+                config.model_config.zipformer2_ctc.model = cstr(model)
+            }
             config.model_config.tokens = cstr(tokens)
             config.model_config.num_threads = 2
             config.model_config.provider = cstr("cpu")
@@ -155,7 +180,11 @@ final class SherpaOnnxTranscriber: @unchecked Sendable {
     private func currentTextLocked(recognizer: OpaquePointer, stream: OpaquePointer) -> String {
         guard let result = SherpaOnnxGetOnlineStreamResult(recognizer, stream) else { return "" }
         defer { SherpaOnnxDestroyOnlineRecognizerResult(result) }
-        return result.pointee.text.map { String(cString: $0) }?.trimmingCharacters(in: .whitespaces) ?? ""
+        guard let raw = result.pointee.text.map({ String(cString: $0) }) else { return "" }
+        // Some models emit their unknown-token literally.
+        return raw.replacingOccurrences(of: "<unk>", with: "")
+            .split(separator: " ", omittingEmptySubsequences: true).joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
     }
 
     private func destroyStreamLocked() {

@@ -96,16 +96,16 @@ in-process. `Scripts/setup_third_party.sh` unpacks the prebuilt macOS arm64
 libs (no TTS) into `third_party/sherpa-onnx/{include,lib}` — `Package.swift`
 links `libsherpa-onnx-c-api.dylib` from there, so the build needs it.
 
-The engine is selectable as 流式 Zipformer 模型 (`model.sherpa`) and its
-files download from the Model Library into
-`Application Support/OmniVoice/Models/sherpa-zipformer-bilingual-zh-en/`.
-For development, the smoke test
-(`SherpaTranscriptionProviderTests`) runs only when an unpacked streaming
-Zipformer model sits in `models/sherpa-zipformer-bilingual-zh-en/`
-(`encoder-/decoder-/joiner-epoch-99-avg-1.onnx`, `tokens.txt`,
-`test_wavs/0.wav`, from
-`csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20`), or
-`SHERPA_MODEL_DIR` points at another one.
+The engine is selectable as 流式 Zipformer 模型 (`model.sherpa`); nine models
+(`ProviderCatalog.sherpaVariants`) download from the Model Library into
+`Application Support/OmniVoice/Models/<variant id>/`. The loader recognizes a
+package's kind from its files (transducer, Paraformer or Zipformer2 CTC).
+
+For development, `SherpaTranscriptionProviderTests` runs one case per model
+package found in `models/sherpa-<variant id>/` (the files listed for that
+variant in `ProviderCatalog`, from the pinned
+`csukuangfj/sherpa-onnx-streaming-*` Hugging Face revision), using the clip
+`models/sherpa-test-wavs/0.wav`. Cases without their files are skipped.
 
 ## Verifying the setup
 

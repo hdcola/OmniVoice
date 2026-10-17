@@ -256,6 +256,7 @@ struct FloatingTranscriptView: View {
             sourceLanguageCode: $session.sourceLanguageCode,
             transcriptionEngineKind: session.transcriptionEngineKind,
             transcriptionEngineID: session.transcriptionEngineID,
+            transcriptionVariantID: session.currentTranscriptionModelVariant?.id,
             allowsAuto: session.languages.transcriptionDirection == .listenForeign
         )
         .labelsHidden()

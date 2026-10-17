@@ -85,13 +85,18 @@ public struct ModelVariant: Identifiable, Hashable, Codable, Sendable {
     /// holding exactly these files (`ModelDownloadManager.localURL(for:)` is
     /// that directory) and `downloadURL`/`sha256` stay nil.
     public let files: [ModelFile]
+    /// Source languages (`LanguageCatalog` codes) this variant can recognize,
+    /// for a model that covers only a few; nil means no restriction of its own.
+    public let sourceLanguageCodes: [String]?
 
     public init(
         id: String, engineID: String, displayName: String, quantization: String,
         approximateSizeMB: Int, downloadURL: URL? = nil, sha256: String? = nil,
-        summary: String = "", recommendedMemoryGB: Int = 0, files: [ModelFile] = []
+        summary: String = "", recommendedMemoryGB: Int = 0, files: [ModelFile] = [],
+        sourceLanguageCodes: [String]? = nil
     ) {
         self.files = files
+        self.sourceLanguageCodes = sourceLanguageCodes
         self.id = id
         self.engineID = engineID
         self.displayName = displayName
@@ -144,7 +149,7 @@ public enum ProviderCatalog {
         EngineDescriptor(
             id: "model.sherpa", displayName: String(localized: "Streaming Zipformer model"), kind: .model,
             badge: String(localized: "Lightweight · Low latency"),
-            summary: String(localized: "Chinese and English streaming model with very low latency and little memory use. Text appears as you speak, without punctuation; Dictation’s “Polish recognized text” can tidy it up.")
+            summary: String(localized: "Small streaming models with very low latency and little memory use; pick the one for your languages. Text appears as you speak, without punctuation; Dictation’s “Polish recognized text” can tidy it up.")
         ),
     ]
 
@@ -169,6 +174,139 @@ public enum ProviderCatalog {
     /// Model variants are keyed by `engineID` so a settings UI can filter
     /// "what sizes/quantizations exist for the currently-selected model
     /// engine" without switching on the engine identity itself.
+    /// sherpa-onnx streaming models on Hugging Face (`csukuangfj/…`), pinned to
+    /// a revision. Sizes and hashes match the files' LFS metadata; only the
+    /// files the loader needs are listed (int8 where one exists). The first
+    /// entry is the engine's default.
+    private static let sherpaVariants: [ModelVariant] = [
+        sherpaVariant(
+            id: "sherpa-zipformer-bilingual-zh-en", name: "Zipformer Bilingual (zh-en)", quantization: "FP32", sizeMB: 341,
+            repo: "sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20",
+            revision: "98590b7ed6443e77b714204da2757d75e1a642f4",
+            files: [
+                ("encoder-epoch-99-avg-1.onnx", 330_083_505, "709f0ed53a734b7942f170127e7547b566cb29c4afc5e67719f314c3d63ccb10"),
+                ("decoder-epoch-99-avg-1.onnx", 13_876_452, "2e3b5ec371f8899ee6acd829fd753ba45772df57a91bdf37cde3136354e7db7d"),
+                ("joiner-epoch-99-avg-1.onnx", 12_833_618, "5f2adc585dd1bec6421c8bb8660d2a73fc8b9ceb24491ef51399ba2a2f0fc31b"),
+                ("tokens.txt", 56_317, "a8e0e4ec53810e433789b54a5c0134a7eaa2ffca595a6334d54c00da858841d3"),
+            ],
+            sourceLanguageCodes: ["zh-CN", "en-US"],
+            summary: String(localized: "Chinese and English with code-switching, real-time streaming. About 360MB; English comes out in capitals without punctuation, which Dictation’s “Polish recognized text” can clean up.")
+        ),
+        sherpaVariant(
+            id: "sherpa-zipformer-zh-2025", name: "Zipformer Chinese (2025)", quantization: "INT8", sizeMB: 160,
+            repo: "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30",
+            revision: "ad658fa0201659a09ea3c176129a191c77ecae8f",
+            files: [
+                ("encoder.int8.onnx", 161_141_793, "5ac51e27981bb4dab01bb9be4958453ba50c3b61c063ddda0eab23fd3671aa4f"),
+                ("decoder.onnx", 5_165_083, "06522ad63cec0fdf6809f4e1db9bb4f7d710c34582e3b35db62ac60eccafac7e"),
+                ("joiner.int8.onnx", 1_033_416, "b34584dc6f561089e1d747fedebb3765f2caa72c927ef54d7ca55e5ae40a814b"),
+                ("tokens.txt", 20_628, "6193c7ea1c96d0d9a1e9652789b40d13a8a913b434a5451e93158f5a09fd6652"),
+            ],
+            sourceLanguageCodes: ["zh-CN"],
+            summary: String(localized: "Newer (2025) Chinese-only streaming model, about 170MB. Mandarin only: English words are not recognized.")
+        ),
+        sherpaVariant(
+            id: "sherpa-zipformer-ctc-zh-2025", name: "Zipformer CTC Chinese (2025)", quantization: "INT8", sizeMB: 155,
+            repo: "sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30",
+            revision: "f29132af655b91f258800df19c5b5d9b9281a5cd",
+            files: [
+                ("model.int8.onnx", 162_290_887, "24ffdc19ba9aaed5a6a9beaede1e087745217d82425cf4041bca0c696661801e"),
+                ("tokens.txt", 20_628, "6193c7ea1c96d0d9a1e9652789b40d13a8a913b434a5451e93158f5a09fd6652"),
+            ],
+            sourceLanguageCodes: ["zh-CN"],
+            summary: String(localized: "CTC version of the 2025 Chinese model, about 160MB, a single model file. Mandarin only: English words are not recognized.")
+        ),
+        sherpaVariant(
+            id: "sherpa-zipformer-small-ctc-zh", name: "Zipformer CTC Chinese (small)", quantization: "INT8", sizeMB: 26,
+            repo: "sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01",
+            revision: "a5f60fe00dcfbaf68fcc1c6b5cf53061e144d6da",
+            files: [
+                ("model.int8.onnx", 26_342_340, "68c9c943840f7d9cf3e8a4970ba50f404feb5277f611fa82b7e72267786fa84a"),
+                ("tokens.txt", 13_366, "6fed8c6c248516f38e7faa19404b57413e8ce259f1cbc1fa4aebc86eac32fdfd"),
+            ],
+            sourceLanguageCodes: ["zh-CN"],
+            summary: String(localized: "The smallest Chinese streaming model here, about 26MB, for low-end Macs. Mandarin only.")
+        ),
+        sherpaVariant(
+            id: "sherpa-zipformer-multi-zh-hans", name: "Zipformer Chinese (multi-dataset)", quantization: "INT8", sizeMB: 73,
+            repo: "sherpa-onnx-streaming-zipformer-multi-zh-hans-int8-2023-12-13",
+            revision: "115a233a980d0a38536c8320e5c54f2fd2aa5416",
+            files: [
+                ("encoder-epoch-20-avg-1-chunk-16-left-128.int8.onnx", 70_104_213, "d6380c74c75aaf37a739061a9197440fc5ca3f73ee339e588268eff2e9d3bf84"),
+                ("decoder-epoch-20-avg-1-chunk-16-left-128.onnx", 5_165_084, "93f0df50c2834fe225bbabd664d59fc2488b15736fbc6acaabddec3188dea9b4"),
+                ("joiner-epoch-20-avg-1-chunk-16-left-128.int8.onnx", 1_033_417, "7fa442b8b35b1ab217dbceadb57a7da5388ee445c6c722eab576a57071e0dcea"),
+                ("tokens.txt", 18_626, "6722bd1585f46f84456b29c3550a343a3cc375b971645773c02ed8e0b4e2405c"),
+            ],
+            sourceLanguageCodes: ["zh-CN"],
+            summary: String(localized: "Chinese streaming model trained on several datasets, about 76MB. Mandarin only.")
+        ),
+        sherpaVariant(
+            id: "sherpa-zipformer-zh-14m", name: "Zipformer Chinese (14M)", quantization: "INT8", sizeMB: 25,
+            repo: "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23",
+            revision: "204ad334e2e683fd295359930cc16fc0432a23ac",
+            files: [
+                ("encoder-epoch-99-avg-1.int8.onnx", 21_621_684, "1c556ea57cec304e55ec4b72e52c1cc098bb01476ed7d90f3de939fe126487b1"),
+                ("decoder-epoch-99-avg-1.int8.onnx", 1_888_682, "22f123bb8cba9b38974b3df18a3f45e7081f4985ebb2e075d9f21f618c468bbf"),
+                ("joiner-epoch-99-avg-1.int8.onnx", 1_795_562, "a7cf9d82757bdcf786059454495a9ca95e4bd7347f72473fc08d794475c36169"),
+                ("tokens.txt", 48_697, "8b294db9045d6e5f94647f4c1eec1af4da143a75053c399611444b378ff966ac"),
+            ],
+            sourceLanguageCodes: ["zh-CN"],
+            summary: String(localized: "Ultra-light 14M-parameter Chinese model, about 25MB, lowest memory use. Mandarin only.")
+        ),
+        sherpaVariant(
+            id: "sherpa-paraformer-bilingual-zh-en", name: "Paraformer Bilingual (zh-en)", quantization: "INT8", sizeMB: 227,
+            repo: "sherpa-onnx-streaming-paraformer-bilingual-zh-en",
+            revision: "8e40c43232a1c5c66c82111efc5820d3accca11b",
+            files: [
+                ("encoder.int8.onnx", 165_462_184, "81a70226a8934e6ed92aa1d4fc486b428b5398e2f2619ed4897b7294cab90e9a"),
+                ("decoder.int8.onnx", 71_664_561, "f3cca9f77bb9d93c8fcbfb63ae617b6b1ee96818df3aa3b151c40658fe38594f"),
+                ("tokens.txt", 75_756, "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6"),
+            ],
+            sourceLanguageCodes: ["zh-CN", "en-US"],
+            summary: String(localized: "Chinese (Mandarin and dialects) and English, about 240MB. Strong on accented and regional Chinese.")
+        ),
+        sherpaVariant(
+            id: "sherpa-paraformer-trilingual-zh-yue-en", name: "Paraformer Trilingual (zh-yue-en)", quantization: "INT8", sizeMB: 228,
+            repo: "sherpa-onnx-streaming-paraformer-trilingual-zh-cantonese-en",
+            revision: "86931b152d37c908528b44d30b431c24a19770da",
+            files: [
+                ("encoder.int8.onnx", 166_362_800, "6047a644b41b236d9d8e89e3b94ef39d1b7037daab028131b722ca52e10b0357"),
+                ("decoder.int8.onnx", 72_062_549, "545427acf508452b7d89969be082c8128c681e3432ff43aef09f6159f4b61a7e"),
+                ("tokens.txt", 81_289, "45b31504211675dd52aa88f998a6f6161703a2834e86760c1cda645a22538085"),
+            ],
+            sourceLanguageCodes: ["zh-CN", "yue-CN", "en-US"],
+            summary: String(localized: "Mandarin, Cantonese and English, about 240MB. The only streaming model here that recognizes Cantonese.")
+        ),
+        sherpaVariant(
+            id: "sherpa-zipformer-multilingual-8", name: "Zipformer Multilingual (8 languages)", quantization: "INT8", sizeMB: 324,
+            repo: "sherpa-onnx-streaming-zipformer-ar_en_id_ja_ru_th_vi_zh-2025-02-10",
+            revision: "c6726c1147387ad2a11148b33973135d92a55e6c",
+            files: [
+                ("encoder-epoch-75-avg-11-chunk-16-left-128.int8.onnx", 296_583_597, "f9001ed7a9e46d0294438c1a30cd7c72d1cc4bdd4e7880edbcda36f67081e32e"),
+                ("decoder-epoch-75-avg-11-chunk-16-left-128.onnx", 33_837_085, "7ebc63f34b21c8efb4a41a5a2eee7fe1448829ce0230ecc5369e67fc14d90d48"),
+                ("joiner-epoch-75-avg-11-chunk-16-left-128.int8.onnx", 8_257_421, "db88e3172323551abaa99b91b18fb422a27ea4a834fd0db10389f9478816f917"),
+                ("tokens.txt", 195_244, "784f24950f6bcce1b0021035632dd60fd4617ecd8ca0581ab57d7b39d77ba5ab"),
+            ],
+            sourceLanguageCodes: ["zh-CN", "en-US", "ja-JP", "ru-RU", "ar-SA", "vi-VN", "th-TH"],
+            summary: String(localized: "Arabic, English, Indonesian, Japanese, Russian, Thai, Vietnamese and Chinese in one model, about 340MB.")
+        ),
+    ]
+
+    private static func sherpaVariant(
+        id: String, name: String, quantization: String, sizeMB: Int, repo: String, revision: String,
+        files: [(name: String, size: Int64, sha256: String)], sourceLanguageCodes: [String], summary: String
+    ) -> ModelVariant {
+        let base = "https://huggingface.co/csukuangfj/\(repo)/resolve/\(revision)"
+        return ModelVariant(
+            id: id, engineID: "model.sherpa", displayName: name, quantization: quantization,
+            approximateSizeMB: sizeMB, summary: summary, recommendedMemoryGB: 1,
+            files: files.map {
+                ModelFile(name: $0.name, url: URL(string: "\(base)/\($0.name)")!, sizeBytes: $0.size, sha256: $0.sha256)
+            },
+            sourceLanguageCodes: sourceLanguageCodes
+        )
+    }
+
     public static let modelVariants: [ModelVariant] = [
         ModelVariant(
             id: "r2t2-q8_0", engineID: "model.r2t2", displayName: "R2T2 (Q8_0)",
@@ -215,32 +353,7 @@ public enum ProviderCatalog {
             summary: String(localized: "Unquantized full-precision version with the highest quality; about 4.7GB peak memory at runtime (Q8_0 is about 3.1GB), suited to devices with plenty of memory."),
             recommendedMemoryGB: 5
         ),
-        // sherpa-onnx streaming Zipformer, Chinese + English with code-switching.
-        // Pinned HF revision; sizes/hashes match the files' LFS metadata.
-        ModelVariant(
-            id: "sherpa-zipformer-bilingual-zh-en", engineID: "model.sherpa",
-            displayName: "Zipformer Bilingual (zh-en)", quantization: "FP32", approximateSizeMB: 357,
-            summary: String(localized: "Chinese and English with code-switching, real-time streaming. About 360MB; English comes out in capitals without punctuation, which Dictation’s “Polish recognized text” can clean up."),
-            recommendedMemoryGB: 1,
-            files: [
-                ModelFile(
-                    name: "encoder-epoch-99-avg-1.onnx", url: URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/98590b7ed6443e77b714204da2757d75e1a642f4/encoder-epoch-99-avg-1.onnx")!,
-                    sizeBytes: 330_083_505, sha256: "709f0ed53a734b7942f170127e7547b566cb29c4afc5e67719f314c3d63ccb10"
-                ),
-                ModelFile(
-                    name: "decoder-epoch-99-avg-1.onnx", url: URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/98590b7ed6443e77b714204da2757d75e1a642f4/decoder-epoch-99-avg-1.onnx")!,
-                    sizeBytes: 13_876_452, sha256: "2e3b5ec371f8899ee6acd829fd753ba45772df57a91bdf37cde3136354e7db7d"
-                ),
-                ModelFile(
-                    name: "joiner-epoch-99-avg-1.onnx", url: URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/98590b7ed6443e77b714204da2757d75e1a642f4/joiner-epoch-99-avg-1.onnx")!,
-                    sizeBytes: 12_833_618, sha256: "5f2adc585dd1bec6421c8bb8660d2a73fc8b9ceb24491ef51399ba2a2f0fc31b"
-                ),
-                ModelFile(
-                    name: "tokens.txt", url: URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/98590b7ed6443e77b714204da2757d75e1a642f4/tokens.txt")!,
-                    sizeBytes: 56_317, sha256: "a8e0e4ec53810e433789b54a5c0134a7eaa2ffca595a6334d54c00da858841d3"
-                ),
-            ]
-        ),
+    ] + sherpaVariants + [
         ModelVariant(
             id: "t3po-q5_k_m", engineID: "model.t3po", displayName: "T3PO (Q5_K_M)",
             quantization: "Q5_K_M", approximateSizeMB: 10021,
@@ -302,40 +415,40 @@ public enum ProviderCatalog {
         ),
     ]
 
-    /// Source languages a local engine can recognize, for engines that cover
-    /// only a few (the sherpa bilingual model: Mandarin + English; Traditional
-    /// Chinese and Cantonese are different models). An engine absent here has
-    /// no restriction of its own.
-    private static let restrictedSourceCodes: [String: Set<String>] = [
-        "model.sherpa": ["zh-CN", "en-US"],
-    ]
+    /// The variant `selectedID` names for `engineID`, or the engine's first
+    /// catalog entry when unset or stale — the same fallback the session uses.
+    public static func resolvedVariant(forEngineID engineID: String, selectedID: String?) -> ModelVariant? {
+        let variants = modelVariants(forEngineID: engineID)
+        return variants.first { $0.id == selectedID } ?? variants.first
+    }
 
-    /// Whether `code` can't be the recognizer's source with `engineID`.
-    /// `nil` is "auto": unsupported by the system engine (it needs a fixed
-    /// language), fine for a local model. Codes outside `LanguageCatalog`
-    /// (custom locales) are left to the system engine to accept or reject,
-    /// but are never in a restricted engine's list.
-    public static func isUnsupportedSource(_ code: String?, engineID: String) -> Bool {
-        if let allowed = restrictedSourceCodes[engineID] {
-            guard let code else { return false }
-            return !allowed.contains(code)
-        }
+    /// Whether `code` can't be the recognizer's source with this engine (and,
+    /// for a local engine, the selected `variantID`). `nil` is "auto":
+    /// unsupported by the system engine (it needs a fixed language), fine for
+    /// a local model. A local variant that lists `sourceLanguageCodes` (the
+    /// sherpa models cover only a few languages) rules out everything else,
+    /// custom locales included; the system engine leaves codes outside
+    /// `LanguageCatalog` to the system to accept or reject.
+    public static func isUnsupportedSource(_ code: String?, engineID: String, variantID: String? = nil) -> Bool {
         if transcriptionEngines.first(where: { $0.id == engineID })?.kind == .system {
             guard let code else { return true }
             return LanguageCatalog.common.first { $0.code == code }?.supportsSystemASRSource == false
         }
-        return false
+        guard let code,
+              let allowed = resolvedVariant(forEngineID: engineID, selectedID: variantID)?.sourceLanguageCodes
+        else { return false }
+        return !allowed.contains(code)
     }
 
-    /// The `LanguageCatalog` entries `engineID` can recognize as a source.
-    public static func sourceLanguageOptions(forEngineID engineID: String) -> [LanguageOption] {
-        LanguageCatalog.common.filter { !isUnsupportedSource($0.code, engineID: engineID) }
+    /// The `LanguageCatalog` entries this engine/variant can recognize as a source.
+    public static func sourceLanguageOptions(forEngineID engineID: String, variantID: String? = nil) -> [LanguageOption] {
+        LanguageCatalog.common.filter { !isUnsupportedSource($0.code, engineID: engineID, variantID: variantID) }
     }
 
-    /// Whether the engine has its own short list of recognizable languages,
-    /// as opposed to following the catalog (local R2T2) or the system.
+    /// Whether the engine's models list their own recognizable languages, as
+    /// opposed to following the catalog (local R2T2) or the system.
     public static func hasRestrictedSources(engineID: String) -> Bool {
-        restrictedSourceCodes[engineID] != nil
+        modelVariants(forEngineID: engineID).contains { $0.sourceLanguageCodes != nil }
     }
 
     /// Whether the engine reports a pause boundary the app should feed it

@@ -3,19 +3,29 @@ import Foundation
 import Testing
 @testable import OmniVoiceCore
 
-/// Smoke test for `SherpaTranscriptionProvider` against a real streaming
-/// Zipformer model. The weights are gitignored and absent in CI, so this
-/// runs only when `models/sherpa-zipformer-bilingual-zh-en` exists (or
-/// `SHERPA_MODEL_DIR` points at another unpacked model with a
-/// `test_wavs/0.wav` next to it).
+/// Smoke test for `SherpaTranscriptionProvider` against real streaming
+/// models. The weights are gitignored and absent in CI, so each case runs
+/// only when its model package exists in `models/sherpa-<variant id>/` (the
+/// layout `Scripts/` and the download manager don't produce — fetch the
+/// files listed in `ProviderCatalog` by hand) next to
+/// `models/sherpa-test-wavs/0.wav`, a Chinese + English clip.
 struct SherpaTranscriptionProviderTests {
-    private static let modelDir: URL? = {
-        let path = ProcessInfo.processInfo.environment["SHERPA_MODEL_DIR"]
-            ?? URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-                .appendingPathComponent("models/sherpa-zipformer-bilingual-zh-en").path
-        return FileManager.default.fileExists(atPath: path + "/tokens.txt") ? URL(fileURLWithPath: path) : nil
-    }()
+    private static let modelsRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("models")
+
+    private static func modelDir(_ variantID: String) -> URL? {
+        let dir = modelsRoot.appendingPathComponent("sherpa-\(variantID)")
+        return FileManager.default.fileExists(atPath: dir.appendingPathComponent("tokens.txt").path) ? dir : nil
+    }
+
+    private static let wav = modelsRoot.appendingPathComponent("sherpa-test-wavs/0.wav")
+
+    /// Variant IDs with their model package on disk (and the test clip).
+    static let availableVariantIDs: [String] =
+        FileManager.default.fileExists(atPath: wav.path)
+            ? ProviderCatalog.modelVariants(forEngineID: "model.sherpa").map(\.id).filter { modelDir($0) != nil }
+            : []
 
     private static func samples(of url: URL) throws -> [Float] {
         let file = try AVAudioFile(forReading: url)
@@ -25,11 +35,12 @@ struct SherpaTranscriptionProviderTests {
         return Array(UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength)))
     }
 
-    @Test(.enabled(if: SherpaTranscriptionProviderTests.modelDir != nil))
+    @Test(.enabled(if: !SherpaTranscriptionProviderTests.availableVariantIDs.isEmpty),
+          arguments: SherpaTranscriptionProviderTests.availableVariantIDs)
     @MainActor
-    func streamsPartialsThenClosesTheSegment() async throws {
-        let dir = try #require(Self.modelDir)
-        let audio = try Self.samples(of: dir.appendingPathComponent("test_wavs/0.wav"))
+    func streamsPartialsThenClosesTheSegment(variantID: String) async throws {
+        let dir = try #require(Self.modelDir(variantID))
+        let audio = try Self.samples(of: Self.wav)
 
         let provider = SherpaTranscriptionProvider(modelDir: dir)
         var events: [TranscriptionEvent] = []
@@ -50,8 +61,7 @@ struct SherpaTranscriptionProviderTests {
         let finals = events.compactMap { event -> String? in
             if case .segmentClosed(let text) = event { return text } else { return nil }
         }
-        print("sherpa partials:", partials.count, "last:", partials.last ?? "-")
-        print("sherpa finals:", finals)
+        print("sherpa[\(variantID)] partials:", partials.count, "finals:", finals)
         #expect(!partials.isEmpty)
         #expect(!finals.isEmpty)
         #expect(!events.contains { if case .appended = $0 { true } else { false } })

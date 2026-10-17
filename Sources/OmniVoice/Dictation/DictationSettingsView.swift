@@ -135,12 +135,13 @@ struct DictationSettingsView: View {
         }
     }
 
-    /// Only an engine with a short language list (the Streaming Zipformer
-    /// model) rules languages out here; the system engine's own gaps are
+    /// Only a model with a short language list (the sherpa ones) rules languages out here; the system engine's own gaps are
     /// already handled by `RecordingSession.dictationLanguageCode`.
     private func isUnsupportedForEngine(_ code: String) -> Bool {
         ProviderCatalog.hasRestrictedSources(engineID: session.transcriptionEngineID)
-            && ProviderCatalog.isUnsupportedSource(code, engineID: session.transcriptionEngineID)
+            && ProviderCatalog.isUnsupportedSource(
+                code, engineID: session.transcriptionEngineID, variantID: session.currentTranscriptionModelVariant?.id
+            )
     }
 
     private func languageName(_ code: String) -> String {

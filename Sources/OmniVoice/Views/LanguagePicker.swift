@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Picker for one side of the 我的语言 / 外语 pair (Settings → 通用 → 语言).
 /// Under an engine that can't recognize every language (the system
-/// recognizer, the Streaming Zipformer model) the source side can't be one
+/// recognizer, a sherpa model) the source side can't be one
 /// it can't recognize — those stay offered on the other side, where they
 /// are only ever a translation target.
 struct LanguagePicker: View {
@@ -20,7 +20,9 @@ struct LanguagePicker: View {
 
     var body: some View {
         let options = isSourceSide
-            ? ProviderCatalog.sourceLanguageOptions(forEngineID: session.transcriptionEngineID)
+            ? ProviderCatalog.sourceLanguageOptions(
+                forEngineID: session.transcriptionEngineID, variantID: session.currentTranscriptionModelVariant?.id
+            )
             : LanguageCatalog.common
         Picker(LocalizedStringKey(title), selection: selection) {
             ForEach(options) { option in

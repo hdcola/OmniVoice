@@ -197,8 +197,9 @@ struct RecordingSessionSettingsTests {
 
     // MARK: - Streaming Zipformer model (Chinese + English only)
 
-    private func makeSherpaDownloadManager() throws -> ModelDownloadManager {
-        let variant = try #require(ProviderCatalog.modelVariants(forEngineID: "model.sherpa").first)
+    private func makeSherpaDownloadManager(variantID: String? = nil) throws -> ModelDownloadManager {
+        let variants = ProviderCatalog.modelVariants(forEngineID: "model.sherpa")
+        let variant = try #require(variants.first { $0.id == variantID } ?? variants.first)
         let cacheDirectory = makeEmptyTempCacheDirectory()
         let manager = ModelDownloadManager(cacheDirectory: cacheDirectory)
         try FileManager.default.createDirectory(at: manager.localURL(for: variant), withIntermediateDirectories: true)
@@ -236,6 +237,32 @@ struct RecordingSessionSettingsTests {
         }
     }
 
+    @Test func aChineseOnlyModelMakesTheSessionSpeakMyLanguageWhenTheForeignOneIsEnglish() throws {
+        let manager = try makeSherpaDownloadManager(variantID: "sherpa-zipformer-zh-2025")
+        withPersisted([:]) {
+            let session = RecordingSession(modelDownloadManager: manager)
+            session.languages.transcriptionDirection = .listenForeign
+            session.languages.foreignLanguageAutoDetect = false
+            session.transcriptionEngineID = "model.sherpa"
+            session.transcriptionModelVariantID = "sherpa-zipformer-zh-2025"
+            #expect(session.languages.myLanguageCode == "zh-CN")
+            #expect(session.languages.transcriptionDirection == .speakMine)
+            #expect(session.sourceLanguageCode == "zh-CN")
+        }
+    }
+
+    @Test func switchingToAWiderModelKeepsTheLanguagesAndAllowsTheSwap() throws {
+        let manager = try makeSherpaDownloadManager()
+        withPersisted([:]) {
+            let session = RecordingSession(modelDownloadManager: manager)
+            session.transcriptionEngineID = "model.sherpa"
+            session.transcriptionModelVariantID = "sherpa-zipformer-multilingual-8"
+            session.languages.foreignLanguageCode = "ja-JP"
+            session.languages.transcriptionDirection = .speakMine
+            #expect(session.swapBlockedReason == nil)
+        }
+    }
+
     @Test func swapIsRefusedWhenTheSherpaEngineCannotRecognizeTheOtherSide() throws {
         let manager = try makeSherpaDownloadManager()
         withPersisted([:]) {
@@ -243,7 +270,7 @@ struct RecordingSessionSettingsTests {
             session.transcriptionEngineID = "model.sherpa"
             session.languages.transcriptionDirection = .speakMine
             session.languages.foreignLanguageCode = "ja-JP"
-            #expect(session.swapBlockedReason == "The Streaming Zipformer model does not support the source language after swapping")
+            #expect(session.swapBlockedReason == "The selected model does not support the source language after swapping")
         }
     }
 

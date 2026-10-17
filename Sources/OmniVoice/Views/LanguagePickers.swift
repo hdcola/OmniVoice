@@ -19,6 +19,7 @@ struct SourceLanguagePicker: View {
     @Binding var sourceLanguageCode: String?
     let transcriptionEngineKind: EngineKind?
     let transcriptionEngineID: String
+    var transcriptionVariantID: String?
     /// False while speaking in the user's own language — there is no
     /// "自动" for that side (see `LanguagePreferences.sourceLanguageCode`).
     var allowsAuto: Bool = true
@@ -29,7 +30,7 @@ struct SourceLanguagePicker: View {
     /// Streaming Zipformer model only knows Chinese and English. Offering
     /// the rest would be a trap — picking one fails or produces nonsense.
     private var options: [LanguageOption] {
-        ProviderCatalog.sourceLanguageOptions(forEngineID: transcriptionEngineID)
+        ProviderCatalog.sourceLanguageOptions(forEngineID: transcriptionEngineID, variantID: transcriptionVariantID)
     }
 
     /// Task 1.2 (源语言自动检测显性化) — "自动" stays in the list even under

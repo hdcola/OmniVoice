@@ -236,6 +236,7 @@ public final class RecordingSession: ObservableObject {
             // variant's provider forever instead of downloading/loading the
             // newly-selected one. Same reasoning as `transcriptionEngineID`'s
             // own `didSet`.
+            validateAndNormalizeSourceLanguage()
             discardLoadedModelsIfStale()
         }
     }
@@ -282,10 +283,17 @@ public final class RecordingSession: ObservableObject {
         let nextSource = languages.transcriptionDirection == .listenForeign
             ? languages.myLanguageCode
             : languages.foreignLanguageCode
-        guard ProviderCatalog.isUnsupportedSource(nextSource, engineID: transcriptionEngineID) else { return nil }
+        guard isUnsupportedSource(nextSource) else { return nil }
         return transcriptionEngineKind == .system
             ? String(localized: "System speech recognition does not support the source language after swapping")
-            : String(localized: "The Streaming Zipformer model does not support the source language after swapping")
+            : String(localized: "The selected model does not support the source language after swapping")
+    }
+
+    /// `code` as the recognizer's source under the current engine and model.
+    func isUnsupportedSource(_ code: String?) -> Bool {
+        ProviderCatalog.isUnsupportedSource(
+            code, engineID: transcriptionEngineID, variantID: currentTranscriptionModelVariant?.id
+        )
     }
 
     public var canSwapTranscriptionDirection: Bool { swapBlockedReason == nil }
@@ -309,7 +317,7 @@ public final class RecordingSession: ObservableObject {
         Self.resolveDictationLanguage(
             choice: languages.dictationLanguage, mine: languages.myLanguageCode,
             foreign: languages.foreignLanguageCode, isModelEngine: transcriptionEngineKind == .model,
-            engineID: transcriptionEngineID
+            engineID: transcriptionEngineID, variantID: currentTranscriptionModelVariant?.id
         )
     }
 
@@ -318,13 +326,15 @@ public final class RecordingSession: ObservableObject {
     public var dictationLanguageChanges: AnyPublisher<String?, Never> {
         Publishers.CombineLatest4(
             languages.$dictationLanguage, languages.$myLanguageCode, languages.$foreignLanguageCode,
-            $transcriptionEngineID
+            $transcriptionEngineID.combineLatest($transcriptionModelVariantID)
         )
-        .map { choice, mine, foreign, engineID in
-            Self.resolveDictationLanguage(
+        .map { choice, mine, foreign, engine in
+            let (engineID, selectedVariantID) = engine
+            return Self.resolveDictationLanguage(
                 choice: choice, mine: mine, foreign: foreign,
                 isModelEngine: ProviderCatalog.transcriptionEngines.first { $0.id == engineID }?.kind == .model,
-                engineID: engineID
+                engineID: engineID,
+                variantID: ProviderCatalog.resolvedVariant(forEngineID: engineID, selectedID: selectedVariantID)?.id
             )
         }
         .removeDuplicates()
@@ -333,14 +343,14 @@ public final class RecordingSession: ObservableObject {
 
     static func resolveDictationLanguage(
         choice: DictationLanguageChoice, mine: String, foreign: String, isModelEngine: Bool,
-        engineID: String? = nil
+        engineID: String? = nil, variantID: String? = nil
     ) -> String? {
         if choice == .auto && isModelEngine { return nil }
         let code = choice == .foreign ? foreign : mine
         // An engine with a short language list can't take the rest: leave the
         // language to its own detection rather than force an unsupported one.
         if let engineID, ProviderCatalog.hasRestrictedSources(engineID: engineID),
-           ProviderCatalog.isUnsupportedSource(code, engineID: engineID) { return nil }
+           ProviderCatalog.isUnsupportedSource(code, engineID: engineID, variantID: variantID) { return nil }
         // The system recognizer can't take every language the catalog lists
         // (see `LanguageOption.supportsSystemASRSource`).
         if !isModelEngine && isUnsupportedForSystemASR(code) { return nil }
@@ -718,13 +728,13 @@ public final class RecordingSession: ObservableObject {
     /// step above would have caught on its own (see `restorePersistedSettings()`'s
     /// doc).
     private func validateAndNormalizeSourceLanguage() {
-        let engineID = transcriptionEngineID
-        guard transcriptionEngineKind == .system || ProviderCatalog.hasRestrictedSources(engineID: engineID) else { return }
+        guard transcriptionEngineKind == .system || ProviderCatalog.hasRestrictedSources(engineID: transcriptionEngineID)
+        else { return }
         // The system recognizer has no "自动". Reset the flag whichever way
         // the transcript runs: left on while speaking, it would make the way
         // back to 听外语 look like a "nil" source and block it for good.
         if transcriptionEngineKind == .system { languages.foreignLanguageAutoDetect = false }
-        let isUnsupported: (String?) -> Bool = { ProviderCatalog.isUnsupportedSource($0, engineID: engineID) }
+        let isUnsupported: (String?) -> Bool = { [unowned self] in isUnsupportedSource($0) }
         guard isUnsupported(languages.sourceLanguageCode) else { return }
         // The user's own language can't be recognized here: listen to the
         // foreign one instead, then repair that side too.
@@ -734,6 +744,11 @@ public final class RecordingSession: ObservableObject {
             languages.foreignLanguageCode = LanguageSettingsMigration.distinctForeign(
                 from: languages.myLanguageCode, preferring: LanguageSettingsMigration.defaultForeign
             )
+        }
+        // A model that knows only one language (a Chinese-only model while
+        // the foreign language is English): speak my language instead.
+        if isUnsupported(languages.sourceLanguageCode) {
+            languages.transcriptionDirection = .speakMine
         }
     }
 
