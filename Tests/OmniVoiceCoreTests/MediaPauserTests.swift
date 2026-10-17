@@ -9,7 +9,11 @@ final class MediaPauserTests: XCTestCase {
         /// Audio output lags the key: while true, `playing` is what the
         /// probe reports instead of the real state.
         var stale: Bool?
-        func isOtherAudioPlaying() -> Bool { stale ?? playing }
+        /// The app the probe hears.
+        var bundleID = "com.coppertino.Vox"
+        func isOtherAudioPlaying(excluding excluded: Set<String>) -> Bool {
+            !excluded.contains(bundleID) && (stale ?? playing)
+        }
         func sendPlayPause() {
             presses += 1
             stale = playing // the output still shows the old state
@@ -17,9 +21,157 @@ final class MediaPauserTests: XCTestCase {
         }
     }
 
+    /// Players taking direct commands; a quit one ignores them.
+    private final class FakePlayers: PlayerController {
+        var playing: [PlayerHandle: Bool] = [:]
+        var quit: Set<PlayerHandle> = []
+        var pauses: [PlayerHandle] = []
+        var plays: [PlayerHandle] = []
+        func reachablePlayers() -> [PlayerHandle] {
+            playing.keys.filter { !quit.contains($0) }.sorted { $0.pid < $1.pid }
+        }
+        func isPlaying(_ player: PlayerHandle) -> Bool { playing[player] ?? false }
+        func pause(_ player: PlayerHandle) -> Bool {
+            guard !quit.contains(player) else { return false }
+            pauses.append(player)
+            playing[player] = false
+            return true
+        }
+        func play(_ player: PlayerHandle) {
+            guard !quit.contains(player) else { return }
+            plays.append(player)
+            playing[player] = true
+        }
+    }
+
+    private let music = PlayerHandle(bundleID: "com.apple.Music", pid: 101)
+    private let spotify = PlayerHandle(bundleID: "com.spotify.client", pid: 102)
+
     private var time: TimeInterval = 0
-    private func makePauser(_ fake: Fake) -> MediaPauser {
-        MediaPauser(probe: fake, sender: fake, now: { [unowned self] in time })
+    private func makePauser(_ fake: Fake, players: FakePlayers = FakePlayers()) -> MediaPauser {
+        MediaPauser(probe: fake, sender: fake, players: players, now: { [unowned self] in time })
+    }
+
+    func testCommandedPlayerIsPausedAndResumedWithoutTheKey() {
+        let fake = Fake()
+        let players = FakePlayers()
+        players.playing = [music: true, spotify: false]
+        let pauser = makePauser(fake, players: players)
+        pauser.pauseIfPlaying()
+        XCTAssertEqual(players.pauses, [music])
+        pauser.resumeIfWePaused()
+        XCTAssertEqual(players.plays, [music])
+        XCTAssertEqual(fake.presses, 0)
+        XCTAssertEqual(players.playing[spotify], false)
+    }
+
+    /// Without Accessibility the key can't be posted; direct control still works.
+    func testWithoutTheKeyOnlyCommandedPlayersArePaused() {
+        let fake = Fake()
+        fake.playing = true
+        let players = FakePlayers()
+        players.playing = [spotify: true]
+        let pauser = makePauser(fake, players: players)
+        pauser.pauseIfPlaying(useKey: false)
+        pauser.resumeIfWePaused()
+        XCTAssertEqual(players.pauses, [spotify])
+        XCTAssertEqual(players.plays, [spotify])
+        XCTAssertEqual(fake.presses, 0)
+    }
+
+    func testIdleCommandedPlayersAreLeftAlone() {
+        let fake = Fake()
+        let players = FakePlayers()
+        players.playing = [music: false]
+        let pauser = makePauser(fake, players: players)
+        pauser.pauseIfPlaying()
+        pauser.resumeIfWePaused()
+        XCTAssertTrue(players.pauses.isEmpty)
+        XCTAssertTrue(players.plays.isEmpty)
+        XCTAssertEqual(fake.presses, 0)
+    }
+
+    /// Not allowed or not running: the key handles it as before.
+    func testUnreachablePlayerFallsBackToTheKey() {
+        let fake = Fake()
+        fake.bundleID = "com.apple.Music"
+        fake.playing = true
+        let players = FakePlayers()
+        let pauser = makePauser(fake, players: players)
+        pauser.pauseIfPlaying()
+        XCTAssertFalse(fake.playing)
+        time = 5
+        fake.stale = nil
+        pauser.resumeIfWePaused()
+        XCTAssertTrue(fake.playing)
+        XCTAssertEqual(fake.presses, 2)
+    }
+
+    /// The player still draining its output after the pause is not heard as
+    /// a reason to press the key too.
+    func testCommandedPlayerIsKeptOutOfTheKeyProbe() {
+        let fake = Fake()
+        fake.bundleID = "com.apple.Music"
+        fake.playing = true // its output is still running
+        let players = FakePlayers()
+        players.playing = [music: true]
+        let pauser = makePauser(fake, players: players)
+        pauser.pauseIfPlaying()
+        XCTAssertEqual(players.pauses, [music])
+        XCTAssertEqual(fake.presses, 0)
+    }
+
+    /// Quit during the dictation: resuming neither relaunches it nor presses
+    /// the key, and the next dictation starts clean.
+    func testPlayerQuitDuringDictationStaysQuit() {
+        let fake = Fake()
+        let players = FakePlayers()
+        players.playing = [music: true]
+        let pauser = makePauser(fake, players: players)
+        pauser.pauseIfPlaying()
+        players.quit = [music]
+        pauser.resumeIfWePaused()
+        XCTAssertTrue(players.plays.isEmpty)
+        XCTAssertEqual(fake.presses, 0)
+        pauser.pauseIfPlaying()
+        pauser.resumeIfWePaused()
+        XCTAssertTrue(players.plays.isEmpty)
+    }
+
+    func testCommandedAndKeyPlayersAreEachHandledOnce() {
+        let fake = Fake()
+        fake.playing = true // Vox, only reachable by the key
+        let players = FakePlayers()
+        players.playing = [spotify: true]
+        let pauser = makePauser(fake, players: players)
+        pauser.pauseIfPlaying()
+        pauser.pauseIfPlaying()
+        XCTAssertEqual(players.pauses, [spotify])
+        XCTAssertEqual(fake.presses, 1)
+        time = 5
+        fake.stale = nil
+        pauser.resumeIfWePaused()
+        XCTAssertEqual(players.plays, [spotify])
+        XCTAssertEqual(fake.presses, 2)
+        XCTAssertTrue(fake.playing)
+    }
+
+    /// Its state is current, so a dictation right after a resume pauses it
+    /// at once instead of watching for it.
+    func testQuickRestartPausesCommandedPlayerAtOnce() {
+        let fake = Fake()
+        let players = FakePlayers()
+        players.playing = [music: true]
+        let pauser = makePauser(fake, players: players)
+        pauser.pauseIfPlaying()
+        time = 5
+        pauser.resumeIfWePaused()
+        time = 5.3
+        pauser.pauseIfPlaying()
+        XCTAssertEqual(players.pauses, [music, music])
+        XCTAssertEqual(players.playing[music], false)
+        XCTAssertFalse(pauser.poll())
+        XCTAssertEqual(fake.presses, 0)
     }
 
     func testPausesAndResumesWhatItPaused() {

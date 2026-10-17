@@ -52,3 +52,8 @@ same certificate for every release.
 - The first release signed this way still resets permissions once (the identity
   changes from cdhash to certificate); later updates keep them.
 - To clear stale entries manually: `tccutil reset All <bundle id>`.
+- Pausing Music and Spotify during dictation sends them Apple Events
+  (`NSAppleEventsUsageDescription`). The build doesn't enable the hardened
+  runtime, so no entitlement is needed today; a future Developer ID /
+  notarized build must add `com.apple.security.automation.apple-events`, or
+  those events fail silently and only the play/pause key is left.
