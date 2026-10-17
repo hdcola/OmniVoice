@@ -6,6 +6,7 @@
 "%@ is already taken by the system or another app" = "%@ 已被系统或其他应用占用";
 "%@ is already used for “%@”" = "%1$@ 已用于「%2$@」";
 "%@ · about %lld MB · about %lld GB memory" = "%@ · 约 %lld MB · 内存约 %lld GB";
+"%@ · about %lld MB · about %lld MB memory" = "%@ · 约 %lld MB · 内存约 %lld MB";
 "%@ · about %lld MB" = "%@ · 约 %lld MB";
 "%lld h %lld min" = "%1$lld 小时 %2$lld 分钟";
 "%lld min %lld s" = "%1$lld 分 %2$lld 秒";

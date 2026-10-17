@@ -22,10 +22,34 @@ struct SherpaTranscriptionProviderTests {
     private static let wav = modelsRoot.appendingPathComponent("sherpa-test-wavs/0.wav")
 
     /// Variant IDs with their model package on disk (and the test clip).
-    static let availableVariantIDs: [String] =
-        FileManager.default.fileExists(atPath: wav.path)
-            ? ProviderCatalog.modelVariants(forEngineID: "model.sherpa").map(\.id).filter { modelDir($0) != nil }
-            : []
+    /// `SHERPA_ONLY=<variant id>` narrows it to one model, so a run's peak
+    /// memory belongs to that model alone.
+    static let availableVariantIDs: [String] = {
+        guard FileManager.default.fileExists(atPath: wav.path) else { return [] }
+        let only = ProcessInfo.processInfo.environment["SHERPA_ONLY"]
+        return ProviderCatalog.modelVariants(forEngineID: "model.sherpa").map(\.id)
+            .filter { modelDir($0) != nil && (only == nil || only == $0) }
+    }()
+
+    /// Current physical footprint of this process, in MB (what Activity
+    /// Monitor calls Memory).
+    private static func footprintMB() -> Int {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return result == KERN_SUCCESS ? Int(info.phys_footprint) / (1024 * 1024) : -1
+    }
+
+    /// Peak resident memory of this process so far, in MB.
+    private static func peakRSSMB() -> Int {
+        var usage = rusage()
+        getrusage(RUSAGE_SELF, &usage)
+        return Int(usage.ru_maxrss) / (1024 * 1024)  // bytes on macOS
+    }
 
     private static func samples(of url: URL) throws -> [Float] {
         let file = try AVAudioFile(forReading: url)
@@ -46,14 +70,20 @@ struct SherpaTranscriptionProviderTests {
         var events: [TranscriptionEvent] = []
         provider.onEvent = { events.append($0) }
 
+        let before = Self.peakRSSMB()
         try await provider.loadModel()
+        let afterLoad = Self.peakRSSMB()
         try await provider.start(config: TranscriptionConfig())
         // 100 ms chunks, like the live capture path.
         for start in stride(from: 0, to: audio.count, by: 1_600) {
             provider.push(samples: Array(audio[start..<min(start + 1_600, audio.count)]))
         }
         await provider.stop()
+        let afterDecode = Self.peakRSSMB()
+        let footprint = Self.footprintMB()
         provider.unload()
+        print("sherpa[\(variantID)] footprint after decode MB: \(footprint), after unload \(Self.footprintMB())")
+        print("sherpa[\(variantID)] peak RSS MB: before \(before), after load \(afterLoad), after decode \(afterDecode)")
 
         let partials = events.compactMap { event -> String? in
             if case .revised(let text) = event { return text } else { return nil }

@@ -88,13 +88,18 @@ public struct ModelVariant: Identifiable, Hashable, Codable, Sendable {
     /// Source languages (`LanguageCatalog` codes) this variant can recognize,
     /// for a model that covers only a few; nil means no restriction of its own.
     public let sourceLanguageCodes: [String]?
+    /// Measured peak memory in MB, for a model well under 1GB where
+    /// `recommendedMemoryGB` (whole GB, rounded up) would overstate it. The
+    /// model card shows this when set.
+    public let memoryMB: Int?
 
     public init(
         id: String, engineID: String, displayName: String, quantization: String,
         approximateSizeMB: Int, downloadURL: URL? = nil, sha256: String? = nil,
         summary: String = "", recommendedMemoryGB: Int = 0, files: [ModelFile] = [],
-        sourceLanguageCodes: [String]? = nil
+        sourceLanguageCodes: [String]? = nil, memoryMB: Int? = nil
     ) {
+        self.memoryMB = memoryMB
         self.files = files
         self.sourceLanguageCodes = sourceLanguageCodes
         self.id = id
@@ -175,7 +180,8 @@ public enum ProviderCatalog {
     /// "what sizes/quantizations exist for the currently-selected model
     /// engine" without switching on the engine identity itself.
     /// sherpa-onnx streaming models on Hugging Face (`csukuangfj/…`), pinned to
-    /// a revision. Sizes and hashes match the files' LFS metadata; only the
+    /// a revision. Sizes and hashes match the files' LFS metadata; `memoryMB` is
+    /// the measured peak RSS (load + a short clip, Apple silicon); only the
     /// files the loader needs are listed (int8 where one exists). The first
     /// entry is the engine's default.
     private static let sherpaVariants: [ModelVariant] = [
@@ -190,6 +196,7 @@ public enum ProviderCatalog {
                 ("tokens.txt", 56_317, "a8e0e4ec53810e433789b54a5c0134a7eaa2ffca595a6334d54c00da858841d3"),
             ],
             sourceLanguageCodes: ["zh-CN", "en-US"],
+            memoryMB: 930,
             summary: String(localized: "Chinese and English with code-switching, real-time streaming. About 360MB; English comes out in capitals without punctuation, which Dictation’s “Polish recognized text” can clean up.")
         ),
         sherpaVariant(
@@ -203,6 +210,7 @@ public enum ProviderCatalog {
                 ("tokens.txt", 20_628, "6193c7ea1c96d0d9a1e9652789b40d13a8a913b434a5451e93158f5a09fd6652"),
             ],
             sourceLanguageCodes: ["zh-CN"],
+            memoryMB: 590,
             summary: String(localized: "Newer (2025) Chinese-only streaming model, about 170MB. Mandarin only: English words are not recognized.")
         ),
         sherpaVariant(
@@ -214,6 +222,7 @@ public enum ProviderCatalog {
                 ("tokens.txt", 20_628, "6193c7ea1c96d0d9a1e9652789b40d13a8a913b434a5451e93158f5a09fd6652"),
             ],
             sourceLanguageCodes: ["zh-CN"],
+            memoryMB: 470,
             summary: String(localized: "CTC version of the 2025 Chinese model, about 160MB, a single model file. Mandarin only: English words are not recognized.")
         ),
         sherpaVariant(
@@ -225,6 +234,7 @@ public enum ProviderCatalog {
                 ("tokens.txt", 13_366, "6fed8c6c248516f38e7faa19404b57413e8ce259f1cbc1fa4aebc86eac32fdfd"),
             ],
             sourceLanguageCodes: ["zh-CN"],
+            memoryMB: 170,
             summary: String(localized: "The smallest Chinese streaming model here, about 26MB, for low-end Macs. Mandarin only.")
         ),
         sherpaVariant(
@@ -238,6 +248,7 @@ public enum ProviderCatalog {
                 ("tokens.txt", 18_626, "6722bd1585f46f84456b29c3550a343a3cc375b971645773c02ed8e0b4e2405c"),
             ],
             sourceLanguageCodes: ["zh-CN"],
+            memoryMB: 350,
             summary: String(localized: "Chinese streaming model trained on several datasets, about 76MB. Mandarin only.")
         ),
         sherpaVariant(
@@ -251,6 +262,7 @@ public enum ProviderCatalog {
                 ("tokens.txt", 48_697, "8b294db9045d6e5f94647f4c1eec1af4da143a75053c399611444b378ff966ac"),
             ],
             sourceLanguageCodes: ["zh-CN"],
+            memoryMB: 140,
             summary: String(localized: "Ultra-light 14M-parameter Chinese model, about 25MB, lowest memory use. Mandarin only.")
         ),
         sherpaVariant(
@@ -263,6 +275,7 @@ public enum ProviderCatalog {
                 ("tokens.txt", 75_756, "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6"),
             ],
             sourceLanguageCodes: ["zh-CN", "en-US"],
+            memoryMB: 540,
             summary: String(localized: "Chinese (Mandarin and dialects) and English, about 240MB. Strong on accented and regional Chinese.")
         ),
         sherpaVariant(
@@ -275,6 +288,7 @@ public enum ProviderCatalog {
                 ("tokens.txt", 81_289, "45b31504211675dd52aa88f998a6f6161703a2834e86760c1cda645a22538085"),
             ],
             sourceLanguageCodes: ["zh-CN", "yue-CN", "en-US"],
+            memoryMB: 550,
             summary: String(localized: "Mandarin, Cantonese and English, about 240MB. The only streaming model here that recognizes Cantonese.")
         ),
         sherpaVariant(
@@ -288,13 +302,15 @@ public enum ProviderCatalog {
                 ("tokens.txt", 195_244, "784f24950f6bcce1b0021035632dd60fd4617ecd8ca0581ab57d7b39d77ba5ab"),
             ],
             sourceLanguageCodes: ["zh-CN", "en-US", "ja-JP", "ru-RU", "ar-SA", "vi-VN", "th-TH"],
+            memoryMB: 800,
             summary: String(localized: "Arabic, English, Indonesian, Japanese, Russian, Thai, Vietnamese and Chinese in one model, about 340MB.")
         ),
     ]
 
     private static func sherpaVariant(
         id: String, name: String, quantization: String, sizeMB: Int, repo: String, revision: String,
-        files: [(name: String, size: Int64, sha256: String)], sourceLanguageCodes: [String], summary: String
+        files: [(name: String, size: Int64, sha256: String)], sourceLanguageCodes: [String], memoryMB: Int,
+        summary: String
     ) -> ModelVariant {
         let base = "https://huggingface.co/csukuangfj/\(repo)/resolve/\(revision)"
         return ModelVariant(
@@ -303,7 +319,7 @@ public enum ProviderCatalog {
             files: files.map {
                 ModelFile(name: $0.name, url: URL(string: "\(base)/\($0.name)")!, sizeBytes: $0.size, sha256: $0.sha256)
             },
-            sourceLanguageCodes: sourceLanguageCodes
+            sourceLanguageCodes: sourceLanguageCodes, memoryMB: memoryMB
         )
     }
 

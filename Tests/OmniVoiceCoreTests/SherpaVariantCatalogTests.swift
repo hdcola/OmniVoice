@@ -25,6 +25,7 @@ struct SherpaVariantCatalogTests {
             #expect((has("encoder") && has("decoder")) || has("model"), "\(variant.id) has no recognizable model layout")
             #expect(names.contains("tokens.txt"))
             #expect(variant.approximateSizeMB > 0)
+            #expect((variant.memoryMB ?? 0) > 0, "\(variant.id) needs a measured memory figure")
             // Every language it claims must be one the pickers can show.
             let codes = try #require(variant.sourceLanguageCodes)
             #expect(!codes.isEmpty)
