@@ -287,7 +287,7 @@
 "Paste, then press Return" = "粘贴后回车";
 "Pause music during dictation" = "语音输入时暂停音乐";
 "Pauses and resumes them with their own commands, so no other app is started or resumed by mistake. Not allowed, they are still paused with the play/pause key; allowing is more precise." = "用它们自己的命令暂停和恢复，不会误启动或误恢复其他应用。未允许时仍会通过播放/暂停键暂停，允许后更准确。";
-"Pauses playing music when you start speaking and resumes it afterwards; browser audio, such as a video, is muted instead and keeps playing. Only what this feature paused or muted is restored." = "开始说话时暂停正在播放的音乐，结束后自动继续；浏览器里的声音（比如视频）改为静音，视频继续播放。只会恢复由它暂停或静音的内容";
+"Pauses playing music when you start speaking and resumes it afterwards; browser audio, such as a video, is muted instead and keeps playing, except while the browser is in a call. Only what this feature paused or muted is restored." = "开始说话时暂停正在播放的音乐，结束后自动继续；浏览器里的声音（比如视频）改为静音，视频继续播放，浏览器正在通话时不静音。只会恢复由它暂停或静音的内容";
 "Permissions" = "权限";
 "Plan A: Standard live bilingual captions (recommended)" = "方案 A：标准实时双语字幕（推荐）";
 "Plan B: Lightweight, low-memory" = "方案 B：轻量低内存方案";
