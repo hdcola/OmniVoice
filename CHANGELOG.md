@@ -7,7 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(dictation): browser audio (videos, web players) is muted during a dictation and comes back afterwards — the video keeps playing; a browser in a call is left alone (Chrome plays every tab through one process, so a Meet call keeps the whole browser unmuted), and no permission is needed
+- feat(dictation): browser audio (videos, web players) is muted during a dictation and comes back afterwards — the video keeps playing; a browser in a call is left alone (Chrome plays every tab through one process, so a Meet call keeps the whole browser unmuted), and no permission is needed (#112)
 
 ### Changed
 - feat(dictation): once allowed in Settings › Dictation › “Control Music and Spotify directly”, Music and Spotify are paused and resumed with their own commands instead of the play/pause key, so a dictation never starts or resumes another app by mistake (“Allow” starts a player that isn’t running in the background to ask, then quits it); without permission, and for other players, the key is still used (#111)
