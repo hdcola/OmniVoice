@@ -9,7 +9,7 @@ The format is based on Keep a Changelog.
 ### Added
 
 ### Changed
-- feat(dictation): once allowed in Settings › Dictation › “Control Music and Spotify directly”, Music and Spotify are paused and resumed with their own commands instead of the play/pause key, so a dictation never starts or resumes another app by mistake; other players still use the key (#111)
+- feat(dictation): once allowed in Settings › Dictation › “Control Music and Spotify directly”, Music and Spotify are paused and resumed with their own commands instead of the play/pause key, so a dictation never starts or resumes another app by mistake (“Allow” starts a player that isn’t running in the background to ask, then quits it); without permission, and for other players, the key is still used (#111)
 
 ### Fixed
 - fix(dictation): starting a dictation no longer launches Music (and steals the focus) when nothing was playing — music is only paused when a dedicated player app (Music, Spotify, …) is outputting audio; browser tabs no longer trigger the pause

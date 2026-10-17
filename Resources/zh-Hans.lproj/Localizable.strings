@@ -10,6 +10,7 @@
 "%@: allowed" = "%@：已允许";
 "%@: denied, turn it on in System Settings › Privacy & Security › Automation" = "%@：已拒绝，请在“系统设置 › 隐私与安全性 › 自动化”中打开";
 "%@: not allowed yet" = "%@：尚未允许";
+"%@: not installed" = "%@：未安装";
 "%@: not running" = "%@：未运行";
 "%lld h %lld min" = "%1$lld 小时 %2$lld 分钟";
 "%lld min %lld s" = "%1$lld 分 %2$lld 秒";
@@ -285,7 +286,7 @@
 "Pair it with the R2T2 speech recognition engine for the best real-time typewriter experience" = "搭配 R2T2 识别引擎可获得最佳实时打字机体验";
 "Paste, then press Return" = "粘贴后回车";
 "Pause music during dictation" = "语音输入时暂停音乐";
-"Pauses and resumes them with their own commands instead of the play/pause key, so no other app is started or resumed by mistake. Open the app, then click Allow." = "用它们自己的命令暂停和恢复，不再发送播放/暂停键，不会误启动或误恢复其他应用。先打开该应用，再点击“去允许”。";
+"Pauses and resumes them with their own commands, so no other app is started or resumed by mistake. Not allowed, they are still paused with the play/pause key; allowing is more precise." = "用它们自己的命令暂停和恢复，不会误启动或误恢复其他应用。未允许时仍会通过播放/暂停键暂停，允许后更准确。";
 "Pauses playing music or video when you start speaking and resumes it afterwards; only content paused by this feature is resumed." = "开始说话时暂停正在播放的音乐或视频，结束后自动继续；只会恢复由它暂停的内容";
 "Permissions" = "权限";
 "Plan A: Standard live bilingual captions (recommended)" = "方案 A：标准实时双语字幕（推荐）";

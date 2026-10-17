@@ -139,12 +139,12 @@ private struct PlayerAccessRow: View {
     var body: some View {
         SettingsRow(
             title: String(localized: "Control Music and Spotify directly"),
-            subtitle: String(localized: "Pauses and resumes them with their own commands instead of the play/pause key, so no other app is started or resumed by mistake. Open the app, then click Allow.")
+            subtitle: String(localized: "Pauses and resumes them with their own commands, so no other app is started or resumed by mistake. Not allowed, they are still paused with the play/pause key; allowing is more precise.")
                 + "\n" + statuses.map { Self.describe($0.player.name, $0.access) }.joined(separator: " · ")
         ) {
             Button("Allow", action: allow)
                 .controlSize(.small)
-                .disabled(isRequesting || !statuses.contains { $0.access == .notDetermined || $0.access == .denied })
+                .disabled(isRequesting || !statuses.contains { [.notDetermined, .notRunning, .denied].contains($0.access) })
         }
         // Players open and quit, and the switch can be flipped in System
         // Settings, while this tab is open. Checking never prompts.
@@ -156,10 +156,11 @@ private struct PlayerAccessRow: View {
         }
     }
 
-    /// Prompts for the undecided ones; once denied, macOS only lets the user
-    /// turn it on in System Settings.
+    /// Prompts for the undecided ones, starting a player that isn't running
+    /// to ask; once denied, macOS only lets the user turn it on in System
+    /// Settings.
     private func allow() {
-        guard statuses.contains(where: { $0.access == .notDetermined }) else {
+        guard statuses.contains(where: { $0.access == .notDetermined || $0.access == .notRunning }) else {
             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!)
             return
         }
@@ -177,6 +178,7 @@ private struct PlayerAccessRow: View {
         case .notDetermined: String(localized: "\(name): not allowed yet")
         case .denied: String(localized: "\(name): denied, turn it on in System Settings › Privacy & Security › Automation")
         case .notRunning: String(localized: "\(name): not running")
+        case .notInstalled: String(localized: "\(name): not installed")
         }
     }
 }

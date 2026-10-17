@@ -6,6 +6,9 @@ import OmniVoiceCore
 /// one that finds the process gone just fails. Permission is only ever
 /// checked here, never asked — the Automation prompt would steal the focus
 /// mid-dictation. It is asked from Settings (`requestAccess`).
+///
+/// Unreachable players aren't left unpaused: `MediaPauser` falls back to the
+/// play/pause key for them.
 struct AppleEventPlayerController: PlayerController {
     struct Player: Sendable {
         let bundleID: String
@@ -22,7 +25,7 @@ struct AppleEventPlayerController: PlayerController {
     ]
 
     enum Access: Equatable {
-        case allowed, notDetermined, denied, notRunning
+        case allowed, notDetermined, denied, notRunning, notInstalled
     }
 
     private static let playCode = fourCC("Play")
@@ -63,18 +66,68 @@ struct AppleEventPlayerController: PlayerController {
     /// Where each player stands, without asking.
     static func accessStatus() -> [(player: Player, access: Access)] {
         players.map { player in
-            guard let pid = pid(of: player) else { return (player, .notRunning) }
-            return (player, access(pid: pid, ask: false))
+            guard isInstalled(player) else { return (player, .notInstalled) }
+            // Not running, macOS won't say; the last answer seen stands in.
+            guard let pid = pid(of: player) else { return (player, lastKnownAccess(player) ?? .notRunning) }
+            let access = access(pid: pid, ask: false)
+            remember(access, for: player)
+            return (player, access)
         }
     }
 
-    /// Shows the Automation prompt for each running player not yet decided.
-    /// Blocks until answered, so it runs off the main thread; Settings only.
+    /// Shows the Automation prompt for each installed player not yet decided.
+    /// macOS only asks on behalf of a running app, so one that isn't running
+    /// is started hidden, without taking the focus, and quit again once
+    /// answered. Settings only: the user just clicked for this.
+    @MainActor
     static func requestAccess() async {
-        let pids = players.compactMap { pid(of: $0) }
-        await Task.detached {
-            for pid in pids { _ = access(pid: pid, ask: true) }
-        }.value
+        for player in players {
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: player.bundleID) else { continue }
+            var launched: NSRunningApplication?
+            if pid(of: player) == nil {
+                let configuration = NSWorkspace.OpenConfiguration()
+                configuration.activates = false
+                configuration.hides = true
+                configuration.addsToRecentItems = false
+                guard let app = try? await NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+                else { continue }
+                launched = app
+                for _ in 0..<50 where !app.isFinishedLaunching {
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+            }
+            guard let pid = launched?.processIdentifier ?? pid(of: player) else { continue }
+            // Blocks until answered (at once if already decided).
+            let access = await Task.detached { access(pid: pid, ask: true) }.value
+            remember(access, for: player)
+            launched?.terminate()
+        }
+    }
+
+    private static func lastKnownAccessKey(_ player: Player) -> String {
+        "org.hdcola.omnivoice.dictation.playerAccess.\(player.bundleID)"
+    }
+
+    private static func lastKnownAccess(_ player: Player) -> Access? {
+        switch UserDefaults.standard.string(forKey: lastKnownAccessKey(player)) {
+        case "allowed": .allowed
+        case "denied": .denied
+        default: nil
+        }
+    }
+
+    /// Only decided answers; anything else says nothing about the permission.
+    private static func remember(_ access: Access, for player: Player) {
+        switch access {
+        case .allowed: UserDefaults.standard.set("allowed", forKey: lastKnownAccessKey(player))
+        case .denied: UserDefaults.standard.set("denied", forKey: lastKnownAccessKey(player))
+        case .notDetermined: UserDefaults.standard.removeObject(forKey: lastKnownAccessKey(player))
+        case .notRunning, .notInstalled: break
+        }
+    }
+
+    private static func isInstalled(_ player: Player) -> Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: player.bundleID) != nil
     }
 
     private static func pid(of player: Player) -> pid_t? {
