@@ -11,7 +11,31 @@ struct SystemMediaKeySender: MediaKeySender {
     private static let keyDownState = 0xA // NX_KEYDOWN
     private static let keyUpState = 0xB // NX_KEYUP
 
+    private static let musicBundleID = "com.apple.Music"
+
     func sendPlayPause() {
+        // With no app owning "now playing", macOS answers the key by launching
+        // Music. The audio probe can't tell (a browser tab may hold an output
+        // open silently), so a Music this press started is quit again.
+        let musicWasRunning = Self.isMusicRunning
+        post()
+        guard !musicWasRunning else { return }
+        Task { @MainActor in
+            for _ in 0..<20 {
+                try? await Task.sleep(for: .milliseconds(100))
+                if let music = NSRunningApplication.runningApplications(withBundleIdentifier: Self.musicBundleID).first {
+                    music.terminate()
+                    return
+                }
+            }
+        }
+    }
+
+    private static var isMusicRunning: Bool {
+        !NSRunningApplication.runningApplications(withBundleIdentifier: musicBundleID).isEmpty
+    }
+
+    private func post() {
         for isDown in [true, false] {
             // The key's state rides in bits 8–15 of both `data1` and the flags.
             let state = (isDown ? Self.keyDownState : Self.keyUpState) << 8

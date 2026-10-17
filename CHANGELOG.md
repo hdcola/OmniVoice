@@ -11,6 +11,7 @@ The format is based on Keep a Changelog.
 ### Changed
 
 ### Fixed
+- fix(dictation): starting a dictation no longer leaves Music open when nothing was playing — a Play/Pause press that launches Music is undone by quitting it again
 
 ### Dependencies
 
