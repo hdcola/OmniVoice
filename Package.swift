@@ -33,6 +33,12 @@ let llamaCppLibDir = llamaCppRoot.appendingPathComponent("build/bin").path
 let llamaCppIncludeFlags = ["-I", llamaCppInclude, "-I", ggmlInclude]
 let llamaCppSwiftIncludeFlags = ["-Xcc", "-I", "-Xcc", llamaCppInclude, "-Xcc", "-I", "-Xcc", ggmlInclude]
 
+// sherpa-onnx ships prebuilt macOS shared libs (headers + dylibs) — unpacked
+// by `Scripts/setup_third_party.sh --sherpa` into `third_party/sherpa-onnx`.
+let sherpaRoot = packageDir.appendingPathComponent("third_party/sherpa-onnx")
+let sherpaInclude = sherpaRoot.appendingPathComponent("include").path
+let sherpaLibDir = sherpaRoot.appendingPathComponent("lib").path
+
 let package = Package(
     name: "OmniVoice",
     platforms: [
@@ -49,6 +55,12 @@ let package = Package(
             ]
         ),
         .target(
+            name: "CSherpaOnnx",
+            cSettings: [
+                .unsafeFlags(["-I", sherpaInclude])
+            ]
+        ),
+        .target(
             name: "CLlamaCpp",
             cSettings: [
                 .unsafeFlags(llamaCppIncludeFlags)
@@ -56,10 +68,10 @@ let package = Package(
         ),
         .target(
             name: "OmniVoiceCore",
-            dependencies: ["CAudioCpp", "CLlamaCpp"],
+            dependencies: ["CAudioCpp", "CLlamaCpp", "CSherpaOnnx"],
             path: "Sources/OmniVoiceCore",
             cSettings: [
-                .unsafeFlags(["-I", audioCppInclude] + llamaCppIncludeFlags)
+                .unsafeFlags(["-I", audioCppInclude, "-I", sherpaInclude] + llamaCppIncludeFlags)
             ],
             swiftSettings: [
                 // swift-tools-version 6.2 (needed for `.macOS(.v26)`) defaults
@@ -70,12 +82,15 @@ let package = Package(
                 // instead — same reasoning `mac-poc-hybrid/Package.swift`
                 // documents for its own executable target.
                 .swiftLanguageMode(.v5),
-                .unsafeFlags(["-Xcc", "-I", "-Xcc", audioCppInclude] + llamaCppSwiftIncludeFlags)
+                .unsafeFlags(["-Xcc", "-I", "-Xcc", audioCppInclude, "-Xcc", "-I", "-Xcc", sherpaInclude] + llamaCppSwiftIncludeFlags)
             ],
             linkerSettings: [
                 .linkedLibrary("audiocpp"),
                 .linkedLibrary("llama"),
+                .linkedLibrary("sherpa-onnx-c-api"),
                 .unsafeFlags([
+                    "-L", sherpaLibDir,
+                    "-Xlinker", "-rpath", "-Xlinker", sherpaLibDir,
                     "-L", audioCppLibDir,
                     "-Xlinker", "-rpath", "-Xlinker", audioCppLibDir,
                     "-L", llamaCppLibDir,
@@ -94,14 +109,14 @@ let package = Package(
             // same `-I` flags repeated, not just the one that first declares
             // them.
             cSettings: [
-                .unsafeFlags(["-I", audioCppInclude] + llamaCppIncludeFlags)
+                .unsafeFlags(["-I", audioCppInclude, "-I", sherpaInclude] + llamaCppIncludeFlags)
             ],
             swiftSettings: [
                 // Same reasoning as `OmniVoiceCore` above — `Translation`'s
                 // `.translationTask` bridge (see `FloatingTranscriptView`)
                 // isn't annotated for Swift 6 strict concurrency either.
                 .swiftLanguageMode(.v5),
-                .unsafeFlags(["-Xcc", "-I", "-Xcc", audioCppInclude] + llamaCppSwiftIncludeFlags)
+                .unsafeFlags(["-Xcc", "-I", "-Xcc", audioCppInclude, "-Xcc", "-I", "-Xcc", sherpaInclude] + llamaCppSwiftIncludeFlags)
             ]
         ),
         .testTarget(
@@ -109,10 +124,10 @@ let package = Package(
             dependencies: ["OmniVoiceCore"],
             path: "Tests/OmniVoiceCoreTests",
             cSettings: [
-                .unsafeFlags(["-I", audioCppInclude] + llamaCppIncludeFlags)
+                .unsafeFlags(["-I", audioCppInclude, "-I", sherpaInclude] + llamaCppIncludeFlags)
             ],
             swiftSettings: [
-                .unsafeFlags(["-Xcc", "-I", "-Xcc", audioCppInclude] + llamaCppSwiftIncludeFlags)
+                .unsafeFlags(["-Xcc", "-I", "-Xcc", audioCppInclude, "-Xcc", "-I", "-Xcc", sherpaInclude] + llamaCppSwiftIncludeFlags)
             ]
         )
     ]

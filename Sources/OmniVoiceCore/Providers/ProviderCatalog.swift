@@ -34,6 +34,22 @@ public struct EngineDescriptor: Identifiable, Hashable, Codable, Sendable {
     }
 }
 
+/// One file of a multi-file model package (e.g. a sherpa-onnx transducer's
+/// encoder/decoder/joiner/tokens), downloaded and verified individually.
+public struct ModelFile: Hashable, Codable, Sendable {
+    public let name: String
+    public let url: URL
+    public let sizeBytes: Int64
+    public let sha256: String
+
+    public init(name: String, url: URL, sizeBytes: Int64, sha256: String) {
+        self.name = name
+        self.url = url
+        self.sizeBytes = sizeBytes
+        self.sha256 = sha256
+    }
+}
+
 /// One downloadable weights file for a `.model`-kind engine — e.g. a
 /// specific size/quantization of R2T2 or T3PO. Deliberately data, not an
 /// enum case per model: as audio.cpp gains support for more community
@@ -65,12 +81,17 @@ public struct ModelVariant: Identifiable, Hashable, Codable, Sendable {
     /// close but not identical. Used by the rich model card's "预计内存占用" line
     /// and the "引擎运行与内存状态" console's resource estimate.
     public let recommendedMemoryGB: Int
+    /// Non-empty for a multi-file package: the variant is then a directory
+    /// holding exactly these files (`ModelDownloadManager.localURL(for:)` is
+    /// that directory) and `downloadURL`/`sha256` stay nil.
+    public let files: [ModelFile]
 
     public init(
         id: String, engineID: String, displayName: String, quantization: String,
         approximateSizeMB: Int, downloadURL: URL? = nil, sha256: String? = nil,
-        summary: String = "", recommendedMemoryGB: Int = 0
+        summary: String = "", recommendedMemoryGB: Int = 0, files: [ModelFile] = []
     ) {
+        self.files = files
         self.id = id
         self.engineID = engineID
         self.displayName = displayName
@@ -119,6 +140,11 @@ public enum ProviderCatalog {
             id: "model.r2t2", displayName: String(localized: "R2T2 offline model"), kind: .model,
             badge: String(localized: "Recommended · Automatic language detection"),
             summary: String(localized: "Supports streaming live transcription, punctuation prediction and automatic detection of mixed languages.")
+        ),
+        EngineDescriptor(
+            id: "model.sherpa", displayName: String(localized: "Streaming Zipformer model"), kind: .model,
+            badge: String(localized: "Lightweight · Low latency"),
+            summary: String(localized: "Small streaming model with very low latency and little memory use. Text appears as you speak, without punctuation; Dictation’s “Polish recognized text” can tidy it up.")
         ),
     ]
 
@@ -189,6 +215,32 @@ public enum ProviderCatalog {
             summary: String(localized: "Unquantized full-precision version with the highest quality; about 4.7GB peak memory at runtime (Q8_0 is about 3.1GB), suited to devices with plenty of memory."),
             recommendedMemoryGB: 5
         ),
+        // sherpa-onnx streaming Zipformer, Chinese + English with code-switching.
+        // Pinned HF revision; sizes/hashes match the files' LFS metadata.
+        ModelVariant(
+            id: "sherpa-zipformer-bilingual-zh-en", engineID: "model.sherpa",
+            displayName: "Zipformer Bilingual (zh-en)", quantization: "FP32", approximateSizeMB: 357,
+            summary: String(localized: "Chinese and English with code-switching, real-time streaming. About 360MB; English comes out in capitals without punctuation, which Dictation’s “Polish recognized text” can clean up."),
+            recommendedMemoryGB: 1,
+            files: [
+                ModelFile(
+                    name: "encoder-epoch-99-avg-1.onnx", url: URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/98590b7ed6443e77b714204da2757d75e1a642f4/encoder-epoch-99-avg-1.onnx")!,
+                    sizeBytes: 330_083_505, sha256: "709f0ed53a734b7942f170127e7547b566cb29c4afc5e67719f314c3d63ccb10"
+                ),
+                ModelFile(
+                    name: "decoder-epoch-99-avg-1.onnx", url: URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/98590b7ed6443e77b714204da2757d75e1a642f4/decoder-epoch-99-avg-1.onnx")!,
+                    sizeBytes: 13_876_452, sha256: "2e3b5ec371f8899ee6acd829fd753ba45772df57a91bdf37cde3136354e7db7d"
+                ),
+                ModelFile(
+                    name: "joiner-epoch-99-avg-1.onnx", url: URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/98590b7ed6443e77b714204da2757d75e1a642f4/joiner-epoch-99-avg-1.onnx")!,
+                    sizeBytes: 12_833_618, sha256: "5f2adc585dd1bec6421c8bb8660d2a73fc8b9ceb24491ef51399ba2a2f0fc31b"
+                ),
+                ModelFile(
+                    name: "tokens.txt", url: URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/98590b7ed6443e77b714204da2757d75e1a642f4/tokens.txt")!,
+                    sizeBytes: 56_317, sha256: "a8e0e4ec53810e433789b54a5c0134a7eaa2ffca595a6334d54c00da858841d3"
+                ),
+            ]
+        ),
         ModelVariant(
             id: "t3po-q5_k_m", engineID: "model.t3po", displayName: "T3PO (Q5_K_M)",
             quantization: "Q5_K_M", approximateSizeMB: 10021,
@@ -249,6 +301,14 @@ public enum ProviderCatalog {
             recommendedMemoryGB: 5
         ),
     ]
+
+    /// Whether the engine reports a pause boundary the app should feed it
+    /// (VAD → `notifyUtteranceBoundary()`). System ASR and the sherpa model
+    /// close their own segments, so the sentence-pause settings do nothing
+    /// for them.
+    public static func usesVADBoundary(engineID: String) -> Bool {
+        transcriptionEngines.first { $0.id == engineID }?.kind == .model && engineID != "model.sherpa"
+    }
 
     public static func modelVariants(forEngineID engineID: String) -> [ModelVariant] {
         modelVariants.filter { $0.engineID == engineID }

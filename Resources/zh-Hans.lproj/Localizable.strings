@@ -202,6 +202,7 @@
 "Launch at login" = "开机时自动启动";
 "Launch" = "启动";
 "Lightweight · Low memory" = "轻量级 · 低内存";
+"Lightweight · Low latency" = "轻量级 · 低延迟";
 "Listen to foreign" = "听外语";
 "Listen to foreign: captions translate foreign speech into my language; Speak my language: what I say is translated into the foreign language. The ⇄ in the Caption panel also switches it" = "听外语：字幕把外语译成我的语言；说我的语言：把我说的话译成外语。字幕悬浮窗里的 ⇄ 也能切换";
 "Load into memory ahead of time so the first translation or transcription doesn't wait" = "提前载入内存，首次翻译/转录无需等待";
@@ -307,6 +308,7 @@
 "Quick Translate" = "快捷翻译";
 "Quit OmniVoice" = "退出 OmniVoice";
 "R2T2 offline model" = "R2T2 离线大模型";
+"Streaming Zipformer model" = "流式 Zipformer 模型";
 "R2T2 recognition + HY-MT1.5 translation" = "R2T2 识别 + HY-MT1.5 翻译";
 "R2T2 speech recognition + HY-MT1.5 translation. Minimal memory use, whole-sentence translation output. Suited to 8GB devices." = "R2T2 语音识别 + HY-MT1.5 翻译。占用内存极小，整句翻译输出。适合 8GB 内存设备。";
 "R2T2 speech recognition + T3PO live streaming translation. Automatic language detection, character-by-character typewriter display, fully offline and private. Recommended for Macs with 16GB+ unified memory." = "R2T2 语音识别 + T3PO 实时流式翻译。自动检测语种、逐字打字机流式显示、完全离线私密。建议 16GB+ 统一内存 Mac。";
@@ -539,3 +541,5 @@
 "✨ Auto-detect language (Auto)" = "✨ 自动检测语种 (Auto)";
 "⭐ Star us on GitHub" = "⭐ 在 GitHub 点个 Star";
 "🧹 Free Memory" = "🧹 释放内存占用";
+"Small streaming model with very low latency and little memory use. Text appears as you speak, without punctuation; Dictation’s “Polish recognized text” can tidy it up." = "延迟极低、内存占用很小的流式小模型。边说边出字，不带标点；语音输入的「润色识别结果」可以帮忙整理。";
+"Chinese and English with code-switching, real-time streaming. About 360MB; English comes out in capitals without punctuation, which Dictation’s “Polish recognized text” can clean up." = "中英文混说，实时流式。约 360MB；英文为大写、不带标点，语音输入的「润色识别结果」可以帮忙整理。";

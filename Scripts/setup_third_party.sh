@@ -12,6 +12,7 @@ set -euo pipefail
 #
 #   --skip-audio    don't clone/build third_party/audio.cpp
 #   --skip-llama    don't clone/build third_party/llama.cpp
+#   --skip-sherpa   don't fetch the prebuilt third_party/sherpa-onnx libs
 #   --with-models   also download the R2T2/T3PO GGUF weights (~12GB total)
 #   --force         rebuild even if the target already looks built (does
 #                   NOT re-clone or discard an existing checkout's local
@@ -21,15 +22,18 @@ AUDIOCPP_COMMIT="77491a33c589c53ff18add050095cf35647c8213"   # pinned — carrie
   # the R2T2 streaming-final-flush null-deref fix (0xShug0/audio.cpp#712);
   # no local patch needed as of this pin.
 LLAMACPP_COMMIT="a02c7f58c1c335f5375bf81f174b9a58cce939af"   # pinned
+SHERPA_VERSION="1.13.8"   # prebuilt macOS arm64 shared libs, no TTS
 
 SKIP_AUDIO=0
 SKIP_LLAMA=0
+SKIP_SHERPA=0
 WITH_MODELS=0
 FORCE=0
 for arg in "$@"; do
   case "$arg" in
     --skip-audio) SKIP_AUDIO=1 ;;
     --skip-llama) SKIP_LLAMA=1 ;;
+    --skip-sherpa) SKIP_SHERPA=1 ;;
     --with-models) WITH_MODELS=1 ;;
     --force) FORCE=1 ;;
     *)
@@ -138,6 +142,21 @@ if [ "$WITH_MODELS" -eq 1 ]; then
     echo "==> downloading T3PO weights (~9GB)"
     curl -L -o "$T3PO_FILE" \
       https://huggingface.co/netease-youdao/Confucius4-T3PO-GGUF/resolve/main/Confucius4-T3PO-Q5_K_M.gguf
+  fi
+fi
+
+if [ "$SKIP_SHERPA" -eq 0 ]; then
+  SHERPA_DIR="$THIRD_PARTY_DIR/sherpa-onnx"
+  if [ -f "$SHERPA_DIR/lib/libsherpa-onnx-c-api.dylib" ]; then
+    echo "==> $SHERPA_DIR already present"
+  else
+    echo "==> fetching sherpa-onnx v$SHERPA_VERSION prebuilt libs"
+    mkdir -p "$SHERPA_DIR"
+    ARCHIVE="sherpa-onnx-v$SHERPA_VERSION-osx-arm64-shared-no-tts"
+    curl -fL -o "$SHERPA_DIR/$ARCHIVE.tar.bz2" \
+      "https://github.com/k2-fsa/sherpa-onnx/releases/download/v$SHERPA_VERSION/$ARCHIVE.tar.bz2"
+    tar -xjf "$SHERPA_DIR/$ARCHIVE.tar.bz2" -C "$SHERPA_DIR" --strip-components=1
+    rm -f "$SHERPA_DIR/$ARCHIVE.tar.bz2"
   fi
 fi
 

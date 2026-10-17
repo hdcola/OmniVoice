@@ -343,6 +343,101 @@ struct ModelDownloadManagerTests {
 
         try FileManager.default.removeItem(at: cacheDirectory)
     }
+
+    // MARK: - Multi-file variants (sherpa-onnx packages)
+
+    private func sha256Hex(ofPath path: String) -> String {
+        SHA256.hash(data: StubURLProtocol.body(forPath: path)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func multiFileVariant(id: String, paths: [String], status: Int = 200) -> ModelVariant {
+        ModelVariant(
+            id: id, engineID: "model.sherpa", displayName: "Multi", quantization: "FP32", approximateSizeMB: 1,
+            files: paths.map {
+                ModelFile(
+                    name: $0, url: StubURLProtocol.url(status: status, path: $0),
+                    sizeBytes: Int64(StubURLProtocol.body(forPath: $0).count), sha256: sha256Hex(ofPath: $0)
+                )
+            }
+        )
+    }
+
+    @Test func aMultiFileVariantLivesInADirectoryAndIsDownloadedOnlyWhenAllFilesExist() throws {
+        let cacheDirectory = makeTempCacheDirectory()
+        let manager = ModelDownloadManager(cacheDirectory: cacheDirectory)
+        let multi = multiFileVariant(id: "multi", paths: ["a.onnx", "tokens.txt"])
+        #expect(manager.localURL(for: multi) == cacheDirectory.appendingPathComponent("multi", isDirectory: true))
+        #expect(!manager.isDownloaded(multi))
+
+        let directory = manager.localURL(for: multi)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: directory.appendingPathComponent("a.onnx").path, contents: Data([1]))
+        #expect(!manager.isDownloaded(multi))
+        FileManager.default.createFile(atPath: directory.appendingPathComponent("tokens.txt").path, contents: Data([1]))
+        #expect(manager.isDownloaded(multi))
+
+        try manager.deleteCachedModel(for: multi)
+        #expect(!manager.isDownloaded(multi))
+        try? FileManager.default.removeItem(at: cacheDirectory)
+    }
+
+    @Test func ensureDownloadedFetchesEveryFileOfAMultiFileVariantIntoOneDirectory() async throws {
+        let cacheDirectory = makeTempCacheDirectory()
+        let manager = makeMockedManager(cacheDirectory: cacheDirectory)
+        let multi = multiFileVariant(id: "multi-ok", paths: ["enc.onnx", "dec.onnx", "tokens.txt"])
+
+        let resolved = try await manager.ensureDownloaded(multi)
+        #expect(resolved == manager.localURL(for: multi))
+        for path in ["enc.onnx", "dec.onnx", "tokens.txt"] {
+            #expect(try Data(contentsOf: resolved.appendingPathComponent(path)) == StubURLProtocol.body(forPath: path))
+        }
+        #expect(manager.isDownloaded(multi))
+        // The staging directory is gone once the package is in place.
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: cacheDirectory.path)
+        #expect(leftovers == ["multi-ok"])
+
+        try FileManager.default.removeItem(at: cacheDirectory)
+    }
+
+    @Test func aFailedFileLeavesNoHalfPopulatedPackageAndKeepsVerifiedFilesForTheRetry() async throws {
+        let cacheDirectory = makeTempCacheDirectory()
+        let manager = makeMockedManager(cacheDirectory: cacheDirectory)
+        let good = multiFileVariant(id: "multi-retry", paths: ["enc.onnx"])
+        var failing = good.files
+        failing.append(ModelFile(
+            name: "dec.onnx", url: StubURLProtocol.url(status: 500, path: "dec.onnx"),
+            sizeBytes: 1, sha256: sha256Hex(ofPath: "dec.onnx")
+        ))
+        let variant = ModelVariant(
+            id: "multi-retry", engineID: "model.sherpa", displayName: "Multi", quantization: "FP32",
+            approximateSizeMB: 1, files: failing
+        )
+
+        await #expect(throws: ModelDownloadError.self) { _ = try await manager.ensureDownloaded(variant) }
+        #expect(!manager.isDownloaded(variant))
+        #expect(!FileManager.default.fileExists(atPath: manager.localURL(for: variant).path))
+        // The file that did verify is kept in staging so a retry skips it.
+        let staged = cacheDirectory.appendingPathComponent("multi-retry.partial/enc.onnx")
+        #expect(FileManager.default.fileExists(atPath: staged.path))
+
+        try FileManager.default.removeItem(at: cacheDirectory)
+    }
+
+    @Test func aMultiFileChecksumMismatchThrows() async throws {
+        let cacheDirectory = makeTempCacheDirectory()
+        let manager = makeMockedManager(cacheDirectory: cacheDirectory)
+        let variant = ModelVariant(
+            id: "multi-bad", engineID: "model.sherpa", displayName: "Multi", quantization: "FP32",
+            approximateSizeMB: 1,
+            files: [ModelFile(
+                name: "enc.onnx", url: StubURLProtocol.url(status: 200, path: "enc.onnx"),
+                sizeBytes: 1, sha256: String(repeating: "0", count: 64)
+            )]
+        )
+        await #expect(throws: ModelDownloadError.self) { _ = try await manager.ensureDownloaded(variant) }
+        #expect(!manager.isDownloaded(variant))
+        try? FileManager.default.removeItem(at: cacheDirectory)
+    }
 }
 
 /// A minimal `URLProtocol` stub so the network phase (success, checksum

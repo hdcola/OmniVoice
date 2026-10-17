@@ -1591,6 +1591,7 @@ public final class RecordingSession: ObservableObject {
     }
 
     private static func makeTranscriptionProvider(engineID: String, modelPath: URL?) -> TranscriptionProvider {
+        if engineID == "model.sherpa" { return SherpaTranscriptionProvider(modelDir: modelPath) }
         switch ProviderCatalog.transcriptionEngines.first(where: { $0.id == engineID })?.kind {
         case .model: return ModelTranscriptionProvider(modelPath: modelPath)
         default: return SystemTranscriptionProvider()
