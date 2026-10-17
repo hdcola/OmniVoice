@@ -81,7 +81,7 @@ Runs fully on-device.
 Hold the right ⌥ Option key (or right ⌘ / ⌃), or tap to start and tap again
 to stop, in any app. Speak, and the text is typed at the cursor.
 
-- Uses system speech recognition, or borrows the local R2T2 model if it is
+- Uses system speech recognition, or borrows the local model if it is
   already loaded for transcription.
 - A bubble shows what it hears; Esc cancels; a time limit (default 2 min)
   closes the microphone if a key release is lost.
@@ -102,7 +102,7 @@ to stop, in any app. Speak, and the text is typed at the cursor.
 
 | | System (built in, no download) | Local models (offline) |
 |---|---|---|
-| Speech recognition | `SpeechAnalyzer` / `SpeechTranscriber` | R2T2 (Q4_K_M / Q8_0 / F16) |
+| Speech recognition | `SpeechAnalyzer` / `SpeechTranscriber` | R2T2 (Q4_K_M / Q8_0 / F16) via audio.cpp; small streaming Zipformer / Paraformer models via sherpa-onnx |
 | Translation | `Translation` framework | HY-MT1.5 1.8B (light), T3PO (high quality) |
 
 Choose the recognition and translation engines independently. Local models

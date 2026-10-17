@@ -96,7 +96,7 @@ in-process. `Scripts/setup_third_party.sh` unpacks the prebuilt macOS arm64
 libs (no TTS) into `third_party/sherpa-onnx/{include,lib}` — `Package.swift`
 links `libsherpa-onnx-c-api.dylib` from there, so the build needs it.
 
-The engine is selectable as 流式 Zipformer 模型 (`model.sherpa`); nine models
+The engine is selectable as sherpa-onnx 本地引擎 (`model.sherpa`); nine models
 (`ProviderCatalog.sherpaVariants`) download from the Model Library into
 `Application Support/OmniVoice/Models/<variant id>/`. The loader recognizes a
 package's kind from its files (transducer, Paraformer or Zipformer2 CTC).

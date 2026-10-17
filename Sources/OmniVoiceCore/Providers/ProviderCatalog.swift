@@ -142,12 +142,12 @@ public enum ProviderCatalog {
             summary: String(localized: "macOS system speech recognition. Ready to use, no extra download.")
         ),
         EngineDescriptor(
-            id: "model.r2t2", displayName: String(localized: "R2T2 offline model"), kind: .model,
+            id: "model.r2t2", displayName: String(localized: "audio.cpp local engine"), kind: .model,
             badge: String(localized: "Recommended · Automatic language detection"),
-            summary: String(localized: "Supports streaming live transcription, punctuation prediction and automatic detection of mixed languages.")
+            summary: String(localized: "Runs large local models (currently R2T2) with streaming live transcription, punctuation prediction and automatic detection of mixed languages.")
         ),
         EngineDescriptor(
-            id: "model.sherpa", displayName: String(localized: "Streaming Zipformer model"), kind: .model,
+            id: "model.sherpa", displayName: String(localized: "sherpa-onnx local engine"), kind: .model,
             badge: String(localized: "Lightweight · Low latency"),
             summary: String(localized: "Small streaming models with very low latency and little memory use; pick the one for your languages. Text appears as you speak, without punctuation; Dictation’s “Polish recognized text” can tidy it up.")
         ),

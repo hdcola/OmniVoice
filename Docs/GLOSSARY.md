@@ -16,7 +16,8 @@ intentionally unchanged (renaming them would break persisted settings).
 | Window listing transcripts | 历史记录 | History | `SessionListView` |
 | Translation engine for transcription | 转录翻译引擎 | Transcription translation engine | `ProviderCatalog` |
 | Translation engine for Quick Translate | 快捷翻译引擎（可「跟随语音识别设置」） | Quick Translate engine (Follow speech recognition) | `SelectionTranslationEngine` |
-| Local streaming ASR engine (sherpa-onnx Zipformer) | 流式 Zipformer 模型 | Streaming Zipformer model | `model.sherpa` / `SherpaTranscriptionProvider` |
+| Local ASR engine on audio.cpp (large models, now R2T2) | audio.cpp 本地引擎 | audio.cpp local engine | `model.r2t2` / `ModelTranscriptionProvider` |
+| Local ASR engine on sherpa-onnx (small streaming models) | sherpa-onnx 本地引擎 | sherpa-onnx local engine | `model.sherpa` / `SherpaTranscriptionProvider` |
 | macOS Translation framework engine | 系统翻译 | System translation | `system.translation` |
 | macOS Speech framework engine | 系统语音识别 | System speech recognition | `system.speech` |
 | Model download/delete UI | 模型库（设置标签页，菜单「模型库…」） | Model Library | `ModelManagementView` |
@@ -29,3 +30,6 @@ intentionally unchanged (renaming them would break persisted settings).
 Rules: never say plain "floating panel" / "悬浮窗" / "面板" without the
 qualifier above; there is no "main window" (the app is menu-bar only);
 don't use 托盘, 转写, 录音 (for the feature), 显存, 会话.
+Engines are named after their runtime (audio.cpp / sherpa-onnx local engine);
+R2T2, T3PO, Zipformer, Paraformer etc. are models, so never call them an
+"engine" or use a model name as an engine name.

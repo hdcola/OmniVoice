@@ -27,7 +27,7 @@ struct SourceLanguagePicker: View {
 
     /// An engine can't recognize every `LanguageCatalog` entry: the system
     /// one drops a handful (`supportsSystemASRSource == false`), the
-    /// Streaming Zipformer model only knows Chinese and English. Offering
+    /// sherpa model covers only a few languages. Offering
     /// the rest would be a trap — picking one fails or produces nonsense.
     private var options: [LanguageOption] {
         ProviderCatalog.sourceLanguageOptions(forEngineID: transcriptionEngineID, variantID: transcriptionVariantID)
@@ -42,7 +42,7 @@ struct SourceLanguagePicker: View {
     private var autoLabel: String {
         if isAutoAvailable { return String(localized: "✨ Auto-detect language (Auto)") }
         return allowsAuto
-            ? String(localized: "✨ Auto-detect (requires the local R2T2 engine)")
+            ? String(localized: "✨ Auto-detect (requires a local engine)")
             : String(localized: "✨ Auto-detect (only available when listening to a foreign language)")
     }
 
@@ -83,7 +83,7 @@ struct SourceLanguagePicker: View {
                 .foregroundStyle(.secondary)
                 .help("Why is “Auto-detect” unavailable?")
                 .popover(isPresented: $isAutoExplanationPresented) {
-                    Text("The macOS system speech recognition engine requires a fixed language. To auto-detect mixed languages, switch to the local R2T2 model in Settings.")
+                    Text("The macOS system speech recognition engine requires a fixed language. To auto-detect mixed languages, switch to a local engine in Settings.")
                         .font(.callout)
                         .frame(width: 260)
                         .padding()

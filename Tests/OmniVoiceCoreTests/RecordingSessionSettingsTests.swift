@@ -195,7 +195,7 @@ struct RecordingSessionSettingsTests {
         }
     }
 
-    // MARK: - Streaming Zipformer model (Chinese + English only)
+    // MARK: - sherpa-onnx local engine (models cover only a few languages)
 
     private func makeSherpaDownloadManager(variantID: String? = nil) throws -> ModelDownloadManager {
         let variants = ProviderCatalog.modelVariants(forEngineID: "model.sherpa")

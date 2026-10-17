@@ -211,7 +211,7 @@ struct ModelManagementView: View {
         ) else {
             return nil
         }
-        return (String(localized: "Pair it with the R2T2 speech recognition engine for the best real-time typewriter experience"), r2t2)
+        return (String(localized: "Pair it with the audio.cpp local engine for the best real-time typewriter experience"), r2t2)
     }
 
     // MARK: - Task 2.3 — Recommended bundles

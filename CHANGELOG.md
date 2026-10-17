@@ -7,12 +7,13 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(asr): new Streaming Zipformer model speech recognition engine (sherpa-onnx, bilingual Chinese-English, about 360MB), selectable in Settings → Speech Recognition and downloadable from the Model Library; works for Live transcription and Dictation, whose Polish recognized text can tidy its unpunctuated output (#114)
-- feat(asr): the Streaming Zipformer model engine now offers nine models to choose from in Settings → Speech Recognition and the Model Library: Zipformer bilingual (zh-en), Chinese 2025 (transducer and CTC), Chinese small CTC, Chinese multi-dataset, Chinese 14M, Paraformer bilingual (zh-en), Paraformer trilingual (Mandarin, Cantonese, English) and a Zipformer covering eight languages; sizes from about 25MB to 360MB (#114)
-- feat(asr): each Streaming Zipformer model only offers the source languages it can recognize (for example Chinese only, or Mandarin, Cantonese and English) (source picker in the Caption panel, My language / Foreign language, ⇄ swap, Dictation language), and switching to it repairs a language it cannot recognize, as System speech recognition already does (#114)
+- feat(asr): new sherpa-onnx local engine for speech recognition (small streaming models), selectable in Settings → Speech Recognition and downloadable from the Model Library; works for Live transcription and Dictation, whose Polish recognized text can tidy its unpunctuated output (#114)
+- feat(asr): the sherpa-onnx local engine offers nine models to choose from in Settings → Speech Recognition and the Model Library: Zipformer bilingual (zh-en), Chinese 2025 (transducer and CTC), Chinese small CTC, Chinese multi-dataset, Chinese 14M, Paraformer bilingual (zh-en), Paraformer trilingual (Mandarin, Cantonese, English) and a Zipformer covering eight languages; sizes from about 25MB to 360MB (#114)
+- feat(asr): each sherpa-onnx model only offers the source languages it can recognize (for example Chinese only, or Mandarin, Cantonese and English) (source picker in the Caption panel, My language / Foreign language, ⇄ swap, Dictation language), and switching to it repairs a language it cannot recognize, as System speech recognition already does (#114)
 - feat(models): model packages made of several files can be downloaded and verified file by file, with one overall progress bar and a retry that skips files already fetched (#114)
 
 ### Changed
+- refactor(asr): speech recognition engines are named after their runtime instead of a model: “R2T2 offline model” is now “audio.cpp local engine” (engine ID and settings unchanged), and the new one is “sherpa-onnx local engine”; the glossary says so (#114)
 
 ### Fixed
 
@@ -20,7 +21,7 @@ The format is based on Keep a Changelog.
 - chore(deps): link prebuilt sherpa-onnx v1.13.8 (macOS arm64) from `third_party/sherpa-onnx`, fetched by `Scripts/setup_third_party.sh` (#114)
 
 ### Documentation
-- docs(setup): describe the sherpa-onnx setup step in `Docs/MODEL_ENGINE_SETUP.md`; add the Streaming Zipformer model to `Docs/GLOSSARY.md` (#114)
+- docs(setup): describe the sherpa-onnx setup step in `Docs/MODEL_ENGINE_SETUP.md`; add the sherpa-onnx local engine to `Docs/GLOSSARY.md` (#114)
 
 ### Tests
 - test(asr): smoke test for the sherpa-onnx provider, skipped when the model is absent (#114)

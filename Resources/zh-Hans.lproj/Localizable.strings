@@ -278,7 +278,7 @@
 "Optional" = "可留空";
 "Output failed validation" = "输出没有通过校验";
 "Output was cut off. This may be a reasoning model: switch to a non-reasoning model, or turn off thinking on the server" = "输出被截断，可能是推理模型：请换非推理模型，或在服务端关闭思考";
-"Pair it with the R2T2 speech recognition engine for the best real-time typewriter experience" = "搭配 R2T2 识别引擎可获得最佳实时打字机体验";
+"Pair it with the audio.cpp local engine for the best real-time typewriter experience" = "搭配 audio.cpp 本地引擎可获得最佳实时打字机体验";
 "Paste, then press Return" = "粘贴后回车";
 "Pause music during dictation" = "语音输入时暂停音乐";
 "Pauses playing music or video when you start speaking and resumes it afterwards; only content paused by this feature is resumed." = "开始说话时暂停正在播放的音乐或视频，结束后自动继续；只会恢复由它暂停的内容";
@@ -307,8 +307,8 @@
 "Quick Translate engine" = "快捷翻译引擎";
 "Quick Translate" = "快捷翻译";
 "Quit OmniVoice" = "退出 OmniVoice";
-"R2T2 offline model" = "R2T2 离线大模型";
-"Streaming Zipformer model" = "流式 Zipformer 模型";
+"audio.cpp local engine" = "audio.cpp 本地引擎";
+"sherpa-onnx local engine" = "sherpa-onnx 本地引擎";
 "R2T2 recognition + HY-MT1.5 translation" = "R2T2 识别 + HY-MT1.5 翻译";
 "R2T2 speech recognition + HY-MT1.5 translation. Minimal memory use, whole-sentence translation output. Suited to 8GB devices." = "R2T2 语音识别 + HY-MT1.5 翻译。占用内存极小，整句翻译输出。适合 8GB 内存设备。";
 "R2T2 speech recognition + T3PO live streaming translation. Automatic language detection, character-by-character typewriter display, fully offline and private. Recommended for Macs with 16GB+ unified memory." = "R2T2 语音识别 + T3PO 实时流式翻译。自动检测语种、逐字打字机流式显示、完全离线私密。建议 16GB+ 统一内存 Mac。";
@@ -401,14 +401,14 @@
 "Stored in the Keychain; the full value is not shown." = "存在钥匙串里，不会显示完整内容";
 "Streaming WAIT/TRANS live character-by-character preview, best for translating between Chinese/Cantonese/English/Japanese/Korean; recommended for devices with 16GB+ unified memory." = "流式 WAIT/TRANS 实时逐字预览，中/粤/英/日/韩之间的翻译效果最佳，建议 16GB+ 统一内存设备使用。";
 "Structured" = "结构化";
-"Supports streaming live transcription, punctuation prediction and automatic detection of mixed languages." = "支持流式实时转录、标点预测与混合语种自动检测。";
+"Runs large local models (currently R2T2) with streaming live transcription, punctuation prediction and automatic detection of mixed languages." = "运行本地大模型（目前是 R2T2），支持流式实时转录、标点预测与混合语种自动检测。";
 "Swap source and target languages" = "互换源语言和目标语言";
 "Switch to System translation" = "切换为系统翻译";
 "Switch translation engine to “System translation” in one click (takes effect after transcription ends)" = "一键将翻译引擎切换为「系统翻译」（转录结束后生效）";
 "Switch translation engine to “System translation” in one click" = "一键将翻译引擎切换为「系统翻译」";
 "System audio failed to start (you may need to grant Screen Recording permission in System Settings): %@" = "系统音频启动失败（可能需要在系统设置里授权屏幕录制权限）: %@";
 "System default" = "系统默认";
-"System engines use the macOS Speech / Translation frameworks; local engines use audio.cpp (R2T2) and llama.cpp (T3PO / HY-MT1.5) and run fully offline." = "系统引擎基于 macOS Speech / Translation 框架；本地引擎基于 audio.cpp（R2T2）与 llama.cpp（T3PO / HY-MT1.5），完全离线运行。";
+"System engines use the macOS Speech / Translation frameworks; local engines use audio.cpp (R2T2), sherpa-onnx (streaming Zipformer / Paraformer) and llama.cpp (T3PO / HY-MT1.5) and run fully offline." = "系统引擎基于 macOS Speech / Translation 框架；本地引擎基于 audio.cpp（R2T2）、sherpa-onnx（流式 Zipformer / Paraformer）与 llama.cpp（T3PO / HY-MT1.5），完全离线运行。";
 "System speech recognition does not support the source language after swapping" = "系统语音识别不支持互换后的源语言";
 "System speech recognition" = "系统语音识别";
 "System translation" = "系统翻译";
@@ -430,7 +430,7 @@
 "The foreign language you listen to or read; in Quick Translate, text in your language is translated into it" = "你要听、要读的外语；快捷翻译里「我的语言」的文字会译成它";
 "The language of this text could not be determined, so a voice for reading it aloud cannot be chosen." = "无法判断这段文字的语言，没法选择朗读语音。";
 "The language to recognize; Auto-detect is only available when a local recognition model is loaded." = "按哪种语言识别；自动检测只在本地识别模型已加载时可用";
-"The macOS system speech recognition engine requires a fixed language. To auto-detect mixed languages, switch to the local R2T2 model in Settings." = "macOS 系统语音识别引擎要求指定固定语种。如需自动识别混合语种，请在设置中切换为 R2T2 本地模型。";
+"The macOS system speech recognition engine requires a fixed language. To auto-detect mixed languages, switch to a local engine in Settings." = "macOS 系统语音识别引擎要求指定固定语种。如需自动识别混合语种，请在设置中切换为本地引擎。";
 "The microphone is set to “None”. Turn on “Include system audio” first, otherwise there is no audio source." = "麦克风已设为「无」，请先开启「包含系统声音」，否则没有可用的音频来源";
 "The model is downloading in the background and will be enabled automatically when it finishes" = "模型正在后台下载中，下载完成后将自动为您无缝启用";
 "The model is not loaded yet" = "模型尚未加载";
@@ -537,7 +537,7 @@
 "⚠️ Other languages (require the system translation engine)" = "⚠️ 其他语言（需系统翻译引擎支持）";
 "⚡ Preload into Memory" = "⚡ 预加载到内存";
 "✨ Auto-detect (only available when listening to a foreign language)" = "✨ 自动检测（仅听外语时可用）";
-"✨ Auto-detect (requires the local R2T2 engine)" = "✨ 自动检测（需本地 R2T2 引擎）";
+"✨ Auto-detect (requires a local engine)" = "✨ 自动检测（需本地引擎）";
 "✨ Auto-detect language (Auto)" = "✨ 自动检测语种 (Auto)";
 "⭐ Star us on GitHub" = "⭐ 在 GitHub 点个 Star";
 "🧹 Free Memory" = "🧹 释放内存占用";
