@@ -10,9 +10,9 @@ text and screenshots anywhere on screen, and types what you dictate into any
 app. Speech recognition and translation run on macOS's built-in frameworks
 or on local models — no cloud service is required.
 
-**Current version: 0.8.2 — internal test build.**
+**Current version: 0.9.0 — internal test build.**
 
-### [⬇ Download OmniVoice 0.8.2 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.8.2/OmniVoice-0.8.2.dmg)
+### [⬇ Download OmniVoice 0.9.0 (.dmg)](https://github.com/hdcola/OmniVoice/releases/download/v0.9.0/OmniVoice-0.9.0.dmg)
 
 Or install with [Homebrew](https://brew.sh):
 

@@ -341,6 +341,17 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       weights, and one-shot `HYMT15Translator.translateText` — plus floating
       panel toolbar/resize-cursor fixes (PR #41), the 启动时显示悬浮窗 toggle
       (PR #42), and the terminology unification pass (PR #43).
+- [x] **0.9.0 release cut** (2026-10-18, `chore/release-0.9.0`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.9.0,
+      `CFBundleVersion` 24), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.9.0]` section, `README.md` / `README.zh-CN.md` version and
+      download-link references bumped to match. Adds the sherpa-onnx local
+      engine (streaming speech recognition with less memory and computation,
+      nine models, PR #114), the three-step onboarding wizard (PR #115) and
+      the Quick Translate engine picker (PR #116); T3PO now translates while
+      sherpa-onnx is still recognizing (PR #118) and the Caption panel's
+      translation is drawn in the full text color (PR #119). What's-new entry
+      (revision 8) introduces the sherpa-onnx local engine.
 - [x] **0.8.2 release cut** (2026-10-16, `chore/release-0.8.2`): version
       bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.8.2,
       `CFBundleVersion` 23), CHANGELOG's `[Unreleased]` cut into a dated
