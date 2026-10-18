@@ -14,7 +14,7 @@ struct SelectionTranslationSettingsView: View {
     /// finish downloading in the "模型库" tab.
     @ObservedObject var downloadManager: ModelDownloadManager
     @EnvironmentObject private var navigation: SettingsNavigationState
-    /// Observed so "跟随转录设置" re-resolves the moment the recording's
+    /// Observed so "跟随转录翻译引擎" re-resolves the moment the recording's
     /// translation engine changes in the "语音识别" tab.
     @EnvironmentObject private var session: RecordingSession
 
@@ -77,12 +77,11 @@ struct SelectionTranslationSettingsView: View {
 
     private var engineCard: some View {
         SettingsCard(title: "Quick Translate engine", icon: "cpu") {
-            SettingsRow(title: "Engine", subtitle: "Both engines run on this Mac; HY-MT1.5 frees its memory after 5 idle minutes") {
+            SettingsRow(title: "Engine", subtitle: "Both options run on this Mac") {
                 Picker("Quick Translate engine", selection: $translator.engineID) {
                     Text(followRecordingLabel).tag(SelectionTranslationEngine.followRecording)
-                    ForEach(SelectionTranslationEngine.all) { engine in
-                        Text(engineLabel(for: engine)).tag(engine.id)
-                    }
+                    Text(SelectionTranslationEngine.displayName(for: SelectionTranslationEngine.system))
+                        .tag(SelectionTranslationEngine.system)
                 }
                 .labelsHidden()
                 .accessibilityLabel("Quick Translate engine")
@@ -112,12 +111,7 @@ struct SelectionTranslationSettingsView: View {
     }
 
     private var followRecordingLabel: String {
-        String(localized: "Follow speech recognition (\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID)))")
-    }
-
-    private func engineLabel(for engine: EngineDescriptor) -> String {
-        engine.id == SelectionTranslationEngine.hymt15 && !translator.isModelEngineAvailable
-            ? String(localized: "\(engine.displayName) (not downloaded)") : engine.displayName
+        String(localized: "Follow transcription translation engine (current: \(SelectionTranslationEngine.displayName(for: translator.followedEngineID)))")
     }
 
     private var unsupportedLanguageNames: String? {

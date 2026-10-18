@@ -181,7 +181,7 @@ private final class FakeModelBackend: SelectionModelTranslating {
         #expect(translator.foreignLanguageCode == "en-US")
     }
 
-    @Test func followRecordingUsesTheRecordingEngineAndReplacesT3PO() {
+    @Test func followRecordingUsesTheRecordingEngineAndT3POFallsBackToSystem() {
         var recording: String? = SelectionTranslationEngine.system
         var modelURL: URL? = URL(fileURLWithPath: "/tmp/hymt.gguf")
         let translator = SelectionTranslator(
@@ -191,8 +191,10 @@ private final class FakeModelBackend: SelectionModelTranslating {
         #expect(translator.effectiveEngineID == SelectionTranslationEngine.system)
         recording = SelectionTranslationEngine.hymt15
         #expect(translator.effectiveEngineID == SelectionTranslationEngine.hymt15)
+        // T3PO isn't offered here: follow uses System translation, whether or
+        // not HY-MT1.5 is downloaded.
         recording = "model.t3po"
-        #expect(translator.effectiveEngineID == SelectionTranslationEngine.hymt15)
+        #expect(translator.effectiveEngineID == SelectionTranslationEngine.system)
         modelURL = nil
         #expect(translator.effectiveEngineID == SelectionTranslationEngine.system)
 
@@ -200,6 +202,19 @@ private final class FakeModelBackend: SelectionModelTranslating {
         translator.engineID = SelectionTranslationEngine.system
         recording = SelectionTranslationEngine.hymt15
         #expect(translator.effectiveEngineID == SelectionTranslationEngine.system)
+    }
+
+    @Test func followedEngineIsKnownEvenWhileSystemTranslationIsPicked() {
+        var recording: String? = SelectionTranslationEngine.hymt15
+        let translator = SelectionTranslator(
+            defaults: Self.makeDefaults(), modelBackend: FakeModelBackend(),
+            recordingEngineID: { recording }, modelURLProvider: { nil }
+        )
+        translator.engineID = SelectionTranslationEngine.system
+        #expect(translator.effectiveEngineID == SelectionTranslationEngine.system)
+        #expect(translator.followedEngineID == SelectionTranslationEngine.hymt15)
+        recording = "model.t3po"
+        #expect(translator.followedEngineID == SelectionTranslationEngine.system)
     }
 
     @Test func followRecordingRoutesTranslationsToTheResolvedEngine() async {
@@ -217,13 +232,20 @@ private final class FakeModelBackend: SelectionModelTranslating {
 
     @Test func restoresPersistedSettingsAndIgnoresUnknownValues() {
         let defaults = Self.makeDefaults()
-        defaults.set(SelectionTranslationEngine.hymt15, forKey: PersistedSelectionKey.engineID)
+        defaults.set(SelectionTranslationEngine.system, forKey: PersistedSelectionKey.engineID)
         defaults.set("ja-JP", forKey: PersistedSelectionKey.myLanguageCode)
         defaults.set("xx-XX", forKey: PersistedSelectionKey.foreignLanguageCode)
         let translator = SelectionTranslator(defaults: defaults, modelBackend: FakeModelBackend(), modelURLProvider: { nil })
-        #expect(translator.engineID == SelectionTranslationEngine.hymt15)
+        #expect(translator.engineID == SelectionTranslationEngine.system)
         #expect(translator.myLanguageCode == "ja-JP")
         #expect(translator.foreignLanguageCode == "en-US")
+    }
+
+    @Test func aStoredHYMTChoiceFromAnEarlierVersionReadsAsFollow() {
+        let defaults = Self.makeDefaults()
+        defaults.set(SelectionTranslationEngine.hymt15, forKey: PersistedSelectionKey.engineID)
+        let translator = SelectionTranslator(defaults: defaults, modelBackend: FakeModelBackend(), modelURLProvider: { nil })
+        #expect(translator.engineID == SelectionTranslationEngine.followRecording)
     }
 
     @Test func translatesEachParagraphAndKeepsLayout() async {

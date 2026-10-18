@@ -15,7 +15,7 @@ intentionally unchanged (renaming them would break persisted settings).
 | One saved recording | 转录记录 | Transcript | `RecordingSessionRecord` |
 | Window listing transcripts | 历史记录 | History | `SessionListView` |
 | Translation engine for transcription | 转录翻译引擎 | Transcription translation engine | `ProviderCatalog` |
-| Translation engine for Quick Translate | 快捷翻译引擎（可「跟随语音识别设置」） | Quick Translate engine (Follow speech recognition) | `SelectionTranslationEngine` |
+| Translation engine for Quick Translate | 快捷翻译引擎（系统翻译 / 跟随转录翻译引擎） | Quick Translate engine (System translation / Follow transcription translation engine) | `SelectionTranslationEngine` |
 | Local ASR engine on audio.cpp (large models, now R2T2) | audio.cpp 本地引擎 | audio.cpp local engine | `model.r2t2` / `ModelTranscriptionProvider` |
 | Local ASR engine on sherpa-onnx (small streaming models) | sherpa-onnx 本地引擎 | sherpa-onnx local engine | `model.sherpa` / `SherpaTranscriptionProvider` |
 | First-run wizard (also re-run from Settings) | 新手引导（三步：权限与开关 → 识别模型 → 翻译模型） | Onboarding (Permissions and switches → Speech recognition model → Translation model) | `OnboardingView` |

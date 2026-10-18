@@ -70,7 +70,7 @@ public final class SelectionTranslator: ObservableObject {
     /// done" listens for.
     @Published public private(set) var finishedTranslationCount = 0
 
-    /// A `SelectionTranslationEngine` ID — `followRecording` or one of `all`.
+    /// `SelectionTranslationEngine.followRecording` or `.system`; both resolve through `effectiveEngineID`.
     @Published public var engineID: String {
         didSet { defaults.set(engineID, forKey: PersistedSelectionKey.engineID) }
     }
@@ -158,8 +158,10 @@ public final class SelectionTranslator: ObservableObject {
         self.recordingEngineID = recordingEngineID
         self.modelURLProvider = modelURLProvider
         let storedEngine = defaults.string(forKey: PersistedSelectionKey.engineID)
+        // The picker offers just System translation and "follow"; a stored
+        // HY-MT1.5 choice (an earlier version) now reads as "follow".
         let isKnown = storedEngine == SelectionTranslationEngine.followRecording
-            || SelectionTranslationEngine.all.contains { $0.id == storedEngine }
+            || storedEngine == SelectionTranslationEngine.system
         engineID = isKnown ? storedEngine! : SelectionTranslationEngine.followRecording
         let languages = languages ?? LanguagePreferences(defaults: defaults)
         self.languages = languages
@@ -174,20 +176,18 @@ public final class SelectionTranslator: ObservableObject {
 
     /// The engine a translation started now would actually use —
     /// `engineID` itself, unless that's `followRecording`: then the
-    /// recording's engine when it's one the panel can run, and for T3PO
-    /// (see `SelectionTranslationEngine`'s doc for why the panel never uses
-    /// it) HY-MT1.5 when downloaded — the closer match, being a local model
-    /// too — else the system engine.
+    /// recording's engine when it's one the panel can run, else (T3PO — see
+    /// `SelectionTranslationEngine`'s doc for why the panel never uses it)
+    /// the system engine.
     public var effectiveEngineID: String {
-        guard engineID == SelectionTranslationEngine.followRecording else { return engineID }
-        switch recordingEngineID() {
-        case SelectionTranslationEngine.system:
-            return SelectionTranslationEngine.system
-        case SelectionTranslationEngine.hymt15:
-            return SelectionTranslationEngine.hymt15
-        default:
-            return isModelEngineAvailable ? SelectionTranslationEngine.hymt15 : SelectionTranslationEngine.system
-        }
+        engineID == SelectionTranslationEngine.followRecording ? followedEngineID : engineID
+    }
+
+    /// What "follow the recording" resolves to right now, whichever option is
+    /// selected — the picker's Follow label shows it.
+    public var followedEngineID: String {
+        recordingEngineID() == SelectionTranslationEngine.hymt15
+            ? SelectionTranslationEngine.hymt15 : SelectionTranslationEngine.system
     }
 
     /// Brings a new selection/OCR result into the source pane and
