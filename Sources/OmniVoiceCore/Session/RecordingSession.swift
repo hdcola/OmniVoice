@@ -1451,6 +1451,8 @@ public final class RecordingSession: ObservableObject {
         // (`unloadModelsBeforeQuit()`) actually unloads.
         await transcriptionProvider?.stop()
         await translationProvider?.stop()
+        sourcePauseTask?.cancel()
+        sourcePauseTask = nil
 
         if let sessionStore, let activeSessionRecord {
             sessionStore.finish(activeSessionRecord)
@@ -1570,6 +1572,7 @@ public final class RecordingSession: ObservableObject {
     /// arrives within `sourcePauseDelay`, tells the translation provider the
     /// speaker paused. Cancelled by the next event and by `stop()`.
     private func scheduleSourcePause() {
+        guard isRunning, !isStopping else { return }
         sourcePauseTask = Task { [weak self] in
             try? await Task.sleep(for: Self.sourcePauseDelay)
             guard !Task.isCancelled else { return }

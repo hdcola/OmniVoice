@@ -24,8 +24,9 @@ struct StablePrefixTracker {
     mutating func ingest(_ hypothesis: String) -> (appended: String?, tentative: String) {
         defer { previous = hypothesis }
         guard hypothesis.hasPrefix(emitted) else {
-            // The recognizer rewrote text we already committed; leave it be.
-            return (nil, "")
+            // The recognizer rewrote text we already committed; leave it be
+            // and keep showing what follows the part both still agree on.
+            return (nil, reconciledTail(of: hypothesis))
         }
         let common = hypothesis.commonPrefix(with: previous)
         let stableCount = max(0, min(common.count, hypothesis.count - holdback))
@@ -45,9 +46,42 @@ struct StablePrefixTracker {
         guard finalText.hasPrefix(emitted) else {
             // Final text diverged from what was committed; the committed
             // prefix can't be retracted, so only deliver what lies beyond it.
-            return String(finalText.dropFirst(min(emitted.count, finalText.count)))
+            return reconciledTail(of: finalText)
         }
         return String(finalText.dropFirst(emitted.count))
+    }
+
+    /// The part of `text` to deliver after `emitted` when `text` no longer
+    /// starts with it: everything past the common prefix, except that a
+    /// divergence inside a word backs up to the word's start (the wrong word
+    /// stays, but nothing is spliced or lost). A space keeps a restarted
+    /// English word from gluing onto the emitted text.
+    private func reconciledTail(of text: String) -> String {
+        let emittedChars = Array(emitted)
+        let textChars = Array(text)
+        var common = 0
+        while common < emittedChars.count, common < textChars.count,
+            emittedChars[common] == textChars[common]
+        {
+            common += 1
+        }
+        func isWordCharacter(_ character: Character) -> Bool {
+            character.isASCII && (character.isLetter || character.isNumber)
+        }
+        var backedOff = false
+        if common > 0, isWordCharacter(textChars[common - 1]),
+            (common < textChars.count && isWordCharacter(textChars[common]))
+                || (common < emittedChars.count && isWordCharacter(emittedChars[common]))
+        {
+            let lastSpace = textChars[..<common].lastIndex { $0.isWhitespace }
+            common = lastSpace.map { $0 + 1 } ?? 0
+            backedOff = true
+        }
+        let tail = String(textChars[common...])
+        if backedOff, !tail.isEmpty, let last = emittedChars.last, !last.isWhitespace {
+            return " " + tail
+        }
+        return tail
     }
 
     mutating func reset() {

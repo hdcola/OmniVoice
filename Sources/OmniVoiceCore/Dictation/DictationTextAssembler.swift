@@ -13,10 +13,10 @@ public struct DictationTextAssembler: Equatable, Sendable {
 
     public init() {}
 
-    /// The still-open segment: an append-style engine's deltas, otherwise
-    /// the latest replace-style hypothesis.
+    /// The still-open segment: an append-style engine's deltas followed by
+    /// its tentative tail, otherwise the latest replace-style hypothesis.
     public var pending: String {
-        appendedInSegment.isEmpty ? revisedInSegment : appendedInSegment
+        appendedInSegment.isEmpty ? revisedInSegment : appendedInSegment + revisedInSegment
     }
 
     /// Everything heard so far, trimmed.

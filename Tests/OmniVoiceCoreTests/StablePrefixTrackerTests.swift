@@ -27,6 +27,30 @@ struct StablePrefixTrackerTests {
         _ = tracker.ingest("hello world")
         let rewritten = tracker.ingest("jello world!!")
         #expect(rewritten.appended == nil)
-        #expect(tracker.close(finalText: "jello world!!") == "ld!!")
+        #expect(rewritten.tentative == "jello world!!")
+        #expect(tracker.close(finalText: "jello world!!") == "jello world!!")
+    }
+
+    @Test func divergenceMidWordBacksUpToTheWordStart() {
+        var tracker = StablePrefixTracker(holdback: 0)
+        _ = tracker.ingest("I think")
+        _ = tracker.ingest("I think")
+        #expect(tracker.close(finalText: "I thought that is true") == " thought that is true")
+    }
+
+    @Test func divergenceInChineseKeepsEverythingPastTheCommonPrefix() {
+        var tracker = StablePrefixTracker(holdback: 0)
+        _ = tracker.ingest("我们应该")
+        _ = tracker.ingest("我们应该")
+        #expect(tracker.close(finalText: "我们必须去做") == "必须去做")
+    }
+
+    @Test func divergedIngestKeepsTheTentativeVisible() {
+        var tracker = StablePrefixTracker(holdback: 0)
+        _ = tracker.ingest("I think")
+        _ = tracker.ingest("I think")
+        let diverged = tracker.ingest("I thought that")
+        #expect(diverged.appended == nil)
+        #expect(diverged.tentative == " thought that")
     }
 }

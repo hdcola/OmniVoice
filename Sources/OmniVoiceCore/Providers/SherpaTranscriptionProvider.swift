@@ -54,10 +54,14 @@ public final class SherpaTranscriptionProvider: TranscriptionProvider {
     public func start(config: TranscriptionConfig) async throws {
         // The bilingual model detects zh/en itself; `config.languageCode` has
         // nothing to select.
+        resetTracker()
+        try transcriber.startStream()
+    }
+
+    private func resetTracker() {
         trackerLock.lock()
         tracker.reset()
         trackerLock.unlock()
-        try transcriber.startStream()
     }
 
     public nonisolated func push(samples: [Float]) {
