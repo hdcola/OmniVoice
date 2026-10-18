@@ -251,6 +251,22 @@ struct RecordingSessionSettingsTests {
         }
     }
 
+    @Test func aChineseOnlyModelMovesMyLanguageWhenNeitherSideIsRecognizable() throws {
+        let manager = try makeSherpaDownloadManager(variantID: "sherpa-zipformer-zh-2025")
+        withPersisted([:]) {
+            let session = RecordingSession(modelDownloadManager: manager)
+            session.languages.myLanguageCode = "ja-JP"
+            session.languages.foreignLanguageCode = "en-US"
+            session.languages.foreignLanguageAutoDetect = false
+            session.languages.transcriptionDirection = .listenForeign
+            session.transcriptionEngineID = "model.sherpa"
+            session.transcriptionModelVariantID = "sherpa-zipformer-zh-2025"
+            #expect(session.languages.myLanguageCode == "zh-CN")
+            #expect(session.languages.foreignLanguageCode == "en-US")
+            #expect(session.sourceLanguageCode == "zh-CN")
+        }
+    }
+
     @Test func switchingToAWiderModelKeepsTheLanguagesAndAllowsTheSwap() throws {
         let manager = try makeSherpaDownloadManager()
         withPersisted([:]) {

@@ -118,11 +118,22 @@ final class SherpaOnnxTranscriber: @unchecked Sendable {
         }
     }
 
+    /// A safety net like `InProcessTranscriber`'s: frees the handles if an
+    /// instance is dropped without `unload()`. No `queue.sync` — nothing
+    /// else can reference it any more.
+    deinit {
+        if let stream { SherpaOnnxDestroyOnlineStream(stream) }
+        if let recognizer { SherpaOnnxDestroyOnlineRecognizer(recognizer) }
+    }
+
     func startStream() throws {
         try queue.sync {
             guard let recognizer else { throw SherpaTranscriberError.notLoaded }
             destroyStreamLocked()
-            stream = SherpaOnnxCreateOnlineStream(recognizer)
+            guard let created = SherpaOnnxCreateOnlineStream(recognizer) else {
+                throw SherpaTranscriberError.createFailed
+            }
+            stream = created
             lastPartial = ""
         }
     }

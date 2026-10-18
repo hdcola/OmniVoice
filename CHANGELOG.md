@@ -8,7 +8,7 @@ The format is based on Keep a Changelog.
 
 ### Added
 - feat(asr): new sherpa-onnx local engine for speech recognition (small streaming models), selectable in Settings → Speech Recognition and downloadable from the Model Library; works for Live transcription and Dictation, whose Polish recognized text can tidy its unpunctuated output (#114)
-- feat(asr): the sherpa-onnx local engine offers nine models to choose from in Settings → Speech Recognition and the Model Library: Paraformer bilingual (zh-en) (default), Zipformer bilingual (zh-en), Chinese 2025 (transducer and CTC), Chinese small CTC, Chinese multi-dataset, Chinese 14M, Paraformer trilingual (Mandarin, Cantonese, English) and a Zipformer covering eight languages; sizes from about 25MB to 360MB (#114)
+- feat(asr): the sherpa-onnx local engine offers nine models to choose from in Settings → Speech Recognition and the Model Library: Paraformer bilingual (zh-en) (default), Zipformer bilingual (zh-en), Chinese 2025 (transducer and CTC), Chinese small CTC, Chinese multi-dataset, Chinese 14M, Paraformer trilingual (Mandarin, Cantonese, English) and a multilingual Zipformer (seven languages); sizes from about 25MB to 360MB (#114)
 - feat(asr): each sherpa-onnx model only offers the source languages it can recognize (for example Chinese only, or Mandarin, Cantonese and English) (source picker in the Caption panel, My language / Foreign language, ⇄ swap, Dictation language), and switching to it repairs a language it cannot recognize, as System speech recognition already does (#114)
 - fix(models): the Model Library shows each sherpa-onnx model's measured memory in MB (about 140 MB to 930 MB) instead of a flat "1 GB" estimate (#114)
 - feat(asr): the sherpa-onnx local engine now defaults to Paraformer bilingual (zh-en), about 540 MB of memory instead of the Zipformer bilingual model's 930 MB (#114)
@@ -26,6 +26,7 @@ The format is based on Keep a Changelog.
 - docs(setup): describe the sherpa-onnx setup step in `Docs/MODEL_ENGINE_SETUP.md`; add the sherpa-onnx local engine to `Docs/GLOSSARY.md` (#114)
 
 ### Tests
+- test(asr): cover a Chinese-only sherpa-onnx model when neither of the user's languages is recognizable, and dropping an unloaded sherpa-onnx transcriber (#114)
 - test(asr): smoke test for the sherpa-onnx provider, skipped when the model is absent (#114)
 
 ## [0.8.2] - 2026-10-16

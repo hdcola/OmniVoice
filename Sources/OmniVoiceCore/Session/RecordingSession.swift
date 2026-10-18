@@ -750,6 +750,19 @@ public final class RecordingSession: ObservableObject {
         if isUnsupported(languages.sourceLanguageCode) {
             languages.transcriptionDirection = .speakMine
         }
+        // Neither side is recognizable (my language ja-JP, foreign English,
+        // a Chinese-only model): move my language to one the model knows.
+        if isUnsupported(languages.sourceLanguageCode),
+            let first = ProviderCatalog.sourceLanguageOptions(
+                forEngineID: transcriptionEngineID, variantID: transcriptionModelVariantID
+            ).first {
+            languages.myLanguageCode = first.code
+            if SelectionLanguageDirection.isSameLanguage(languages.foreignLanguageCode, first.code) {
+                languages.foreignLanguageCode = LanguageSettingsMigration.distinctForeign(
+                    from: first.code, preferring: LanguageSettingsMigration.defaultForeign
+                )
+            }
+        }
     }
 
     /// `refreshDevices()`'s own fallback (below) intentionally does *not*

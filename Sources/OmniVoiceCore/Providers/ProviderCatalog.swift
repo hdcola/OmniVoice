@@ -292,7 +292,7 @@ public enum ProviderCatalog {
             summary: String(localized: "Mandarin, Cantonese and English, about 240MB. The only streaming model here that recognizes Cantonese.")
         ),
         sherpaVariant(
-            id: "sherpa-zipformer-multilingual-8", name: "Zipformer Multilingual (8 languages)", quantization: "INT8", sizeMB: 324,
+            id: "sherpa-zipformer-multilingual-8", name: "Zipformer Multilingual", quantization: "INT8", sizeMB: 324,
             repo: "sherpa-onnx-streaming-zipformer-ar_en_id_ja_ru_th_vi_zh-2025-02-10",
             revision: "c6726c1147387ad2a11148b33973135d92a55e6c",
             files: [
@@ -303,7 +303,7 @@ public enum ProviderCatalog {
             ],
             sourceLanguageCodes: ["zh-CN", "en-US", "ja-JP", "ru-RU", "ar-SA", "vi-VN", "th-TH"],
             memoryMB: 800,
-            summary: String(localized: "Arabic, English, Indonesian, Japanese, Russian, Thai, Vietnamese and Chinese in one model, about 340MB.")
+            summary: String(localized: "Arabic, English, Japanese, Russian, Thai, Vietnamese and Chinese in one model, about 340MB.")
         ),
     ]
 
