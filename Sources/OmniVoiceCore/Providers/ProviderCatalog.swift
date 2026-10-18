@@ -323,7 +323,7 @@ public enum ProviderCatalog {
             // which matches the `resolve/main` response's `X-Linked-ETag`.
             sha256: "19f5ccd624484bcb5d44301437de41560b0ecc40c430e8850dfeefefbe82ccf5",
             summary: String(localized: "Optimized for mixed Chinese-English talks and professional meetings, with automatic language detection and sentence/punctuation completion."),
-            recommendedMemoryGB: 3, memoryMB: 3100
+            recommendedMemoryGB: 3, memoryMB: 3100, isMemoryEstimated: true
         ),
         // Smaller/faster R2T2 — a community Q4_K_M quantization (Q4_K with
         // Q6_K MLP-down and Q2_K embeddings, BF16 audio tower) by
@@ -342,7 +342,7 @@ public enum ProviderCatalog {
             )!,
             sha256: "d740d6636f2ea2f3736800c3c88a6e22ecb6c0f26c567fe22b0572ae9c2c4ec8",
             summary: String(localized: "Community quantization (unofficial release): about half the size of Q8_0, about 1.8GB peak memory at runtime, faster decoding, suited to memory-constrained devices; slightly lower accuracy than Q8_0."),
-            recommendedMemoryGB: 2, memoryMB: 1800
+            recommendedMemoryGB: 2, memoryMB: 1800, isMemoryEstimated: true
         ),
         // Same publisher/repo as `r2t2-q8_0`; sha256 verified against HF's
         // LFS metadata (`?blobs=true`) and the `resolve/main`
@@ -355,7 +355,7 @@ public enum ProviderCatalog {
             )!,
             sha256: "d1b531ceaf5640d98352d3a9180238d99d36d393e160afd4692031077e7bae2c",
             summary: String(localized: "Unquantized full-precision version with the highest quality; about 4.7GB peak memory at runtime (Q8_0 is about 3.1GB), suited to devices with plenty of memory."),
-            recommendedMemoryGB: 5, memoryMB: 4700
+            recommendedMemoryGB: 5, memoryMB: 4700, isMemoryEstimated: true
         ),
     ] + sherpaVariants + [
         ModelVariant(

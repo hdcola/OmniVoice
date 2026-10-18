@@ -46,9 +46,10 @@ struct ModelSelectionPlanTests {
 
     @Test func estimatesAreFlaggedAndMeasurementsAreNot() throws {
         #expect(try #require(ProviderCatalog.variant(forID: "t3po-q5_k_m")).isMemoryEstimated)
-        #expect(!(try #require(ProviderCatalog.variant(forID: "r2t2-q8_0")).isMemoryEstimated))
+        #expect(!(try #require(ProviderCatalog.variant(forID: "hymt15-1.8b-q4_k_m")).isMemoryEstimated))
+        #expect(!(try #require(ProviderCatalog.variant(forID: "sherpa-zipformer-zh-14m")).isMemoryEstimated))
         #expect(plan("r2t2-q8_0", "t3po-q5_k_m").isMemoryEstimated)
-        #expect(!plan("r2t2-q8_0", nil).isMemoryEstimated)
+        #expect(!plan("sherpa-zipformer-zh-14m", "hymt15-1.8b-q4_k_m").isMemoryEstimated)
     }
 
     @Test func notesWarnAboutSherpaWithT3POAndLimitedLanguages() {
