@@ -17,12 +17,14 @@ The format is based on Keep a Changelog.
 - feat(dictation): browser audio (videos, web players) is muted during a dictation and comes back afterwards — the video keeps playing; a browser in a call is left alone (Chrome plays every tab through one process, so a Meet call keeps the whole browser unmuted), and no permission is needed (#112)
 
 ### Changed
+- refactor(selection): the Quick Translate engine picker offers just HY-MT1.5 and System translation; the “Follow speech recognition” entry is gone (it always duplicated one of them). Until you pick one, it uses HY-MT1.5 once downloaded, else System translation; a stored “follow” choice becomes the engine it resolved to (#116)
 - refactor(models): the Model Library no longer has the Plan A / Plan B “Recommended setups” card and the wizard no longer has the three run modes; pick the models yourself (#115)
 - feat(models): model cards show memory in MB/GB for the audio.cpp and translation models too, marking figures that are estimates (#115)
 - refactor(asr): speech recognition engines are named after their runtime instead of a model: “R2T2 offline model” is now “audio.cpp local engine” (engine ID and settings unchanged), and the new one is “sherpa-onnx local engine”; the glossary says so (#114)
 - feat(dictation): once allowed in Settings › Dictation › “Control Music and Spotify directly”, Music and Spotify are paused and resumed with their own commands instead of the play/pause key, so a dictation never starts or resumes another app by mistake (“Allow” starts a player that isn’t running in the background to ask, then quits it); without permission, and for other players, the key is still used (#112)
 
 ### Fixed
+- fix(selection): the Quick Translate engine note says Quick Translate releases HY-MT1.5 after 5 idle minutes unless transcription is still using it, instead of promising the memory is always freed (#116)
 - fix(dictation): starting a dictation no longer launches Music (and steals the focus) when nothing was playing — music is only paused when a dedicated player app (Music, Spotify, …) is outputting audio; browser tabs no longer trigger the play/pause key (#112)
 
 ### Dependencies
