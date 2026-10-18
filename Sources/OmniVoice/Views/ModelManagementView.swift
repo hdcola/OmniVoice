@@ -25,12 +25,6 @@ struct ModelManagementView: View {
     /// itself auto-activated, cleared on "撤销切换" or once the user
     /// dismisses it. `nil` the rest of the time (nothing to show).
     @State private var activationBanner: ActivationBanner?
-    /// Which variant IDs a bundle download most recently kicked off — purely
-    /// so `bundleCard(for:)` can show "下载中" immediately for every member,
-    /// same reasoning `ModelDownloadManager.isDownloading(_:)`'s doc gives
-    /// for reading a job's existence rather than waiting on its first
-    /// progress tick.
-    @State private var pendingBundleDownloads: Set<String> = []
     /// Task 4.3 (异常状态内联重试) — per-variant failure message (network
     /// interruption, checksum mismatch, ...), rendered as an inline error
     /// bar on that variant's own card with "重试"/"复制下载链接" actions,
@@ -49,7 +43,7 @@ struct ModelManagementView: View {
 
     var body: some View {
         // A bare `Form` doesn't scroll on macOS (round-4 user report: with
-        // both recommended bundles and every model variant rendered, the
+        // every model variant rendered, the
         // bottom cards were clipped off, unreachable), so the cards live in
         // a `ScrollView`.
         ScrollView {
@@ -57,7 +51,6 @@ struct ModelManagementView: View {
                 if let activationBanner {
                     activationBannerView(activationBanner)
                 }
-                bundleSection
                 SettingsCard(title: "Speech recognition models", icon: "waveform") {
                     modelRows(for: ProviderCatalog.transcriptionEngines)
                 }
@@ -214,102 +207,6 @@ struct ModelManagementView: View {
         return (String(localized: "Pair it with the audio.cpp local engine for the best real-time typewriter experience"), r2t2)
     }
 
-    // MARK: - Task 2.3 — Recommended bundles
-
-    private var bundleSection: some View {
-        SettingsCard(title: "Recommended setups", icon: "sparkles") {
-            ForEach(Array(ProviderCatalog.bundles.enumerated()), id: \.element.id) { index, bundle in
-                if index > 0 { SettingsDivider() }
-                bundleCard(for: bundle)
-            }
-        }
-    }
-
-    /// Round-4 user report (Docs/UX-SETTINGS-MODEL-MANAGEMENT.md's bundle
-    /// section) — a bare "已下载 X/Y" count reads as contradictory once two
-    /// bundles share a variant (both recommended pairings here use
-    /// `r2t2-q8_0`): downloading R2T2 for 方案A also, correctly, counts
-    /// toward 方案B's own total, but nothing on screen said *why* 方案B could
-    /// already show progress the user never explicitly asked it to download.
-    /// This itemized checklist makes that shared state visible per variant,
-    /// instead of only a count — see `bundleCard(for:)`.
-    private func bundleChecklist(_ status: ModelBundleStatus) -> some View {
-        HStack(spacing: 12) {
-            ForEach(status.variants) { variant in
-                let isDownloaded = status.downloadedVariants.contains(variant)
-                HStack(spacing: 4) {
-                    Image(systemName: isDownloaded ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(isDownloaded ? Color.green : Color.secondary)
-                    Text(variant.displayName)
-                }
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func bundleCard(for bundle: ModelBundle) -> some View {
-        // `ModelBundle.status(isDownloaded:)` resolves strictly against
-        // `bundle.variantIDs` — the exact quantization each bundle names,
-        // never every variant sharing its engine family, and never counted
-        // twice (see that type's doc for the full reasoning this was
-        // audited against).
-        let status = bundle.status(isDownloaded: downloadManager.isDownloaded)
-        let isBundleDownloading = status.variants.contains {
-            downloadManager.isDownloading($0) || pendingBundleDownloads.contains($0.id)
-        }
-
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(bundle.displayName).font(.system(size: 13, weight: .semibold))
-                Spacer(minLength: 8)
-                if status.isFullyDownloaded {
-                    StatusPill(text: "All downloaded", tone: .good)
-                } else {
-                    StatusPill(
-                        text: String(localized: "Downloaded \(status.downloadedVariants.count)/\(status.variants.count)"),
-                        tone: status.downloadedVariants.isEmpty ? .neutral : .warning
-                    )
-                }
-            }
-            Text(bundle.summary)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            // Itemized per variant, not just a count: two bundles share a
-            // variant (both recommended pairings use `r2t2-q8_0`), so a bare
-            // "已下载 X/Y" read as contradictory (round-4 user report).
-            bundleChecklist(status)
-            if !status.isFullyDownloaded {
-                HStack {
-                    Spacer()
-                    PillButton(
-                        title: status.downloadedVariants.isEmpty
-                            ? String(localized: "Set Up This Plan (about \(status.remainingSizeMB) MB)")
-                            : String(localized: "Download Remaining Components (about \(status.remainingSizeMB) MB)"),
-                        isWorking: isBundleDownloading,
-                        workingTitle: "Downloading…"
-                    ) {
-                        downloadBundle(bundle)
-                    }
-                    .disabled(isBundleDownloading)
-                }
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-    }
-
-    private func downloadBundle(_ bundle: ModelBundle) {
-        let variants = bundle.status(isDownloaded: downloadManager.isDownloaded).remainingVariants
-        for variant in variants {
-            pendingBundleDownloads.insert(variant.id)
-            download(variant) {
-                pendingBundleDownloads.remove(variant.id)
-            }
-        }
-    }
-
     // MARK: - Rich model cards (Task 2.2)
 
     /// Every model variant of the given engines, one divider-separated row
@@ -331,10 +228,11 @@ struct ModelManagementView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(variant.displayName).font(.system(size: 13, weight: .semibold))
                 Group {
-                    if let memoryMB = variant.memoryMB {
-                        Text("\(variant.quantization) · about \(variant.approximateSizeMB) MB · about \(memoryMB) MB memory")
+                    let memory = MemoryFormat.text(mb: variant.estimatedMemoryMB)
+                    if variant.isMemoryEstimated {
+                        Text("\(variant.quantization) · about \(variant.approximateSizeMB) MB · memory about \(memory) (estimated)")
                     } else {
-                        Text("\(variant.quantization) · about \(variant.approximateSizeMB) MB · about \(variant.recommendedMemoryGB) GB memory")
+                        Text("\(variant.quantization) · about \(variant.approximateSizeMB) MB · memory about \(memory)")
                     }
                 }
                     .font(.system(size: 11))

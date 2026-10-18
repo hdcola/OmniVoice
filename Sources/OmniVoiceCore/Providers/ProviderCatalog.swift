@@ -92,14 +92,22 @@ public struct ModelVariant: Identifiable, Hashable, Codable, Sendable {
     /// `recommendedMemoryGB` (whole GB, rounded up) would overstate it. The
     /// model card shows this when set.
     public let memoryMB: Int?
+    /// `memoryMB` is derived from the file size, not measured on a Mac; shown
+    /// as an estimate.
+    public let isMemoryEstimated: Bool
+
+    /// Peak memory in MB: the measured/derived `memoryMB`, else
+    /// `recommendedMemoryGB` (whole GB).
+    public var estimatedMemoryMB: Int { memoryMB ?? recommendedMemoryGB * 1024 }
 
     public init(
         id: String, engineID: String, displayName: String, quantization: String,
         approximateSizeMB: Int, downloadURL: URL? = nil, sha256: String? = nil,
         summary: String = "", recommendedMemoryGB: Int = 0, files: [ModelFile] = [],
-        sourceLanguageCodes: [String]? = nil, memoryMB: Int? = nil
+        sourceLanguageCodes: [String]? = nil, memoryMB: Int? = nil, isMemoryEstimated: Bool = false
     ) {
         self.memoryMB = memoryMB
+        self.isMemoryEstimated = isMemoryEstimated
         self.files = files
         self.sourceLanguageCodes = sourceLanguageCodes
         self.id = id
@@ -110,26 +118,6 @@ public struct ModelVariant: Identifiable, Hashable, Codable, Sendable {
         self.downloadURL = downloadURL
         self.sha256 = sha256
         self.summary = summary
-        self.recommendedMemoryGB = recommendedMemoryGB
-    }
-}
-
-/// One recommended engine pairing (Docs/UX-SETTINGS-MODEL-MANAGEMENT.md
-/// §4.3.1 "一键配置推荐组合") — a named bundle of `ModelVariant`s a user can
-/// download in one action instead of hunting for the right ASR/translation
-/// pairing themselves.
-public struct ModelBundle: Identifiable, Hashable, Codable, Sendable {
-    public let id: String
-    public let displayName: String
-    public let summary: String
-    public let variantIDs: [String]
-    public let recommendedMemoryGB: Int
-
-    public init(id: String, displayName: String, summary: String, variantIDs: [String], recommendedMemoryGB: Int) {
-        self.id = id
-        self.displayName = displayName
-        self.summary = summary
-        self.variantIDs = variantIDs
         self.recommendedMemoryGB = recommendedMemoryGB
     }
 }
@@ -335,7 +323,7 @@ public enum ProviderCatalog {
             // which matches the `resolve/main` response's `X-Linked-ETag`.
             sha256: "19f5ccd624484bcb5d44301437de41560b0ecc40c430e8850dfeefefbe82ccf5",
             summary: String(localized: "Optimized for mixed Chinese-English talks and professional meetings, with automatic language detection and sentence/punctuation completion."),
-            recommendedMemoryGB: 3
+            recommendedMemoryGB: 3, memoryMB: 3100
         ),
         // Smaller/faster R2T2 — a community Q4_K_M quantization (Q4_K with
         // Q6_K MLP-down and Q2_K embeddings, BF16 audio tower) by
@@ -354,7 +342,7 @@ public enum ProviderCatalog {
             )!,
             sha256: "d740d6636f2ea2f3736800c3c88a6e22ecb6c0f26c567fe22b0572ae9c2c4ec8",
             summary: String(localized: "Community quantization (unofficial release): about half the size of Q8_0, about 1.8GB peak memory at runtime, faster decoding, suited to memory-constrained devices; slightly lower accuracy than Q8_0."),
-            recommendedMemoryGB: 2
+            recommendedMemoryGB: 2, memoryMB: 1800
         ),
         // Same publisher/repo as `r2t2-q8_0`; sha256 verified against HF's
         // LFS metadata (`?blobs=true`) and the `resolve/main`
@@ -367,7 +355,7 @@ public enum ProviderCatalog {
             )!,
             sha256: "d1b531ceaf5640d98352d3a9180238d99d36d393e160afd4692031077e7bae2c",
             summary: String(localized: "Unquantized full-precision version with the highest quality; about 4.7GB peak memory at runtime (Q8_0 is about 3.1GB), suited to devices with plenty of memory."),
-            recommendedMemoryGB: 5
+            recommendedMemoryGB: 5, memoryMB: 4700
         ),
     ] + sherpaVariants + [
         ModelVariant(
@@ -379,7 +367,7 @@ public enum ProviderCatalog {
             )!,
             sha256: "019b162a8fdff3edb1e2469445043fc2ebb0de0fbda9ca6454bc86b5898fac35",
             summary: String(localized: "Streaming WAIT/TRANS live character-by-character preview, best for translating between Chinese/Cantonese/English/Japanese/Korean; recommended for devices with 16GB+ unified memory."),
-            recommendedMemoryGB: 11
+            recommendedMemoryGB: 11, memoryMB: 11000, isMemoryEstimated: true
         ),
         // Tencent's HY-MT1.5-1.8B — the low-memory translation option: no
         // smaller quantization exists in R2T2's/T3PO's own repos (see
@@ -396,7 +384,7 @@ public enum ProviderCatalog {
             )!,
             sha256: "4383ac0c3c8e476de98ff979c2a3f069f8c4fb385e7860cf2d28da896cc477c7",
             summary: String(localized: "One-shot whole-sentence translation with no live typewriter preview and minimal memory use; suited to 8GB devices."),
-            recommendedMemoryGB: 2
+            recommendedMemoryGB: 2, memoryMB: 1500
         ),
         ModelVariant(
             id: "hymt15-1.8b-q8_0", engineID: "model.hymt15", displayName: "HY-MT1.5 1.8B (Q8_0)",
@@ -406,28 +394,7 @@ public enum ProviderCatalog {
             )!,
             sha256: "6789b06d0902f2f5312c0e1703d56ccbddfcfb6c653d22519b7c720f7db9a98e",
             summary: String(localized: "One-shot whole-sentence translation with no live typewriter preview; slightly higher accuracy than Q4_K_M with still-minimal memory use."),
-            recommendedMemoryGB: 3
-        ),
-    ]
-
-    /// Docs/UX-SETTINGS-MODEL-MANAGEMENT.md §4.3.1 — the two standard
-    /// pairings offered as one-click downloads above the model list, so a
-    /// user doesn't have to work out on their own which ASR+translation
-    /// combination actually makes sense together.
-    public static let bundles: [ModelBundle] = [
-        ModelBundle(
-            id: "bundle.standard-realtime",
-            displayName: String(localized: "Plan A: Standard live bilingual captions (recommended)"),
-            summary: String(localized: "R2T2 speech recognition + T3PO live streaming translation. Automatic language detection, character-by-character typewriter display, fully offline and private. Recommended for Macs with 16GB+ unified memory."),
-            variantIDs: ["r2t2-q8_0", "t3po-q5_k_m"],
-            recommendedMemoryGB: 14
-        ),
-        ModelBundle(
-            id: "bundle.lightweight",
-            displayName: String(localized: "Plan B: Lightweight, low-memory"),
-            summary: String(localized: "R2T2 speech recognition + HY-MT1.5 translation. Minimal memory use, whole-sentence translation output. Suited to 8GB devices."),
-            variantIDs: ["r2t2-q8_0", "hymt15-1.8b-q4_k_m"],
-            recommendedMemoryGB: 5
+            recommendedMemoryGB: 3, memoryMB: 2500, isMemoryEstimated: true
         ),
     ]
 
@@ -513,42 +480,5 @@ public enum ProviderCatalog {
 
     public static func variant(forID id: String) -> ModelVariant? {
         modelVariants.first { $0.id == id }
-    }
-}
-
-/// A `ModelBundle`'s download state, resolved strictly against the exact
-/// `ModelVariant`s its `variantIDs` name — never every variant belonging to
-/// the same `engineID`, and never a variant counted twice. Two bundles can
-/// legitimately share a variant (both recommended pairings in
-/// `ProviderCatalog.bundles` use `r2t2-q8_0`), so downloading it via one
-/// bundle correctly reads as already-done in the other too — this type only
-/// *reports* that shared state, it never infers a variant as downloaded from
-/// a sibling quantization or its engine ID the way an `engineID`-keyed check
-/// would.
-public struct ModelBundleStatus: Sendable {
-    public let variants: [ModelVariant]
-    public let downloadedVariants: [ModelVariant]
-    public let remainingVariants: [ModelVariant]
-
-    public var isFullyDownloaded: Bool { remainingVariants.isEmpty }
-
-    /// Total size of only the variants this specific bundle is still
-    /// missing — never the whole bundle's size, and never another bundle's
-    /// variants, so a "一键下载剩余组件" button's stated size always matches
-    /// exactly what tapping it will transfer.
-    public var remainingSizeMB: Int { remainingVariants.reduce(0) { $0 + $1.approximateSizeMB } }
-}
-
-extension ModelBundle {
-    /// - Parameter isDownloaded: typically `ModelDownloadManager.isDownloaded(_:)`,
-    ///   injected so this stays testable without a real `ModelDownloadManager`/
-    ///   filesystem.
-    public func status(isDownloaded: (ModelVariant) -> Bool) -> ModelBundleStatus {
-        let variants = variantIDs.compactMap(ProviderCatalog.variant(forID:))
-        return ModelBundleStatus(
-            variants: variants,
-            downloadedVariants: variants.filter(isDownloaded),
-            remainingVariants: variants.filter { !isDownloaded($0) }
-        )
     }
 }

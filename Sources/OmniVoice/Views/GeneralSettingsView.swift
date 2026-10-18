@@ -184,10 +184,10 @@ struct GeneralSettingsView: View {
         SettingsCard(title: String(localized: "Onboarding"), icon: "sparkles") {
             SettingsRow(
                 title: String(localized: "Re-run onboarding"),
-                subtitle: String(localized: "Review permissions, run mode, and optional features (such as double ⌘C translate) again; your existing settings and downloaded models are kept")
+                subtitle: String(localized: "Review permissions, models, and optional features (such as double ⌘C translate) again; your existing settings and downloaded models are kept")
             ) {
                 PillButton(title: String(localized: "Re-run")) { appDelegate.showOnboarding() }
-                    // Changing the run mode swaps engines, which Settings
+                    // Changing the models swaps engines, which Settings
                     // refuses mid-recording / while a model loads.
                     .disabled(session.isSettingsBusy)
             }

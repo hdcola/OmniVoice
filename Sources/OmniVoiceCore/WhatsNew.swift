@@ -100,7 +100,7 @@ public enum WhatsNewCatalog {
             revision: 1,
             title: String(localized: "You can re-run onboarding"),
             bullets: [
-                String(localized: "In “Settings › General › Onboarding”, click “Re-run” to revisit permissions and the run mode at any time."),
+                String(localized: "In “Settings › General › Onboarding”, click “Re-run” to revisit permissions and the models at any time."),
             ],
             actionTitle: String(localized: "Re-run"),
             action: .rerunOnboarding
