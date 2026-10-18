@@ -7,6 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(onboarding): the first-run wizard has three steps — permissions and switches, then a speech recognition model, then a translation model — each choice showing its memory use and download size, with your Mac's memory next to the selected total (orange from half, red from 70%); the preselection follows this Mac's memory, and notes warn about pairings such as sherpa-onnx with T3PO (translation waits for the sentence end) (#115)
 - feat(asr): new sherpa-onnx local engine for speech recognition (small streaming models), selectable in Settings → Speech Recognition and downloadable from the Model Library; works for Live transcription and Dictation, whose Polish recognized text can tidy its unpunctuated output (#114)
 - feat(asr): the sherpa-onnx local engine offers nine models to choose from in Settings → Speech Recognition and the Model Library: Paraformer bilingual (zh-en) (default), Zipformer bilingual (zh-en), Chinese 2025 (transducer and CTC), Chinese small CTC, Chinese multi-dataset, Chinese 14M, Paraformer trilingual (Mandarin, Cantonese, English) and a multilingual Zipformer (seven languages); sizes from about 25MB to 360MB (#114)
 - feat(asr): each sherpa-onnx model only offers the source languages it can recognize (for example Chinese only, or Mandarin, Cantonese and English) (source picker in the Caption panel, My language / Foreign language, ⇄ swap, Dictation language), and switching to it repairs a language it cannot recognize, as System speech recognition already does (#114)
@@ -16,6 +17,8 @@ The format is based on Keep a Changelog.
 - feat(dictation): browser audio (videos, web players) is muted during a dictation and comes back afterwards — the video keeps playing; a browser in a call is left alone (Chrome plays every tab through one process, so a Meet call keeps the whole browser unmuted), and no permission is needed (#112)
 
 ### Changed
+- refactor(models): the Model Library no longer has the Plan A / Plan B “Recommended setups” card and the wizard no longer has the three run modes; pick the models yourself (#115)
+- feat(models): model cards show memory in MB/GB for the audio.cpp and translation models too, marking figures that are estimates (#115)
 - refactor(asr): speech recognition engines are named after their runtime instead of a model: “R2T2 offline model” is now “audio.cpp local engine” (engine ID and settings unchanged), and the new one is “sherpa-onnx local engine”; the glossary says so (#114)
 - feat(dictation): once allowed in Settings › Dictation › “Control Music and Spotify directly”, Music and Spotify are paused and resumed with their own commands instead of the play/pause key, so a dictation never starts or resumes another app by mistake (“Allow” starts a player that isn’t running in the background to ask, then quits it); without permission, and for other players, the key is still used (#112)
 
@@ -26,9 +29,11 @@ The format is based on Keep a Changelog.
 - chore(deps): link prebuilt sherpa-onnx v1.13.8 (macOS arm64) from `third_party/sherpa-onnx`, fetched by `Scripts/setup_third_party.sh` (#114)
 
 ### Documentation
+- docs(onboarding): README and glossary describe the three-step wizard (#115)
 - docs(setup): describe the sherpa-onnx setup step in `Docs/MODEL_ENGINE_SETUP.md`; add the sherpa-onnx local engine to `Docs/GLOSSARY.md` (#114)
 
 ### Tests
+- test(onboarding): cover the selection plan (memory total, download size, memory pressure, notes, recommendation) and drop the bundle tests (#115)
 - test(asr): cover a Chinese-only sherpa-onnx model when neither of the user's languages is recognizable, and dropping an unloaded sherpa-onnx transcriber (#114)
 - test(asr): smoke test for the sherpa-onnx provider, skipped when the model is absent (#114)
 
