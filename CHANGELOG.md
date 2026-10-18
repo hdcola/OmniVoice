@@ -8,9 +8,10 @@ The format is based on Keep a Changelog.
 
 ### Added
 - feat(asr): new sherpa-onnx local engine for speech recognition (small streaming models), selectable in Settings → Speech Recognition and downloadable from the Model Library; works for Live transcription and Dictation, whose Polish recognized text can tidy its unpunctuated output (#114)
-- feat(asr): the sherpa-onnx local engine offers nine models to choose from in Settings → Speech Recognition and the Model Library: Zipformer bilingual (zh-en), Chinese 2025 (transducer and CTC), Chinese small CTC, Chinese multi-dataset, Chinese 14M, Paraformer bilingual (zh-en), Paraformer trilingual (Mandarin, Cantonese, English) and a Zipformer covering eight languages; sizes from about 25MB to 360MB (#114)
+- feat(asr): the sherpa-onnx local engine offers nine models to choose from in Settings → Speech Recognition and the Model Library: Paraformer bilingual (zh-en) (default), Zipformer bilingual (zh-en), Chinese 2025 (transducer and CTC), Chinese small CTC, Chinese multi-dataset, Chinese 14M, Paraformer trilingual (Mandarin, Cantonese, English) and a Zipformer covering eight languages; sizes from about 25MB to 360MB (#114)
 - feat(asr): each sherpa-onnx model only offers the source languages it can recognize (for example Chinese only, or Mandarin, Cantonese and English) (source picker in the Caption panel, My language / Foreign language, ⇄ swap, Dictation language), and switching to it repairs a language it cannot recognize, as System speech recognition already does (#114)
 - fix(models): the Model Library shows each sherpa-onnx model's measured memory in MB (about 140 MB to 930 MB) instead of a flat "1 GB" estimate (#114)
+- feat(asr): the sherpa-onnx local engine now defaults to Paraformer bilingual (zh-en), about 540 MB of memory instead of the Zipformer bilingual model's 930 MB (#114)
 - feat(models): model packages made of several files can be downloaded and verified file by file, with one overall progress bar and a retry that skips files already fetched (#114)
 
 ### Changed

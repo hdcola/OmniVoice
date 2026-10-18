@@ -35,10 +35,10 @@ struct SherpaVariantCatalogTests {
         }
     }
 
-    @Test func variantIDsAreUniqueAndTheDefaultIsTheBilingualModel() {
+    @Test func variantIDsAreUniqueAndTheDefaultIsTheParaformerBilingualModel() {
         let ids = ProviderCatalog.modelVariants(forEngineID: "model.sherpa").map(\.id)
         #expect(Set(ids).count == ids.count)
-        #expect(ids.first == "sherpa-zipformer-bilingual-zh-en")
+        #expect(ids.first == "sherpa-paraformer-bilingual-zh-en")
         #expect(ids.count >= 9)
     }
 

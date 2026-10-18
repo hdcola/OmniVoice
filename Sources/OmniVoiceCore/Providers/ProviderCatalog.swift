@@ -186,6 +186,19 @@ public enum ProviderCatalog {
     /// entry is the engine's default.
     private static let sherpaVariants: [ModelVariant] = [
         sherpaVariant(
+            id: "sherpa-paraformer-bilingual-zh-en", name: "Paraformer Bilingual (zh-en)", quantization: "INT8", sizeMB: 227,
+            repo: "sherpa-onnx-streaming-paraformer-bilingual-zh-en",
+            revision: "8e40c43232a1c5c66c82111efc5820d3accca11b",
+            files: [
+                ("encoder.int8.onnx", 165_462_184, "81a70226a8934e6ed92aa1d4fc486b428b5398e2f2619ed4897b7294cab90e9a"),
+                ("decoder.int8.onnx", 71_664_561, "f3cca9f77bb9d93c8fcbfb63ae617b6b1ee96818df3aa3b151c40658fe38594f"),
+                ("tokens.txt", 75_756, "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6"),
+            ],
+            sourceLanguageCodes: ["zh-CN", "en-US"],
+            memoryMB: 540,
+            summary: String(localized: "Chinese (Mandarin and dialects) and English, about 240MB. Strong on accented and regional Chinese.")
+        ),
+        sherpaVariant(
             id: "sherpa-zipformer-bilingual-zh-en", name: "Zipformer Bilingual (zh-en)", quantization: "FP32", sizeMB: 341,
             repo: "sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20",
             revision: "98590b7ed6443e77b714204da2757d75e1a642f4",
@@ -264,19 +277,6 @@ public enum ProviderCatalog {
             sourceLanguageCodes: ["zh-CN"],
             memoryMB: 140,
             summary: String(localized: "Ultra-light 14M-parameter Chinese model, about 25MB, lowest memory use. Mandarin only.")
-        ),
-        sherpaVariant(
-            id: "sherpa-paraformer-bilingual-zh-en", name: "Paraformer Bilingual (zh-en)", quantization: "INT8", sizeMB: 227,
-            repo: "sherpa-onnx-streaming-paraformer-bilingual-zh-en",
-            revision: "8e40c43232a1c5c66c82111efc5820d3accca11b",
-            files: [
-                ("encoder.int8.onnx", 165_462_184, "81a70226a8934e6ed92aa1d4fc486b428b5398e2f2619ed4897b7294cab90e9a"),
-                ("decoder.int8.onnx", 71_664_561, "f3cca9f77bb9d93c8fcbfb63ae617b6b1ee96818df3aa3b151c40658fe38594f"),
-                ("tokens.txt", 75_756, "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6"),
-            ],
-            sourceLanguageCodes: ["zh-CN", "en-US"],
-            memoryMB: 540,
-            summary: String(localized: "Chinese (Mandarin and dialects) and English, about 240MB. Strong on accented and regional Chinese.")
         ),
         sherpaVariant(
             id: "sherpa-paraformer-trilingual-zh-yue-en", name: "Paraformer Trilingual (zh-yue-en)", quantization: "INT8", sizeMB: 228,
