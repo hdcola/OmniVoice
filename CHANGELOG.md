@@ -7,6 +7,20 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.9.0] - 2026-10-18
+
+### Added
 - feat(onboarding): the first-run wizard has three steps — permissions and switches, then a speech recognition model, then a translation model — each choice showing its memory use and download size, with your Mac's memory next to the selected total (orange from half, red from 70%); the preselection follows this Mac's memory, and notes warn about pairings such as sherpa-onnx with T3PO (translation waits for the sentence end) (#115)
 - feat(asr): new sherpa-onnx local engine for speech recognition (small streaming models), selectable in Settings → Speech Recognition and downloadable from the Model Library; works for Live transcription and Dictation, whose Polish recognized text can tidy its unpunctuated output (#114)
 - feat(asr): the sherpa-onnx local engine offers nine models to choose from in Settings → Speech Recognition and the Model Library: Paraformer bilingual (zh-en) (default), Zipformer bilingual (zh-en), Chinese 2025 (transducer and CTC), Chinese small CTC, Chinese multi-dataset, Chinese 14M, Paraformer trilingual (Mandarin, Cantonese, English) and a multilingual Zipformer (seven languages); sizes from about 25MB to 360MB (#114)
@@ -14,6 +28,7 @@ The format is based on Keep a Changelog.
 - fix(models): the Model Library shows each sherpa-onnx model's measured memory in MB (about 140 MB to 930 MB) instead of a flat "1 GB" estimate (#114)
 - feat(asr): the sherpa-onnx local engine now defaults to Paraformer bilingual (zh-en), about 540 MB of memory instead of the Zipformer bilingual model's 930 MB (#114)
 - feat(models): model packages made of several files can be downloaded and verified file by file, with one overall progress bar and a retry that skips files already fetched (#114)
+- feat(whatsnew): what's new introduces the sherpa-onnx local engine, which does real-time streaming speech recognition with less memory and computation
 - feat(dictation): browser audio (videos, web players) is muted during a dictation and comes back afterwards — the video keeps playing; a browser in a call is left alone (Chrome plays every tab through one process, so a Meet call keeps the whole browser unmuted), and no permission is needed (#112)
 
 ### Changed

@@ -47,39 +47,45 @@ struct WhatsNewTests {
         #expect(WhatsNewCatalog.latestRevision >= 1)
     }
 
-    @Test("someone who saw revision 1 is shown the media-pause, polish, dictation-translation, speech and Return-to-send notes, then the voice input note")
+    @Test("someone who saw revision 1 is shown the sherpa-onnx, media-pause, polish, dictation-translation, speech and Return-to-send notes, then the voice input note")
     func voiceInputIsNewForRevisionOneUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 1)
-        #expect(shown.map(\.action) == [nil, nil, nil, nil, nil, .enableDictation])
+        #expect(shown.map(\.action) == [nil, nil, nil, nil, nil, nil, .enableDictation])
     }
 
-    @Test("someone who saw revision 2 is shown the dictation-translation, translation-speech and Return-to-send notes")
+    @Test("someone who saw revision 2 is shown the sherpa-onnx, dictation-translation, translation-speech and Return-to-send notes")
     func returnToSendIsNewForRevisionTwoUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 2)
-        #expect(shown.map(\.revision) == [7, 6, 5, 4, 3])
+        #expect(shown.map(\.revision) == [8, 7, 6, 5, 4, 3])
     }
 
-    @Test("someone who saw revision 3 is shown the dictation-translation and translation-speech notes")
+    @Test("someone who saw revision 3 is shown the sherpa-onnx, dictation-translation and translation-speech notes")
     func translationSpeechIsNewForRevisionThreeUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 3)
-        #expect(shown.map(\.title) == ["Dictation: automatically pause music and video", "Dictation: polish recognized text (optional)", "Dictation: translate before entering", "Read translations aloud"])
+        #expect(shown.map(\.title) == ["New sherpa-onnx local engine: streaming recognition with less memory", "Dictation: automatically pause music and video", "Dictation: polish recognized text (optional)", "Dictation: translate before entering", "Read translations aloud"])
     }
 
-    @Test("someone who saw revision 4 is shown the polish and dictation-translation notes")
+    @Test("someone who saw revision 4 is shown the sherpa-onnx, polish and dictation-translation notes")
     func dictationTranslationIsNewForRevisionFourUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 4)
-        #expect(shown.map(\.title) == ["Dictation: automatically pause music and video", "Dictation: polish recognized text (optional)", "Dictation: translate before entering"])
+        #expect(shown.map(\.title) == ["New sherpa-onnx local engine: streaming recognition with less memory", "Dictation: automatically pause music and video", "Dictation: polish recognized text (optional)", "Dictation: translate before entering"])
     }
 
-    @Test("someone who saw revision 5 is shown the media-pause and polish notes")
+    @Test("someone who saw revision 5 is shown the sherpa-onnx, media-pause and polish notes")
     func polishIsNewForRevisionFiveUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 5)
-        #expect(shown.map(\.title) == ["Dictation: automatically pause music and video", "Dictation: polish recognized text (optional)"])
+        #expect(shown.map(\.title) == ["New sherpa-onnx local engine: streaming recognition with less memory", "Dictation: automatically pause music and video", "Dictation: polish recognized text (optional)"])
     }
 
-    @Test("someone who saw revision 6 is shown just the media-pause note")
+    @Test("someone who saw revision 6 is shown the media-pause and sherpa-onnx notes")
     func mediaPauseIsNewForRevisionSixUsers() {
         let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 6)
-        #expect(shown.map(\.title) == ["Dictation: automatically pause music and video"])
+        #expect(shown.map(\.title) == ["New sherpa-onnx local engine: streaming recognition with less memory", "Dictation: automatically pause music and video"])
+    }
+
+    @Test("someone who saw revision 7 is shown just the sherpa-onnx note")
+    func sherpaIsNewForRevisionSevenUsers() {
+        let shown = WhatsNewCatalog.entriesToShow(hasCompletedOnboarding: true, lastSeenRevision: 7)
+        #expect(shown.map(\.title) == ["New sherpa-onnx local engine: streaming recognition with less memory"])
     }
 }

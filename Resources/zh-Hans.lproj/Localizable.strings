@@ -89,6 +89,9 @@
 "Dictation is in progress. Try again in a moment." = "正在语音输入，请稍后再开始";
 "Dictation language" = "语音输入语言";
 "Dictation" = "语音输入";
+"New sherpa-onnx local engine: streaming recognition with less memory" = "新增 sherpa-onnx 本地引擎：流式识别，更省内存";
+"Live transcription and Dictation can now use the sherpa-onnx local engine, built for real-time streaming speech recognition with much less memory and computation than the large models: about 140 MB to 930 MB of memory, and the default Paraformer bilingual (zh-en) model uses about 540 MB." = "转录和语音输入现在可以使用 sherpa-onnx 本地引擎：它专为实时流式语音识别而设计，比大模型占用的内存和计算资源少得多——内存约 140 MB 到 930 MB，默认的 Paraformer 双语（中英）模型约 540 MB。";
+"Choose it in “Settings › Speech Recognition” and download its models (nine to choose from, about 25 MB to 360 MB) in the Model Library. Its output has no punctuation, so turn on “Polish recognized text” in Dictation to tidy it." = "在「设置 › 语音识别」中选择它，并在模型库中下载模型（共九个可选，约 25 MB 到 360 MB）。它的输出不带标点，可在语音输入中开启「润色识别结果」来整理。";
 "Dictation: automatically pause music and video" = "语音输入：自动暂停音乐和视频";
 "Dictation: polish recognized text (optional)" = "语音输入：润色识别结果（可选）";
 "Dictation: press Return to finish and send" = "语音输入：按 Return 结束并发送";

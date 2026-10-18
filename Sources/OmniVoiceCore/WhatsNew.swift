@@ -37,6 +37,14 @@ public struct WhatsNewEntry: Equatable, Sendable, Identifiable {
 public enum WhatsNewCatalog {
     public static let entries: [WhatsNewEntry] = [
         WhatsNewEntry(
+            revision: 8,
+            title: String(localized: "New sherpa-onnx local engine: streaming recognition with less memory"),
+            bullets: [
+                String(localized: "Live transcription and Dictation can now use the sherpa-onnx local engine, built for real-time streaming speech recognition with much less memory and computation than the large models: about 140 MB to 930 MB of memory, and the default Paraformer bilingual (zh-en) model uses about 540 MB."),
+                String(localized: "Choose it in “Settings › Speech Recognition” and download its models (nine to choose from, about 25 MB to 360 MB) in the Model Library. Its output has no punctuation, so turn on “Polish recognized text” in Dictation to tidy it."),
+            ]
+        ),
+        WhatsNewEntry(
             revision: 7,
             title: String(localized: "Dictation: automatically pause music and video"),
             bullets: [
