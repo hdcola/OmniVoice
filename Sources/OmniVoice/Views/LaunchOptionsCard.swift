@@ -18,43 +18,54 @@ struct LaunchOptionsCard: View {
     /// then load nothing, so it's left out of the choices.
     var translationOnlyAvailable = true
     var onOpenLoginItems: () -> Void = {}
+    /// The first-run wizard splits the two rows over two steps.
+    var showsLoginRow = true
+    var showsPreloadRow = true
 
     var body: some View {
         SettingsCard(title: title, icon: "power") {
-            SettingsRow(
-                title: "Launch at login",
-                subtitle: loginSubtitle,
-                subtitleTint: loginError == nil ? .secondary : .red
-            ) {
-                HStack(spacing: 8) {
-                    if needsLoginApproval {
-                        PillButton(title: "Allow", action: onOpenLoginItems)
-                    }
-                    Toggle("Launch at login", isOn: $launchAtLogin)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
+            if showsLoginRow { loginRow }
+            if showsLoginRow && showsPreloadRow { SettingsDivider() }
+            if showsPreloadRow { preloadRow }
+        }
+    }
+
+    private var loginRow: some View {
+        SettingsRow(
+            title: "Launch at login",
+            subtitle: loginSubtitle,
+            subtitleTint: loginError == nil ? .secondary : .red
+        ) {
+            HStack(spacing: 8) {
+                if needsLoginApproval {
+                    PillButton(title: "Allow", action: onOpenLoginItems)
+                }
+                Toggle("Launch at login", isOn: $launchAtLogin)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+        }
+    }
+
+    private var preloadRow: some View {
+        SettingsRow(
+            title: "Load models at launch",
+            subtitle: preloadAvailable
+                ? (memoryNote ?? String(localized: "Load into memory ahead of time so the first translation or transcription doesn't wait"))
+                : String(localized: "The current engines are built into macOS; there is nothing to load")
+        ) {
+            Picker("Load models at launch", selection: $preloadMode) {
+                ForEach(LaunchPreloadMode.allCases.filter {
+                    $0 != .translationOnly || translationOnlyAvailable || preloadMode == .translationOnly
+                }) { mode in
+                    Text(mode.label).tag(mode)
                 }
             }
-            SettingsDivider()
-            SettingsRow(
-                title: "Load models at launch",
-                subtitle: preloadAvailable
-                    ? (memoryNote ?? String(localized: "Load into memory ahead of time so the first translation or transcription doesn't wait"))
-                    : String(localized: "The current engines are built into macOS; there is nothing to load")
-            ) {
-                Picker("Load models at launch", selection: $preloadMode) {
-                    ForEach(LaunchPreloadMode.allCases.filter {
-                        $0 != .translationOnly || translationOnlyAvailable || preloadMode == .translationOnly
-                    }) { mode in
-                        Text(mode.label).tag(mode)
-                    }
-                }
-                .labelsHidden()
-                .accessibilityLabel("Load models at launch")
-                .fixedSize()
-                .disabled(!preloadAvailable)
-            }
+            .labelsHidden()
+            .accessibilityLabel("Load models at launch")
+            .fixedSize()
+            .disabled(!preloadAvailable)
         }
     }
 

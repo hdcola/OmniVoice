@@ -18,6 +18,7 @@ intentionally unchanged (renaming them would break persisted settings).
 | Translation engine for Quick Translate | 快捷翻译引擎（可「跟随语音识别设置」） | Quick Translate engine (Follow speech recognition) | `SelectionTranslationEngine` |
 | Local ASR engine on audio.cpp (large models, now R2T2) | audio.cpp 本地引擎 | audio.cpp local engine | `model.r2t2` / `ModelTranscriptionProvider` |
 | Local ASR engine on sherpa-onnx (small streaming models) | sherpa-onnx 本地引擎 | sherpa-onnx local engine | `model.sherpa` / `SherpaTranscriptionProvider` |
+| First-run wizard (also re-run from Settings) | 新手引导（三步：权限与开关 → 识别模型 → 翻译模型） | Onboarding (Permissions and switches → Speech recognition model → Translation model) | `OnboardingView` |
 | macOS Translation framework engine | 系统翻译 | System translation | `system.translation` |
 | macOS Speech framework engine | 系统语音识别 | System speech recognition | `system.speech` |
 | Model download/delete UI | 模型库（设置标签页，菜单「模型库…」） | Model Library | `ModelManagementView` |

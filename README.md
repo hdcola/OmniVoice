@@ -109,8 +109,9 @@ Choose the recognition and translation engines independently. Local models
 run in-process through `audio.cpp` and `llama.cpp`. The **Model Library**
 downloads them with progress, disk-space checks and SHA-256 verification,
 shows memory use, and can preload models at launch. The
-first-run wizard offers three run modes — lightweight (system engines),
-balanced (R2T2 + HY-MT1.5) and high-accuracy (all local).
+first-run wizard has three steps — permissions and switches, then a
+speech recognition model, then a translation model — and shows each choice's
+memory use next to your Mac's memory.
 
 ### App
 

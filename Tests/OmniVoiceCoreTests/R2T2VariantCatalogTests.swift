@@ -3,8 +3,7 @@ import Testing
 
 /// R2T2 ships in three user-selectable precisions. The first catalog entry
 /// is what `RecordingSession.resolveModelVariant` falls back to, so it must
-/// stay Q8_0 — and the recommended bundles must keep naming exactly Q8_0
-/// rather than picking up the new entries.
+/// stay Q8_0.
 struct R2T2VariantCatalogTests {
     @Test func r2t2OffersQ4Q8AndF16WithQ8AsDefault() {
         let ids = ProviderCatalog.modelVariants(forEngineID: "model.r2t2").map(\.id)
@@ -27,13 +26,6 @@ struct R2T2VariantCatalogTests {
         #expect(q8.approximateSizeMB < f16.approximateSizeMB)
         #expect(q4.recommendedMemoryGB <= q8.recommendedMemoryGB)
         #expect(q8.recommendedMemoryGB <= f16.recommendedMemoryGB)
-    }
-
-    @Test func bundlesStillPinR2T2ToQ8() {
-        for bundle in ProviderCatalog.bundles {
-            let r2t2 = bundle.variantIDs.filter { $0.hasPrefix("r2t2-") }
-            #expect(r2t2 == ["r2t2-q8_0"], "\(bundle.id)")
-        }
     }
 
     @Test func companionSuggestionOffersDefaultR2T2OnlyWhenNoVariantIsDownloaded() {
