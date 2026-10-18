@@ -42,24 +42,23 @@ struct ModelManagementView: View {
     }
 
     var body: some View {
-        // A bare `Form` doesn't scroll on macOS (round-4 user report: with
-        // every model variant rendered, the
-        // bottom cards were clipped off, unreachable), so the cards live in
-        // a `ScrollView`.
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                if let activationBanner {
+        // `.grouped` scrolls on its own (round-4 user report: the old
+        // `.columns` form didn't, and with every model variant rendered the
+        // bottom rows were clipped off, unreachable).
+        Form {
+            if let activationBanner {
+                Section {
                     activationBannerView(activationBanner)
                 }
-                SettingsCard(title: "Speech recognition models", icon: "waveform") {
-                    modelRows(for: ProviderCatalog.transcriptionEngines)
-                }
-                SettingsCard(title: "Translation models", icon: "character.bubble") {
-                    modelRows(for: ProviderCatalog.translationEngines)
-                }
             }
-            .padding(16)
+            Section(String(localized: "Speech recognition models")) {
+                modelRows(for: ProviderCatalog.transcriptionEngines)
+            }
+            Section(String(localized: "Translation models")) {
+                modelRows(for: ProviderCatalog.translationEngines)
+            }
         }
+        .formStyle(.grouped)
         .alert(
             errorTitle,
             isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
@@ -123,7 +122,7 @@ struct ModelManagementView: View {
                     .font(.system(size: 12))
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                PillButton(title: "Undo Switch") {
+                Button("Undo Switch") {
                     banner.undo()
                     activationBanner = nil
                 }
@@ -136,16 +135,13 @@ struct ModelManagementView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
-                    PillButton(title: String(localized: "Download \(companion.variant.displayName) (about \(companion.variant.approximateSizeMB) MB)")) {
+                    Button(String(localized: "Download \(companion.variant.displayName) (about \(companion.variant.approximateSizeMB) MB)")) {
                         download(companion.variant)
                     }
                 }
             }
         }
-        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.accentColor.opacity(0.1)))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.accentColor.opacity(0.3), lineWidth: 0.5))
     }
 
     /// Checks whether `variant`'s owning engine's *category* (ASR vs.
@@ -209,15 +205,13 @@ struct ModelManagementView: View {
 
     // MARK: - Rich model cards (Task 2.2)
 
-    /// Every model variant of the given engines, one divider-separated row
-    /// each; engines with no downloadable weights (the `.system` ones) have
+    /// Every model variant of the given engines, one row each; engines with no downloadable weights (the `.system` ones) have
     /// no variants and contribute nothing.
     @ViewBuilder
     private func modelRows(for engines: [EngineDescriptor]) -> some View {
         let variants = engines.filter { $0.kind == .model }
             .flatMap { ProviderCatalog.modelVariants(forEngineID: $0.id) }
-        ForEach(Array(variants.enumerated()), id: \.element.id) { index, variant in
-            if index > 0 { SettingsDivider() }
+        ForEach(variants) { variant in
             variantCard(for: variant)
         }
     }
@@ -249,8 +243,7 @@ struct ModelManagementView: View {
             Spacer(minLength: 8)
             actionButton(for: variant)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, 4)
     }
 
     @ViewBuilder
@@ -279,9 +272,9 @@ struct ModelManagementView: View {
                 .foregroundStyle(.red)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
-                PillButton(title: "Retry Now") { download(variant) }
+                Button("Retry Now") { download(variant) }
                 if variant.downloadURL != nil {
-                    PillButton(title: "Copy Download Link") { copyDownloadLink(for: variant) }
+                    Button("Copy Download Link") { copyDownloadLink(for: variant) }
                 }
             }
         }
@@ -304,7 +297,7 @@ struct ModelManagementView: View {
     private func downloadingStatus(for variant: ModelVariant) -> some View {
         if let fraction = downloadManager.downloadProgress[variant.id] {
             // `.rounded()`, not a bare `Int(...)` truncation — see
-            // `SettingsView`'s `opacitySlider` doc for why (binary
+            // `RecognitionSettingsView`'s `opacitySlider` doc for why (binary
             // floating-point rounding can land a hair under a "clean"
             // percentage).
             Text("Downloading \(Int((fraction * 100).rounded()))%")
@@ -333,7 +326,7 @@ struct ModelManagementView: View {
     @ViewBuilder
     private func actionButton(for variant: ModelVariant) -> some View {
         if downloadManager.isDownloading(variant) {
-            PillButton(title: "Cancel") { downloadManager.cancelDownload(for: variant) }
+            Button("Cancel") { downloadManager.cancelDownload(for: variant) }
         } else if downloadManager.isDownloaded(variant) {
             // Guards against deleting the weights out from under an active
             // recording/preload — an in-flight `loadModel()`/an already
@@ -341,10 +334,10 @@ struct ModelManagementView: View {
             // very next preload/start attempt for this variant would find
             // nothing there and fail confusingly rather than with the clear
             // "尚未下载" message a deliberate re-download produces.
-            PillButton(title: "Delete", tint: .red) { pendingDeletion = variant }
+            Button("Delete", role: .destructive) { pendingDeletion = variant }
                 .disabled(session.isSessionActive || session.isPreloadingModel)
         } else {
-            PillButton(title: "Download") { download(variant) }
+            Button("Download") { download(variant) }
         }
     }
 

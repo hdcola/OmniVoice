@@ -35,20 +35,30 @@ extension RecordingSession {
     }
 }
 
-/// One-line pointer at the top of 语音输入 / 快捷翻译: their languages are
-/// set in 通用 → 语言, so link there instead of leaving the user to hunt.
-struct LanguageSettingsHint: View {
+/// One-line pointer, as a section footer, to a setting that lives on
+/// "通用": the languages 语音输入 / 快捷翻译 use are set in its "语言"
+/// section, their keys in "快捷键". Links there instead of leaving the user
+/// to hunt.
+struct GeneralTabHint: View {
+    enum Topic { case languages, shortcuts }
+
+    let topic: Topic
     @EnvironmentObject private var navigation: SettingsNavigationState
 
     var body: some View {
         HStack(spacing: 4) {
-            Text("Set languages in General → Language.")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            Button("Go to General to set languages") { navigation.open(.general) }
-                .buttonStyle(.link)
-                .font(.system(size: 11))
+            switch topic {
+            case .languages:
+                Text("Set languages in General → Language.")
+                Button("Go to General to set languages") { navigation.open(.general) }
+                    .buttonStyle(.link)
+            case .shortcuts:
+                Text("Set shortcuts in General → Shortcuts.")
+                Button("Go to General to set shortcuts") { navigation.open(.general) }
+                    .buttonStyle(.link)
+            }
         }
-        .padding(.horizontal, 4)
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
     }
 }

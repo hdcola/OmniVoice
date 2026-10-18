@@ -33,6 +33,7 @@
 "After selecting text in another app, press ⌘C twice quickly to translate what you just copied; it also works where ⌥A can't read the selection, such as web pages." = "在其他应用里选中文字后，快速按两下 ⌘C，直接翻译刚复制的内容；网页等 ⌥A 读不到选区的地方也能用。";
 "After selecting text in another app, press ⌘C twice quickly to translate what you just copied; requires the “Input Monitoring” permission" = "在其他应用里选中文字后快速按两下 ⌘C，直接翻译刚复制的内容；需要「输入监控」权限";
 "After you finish speaking, the translation is shown for confirmation: Return types and sends, the trigger key only types, Esc discards, and you can type the original instead. Uses the translation engine chosen in the Quick Translate tab; if you spoke the foreign language, it is typed directly. You can also toggle this at any time from the button on the bubble while dictating." = "说完后先显示译文供你确认：Return 输入并发送，触发键仅输入，Esc 放弃，也可以改输原文；用「快捷翻译」页里选的翻译引擎，说的已是外语时直接输入。语音输入时点气泡上的按钮也能随时开关";
+"All permissions granted" = "所有权限均已授权";
 "Allow" = "去允许";
 "Arabic" = "阿拉伯语";
 "Audio quieter than this counts as silence; lower it (more negative) if your microphone is quiet or you speak softly" = "低于该音量视为静音；麦克风音量小、轻声说话时调低（更负）";
@@ -93,10 +94,13 @@
 "Dictation (optional)" = "语音输入（可选）";
 "Dictation is in progress. Try again in a moment." = "正在语音输入，请稍后再开始";
 "Dictation language" = "语音输入语言";
+"Dictation trigger key" = "语音输入触发键";
 "Dictation" = "语音输入";
 "Discard" = "放弃";
 "Export as Markdown…" = "导出为 Markdown…";
 "Follow transcription translation engine · %@" = "跟随转录翻译引擎 · %@";
+"Go to General to set shortcuts" = "去通用设快捷键";
+"Launch and notifications" = "启动与通知";
 "Listening…" = "正在聆听…";
 "New line" = "换行";
 "New sherpa-onnx local engine: streaming recognition with less memory" = "新增 sherpa-onnx 本地引擎：流式识别，更省内存";
@@ -238,8 +242,12 @@
 "Open System Settings" = "打开系统设置";
 "Polishing…" = "润色中…";
 "Press ⌫ or use the Manage menu at the bottom of the sidebar to delete them in bulk" = "按 ⌫ 或使用侧栏底部的“管理”菜单批量删除";
+"Read aloud" = "朗读";
+"Set shortcuts in General → Shortcuts." = "快捷键在「通用 → 快捷键」中设置。";
 "Share" = "分享";
 "Share…" = "分享…";
+"Shortcuts" = "快捷键";
+"Show Details" = "显示详情";
 "The recognition engine could not load the model" = "识别引擎无法加载模型";
 "Model" = "模型";
 "More accurate (waits for more context)" = "更准确（等待更多上下文）";
@@ -260,7 +268,6 @@
 "Not recognized" = "未能识别";
 "Not set" = "未设置";
 "Not started" = "未启动";
-"Notifications" = "通知";
 "OK" = "好";
 "Off by default. Turning it on requires “Input Monitoring” permission; it only detects this combination and doesn't record other keys." = "默认关闭。开启后需要「输入监控」权限，只检测这个组合，不记录其他按键。";
 "Off by default. Turning it on requires “Input Monitoring”, “Accessibility”, and Microphone permissions; if live transcription uses a local model that is already loaded, it is reused directly." = "默认关闭。开启后需要「输入监控」「辅助功能」和麦克风权限；实时转录用本地模型且已加载时，会直接复用它。";
@@ -309,6 +316,7 @@
 "Quit OmniVoice" = "退出 OmniVoice";
 "Translation copied" = "已复制译文";
 "Translation failed" = "翻译失败";
+"Turn on dictation in the Dictation tab first." = "请先在「语音输入」标签页中打开语音输入。";
 "Type and send" = "输入并发送";
 "Type only" = "仅输入";
 "Type original and send" = "输入原文并发送";
@@ -461,7 +469,6 @@
 "Translate screenshot needs Screen Recording permission. After granting it, press the shortcut again." = "截图翻译需要「屏幕录制」权限。授权后请重新按一次快捷键。";
 "Translate screenshot" = "截图翻译";
 "Translate selected text in any app" = "翻译任意应用中选中的文字";
-"Translate selection and screenshot" = "划词与截图翻译";
 "Translate selection" = "划词翻译";
 "Translate to %@" = "译成%@";
 "Translate to foreign language before typing (%@)" = "输入前翻译成外语（%@）";
@@ -482,7 +489,6 @@
 "Translation only: about %lld GB; translation and recognition: about %lld GB" = "仅翻译约 %lld GB；翻译和识别约 %lld GB";
 "Translation uses the system engine, so “Translation model only” loads nothing; the recognition model is about %lld GB" = "翻译为系统引擎，「仅翻译模型」不会加载任何内容；识别模型约 %lld GB";
 "Translation" = "译文";
-"Trigger key" = "触发键";
 "Trigger mode" = "触发方式";
 "Turn On" = "开启";
 "Type Original" = "输入原文";

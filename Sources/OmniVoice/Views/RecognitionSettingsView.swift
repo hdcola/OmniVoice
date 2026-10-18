@@ -3,8 +3,8 @@ import OmniVoiceCore
 import SwiftUI
 
 /// Settings' "语音识别" tab — the recognition engine (with VAD tuning), the
-/// transcription-translation engine and the engine memory console, with the
-/// inline download rows that go with an undownloaded engine.
+/// transcription-translation engine, the 字幕悬浮窗 and the engine memory
+/// console, with the inline download rows that go with an undownloaded engine.
 struct RecognitionSettingsView: View {
     @EnvironmentObject private var session: RecordingSession
     /// Observed directly (not just reached through `session`) so the engine
@@ -21,34 +21,35 @@ struct RecognitionSettingsView: View {
     @State private var inlineDownloadFailures: [String: String] = [:]
     /// Task 4.2 (下载前磁盘空间可视化预检) for the inline row.
     @State private var inlineDiskSpaceWarning: (variant: ModelVariant, error: ModelDownloadError)?
+    /// Read once at launch by `AppDelegate` — flipping it doesn't show/hide
+    /// the panel right now, only decides whether it opens on the next start.
+    @AppStorage(PersistedFloatingPanelKey.showOnLaunch) private var showFloatingPanelOnLaunch = true
 
     init(modelDownloadManager: ModelDownloadManager) {
         self.downloadManager = modelDownloadManager
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                transcriptionEngineCard
-                translationEngineCard
-                memoryConsole
-            }
-            .padding(16)
-            // `modelVariantPicker`/`inlineDownloadSection`/the "翻译提交策略"
-            // row each insert or remove a row depending on the selected
-            // engine; without this the card simply snaps to its new height
-            // the instant either `Picker`'s selection changes. Keyed on the
-            // two engine IDs (not every field in `session`) so unrelated
-            // changes elsewhere — the memory status pill, say — don't also
-            // animate.
-            .animation(.easeInOut(duration: 0.2), value: session.transcriptionEngineID)
-            .animation(.easeInOut(duration: 0.2), value: session.translationEngineID)
+        Form {
+            transcriptionEngineSection
+            translationEngineSection
+            captionPanelSection
+            memoryConsole
         }
+        .formStyle(.grouped)
+        // `modelVariantPicker`/`inlineDownloadSection`/the "翻译提交策略"
+        // row each insert or remove a row depending on the selected
+        // engine; without this the section simply snaps to its new height
+        // the instant either `Picker`'s selection changes. Keyed on the
+        // two engine IDs (not every field in `session`) so unrelated
+        // changes elsewhere — the memory status, say — don't also animate.
+        .animation(.easeInOut(duration: 0.2), value: session.transcriptionEngineID)
+        .animation(.easeInOut(duration: 0.2), value: session.translationEngineID)
     }
 
-    private var transcriptionEngineCard: some View {
-        SettingsCard(title: "Speech recognition engine (ASR)", icon: "waveform") {
-            SettingsRow(title: "Engine") {
+    private var transcriptionEngineSection: some View {
+        Section(String(localized: "Speech recognition engine (ASR)")) {
+            SettingsFormRow(title: "Engine") {
                 Picker("Speech recognition engine", selection: $session.transcriptionEngineID) {
                     // Every catalog engine is always listed, downloaded or
                     // not; an undownloaded `.model` engine is labeled rather
@@ -78,8 +79,7 @@ struct RecognitionSettingsView: View {
             // Only `.model` engines act on the pause boundary (system ASR
             // produces its own), so the VAD tuning is hidden for system engines.
             if ProviderCatalog.usesVADBoundary(engineID: session.transcriptionEngineID) {
-                SettingsDivider()
-                SettingsRow(
+                SettingsFormRow(
                     title: "Sentence pause length",
                     subtitle: "Silence longer than this ends the current sentence; longer values split sentences less often but make text appear more slowly"
                 ) {
@@ -94,8 +94,7 @@ struct RecognitionSettingsView: View {
                             .frame(width: 52, alignment: .trailing)
                     }
                 }
-                SettingsDivider()
-                SettingsRow(
+                SettingsFormRow(
                     title: "Silence level threshold",
                     subtitle: "Audio quieter than this counts as silence; lower it (more negative) if your microphone is quiet or you speak softly"
                 ) {
@@ -114,9 +113,9 @@ struct RecognitionSettingsView: View {
         }
     }
 
-    private var translationEngineCard: some View {
-        SettingsCard(title: "Transcription translation engine", icon: "character.bubble") {
-            SettingsRow(title: "Engine") {
+    private var translationEngineSection: some View {
+        Section(String(localized: "Transcription translation engine")) {
+            SettingsFormRow(title: "Engine") {
                 Picker("Transcription translation engine", selection: $session.translationEngineID) {
                     ForEach(ProviderCatalog.translationEngines) { engine in
                         Text(engineLabel(for: engine)).tag(engine.id)
@@ -143,8 +142,7 @@ struct RecognitionSettingsView: View {
             // *not* `.disabled(isBusy)` — safe to change mid-recording, same
             // as `targetLanguageCode`'s picker.
             if session.translationEngineID == "model.t3po" {
-                SettingsDivider()
-                SettingsRow(title: "Translation commit strategy") {
+                SettingsFormRow(title: "Translation commit strategy") {
                     Picker("Translation commit strategy", selection: $session.translationCommitEagerness) {
                         ForEach(TranslationCommitEagerness.allCases, id: \.self) { eagerness in
                             Text(eagerness.displayName).tag(eagerness)
@@ -155,15 +153,14 @@ struct RecognitionSettingsView: View {
                     .fixedSize()
                 }
             }
-            SettingsDivider()
             translationOutputContent
         }
     }
 
-    /// Row shown at the bottom of the translation card — the `TextField`
+    /// Row shown at the bottom of the translation section — the `TextField`
     /// when `translationEarlyTranslateThreshold` actually does something for
     /// the current engine pairing, otherwise a short explanation of why not.
-    /// The card stays present (only this row's content swaps) so switching
+    /// The section stays present (only this row's content swaps) so switching
     /// engines doesn't toggle a whole group in and out.
     @ViewBuilder
     private var translationOutputContent: some View {
@@ -176,7 +173,7 @@ struct RecognitionSettingsView: View {
         // there's nothing "early" left to translate by then).
         if session.translationEngineID != "model.t3po",
             session.transcriptionEngineKind != .system, session.transcriptionEngineID != "model.sherpa" {
-            SettingsRow(
+            SettingsFormRow(
                 title: "Early-translation threshold for long sentences",
                 subtitle: "Lower values show text sooner, but long sentences are more likely to be split into several parts"
             ) {
@@ -202,7 +199,7 @@ struct RecognitionSettingsView: View {
                 }
             }
         } else {
-            SettingsNote(text: "The current engine doesn't need an early-translation threshold (it only applies to translation engines that output in segments in real time).")
+            SettingsFormNote(text: "The current engine doesn't need an early-translation threshold (it only applies to translation engines that output in segments in real time).")
         }
     }
 
@@ -236,8 +233,7 @@ struct RecognitionSettingsView: View {
         let selectedID = selection.wrappedValue
         let shown = variants.filter { downloadManager.isDownloaded($0) || $0.id == selectedID }
         if !shown.isEmpty {
-            SettingsDivider()
-            SettingsRow(title: "Model") {
+            SettingsFormRow(title: "Model") {
                 Picker("Model", selection: selection) {
                     ForEach(shown) { variant in
                         Text(variantLabel(for: variant)).tag(Optional(variant.id))
@@ -265,14 +261,9 @@ struct RecognitionSettingsView: View {
     private func inlineDownloadSection(forEngineID engineID: String) -> some View {
         if let engine = (ProviderCatalog.transcriptionEngines + ProviderCatalog.translationEngines)
             .first(where: { $0.id == engineID }), engine.kind == .model, !hasDownloadedVariant(engine) {
-            SettingsDivider()
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(ProviderCatalog.modelVariants(forEngineID: engineID)) { variant in
-                    inlineDownloadRow(for: variant)
-                }
+            ForEach(ProviderCatalog.modelVariants(forEngineID: engineID)) { variant in
+                inlineDownloadRow(for: variant)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
         }
     }
 
@@ -303,9 +294,9 @@ struct RecognitionSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.red)
                     HStack {
-                        PillButton(title: "Retry Now") { downloadInline(variant) }
+                        Button("Retry Now") { downloadInline(variant) }
                         if variant.downloadURL != nil {
-                            PillButton(title: "Copy Download Link") { copyDownloadLink(for: variant) }
+                            Button("Copy Download Link") { copyDownloadLink(for: variant) }
                         }
                     }
                 } else {
@@ -316,9 +307,10 @@ struct RecognitionSettingsView: View {
             }
             Spacer()
             if downloadManager.isDownloading(variant) {
-                PillButton(title: "Cancel") { downloadManager.cancelDownload(for: variant) }
+                Button("Cancel") { downloadManager.cancelDownload(for: variant) }
             } else {
-                PillButton(title: "Download and Enable") { downloadInline(variant) }
+                Button("Download and Enable") { downloadInline(variant) }
+                    .buttonStyle(.borderedProminent)
             }
         }
         // Task 4.2 — same copy as `ModelManagementView`'s own disk-space
@@ -388,6 +380,57 @@ struct RecognitionSettingsView: View {
         }
     }
 
+    // MARK: - 字幕悬浮窗
+
+    /// Deliberately outside any `.disabled(session.isSettingsBusy)` — these only ever touch
+    /// `FloatingTranscriptView`'s own SwiftUI opacity (see
+    /// `panelBackgroundOpacity`/`panelContentOpacity`'s docs), never
+    /// anything `start()` reads once at setup time, so there's no race to
+    /// guard against; adjusting either while recording (to see through the
+    /// panel at whatever's behind it, without losing legibility) is exactly
+    /// when they're most useful. Two separate sliders, not one — a single
+    /// shared value (an earlier version of this had exactly that, driving
+    /// `NSWindow.alphaValue`) faded the transcript text right along with the
+    /// background, so a panel transparent enough to not block the view
+    /// behind it also made the text hard to read.
+    private var captionPanelSection: some View {
+        Section(String(localized: "Caption panel")) {
+            SettingsFormRow(
+                title: String(localized: "Show the Caption panel at launch"),
+                subtitle: String(localized: "When off, it no longer appears automatically at launch; it still shows when live transcription starts, and can be opened from the Menu bar")
+            ) {
+                Toggle("Show the Caption panel at launch", isOn: $showFloatingPanelOnLaunch)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+            opacitySlider(String(localized: "Background opacity"), value: $session.panelBackgroundOpacity, range: 0.1...1.0)
+            // "内容透明度", not "文字透明度" — `panelContentOpacity` fades the
+            // whole panel content stack (buttons/pickers/dividers/status bar
+            // too), not just the transcript text.
+            opacitySlider(String(localized: "Content opacity"), value: $session.panelContentOpacity, range: 0.4...1.0)
+        }
+    }
+
+    private func opacitySlider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        SettingsFormRow(title: label) {
+            HStack(spacing: 8) {
+                Slider(value: value, in: range)
+                    .frame(width: 180)
+                // `.rounded()`, not a bare `Int(...)` truncation — a
+                // `Slider`'s underlying `Double` can land a hair under a
+                // "clean" percentage from binary floating-point rounding
+                // (e.g. 0.29999999999999994 for what's visually 0.3), which
+                // truncation reads as 29% — jittery/off-by-one against where
+                // the thumb actually looks.
+                Text("\(Int((value.wrappedValue * 100).rounded()))%")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .frame(width: 40, alignment: .trailing)
+            }
+        }
+    }
+
     // MARK: - Memory & preload console (Task 3.3)
 
     /// Moves the floating panel's "预加载模型"/"模型已就绪" affordance
@@ -403,32 +446,32 @@ struct RecognitionSettingsView: View {
     /// above) keeps the jump to the size of the content difference instead
     /// of a full section.
     private var memoryConsole: some View {
-        SettingsCard(title: "Engine status and memory", icon: "memorychip") {
+        Section(String(localized: "Engine status and memory")) {
             if session.usesOnDeviceModelEngine {
-                SettingsRow(title: "Model status", subtitle: String(localized: "Estimated memory use: about \(session.settingsEstimatedMemoryGB) GB")) {
+                SettingsFormRow(title: "Model status", subtitle: String(localized: "Estimated memory use: about \(session.settingsEstimatedMemoryGB) GB")) {
                     StatusPill(text: memoryStatusText, tone: memoryStatusTone)
                 }
-                SettingsDivider()
                 HStack {
                     Spacer()
-                    PillButton(
-                        title: "⚡ Preload into Memory",
-                        isWorking: session.isPreloadingModel,
-                        workingTitle: "Loading…"
-                    ) {
+                    Button {
                         Task { await session.preloadModel() }
+                    } label: {
+                        HStack(spacing: 5) {
+                            if session.isPreloadingModel {
+                                ProgressView().controlSize(.small)
+                            }
+                            Text(session.isPreloadingModel ? LocalizedStringKey("Loading…") : "⚡ Preload into Memory")
+                        }
                     }
                     .disabled(session.isSessionActive || session.isPreloadingModel || session.isModelLoaded)
 
-                    PillButton(title: "🧹 Free Memory") {
+                    Button("🧹 Free Memory") {
                         session.unloadModels()
                     }
                     .disabled(!session.hasLoadedModels || session.isSessionActive || session.isPreloadingModel)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
             } else {
-                SettingsNote(text: "The current engines are built into macOS; there is nothing to preload or free.")
+                SettingsFormNote(text: "The current engines are built into macOS; there is nothing to preload or free.")
             }
         }
     }

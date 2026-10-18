@@ -1,9 +1,63 @@
 import SwiftUI
 
-// Building blocks for the card-style Settings tabs: each group is a rounded
-// card, each row a title + one-line subtitle on the left and its control on
-// the right. Inspired by SnapTra Translator's settings
-// (https://github.com/yelog/SnapTraTranslator).
+// Building blocks for the Settings window and the card-style onboarding and
+// What's New windows. Settings is a grouped `Form` built from
+// `SettingsFormRow` / `SettingsFormNote`; onboarding and What's New keep
+// their own look with `SettingsCard` / `SettingsRow` (inspired by SnapTra
+// Translator, https://github.com/yelog/SnapTraTranslator).
+
+/// A Settings form row's label: the title, and under it an optional
+/// description in the smaller secondary style System Settings uses.
+struct SettingsLabel: View {
+    let title: String
+    var subtitle: String?
+    /// `.red` / `.orange` for an error or warning standing in for the subtitle.
+    var subtitleTint: Color = .secondary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(LocalizedStringKey(title))
+            if let subtitle {
+                Text(LocalizedStringKey(subtitle))
+                    .font(.subheadline)
+                    .foregroundStyle(subtitleTint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+/// One row of a grouped Settings `Form`: `SettingsLabel` on the left, the
+/// control on the right. A row's own `.disabled` greys the whole row.
+struct SettingsFormRow<Control: View>: View {
+    let title: String
+    var subtitle: String?
+    var subtitleTint: Color = .secondary
+    @ViewBuilder var control: Control
+
+    var body: some View {
+        LabeledContent {
+            control
+        } label: {
+            SettingsLabel(title: title, subtitle: subtitle, subtitleTint: subtitleTint)
+        }
+    }
+}
+
+/// A free-form note as its own row of a Settings `Form` (warnings, "go to
+/// the model library" nudges).
+struct SettingsFormNote: View {
+    let text: String
+    var tint: Color = .secondary
+
+    var body: some View {
+        Text(LocalizedStringKey(text))
+            .font(.subheadline)
+            .foregroundStyle(tint)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
 
 /// A rounded card holding one group of rows, with its title (and icon) as
 /// the first line inside the card. Rows are separated by `SettingsDivider`s
@@ -42,53 +96,6 @@ struct SettingsCard<Content: View>: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.08), lineWidth: 0.5)
         )
-    }
-}
-
-/// Icon-over-label tab switcher shown at the top of the Settings window: six
-/// equal-width columns, so a long English label ("Speech Recognition") wraps
-/// to two lines in a reserved two-line slot instead of making its tab taller
-/// than the others.
-struct SettingsTabBar: View {
-    @Binding var selection: SettingsTab
-
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(Array(SettingsTab.allCases.enumerated()), id: \.element.id) { index, tab in
-                Button {
-                    selection = tab
-                } label: {
-                    VStack(spacing: 3) {
-                        Image(systemName: tab.systemImage)
-                            .font(.system(size: 16, weight: .regular))
-                            .frame(height: 20)
-                            .accessibilityHidden(true)
-                        Text(tab.title)
-                            .font(.system(size: 11, weight: .medium))
-                            .lineLimit(2, reservesSpace: true)
-                            .multilineTextAlignment(.center)
-                    }
-                    .foregroundStyle(selection == tab ? Color.primary : .secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(selection == tab ? Color.primary.opacity(0.14) : .clear)
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .focusEffectDisabled()
-                .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
-                .accessibilityAddTraits(selection == tab ? .isSelected : [])
-            }
-        }
-        .padding(3)
-        .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Color.primary.opacity(0.06)))
-        .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
-        .padding(.horizontal, 16)
-        .animation(.easeInOut(duration: 0.15), value: selection)
     }
 }
 

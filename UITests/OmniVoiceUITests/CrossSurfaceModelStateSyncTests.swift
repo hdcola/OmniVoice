@@ -36,14 +36,11 @@ final class CrossSurfaceModelStateSyncTests: XCTestCase {
     private func openSettings() {
         app.activate()
         app.typeKey(",", modifierFlags: .command)
-        let tab = app.buttons["语音识别"].firstMatch
+        let tab = app.toolbars.buttons["语音识别"].firstMatch
         XCTAssertTrue(tab.waitForExistence(timeout: 10), "Settings tab 语音识别 should exist")
         tab.click()
-        let selected = XCTWaiter.wait(
-            for: [expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: tab)],
-            timeout: 5
-        )
-        XCTAssertEqual(selected, .completed, "Settings tab 语音识别 should become selected")
+        // The Settings window's title follows the selected toolbar tab.
+        XCTAssertTrue(app.windows["语音识别"].waitForExistence(timeout: 5), "Settings tab 语音识别 should become selected")
     }
 
     /// Selecting an on-device ASR engine (R2T2, undownloaded on a fresh
