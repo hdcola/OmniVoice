@@ -85,4 +85,10 @@ public enum MemoryFormat {
     public static func text(mb: Int) -> String {
         mb >= 1000 ? String(format: "%.1f GB", Double(mb) / 1000) : "\(mb) MB"
     }
+
+    /// Installed memory is sold in binary gigabytes: 16384 MB reads "16 GB",
+    /// not "16.4 GB".
+    public static func physicalText(mb: Int) -> String {
+        mb >= 1024 ? "\(Int((Double(mb) / 1024).rounded())) GB" : text(mb: mb)
+    }
 }

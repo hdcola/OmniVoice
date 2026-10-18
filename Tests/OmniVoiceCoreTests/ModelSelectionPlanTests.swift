@@ -65,4 +65,11 @@ struct ModelSelectionPlanTests {
         #expect(ModelSelectionPlan.recommended(physicalMemoryMB: 32 * 1024).transcription?.id == "r2t2-q8_0")
         #expect(ModelSelectionPlan.recommended(physicalMemoryMB: 32 * 1024).translation?.id == "t3po-q5_k_m")
     }
+
+    @Test func physicalMemoryReadsInBinaryGigabytes() {
+        #expect(MemoryFormat.physicalText(mb: 16 * 1024) == "16 GB")
+        #expect(MemoryFormat.physicalText(mb: 8 * 1024) == "8 GB")
+        #expect(MemoryFormat.physicalText(mb: 512) == "512 MB")
+        #expect(MemoryFormat.text(mb: 16 * 1024) == "16.4 GB")
+    }
 }

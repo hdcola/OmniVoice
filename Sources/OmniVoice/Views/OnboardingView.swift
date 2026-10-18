@@ -92,6 +92,9 @@ struct OnboardingView: View {
                             title: String(localized: "Startup preferences"),
                             launchAtLogin: $launchAtLogin,
                             preloadMode: $preloadMode,
+                            needsLoginApproval: loginItem.needsApproval,
+                            loginError: loginItem.lastError,
+                            onOpenLoginItems: { loginItem.openLoginItemsSettings() },
                             showsPreloadRow: false
                         )
                     case .speech:
@@ -123,6 +126,10 @@ struct OnboardingView: View {
             launchAtLogin = loginItem.isEnabled
         }
         .onChange(of: plan) { _, plan in
+            // "Translation model only" loads nothing once translation is System.
+            if plan.translation == nil, preloadMode == .translationOnly {
+                preloadMode = Self.defaultPreloadMode(for: plan)
+            }
             guard !preloadModeEdited else { return }
             preloadMode = Self.defaultPreloadMode(for: plan)
         }
@@ -335,7 +342,7 @@ struct OnboardingView: View {
         return VStack(alignment: .leading, spacing: 4) {
             Divider().opacity(0.5)
             HStack(alignment: .firstTextBaseline) {
-                Text("This Mac: \(MemoryFormat.text(mb: physical)) memory")
+                Text("This Mac: \(MemoryFormat.physicalText(mb: physical)) memory")
                 Spacer(minLength: 8)
                 Text(memoryTotalText)
                     .fontWeight(.semibold)
@@ -490,8 +497,8 @@ struct OnboardingView: View {
         // the system ones.
         let replacingEngines = isRerun
         if appliesSelection {
-            if isRerun { switchToSystemEngines(for: plan) }
             guard startDownload(replacingEngines: replacingEngines) else { return }
+            if isRerun { switchToSystemEngines(for: plan) }
         }
         persistLaunchOptions()
         // Both directions, so a re-run wizard can also turn it off.
