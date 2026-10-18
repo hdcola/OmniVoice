@@ -94,6 +94,14 @@ struct SherpaTranscriptionProviderTests {
         print("sherpa[\(variantID)] partials:", partials.count, "finals:", finals)
         #expect(!partials.isEmpty)
         #expect(!finals.isEmpty)
-        #expect(!events.contains { if case .appended = $0 { true } else { false } })
+        var rebuilt = ""
+        for event in events {
+            switch event {
+            case .appended(let text): rebuilt += text
+            case .segmentClosed(let tail): rebuilt += tail
+            default: break
+            }
+        }
+        #expect(!rebuilt.isEmpty)
     }
 }

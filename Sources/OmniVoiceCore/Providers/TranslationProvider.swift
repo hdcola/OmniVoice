@@ -125,10 +125,19 @@ public protocol TranslationProvider: AnyObject {
     /// `onFlushBoundary`.
     func flush()
 
+    /// The source text has gone quiet for a moment (no new text from the
+    /// recognizer) without the segment closing — a soft sentence break for
+    /// recognizers that emit no punctuation. A one-shot engine may translate
+    /// what it has buffered early; the default no-op is correct for T3PO,
+    /// which already probes by length, and for `SystemTranslationProvider`,
+    /// which only translates at `flush()`.
+    func notifyPause()
+
     func stop() async
 }
 
 extension TranslationProvider {
+    public func notifyPause() {}
     public func updateTargetLanguage(_ code: String) {}
     public func updateCommitEagerness(_ eagerness: TranslationCommitEagerness) {}
     public func updateEarlyTranslateThreshold(_ characters: Int) {}
