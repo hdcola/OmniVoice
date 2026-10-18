@@ -2,6 +2,16 @@ import OmniVoiceCore
 import SwiftData
 import SwiftUI
 
+/// Lets the menu bar's recent-transcript rows open History on one
+/// transcript — the window may not exist yet when the row is clicked, so the
+/// request waits here until `SessionListView` picks it up.
+@MainActor
+final class HistoryNavigationState: ObservableObject {
+    static let shared = HistoryNavigationState()
+
+    @Published var requestedSessionID: UUID?
+}
+
 /// The history window's sidebar — every past (and the current, if running)
 /// recording, searchable, newest first.
 struct SessionListView: View {
@@ -28,6 +38,7 @@ struct SessionListView: View {
     /// Non-nil while the rename alert is on screen.
     @State private var renamingSession: RecordingSessionRecord?
     @State private var renameText: String = ""
+    @ObservedObject private var navigation = HistoryNavigationState.shared
 
     var body: some View {
         NavigationSplitView {
@@ -75,6 +86,8 @@ struct SessionListView: View {
             }
         }
         .frame(minWidth: 900, minHeight: 460)
+        .onAppear(perform: showRequestedSession)
+        .onChange(of: navigation.requestedSessionID) { showRequestedSession() }
         // One dialog for every delete flow — stacking several
         // `.confirmationDialog`s on one view can leave some unpresentable.
         .confirmationDialog(
@@ -173,6 +186,15 @@ struct SessionListView: View {
     private func isStale(_ session: RecordingSessionRecord, olderThanDays days: Int) -> Bool {
         let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: .now) ?? .now
         return session.startedAt < cutoff && isDeletable(session)
+    }
+
+    /// Selects the transcript the menu bar asked for, clearing a search that
+    /// would hide it.
+    private func showRequestedSession() {
+        guard let id = navigation.requestedSessionID else { return }
+        navigation.requestedSessionID = nil
+        searchText = ""
+        selection = [id]
     }
 
     /// Selected *and currently visible*: a selection made before typing a

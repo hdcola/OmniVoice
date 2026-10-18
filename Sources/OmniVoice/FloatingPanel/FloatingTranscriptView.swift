@@ -66,7 +66,7 @@ struct FloatingTranscriptView: View {
             // Not faded with the controls: a missing permission is the one
             // thing on the panel the user has to act on. Inserted only when
             // the permission flag flips, never on hover (see above).
-            ForEach(permissionIssues) { issue in
+            ForEach(PermissionIssue.current(in: session)) { issue in
                 permissionBanner(issue)
             }
             statusBar
@@ -286,67 +286,10 @@ struct FloatingTranscriptView: View {
     }
 
     private var languagePopover: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
-                GridRow {
-                    Text("Source language")
-                        .foregroundStyle(.secondary)
-                    // Disabled for the whole start→stop lifecycle
-                    // (isSessionActive, not just isRunning): it's only read
-                    // once, at the top of `start()`, to configure the ASR
-                    // engine for that recording (`SpeechAnalyzer`'s locale
-                    // can't change mid-session).
-                    SourceLanguagePicker(
-                        sourceLanguageCode: $session.sourceLanguageCode,
-                        transcriptionEngineKind: session.transcriptionEngineKind,
-                        transcriptionEngineID: session.transcriptionEngineID,
-                        transcriptionVariantID: session.currentTranscriptionModelVariant?.id,
-                        allowsAuto: session.languages.transcriptionDirection == .listenForeign
-                    )
-                    .labelsHidden()
-                    .disabled(session.isSessionActive)
-                    .fixedSize()
-                }
-                GridRow {
-                    Text("Target language")
-                        .foregroundStyle(.secondary)
-                    // Target stays editable while running: unlike source, it
-                    // isn't baked into a provider at `start()` — the
-                    // `.translationTask` above rebuilds
-                    // `translationConfiguration` on every change, so
-                    // switching it mid-recording retargets the next
-                    // translated segment.
-                    TargetLanguagePicker(
-                        targetLanguageCode: $session.targetLanguageCode,
-                        translationEngineID: session.translationEngineID,
-                        onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
-                        isSessionActive: session.isSessionActive
-                    )
-                    .labelsHidden()
-                    .fixedSize()
-                }
-            }
-            // Swaps source and target (听外语 ⇄ 说我的语言). Not while a
-            // recording runs (the source is fixed at `start()`). "自动" survives
-            // a swap — it comes back when swapping back. The reason it's
-            // blocked is written right under it: a tooltip never shows in
-            // this panel, which is never key.
-            Button {
-                session.swapTranscriptionDirection()
-            } label: {
-                Label("Swap source and target languages", systemImage: "arrow.left.arrow.right")
-            }
-            .disabled(!session.canSwapTranscriptionDirection)
-            if let reason = session.swapBlockedReason {
-                Text(reason)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .font(.callout)
-        .padding(14)
-        .frame(width: 320, alignment: .leading)
+        LanguagePairControls(session: session)
+            .font(.callout)
+            .padding(14)
+            .frame(width: 320, alignment: .leading)
     }
 
     /// Display mode (双语对照 / 仅译文 / 仅原文) and font size, set rarely
@@ -404,41 +347,6 @@ struct FloatingTranscriptView: View {
     }
 
     // MARK: - Problems and status
-
-    private enum PermissionIssue: String, Identifiable {
-        case microphone
-        case screenRecording
-
-        var id: String { rawValue }
-
-        var message: String {
-            switch self {
-            case .microphone: return String(localized: "Grant microphone access in System Settings")
-            case .screenRecording: return String(localized: "Grant screen recording access in System Settings")
-            }
-        }
-
-        var systemImage: String {
-            switch self {
-            case .microphone: return "mic.slash"
-            case .screenRecording: return "display"
-            }
-        }
-
-        var settingsURL: URL {
-            switch self {
-            case .microphone: return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
-            case .screenRecording: return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
-            }
-        }
-    }
-
-    private var permissionIssues: [PermissionIssue] {
-        var issues: [PermissionIssue] = []
-        if session.microphonePermissionNeeded { issues.append(.microphone) }
-        if session.screenRecordingPermissionNeeded { issues.append(.screenRecording) }
-        return issues
-    }
 
     /// One missing permission, with a one-tap deeplink straight to the
     /// relevant System Settings privacy pane (proposal 3.4.C).
@@ -545,29 +453,6 @@ struct FloatingTranscriptView: View {
             source: session.currentSourceLanguage,
             target: session.currentTargetLanguage
         )
-    }
-}
-
-/// Four small bars that rise with the microphone level — next to the timer
-/// in the start/stop capsule. Without it a misconfigured input device (wrong
-/// mic, muted, unplugged) looked identical to a working one until text
-/// failed to show up. Scales with `level` (0...1, see `AudioMixer.onLevel`)
-/// rather than toggling on/off, so it reads as a meter.
-private struct InputLevelBars: View {
-    let level: Float
-    private static let weights: [CGFloat] = [0.55, 1, 0.75, 0.9]
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 2) {
-            ForEach(Self.weights.indices, id: \.self) { index in
-                Capsule()
-                    .fill(Color.green)
-                    .frame(width: 2, height: 3 + CGFloat(level) * 9 * Self.weights[index])
-            }
-        }
-        .frame(height: 12)
-        .animation(.easeOut(duration: 0.1), value: level)
-        .accessibilityLabel("Microphone is receiving audio")
     }
 }
 

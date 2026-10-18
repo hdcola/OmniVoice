@@ -56,6 +56,7 @@ struct GlobalShortcut: Equatable, Hashable, Codable {
 
     static let optionA = GlobalShortcut(keyCode: UInt16(kVK_ANSI_A), modifiers: .option)
     static let optionS = GlobalShortcut(keyCode: UInt16(kVK_ANSI_S), modifiers: .option)
+    static let optionR = GlobalShortcut(keyCode: UInt16(kVK_ANSI_R), modifiers: .option)
 
     init(keyCode: UInt16, modifiers: Modifiers) {
         self.keyCode = keyCode
@@ -141,6 +142,9 @@ enum GlobalShortcutAction: String, CaseIterable, Identifiable {
     case translateSelection
     /// Freezes the screen, lets the user frame some text, and translates it.
     case captureText
+    /// Starts live transcription, or stops the one running — without
+    /// opening the menu bar or the 字幕悬浮窗 first.
+    case toggleTranscription
 
     var id: String { rawValue }
 
@@ -148,6 +152,7 @@ enum GlobalShortcutAction: String, CaseIterable, Identifiable {
         switch self {
         case .translateSelection: return String(localized: "Translate selection")
         case .captureText: return String(localized: "Translate screenshot")
+        case .toggleTranscription: return String(localized: "Start/Stop Transcription")
         }
     }
 
@@ -155,6 +160,7 @@ enum GlobalShortcutAction: String, CaseIterable, Identifiable {
         switch self {
         case .translateSelection: return String(localized: "Translate selected text in any app")
         case .captureText: return String(localized: "Select text on screen and translate it")
+        case .toggleTranscription: return String(localized: "Start or stop live transcription from any app")
         }
     }
 
@@ -162,6 +168,7 @@ enum GlobalShortcutAction: String, CaseIterable, Identifiable {
         switch self {
         case .translateSelection: return .optionA
         case .captureText: return .optionS
+        case .toggleTranscription: return .optionR
         }
     }
 

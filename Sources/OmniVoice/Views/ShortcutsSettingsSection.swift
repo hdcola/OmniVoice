@@ -2,7 +2,7 @@ import SwiftUI
 
 /// "快捷键" — the last section of Settings' "通用" tab, and the one place
 /// every key that starts something is set: the global shortcuts (划词翻译,
-/// 截图翻译), double ⌘C and the 语音输入 trigger key. They used to be spread
+/// 截图翻译, 开始/停止转录), double ⌘C and the 语音输入 trigger key. They used to be spread
 /// over the 快捷翻译 and 语音输入 tabs.
 struct ShortcutsSettingsSection: View {
     @ObservedObject var selectionController: SelectionTranslationController

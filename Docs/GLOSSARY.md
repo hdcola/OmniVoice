@@ -25,7 +25,8 @@ intentionally unchanged (renaming them would break persisted settings).
 | Memory used by loaded models | 内存 | Memory | — |
 | Global key bindings, all set in one section (Settings → General → Shortcuts, with double ⌘C and the Dictation trigger key) | 快捷键（设置「通用」中的分组） | Shortcuts | `GlobalShortcut`, `ShortcutsSettingsSection` |
 | Key held or pressed to dictate | 语音输入触发键 | Dictation trigger key | `DictationTriggerKey` |
-| Status-bar icon + menu | 菜单栏 | Menu bar | `MenuBarExtra` |
+| Status-bar icon + the popover it opens | 菜单栏 | Menu bar | `MenuBarExtra`, `MenuBarContentView` |
+| ⌥R action (global shortcut) | 开始/停止转录 | Start/Stop Transcription | `toggleTranscription` |
 | Language the app UI is shown in (Settings → General) | 界面语言（跟随系统 / English / 简体中文；重启后生效） | Interface language (Follow system) | `AppLanguage` |
 | Settings row granting Automation access to Music/Spotify for pausing during dictation | 直接控制 Music 和 Spotify | Control Music and Spotify directly | `PlayerAccessRow`, `AppleEventPlayerController` |
 | Settings tabs (toolbar tabs; the Caption panel's settings are on Speech Recognition) | 通用 · 语音识别 · 语音输入 · 快捷翻译 · 模型库 · 关于 | General · Speech Recognition · Dictation · Quick Translate · Model Library · About | `SettingsTab` |

@@ -1,5 +1,4 @@
 "%.1f s" = "%.1f 秒";
-"%@ (%@)" = "%1$@（%2$@）";
 "%@ (custom)" = "%@（自定义）";
 "%@ (not downloaded · click to set up)" = "%@（未下载 · 点击配置）";
 "%@ (not downloaded)" = "%@（未下载）";
@@ -37,6 +36,7 @@
 "Allow" = "去允许";
 "Arabic" = "阿拉伯语";
 "Audio quieter than this counts as silence; lower it (more negative) if your microphone is quiet or you speak softly" = "低于该音量视为静音；麦克风音量小、轻声说话时调低（更负）";
+"Audio source" = "音频来源";
 "Auto-detect (requires local model)" = "自动检测（需本地模型）";
 "Auto-detect foreign language" = "自动检测外语";
 "Auto-detect" = "自动检测";
@@ -231,8 +231,6 @@
 "Model Download Complete" = "模型下载完成";
 "Model Download Failed" = "模型下载失败";
 "Model Library" = "模型库";
-"Model Library… (downloading %lld%%)" = "模型库…（下载中 %lld%%）";
-"Model Library… (preparing download…)" = "模型库…（准备下载…）";
 "Model Library…" = "模型库…";
 "Model name" = "模型名";
 "Model preloaded" = "模型已预加载";
@@ -243,11 +241,18 @@
 "Polishing…" = "润色中…";
 "Press ⌫ or use the Manage menu at the bottom of the sidebar to delete them in bulk" = "按 ⌫ 或使用侧栏底部的“管理”菜单批量删除";
 "Read aloud" = "朗读";
+"Ready · %@" = "就绪 · %@";
+"Ready" = "就绪";
+"Recent transcripts" = "最近的转录记录";
 "Set shortcuts in General → Shortcuts." = "快捷键在「通用 → 快捷键」中设置。";
 "Share" = "分享";
 "Share…" = "分享…";
 "Shortcuts" = "快捷键";
+"Show Caption Panel" = "显示字幕悬浮窗";
 "Show Details" = "显示详情";
+"Start or stop live transcription from any app" = "在任何应用中开始或停止转录";
+"Start/Stop Transcription" = "开始/停止转录";
+"Stopping…" = "正在停止…";
 "The recognition engine could not load the model" = "识别引擎无法加载模型";
 "Model" = "模型";
 "More accurate (waits for more context)" = "更准确（等待更多上下文）";
@@ -372,7 +377,6 @@
 "Setup is incomplete" = "还没配置完";
 "Setup is incomplete: fill in the service, model and API Key below, otherwise the original text is typed." = "还没配置完：请填写下面的服务、模型和 API Key，否则会直接输入原文";
 "Show the Caption panel at launch" = "启动时显示字幕悬浮窗";
-"Show/Hide Caption Panel" = "显示/隐藏字幕悬浮窗";
 "Silence level threshold" = "静音电平阈值";
 "Silence longer than this ends the current sentence; longer values split sentences less often but make text appear more slowly" = "说话后静音超过该时长就结束当前句；越长越不易被拆句，但出字更慢";
 "Simplified Chinese" = "简体中文";
