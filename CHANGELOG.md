@@ -7,19 +7,30 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(asr): new sherpa-onnx local engine for speech recognition (small streaming models), selectable in Settings → Speech Recognition and downloadable from the Model Library; works for Live transcription and Dictation, whose Polish recognized text can tidy its unpunctuated output (#114)
+- feat(asr): the sherpa-onnx local engine offers nine models to choose from in Settings → Speech Recognition and the Model Library: Paraformer bilingual (zh-en) (default), Zipformer bilingual (zh-en), Chinese 2025 (transducer and CTC), Chinese small CTC, Chinese multi-dataset, Chinese 14M, Paraformer trilingual (Mandarin, Cantonese, English) and a multilingual Zipformer (seven languages); sizes from about 25MB to 360MB (#114)
+- feat(asr): each sherpa-onnx model only offers the source languages it can recognize (for example Chinese only, or Mandarin, Cantonese and English) (source picker in the Caption panel, My language / Foreign language, ⇄ swap, Dictation language), and switching to it repairs a language it cannot recognize, as System speech recognition already does (#114)
+- fix(models): the Model Library shows each sherpa-onnx model's measured memory in MB (about 140 MB to 930 MB) instead of a flat "1 GB" estimate (#114)
+- feat(asr): the sherpa-onnx local engine now defaults to Paraformer bilingual (zh-en), about 540 MB of memory instead of the Zipformer bilingual model's 930 MB (#114)
+- feat(models): model packages made of several files can be downloaded and verified file by file, with one overall progress bar and a retry that skips files already fetched (#114)
 - feat(dictation): browser audio (videos, web players) is muted during a dictation and comes back afterwards — the video keeps playing; a browser in a call is left alone (Chrome plays every tab through one process, so a Meet call keeps the whole browser unmuted), and no permission is needed (#112)
 
 ### Changed
+- refactor(asr): speech recognition engines are named after their runtime instead of a model: “R2T2 offline model” is now “audio.cpp local engine” (engine ID and settings unchanged), and the new one is “sherpa-onnx local engine”; the glossary says so (#114)
 - feat(dictation): once allowed in Settings › Dictation › “Control Music and Spotify directly”, Music and Spotify are paused and resumed with their own commands instead of the play/pause key, so a dictation never starts or resumes another app by mistake (“Allow” starts a player that isn’t running in the background to ask, then quits it); without permission, and for other players, the key is still used (#112)
 
 ### Fixed
 - fix(dictation): starting a dictation no longer launches Music (and steals the focus) when nothing was playing — music is only paused when a dedicated player app (Music, Spotify, …) is outputting audio; browser tabs no longer trigger the play/pause key (#112)
 
 ### Dependencies
+- chore(deps): link prebuilt sherpa-onnx v1.13.8 (macOS arm64) from `third_party/sherpa-onnx`, fetched by `Scripts/setup_third_party.sh` (#114)
 
 ### Documentation
+- docs(setup): describe the sherpa-onnx setup step in `Docs/MODEL_ENGINE_SETUP.md`; add the sherpa-onnx local engine to `Docs/GLOSSARY.md` (#114)
 
 ### Tests
+- test(asr): cover a Chinese-only sherpa-onnx model when neither of the user's languages is recognizable, and dropping an unloaded sherpa-onnx transcriber (#114)
+- test(asr): smoke test for the sherpa-onnx provider, skipped when the model is absent (#114)
 
 ## [0.8.2] - 2026-10-16
 

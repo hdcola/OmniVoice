@@ -65,7 +65,7 @@ OmniVoice 没有主窗口，一切都在菜单栏、字幕悬浮窗和设置窗�
 在任意 App 里按住右 ⌥ Option（或右 ⌘ / ⌃），或者点按开始、再点按结束，说话，
 文字就会输入到光标处。
 
-- 使用系统语音识别；如果转录已经载入了本地 R2T2 模型，则直接借用它。
+- 使用系统语音识别；如果转录已经载入了本地模型，则直接借用它。
 - 小气泡实时显示听到的内容；Esc 取消；有时长上限（默认 2 分钟），按键释放丢失时
   也会自动关闭麦克风。
 - 点按模式下，按 Return 会结束听写、输入文字并再按一次 Return（适合聊天和发送提示词）。
@@ -81,7 +81,7 @@ OmniVoice 没有主窗口，一切都在菜单栏、字幕悬浮窗和设置窗�
 
 | | 系统（内置，无需下载） | 本地模型（离线） |
 |---|---|---|
-| 语音识别 | `SpeechAnalyzer` / `SpeechTranscriber` | R2T2（Q4_K_M / Q8_0 / F16） |
+| 语音识别 | `SpeechAnalyzer` / `SpeechTranscriber` | R2T2（Q4_K_M / Q8_0 / F16，基于 audio.cpp）；流式 Zipformer / Paraformer 小模型（基于 sherpa-onnx） |
 | 翻译 | `Translation` 框架 | HY-MT1.5 1.8B（轻量）、T3PO（高质量） |
 
 识别引擎和翻译引擎可分别选择。本地模型通过 `audio.cpp` 和 `llama.cpp` 在进程内运行。

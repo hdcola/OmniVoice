@@ -151,7 +151,7 @@ struct SettingsView: View {
                 aboutLink("Report an Issue", icon: "exclamationmark.bubble", url: Self.repositoryURL.appendingPathComponent("issues"))
             }
 
-            Text("System engines use the macOS Speech / Translation frameworks; local engines use audio.cpp (R2T2) and llama.cpp (T3PO / HY-MT1.5) and run fully offline.")
+            Text("System engines use the macOS Speech / Translation frameworks; local engines use audio.cpp (R2T2), sherpa-onnx (streaming Zipformer / Paraformer) and llama.cpp (T3PO / HY-MT1.5) and run fully offline.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

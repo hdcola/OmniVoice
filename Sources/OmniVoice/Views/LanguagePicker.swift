@@ -2,9 +2,10 @@ import OmniVoiceCore
 import SwiftUI
 
 /// Picker for one side of the 我的语言 / 外语 pair (Settings → 通用 → 语言).
-/// Under the system recognizer the source side can't be one of the
-/// languages it can't recognize — those stay offered on the other side,
-/// where they are only ever a translation target.
+/// Under an engine that can't recognize every language (the system
+/// recognizer, a sherpa model) the source side can't be one
+/// it can't recognize — those stay offered on the other side, where they
+/// are only ever a translation target.
 struct LanguagePicker: View {
     @EnvironmentObject private var session: RecordingSession
     let title: String
@@ -18,8 +19,11 @@ struct LanguagePicker: View {
     }
 
     var body: some View {
-        let restricted = isSourceSide && session.transcriptionEngineKind == .system
-        let options = restricted ? LanguageCatalog.common.filter(\.supportsSystemASRSource) : LanguageCatalog.common
+        let options = isSourceSide
+            ? ProviderCatalog.sourceLanguageOptions(
+                forEngineID: session.transcriptionEngineID, variantID: session.currentTranscriptionModelVariant?.id
+            )
+            : LanguageCatalog.common
         Picker(LocalizedStringKey(title), selection: selection) {
             ForEach(options) { option in
                 Text(option.displayName).tag(option.code)

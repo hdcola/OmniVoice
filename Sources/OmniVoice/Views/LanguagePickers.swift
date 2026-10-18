@@ -18,19 +18,19 @@ struct PanelPopoverOpenKey: PreferenceKey {
 struct SourceLanguagePicker: View {
     @Binding var sourceLanguageCode: String?
     let transcriptionEngineKind: EngineKind?
+    let transcriptionEngineID: String
+    var transcriptionVariantID: String?
     /// False while speaking in the user's own language — there is no
     /// "自动" for that side (see `LanguagePreferences.sourceLanguageCode`).
     var allowsAuto: Bool = true
     @State private var isAutoExplanationPresented = false
 
-    /// The system ASR engine can't recognize a handful of `LanguageCatalog`
-    /// entries at all (`supportsSystemASRSource == false`) — offering them
-    /// here while `.system` is selected would be a guaranteed-to-fail trap,
-    /// since picking one and hitting start throws every time.
+    /// An engine can't recognize every `LanguageCatalog` entry: the system
+    /// one drops a handful (`supportsSystemASRSource == false`), the
+    /// sherpa model covers only a few languages. Offering
+    /// the rest would be a trap — picking one fails or produces nonsense.
     private var options: [LanguageOption] {
-        transcriptionEngineKind == .system
-            ? LanguageCatalog.common.filter(\.supportsSystemASRSource)
-            : LanguageCatalog.common
+        ProviderCatalog.sourceLanguageOptions(forEngineID: transcriptionEngineID, variantID: transcriptionVariantID)
     }
 
     /// Task 1.2 (源语言自动检测显性化) — "自动" stays in the list even under
@@ -42,7 +42,7 @@ struct SourceLanguagePicker: View {
     private var autoLabel: String {
         if isAutoAvailable { return String(localized: "✨ Auto-detect language (Auto)") }
         return allowsAuto
-            ? String(localized: "✨ Auto-detect (requires the local R2T2 engine)")
+            ? String(localized: "✨ Auto-detect (requires a local engine)")
             : String(localized: "✨ Auto-detect (only available when listening to a foreign language)")
     }
 
@@ -83,7 +83,7 @@ struct SourceLanguagePicker: View {
                 .foregroundStyle(.secondary)
                 .help("Why is “Auto-detect” unavailable?")
                 .popover(isPresented: $isAutoExplanationPresented) {
-                    Text("The macOS system speech recognition engine requires a fixed language. To auto-detect mixed languages, switch to the local R2T2 model in Settings.")
+                    Text("The macOS system speech recognition engine requires a fixed language. To auto-detect mixed languages, switch to a local engine in Settings.")
                         .font(.callout)
                         .frame(width: 260)
                         .padding()

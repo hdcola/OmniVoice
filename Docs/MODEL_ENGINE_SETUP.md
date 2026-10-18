@@ -89,6 +89,24 @@ A real "download on first use" flow (fetching into a per-user cache instead
 of this repo-relative `models/` convention) is a separate follow-up — see
 `Docs/PROGRESS.md`.
 
+## 4. sherpa-onnx (streaming ASR prototype)
+
+`SherpaTranscriptionProvider` runs sherpa-onnx's streaming transducers
+in-process. `Scripts/setup_third_party.sh` unpacks the prebuilt macOS arm64
+libs (no TTS) into `third_party/sherpa-onnx/{include,lib}` — `Package.swift`
+links `libsherpa-onnx-c-api.dylib` from there, so the build needs it.
+
+The engine is selectable as sherpa-onnx 本地引擎 (`model.sherpa`); nine models
+(`ProviderCatalog.sherpaVariants`) download from the Model Library into
+`Application Support/OmniVoice/Models/<variant id>/`. The loader recognizes a
+package's kind from its files (transducer, Paraformer or Zipformer2 CTC).
+
+For development, `SherpaTranscriptionProviderTests` runs one case per model
+package found in `models/sherpa-<variant id>/` (the files listed for that
+variant in `ProviderCatalog`, from the pinned
+`csukuangfj/sherpa-onnx-streaming-*` Hugging Face revision), using the clip
+`models/sherpa-test-wavs/0.wav`. Cases without their files are skipped.
+
 ## Verifying the setup
 
 ```bash

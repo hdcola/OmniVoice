@@ -77,7 +77,7 @@ struct RecognitionSettingsView: View {
             inlineDownloadSection(forEngineID: session.transcriptionEngineID)
             // Only `.model` engines act on the pause boundary (system ASR
             // produces its own), so the VAD tuning is hidden for system engines.
-            if session.transcriptionEngineKind == .model {
+            if ProviderCatalog.usesVADBoundary(engineID: session.transcriptionEngineID) {
                 SettingsDivider()
                 SettingsRow(
                     title: "Sentence pause length",
@@ -174,7 +174,8 @@ struct RecognitionSettingsView: View {
         // `.appended` mid-utterance, so `translationProvider.feed(_:)` only
         // ever runs once per segment, immediately followed by `flush()` —
         // there's nothing "early" left to translate by then).
-        if session.translationEngineID != "model.t3po", session.transcriptionEngineKind != .system {
+        if session.translationEngineID != "model.t3po",
+            session.transcriptionEngineKind != .system, session.transcriptionEngineID != "model.sherpa" {
             SettingsRow(
                 title: "Early-translation threshold for long sentences",
                 subtitle: "Lower values show text sooner, but long sentences are more likely to be split into several parts"

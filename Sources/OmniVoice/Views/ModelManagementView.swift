@@ -211,7 +211,7 @@ struct ModelManagementView: View {
         ) else {
             return nil
         }
-        return (String(localized: "Pair it with the R2T2 speech recognition engine for the best real-time typewriter experience"), r2t2)
+        return (String(localized: "Pair it with the audio.cpp local engine for the best real-time typewriter experience"), r2t2)
     }
 
     // MARK: - Task 2.3 — Recommended bundles
@@ -330,7 +330,13 @@ struct ModelManagementView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(variant.displayName).font(.system(size: 13, weight: .semibold))
-                Text("\(variant.quantization) · about \(variant.approximateSizeMB) MB · about \(variant.recommendedMemoryGB) GB memory")
+                Group {
+                    if let memoryMB = variant.memoryMB {
+                        Text("\(variant.quantization) · about \(variant.approximateSizeMB) MB · about \(memoryMB) MB memory")
+                    } else {
+                        Text("\(variant.quantization) · about \(variant.approximateSizeMB) MB · about \(variant.recommendedMemoryGB) GB memory")
+                    }
+                }
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 if !variant.summary.isEmpty {

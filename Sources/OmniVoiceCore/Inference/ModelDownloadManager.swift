@@ -136,6 +136,9 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// needing its own inner `Task { @MainActor in ... }` hop on every one of
     /// a multi-gigabyte download's several-thousand progress callbacks.
     private var progressHandlers: [String: [@MainActor (Double) -> Void]] = [:]
+    /// While a multi-file variant downloads: bytes already finished and the
+    /// package total, so one file's callbacks read as package-wide progress.
+    private var batchContexts: [String: (doneBytes: Int64, totalBytes: Int64)] = [:]
     /// Throttle state for `handleProgress` — see its doc.
     private var lastReportedProgress: [String: (fraction: Double, time: Date)] = [:]
 
@@ -200,12 +203,29 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
 
     /// Where `variant`'s weights live once downloaded — regardless of
     /// whether they actually are yet (see `isDownloaded(_:)`).
+    ///
+    /// A multi-file variant (`variant.files`) is a directory named by
+    /// `variant.id`, otherwise a single `<id>.gguf` file.
     public func localURL(for variant: ModelVariant) -> URL {
-        cacheDirectory.appendingPathComponent("\(variant.id).gguf")
+        if variant.files.isEmpty {
+            return cacheDirectory.appendingPathComponent("\(variant.id).gguf")
+        }
+        return cacheDirectory.appendingPathComponent(variant.id, isDirectory: true)
+    }
+
+    /// Where a multi-file variant's verified files accumulate until the last
+    /// one lands. Kept across a failed/cancelled run, so a retry only
+    /// fetches what is missing.
+    private func stagingURL(for variant: ModelVariant) -> URL {
+        cacheDirectory.appendingPathComponent("\(variant.id).partial", isDirectory: true)
     }
 
     public func isDownloaded(_ variant: ModelVariant) -> Bool {
-        FileManager.default.fileExists(atPath: localURL(for: variant).path)
+        let url = localURL(for: variant)
+        if variant.files.isEmpty { return FileManager.default.fileExists(atPath: url.path) }
+        return variant.files.allSatisfy {
+            FileManager.default.fileExists(atPath: url.appendingPathComponent($0.name).path)
+        }
     }
 
     public func isDownloading(_ variant: ModelVariant) -> Bool {
@@ -240,6 +260,9 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     public func deleteCachedModel(for variant: ModelVariant) throws {
         cancelDownload(for: variant)
         let url = localURL(for: variant)
+        if !variant.files.isEmpty {
+            try? FileManager.default.removeItem(at: stagingURL(for: variant))
+        }
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         // `isDownloaded(_:)` is a plain file-existence check, not a
         // `@Published` property — nothing here would otherwise tell a
@@ -296,7 +319,7 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     ) async throws -> URL {
         let destination = localURL(for: variant)
         if isDownloaded(variant) { return destination }
-        guard variant.downloadURL != nil else {
+        guard variant.downloadURL != nil || !variant.files.isEmpty else {
             throw ModelDownloadError.missingDownloadURL(variantID: variant.id)
         }
 
@@ -363,7 +386,53 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
         return try await job.value
     }
 
+    /// Multi-file package: each file is downloaded and hash-verified into the
+    /// staging directory (skipping any already there from an earlier run),
+    /// then the directory is moved into place in one step — so
+    /// `isDownloaded(_:)` never sees a half-populated package. Progress is
+    /// reported over the whole package's bytes, not per file.
+    private func runDirectoryJob(for variant: ModelVariant) async throws -> URL {
+        try Task.checkCancellation()
+        let destination = localURL(for: variant)
+        let staging = stagingURL(for: variant)
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+
+        let missing = variant.files.filter {
+            !FileManager.default.fileExists(atPath: staging.appendingPathComponent($0.name).path)
+        }
+        let requiredMB = Int(missing.reduce(0) { $0 + $1.sizeBytes } / (1024 * 1024)) + Self.diskSpaceSafetyMarginMB
+        if let availableMB = Self.availableDiskSpaceMB(at: cacheDirectory), availableMB < requiredMB {
+            throw ModelDownloadError.insufficientDiskSpace(requiredMB: requiredMB, availableMB: availableMB)
+        }
+
+        let totalBytes = variant.files.reduce(0) { $0 + $1.sizeBytes }
+        var doneBytes = variant.files.reduce(0) { sum, file in
+            missing.contains(file) ? sum : sum + file.sizeBytes
+        }
+        defer { batchContexts[variant.id] = nil }
+        for file in missing {
+            try Task.checkCancellation()
+            batchContexts[variant.id] = (doneBytes, totalBytes)
+            let tempFileURL = try await runDownload(variantID: variant.id, from: file.url)
+            do {
+                try await verifyAndMove(
+                    variantID: variant.id, expectedSHA256: file.sha256,
+                    tempFileURL: tempFileURL, destination: staging.appendingPathComponent(file.name)
+                )
+            } catch {
+                try? FileManager.default.removeItem(at: tempFileURL)
+                throw error
+            }
+            doneBytes += file.sizeBytes
+        }
+
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: staging, to: destination)
+        return destination
+    }
+
     private func runJob(for variant: ModelVariant) async throws -> URL {
+        if !variant.files.isEmpty { return try await runDirectoryJob(for: variant) }
         try Task.checkCancellation()
         let destination = localURL(for: variant)
         guard let downloadURL = variant.downloadURL else {
@@ -457,7 +526,13 @@ public final class ModelDownloadManager: NSObject, ObservableObject {
     /// once per ~0.5% of progress or 100ms, whichever comes first — except
     /// the terminal `1.0`, which always gets through so a progress view
     /// never gets stuck just short of "done".
-    fileprivate func handleProgress(variantID: String, fraction: Double, bytesWritten: Int64, totalBytes: Int64) {
+    fileprivate func handleProgress(variantID: String, fraction rawFraction: Double, bytesWritten rawBytes: Int64, totalBytes rawTotal: Int64) {
+        var fraction = rawFraction, bytesWritten = rawBytes, totalBytes = rawTotal
+        if let batch = batchContexts[variantID], batch.totalBytes > 0 {
+            bytesWritten = batch.doneBytes + rawBytes
+            totalBytes = batch.totalBytes
+            fraction = min(1.0, Double(bytesWritten) / Double(totalBytes))
+        }
         let now = Date()
         // Review Round 1 Must-Fix 5 — this early `return` must come *before*
         // any `@Published` write, `downloadStats` included: a `Dictionary`-
