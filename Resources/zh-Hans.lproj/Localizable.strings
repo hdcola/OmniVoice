@@ -544,7 +544,6 @@
 "Selected: no extra memory" = "已选：不额外占用内存";
 "Selected: about %@ memory (estimated)" = "已选：内存约 %@（估算）";
 "Selected: about %@ memory" = "已选：内存约 %@";
-"T3PO previews word by word from a recognizer that streams text; with the sherpa-onnx local engine, translation waits until each sentence ends." = "T3PO 的逐字预览依赖能逐字输出文本的识别引擎；搭配 sherpa-onnx 本地引擎时，翻译要等每句话结束后才出。";
 "This speech model recognizes only: %@." = "这个识别模型只能识别：%@。";
 "Back" = "上一步";
 "Next" = "下一步";

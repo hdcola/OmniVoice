@@ -52,9 +52,8 @@ struct ModelSelectionPlanTests {
         #expect(!plan("sherpa-zipformer-zh-14m", "hymt15-1.8b-q4_k_m").isMemoryEstimated)
     }
 
-    @Test func notesWarnAboutSherpaWithT3POAndLimitedLanguages() {
-        #expect(plan("sherpa-paraformer-bilingual-zh-en", "t3po-q5_k_m").notes.contains(.translationWaitsForSentenceEnd))
-        #expect(!plan("r2t2-q8_0", "t3po-q5_k_m").notes.contains(.translationWaitsForSentenceEnd))
+    @Test func notesWarnAboutLimitedLanguages() {
+        #expect(plan("sherpa-paraformer-bilingual-zh-en", "t3po-q5_k_m").notes.isEmpty)
         #expect(plan("sherpa-zipformer-zh-14m", nil).notes == [.limitedLanguages(["zh-CN"])])
         #expect(plan("r2t2-q8_0", nil).notes.isEmpty)
     }
