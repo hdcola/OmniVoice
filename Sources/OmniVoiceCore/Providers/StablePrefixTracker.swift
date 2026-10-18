@@ -54,8 +54,8 @@ struct StablePrefixTracker {
     /// The part of `text` to deliver after `emitted` when `text` no longer
     /// starts with it: everything past the common prefix, except that a
     /// divergence inside a word backs up to the word's start (the wrong word
-    /// stays, but nothing is spliced or lost). A space keeps a restarted
-    /// English word from gluing onto the emitted text.
+    /// stays, but nothing is spliced or lost). A space keeps a word from
+    /// gluing onto emitted text that ends in a word of a spaced script.
     private func reconciledTail(of text: String) -> String {
         let emittedChars = Array(emitted)
         let textChars = Array(text)
@@ -65,20 +65,23 @@ struct StablePrefixTracker {
         {
             common += 1
         }
+        // Everything in `text` is already emitted; appending would duplicate it.
+        if common == textChars.count { return "" }
         func isWordCharacter(_ character: Character) -> Bool {
-            character.isASCII && (character.isLetter || character.isNumber)
+            (character.isLetter || character.isNumber)
+                && !DictationTextAssembler.isSpaceless(character)
         }
-        var backedOff = false
         if common > 0, isWordCharacter(textChars[common - 1]),
-            (common < textChars.count && isWordCharacter(textChars[common]))
+            isWordCharacter(textChars[common])
                 || (common < emittedChars.count && isWordCharacter(emittedChars[common]))
         {
             let lastSpace = textChars[..<common].lastIndex { $0.isWhitespace }
             common = lastSpace.map { $0 + 1 } ?? 0
-            backedOff = true
         }
         let tail = String(textChars[common...])
-        if backedOff, !tail.isEmpty, let last = emittedChars.last, !last.isWhitespace {
+        if let first = tail.first, let last = emittedChars.last,
+            isWordCharacter(first), isWordCharacter(last)
+        {
             return " " + tail
         }
         return tail

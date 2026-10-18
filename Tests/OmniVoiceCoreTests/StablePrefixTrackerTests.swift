@@ -27,8 +27,8 @@ struct StablePrefixTrackerTests {
         _ = tracker.ingest("hello world")
         let rewritten = tracker.ingest("jello world!!")
         #expect(rewritten.appended == nil)
-        #expect(rewritten.tentative == "jello world!!")
-        #expect(tracker.close(finalText: "jello world!!") == "jello world!!")
+        #expect(rewritten.tentative == " jello world!!")
+        #expect(tracker.close(finalText: "jello world!!") == " jello world!!")
     }
 
     @Test func divergenceMidWordBacksUpToTheWordStart() {
@@ -52,5 +52,31 @@ struct StablePrefixTrackerTests {
         let diverged = tracker.ingest("I thought that")
         #expect(diverged.appended == nil)
         #expect(diverged.tentative == " thought that")
+    }
+
+    @Test func textShorterThanEmittedAddsNothing() {
+        var tracker = StablePrefixTracker(holdback: 0)
+        _ = tracker.ingest("hello world")
+        _ = tracker.ingest("hello world")
+        #expect(tracker.ingest("hello wo").tentative == "")
+        #expect(tracker.close(finalText: "hello wo") == "")
+    }
+
+    @Test func divergenceAtAWordBoundaryKeepsTheWordsApart() {
+        var tracker = StablePrefixTracker(holdback: 0)
+        _ = tracker.ingest("I think")
+        _ = tracker.ingest("I think")
+        #expect(tracker.close(finalText: "I believe so") == " believe so")
+
+        _ = tracker.ingest("good")
+        _ = tracker.ingest("good")
+        #expect(tracker.close(finalText: "bad morning") == " bad morning")
+    }
+
+    @Test func divergenceInAccentedWordBacksUpToTheWordStart() {
+        var tracker = StablePrefixTracker(holdback: 0)
+        _ = tracker.ingest("C'est déjà")
+        _ = tracker.ingest("C'est déjà")
+        #expect(tracker.close(finalText: "C'est dépassé") == " dépassé")
     }
 }

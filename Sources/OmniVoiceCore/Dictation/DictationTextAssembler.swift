@@ -62,7 +62,7 @@ public struct DictationTextAssembler: Equatable, Sendable {
 
     /// Chinese and Japanese run words together; Korean (Hangul) separates
     /// them with spaces like Latin text, so it is deliberately not here.
-    private static func isSpaceless(_ character: Character) -> Bool {
+    static func isSpaceless(_ character: Character) -> Bool {
         character.unicodeScalars.contains { scalar in
             switch scalar.value {
             case 0x2E80...0x9FFF, 0xF900...0xFAFF, 0x3000...0x303F, 0xFF00...0xFFEF:
