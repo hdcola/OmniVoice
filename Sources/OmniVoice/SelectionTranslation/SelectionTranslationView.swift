@@ -17,6 +17,7 @@ struct SelectionTranslationView: View {
     @ObservedObject var controller: SelectionTranslationController
     @ObservedObject var translator: SelectionTranslator
     @ObservedObject var speaker: SelectionSpeaker
+    @State private var copyConfirmation: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -53,6 +54,9 @@ struct SelectionTranslationView: View {
                 }
                 .clipped()
                 .background(paneBackground)
+                // Over the bottom of the translation it refers to, clear of
+                // the footer's buttons.
+                .copyConfirmation($copyConfirmation)
             }
             .padding(.horizontal, 12)
             footer
@@ -86,9 +90,7 @@ struct SelectionTranslationView: View {
                 .foregroundStyle(.secondary)
             targetMenu
             Spacer()
-            Text(engineName)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            engineMenu
             Button {
                 controller.hidePanel()
             } label: {
@@ -144,7 +146,39 @@ struct SelectionTranslationView: View {
 
     private var engineName: String {
         let name = SelectionTranslationEngine.displayName(for: translator.effectiveEngineID)
-        return translator.engineID == SelectionTranslationEngine.followRecording ? String(localized: "Follow transcription · \(name)") : name
+        return translator.engineID == SelectionTranslationEngine.followRecording
+            ? String(localized: "Follow transcription translation engine · \(name)") : name
+    }
+
+    /// The engine in use, and a switch between the same two choices as
+    /// Settings' 快捷翻译 tab — so trying the other engine on this text is
+    /// one click instead of a trip to Settings. Switching translates again.
+    private var engineMenu: some View {
+        Menu {
+            Picker("Quick Translate engine", selection: Binding(
+                get: { translator.engineID },
+                set: { engineID in
+                    guard engineID != translator.engineID else { return }
+                    translator.engineID = engineID
+                    if !translator.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        translator.translate()
+                    }
+                }
+            )) {
+                Text("Follow transcription translation engine (current: \(SelectionTranslationEngine.displayName(for: translator.followedEngineID)))")
+                    .tag(SelectionTranslationEngine.followRecording)
+                Text(SelectionTranslationEngine.displayName(for: SelectionTranslationEngine.system))
+                    .tag(SelectionTranslationEngine.system)
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Text(engineName)
+                .font(.caption)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .foregroundStyle(.secondary)
+        .help("Quick Translate engine")
     }
 
     // MARK: - Notice
@@ -276,6 +310,8 @@ struct SelectionTranslationView: View {
                 Button("Stop") { translator.cancel() }
             }
             Button("Copy Translation") { copyResult() }
+                .keyboardShortcut("c", modifiers: [.command, .shift])
+                .help(Text(verbatim: String(localized: "Copy Translation") + " (⇧⌘C)"))
                 .disabled(translator.resultText.isEmpty)
             Button("Translate") { translator.translate() }
                 .disabled(translator.sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -294,13 +330,16 @@ struct SelectionTranslationView: View {
         } else if translator.isBusy, !translator.resultText.isEmpty {
             Text("Translating…")
         } else {
-            Text("⏎ Translate · ⇧⏎ New line · Esc Close")
+            KeyHintRow(hints: [
+                KeyHint(key: "⏎", action: String(localized: "Translate")),
+                KeyHint(key: "⇧⏎", action: String(localized: "New line")),
+                KeyHint(key: "esc", action: String(localized: "Close")),
+            ])
         }
     }
 
     private func copyResult() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(translator.resultText, forType: .string)
+        Clipboard.copy(translator.resultText)
+        copyConfirmation = String(localized: "Translation copied")
     }
 }

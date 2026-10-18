@@ -45,26 +45,12 @@ struct SessionListView: View {
             .frame(minWidth: 340)
             .navigationSplitViewColumnWidth(min: 340, ideal: 380, max: 520)
             .onDeleteCommand { requestDeletion(of: selectedSessions) }
-            .toolbar {
-                ToolbarItem {
-                    Menu {
-                        Button("Delete \(selectedDeletable.count) Selected…", role: .destructive) {
-                            requestDeletion(of: selectedSessions)
-                        }
-                        .disabled(selectedDeletable.isEmpty)
-                        Divider()
-                        Button("Clean Up Empty Transcripts…") { pendingRequest = .empty }
-                            .disabled(!sessions.contains(where: isEmptyAndDeletable))
-                        Button("Delete Transcripts Older Than 30 Days…") { pendingRequest = .olderThan(days: 30) }
-                            .disabled(!sessions.contains { isStale($0, olderThanDays: 30) })
-                        Button("Delete Transcripts Older Than 90 Days…") { pendingRequest = .olderThan(days: 90) }
-                            .disabled(!sessions.contains { isStale($0, olderThanDays: 90) })
-                    } label: {
-                        Label("Manage", systemImage: "trash")
-                    }
-                }
+            // Housekeeping sits at the foot of the list, like Finder's and
+            // Mail's sidebars, leaving the title bar to the window controls.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !sessions.isEmpty { sidebarFooter }
             }
-            .searchable(text: $searchText, prompt: "Search transcripts or translations")
+            .searchable(text: $searchText, placement: .sidebar, prompt: "Search transcripts or translations")
             .navigationTitle("History")
         } detail: {
             // Detail is driven straight from the selection: a `NavigationLink`
@@ -78,7 +64,7 @@ struct SessionListView: View {
                 ContentUnavailableView(
                     "\(visibleSelection.count) transcripts selected",
                     systemImage: "checkmark.circle",
-                    description: Text("Press ⌫ or use the toolbar Manage menu to delete them in bulk")
+                    description: Text("Press ⌫ or use the Manage menu at the bottom of the sidebar to delete them in bulk")
                 )
             } else {
                 ContentUnavailableView(
@@ -110,6 +96,38 @@ struct SessionListView: View {
             Button("Save") { commitRename() }
             Button("Cancel", role: .cancel) { renamingSession = nil }
         }
+    }
+
+    /// The transcript count and the bulk-delete menu, under the list.
+    private var sidebarFooter: some View {
+        HStack(spacing: 8) {
+            Text("\(sessions.count) transcripts")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            Menu {
+                Button("Delete \(selectedDeletable.count) Selected…", role: .destructive) {
+                    requestDeletion(of: selectedSessions)
+                }
+                .disabled(selectedDeletable.isEmpty)
+                Divider()
+                Button("Clean Up Empty Transcripts…") { pendingRequest = .empty }
+                    .disabled(!sessions.contains(where: isEmptyAndDeletable))
+                Button("Delete Transcripts Older Than 30 Days…") { pendingRequest = .olderThan(days: 30) }
+                    .disabled(!sessions.contains { isStale($0, olderThanDays: 30) })
+                Button("Delete Transcripts Older Than 90 Days…") { pendingRequest = .olderThan(days: 90) }
+                    .disabled(!sessions.contains { isStale($0, olderThanDays: 90) })
+            } label: {
+                Text("Manage")
+                    .font(.caption)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
     }
 
     /// What a confirmation dialog is asking to delete. Bulk cases resolve
