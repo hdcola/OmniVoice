@@ -181,7 +181,7 @@ private final class FakeModelBackend: SelectionModelTranslating {
         #expect(translator.foreignLanguageCode == "en-US")
     }
 
-    @Test func followRecordingUsesTheRecordingEngineAndReplacesT3PO() {
+    @Test func followRecordingUsesTheRecordingEngineAndT3POFallsBackToSystem() {
         var recording: String? = SelectionTranslationEngine.system
         var modelURL: URL? = URL(fileURLWithPath: "/tmp/hymt.gguf")
         let translator = SelectionTranslator(
@@ -191,8 +191,10 @@ private final class FakeModelBackend: SelectionModelTranslating {
         #expect(translator.effectiveEngineID == SelectionTranslationEngine.system)
         recording = SelectionTranslationEngine.hymt15
         #expect(translator.effectiveEngineID == SelectionTranslationEngine.hymt15)
+        // T3PO isn't offered here: follow uses System translation, whether or
+        // not HY-MT1.5 is downloaded.
         recording = "model.t3po"
-        #expect(translator.effectiveEngineID == SelectionTranslationEngine.hymt15)
+        #expect(translator.effectiveEngineID == SelectionTranslationEngine.system)
         modelURL = nil
         #expect(translator.effectiveEngineID == SelectionTranslationEngine.system)
 

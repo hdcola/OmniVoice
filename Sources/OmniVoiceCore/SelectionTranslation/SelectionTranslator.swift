@@ -176,20 +176,13 @@ public final class SelectionTranslator: ObservableObject {
 
     /// The engine a translation started now would actually use —
     /// `engineID` itself, unless that's `followRecording`: then the
-    /// recording's engine when it's one the panel can run, and for T3PO
-    /// (see `SelectionTranslationEngine`'s doc for why the panel never uses
-    /// it) HY-MT1.5 when downloaded — the closer match, being a local model
-    /// too — else the system engine.
+    /// recording's engine when it's one the panel can run, else (T3PO — see
+    /// `SelectionTranslationEngine`'s doc for why the panel never uses it)
+    /// the system engine.
     public var effectiveEngineID: String {
         guard engineID == SelectionTranslationEngine.followRecording else { return engineID }
-        switch recordingEngineID() {
-        case SelectionTranslationEngine.system:
-            return SelectionTranslationEngine.system
-        case SelectionTranslationEngine.hymt15:
-            return SelectionTranslationEngine.hymt15
-        default:
-            return isModelEngineAvailable ? SelectionTranslationEngine.hymt15 : SelectionTranslationEngine.system
-        }
+        return recordingEngineID() == SelectionTranslationEngine.hymt15
+            ? SelectionTranslationEngine.hymt15 : SelectionTranslationEngine.system
     }
 
     /// Brings a new selection/OCR result into the source pane and
