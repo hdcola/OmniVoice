@@ -776,7 +776,7 @@ private struct TranscriptLineRow: View {
                         // of the row looking blank until the translation lands.
                         Text(line.displaySource)
                             .font(.system(size: CGFloat(fontScale.translationFontSize)).italic())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary.opacity(0.7))
                     }
                 }
             }
@@ -824,23 +824,27 @@ private struct TranscriptLineRow: View {
         }
     }
 
+    /// Full-strength `.primary` for committed text, not `.secondary`: the
+    /// translation is what the reader actually follows, and gray on the
+    /// panel's translucent background was hard to read. The preview stays
+    /// distinguishable by its italics and a lighter `.primary` opacity.
     @ViewBuilder
     private var translationView: some View {
         if line.translationPreview.isEmpty {
             Text(line.translation)
                 .font(.system(size: CGFloat(fontScale.translationFontSize)))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
         } else if line.translation.isEmpty {
             Text(line.translationPreview)
                 .font(.system(size: CGFloat(fontScale.translationFontSize)).italic())
-                .foregroundStyle(.secondary.opacity(0.75))
+                .foregroundStyle(.primary.opacity(0.7))
         } else {
             (Text(line.translation)
                 .font(.system(size: CGFloat(fontScale.translationFontSize)))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
             + Text(line.translationPreview)
                 .font(.system(size: CGFloat(fontScale.translationFontSize)).italic())
-                .foregroundStyle(.secondary.opacity(0.75)))
+                .foregroundStyle(.primary.opacity(0.7)))
         }
     }
 }

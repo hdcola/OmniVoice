@@ -26,6 +26,7 @@ The format is based on Keep a Changelog.
 ### Fixed
 - fix(translation): with a recognizer that emits no punctuation (sherpa-onnx), HY-MT1.5 now treats a short pause in the speech as a sentence break and translates the buffered text early, instead of waiting for the sentence end or the character threshold (#118)
 - fix(asr): with the sherpa-onnx local engine, T3PO now translates while a sentence is still being recognized — text that has stopped changing is passed on early instead of the whole sentence only at its end, so the first-run wizard no longer warns that sherpa-onnx with T3PO waits for the sentence end (#118)
+- fix(panel): the translation in the Caption panel is drawn in the full text color instead of gray, so it is easier to read; the not-yet-final preview stays italic and slightly lighter (#119)
 - fix(selection): the Quick Translate engine note no longer promises that HY-MT1.5 frees its memory after 5 idle minutes (#116)
 - fix(dictation): starting a dictation no longer launches Music (and steals the focus) when nothing was playing — music is only paused when a dedicated player app (Music, Spotify, …) is outputting audio; browser tabs no longer trigger the play/pause key (#112)
 
