@@ -164,7 +164,7 @@ private final class FakeModelBackend: SelectionModelTranslating {
         modelURL: URL? = URL(fileURLWithPath: "/tmp/hymt.gguf")
     ) -> SelectionTranslator {
         let translator = SelectionTranslator(defaults: Self.makeDefaults(), modelBackend: backend, modelURLProvider: { modelURL })
-        translator.engineID = SelectionTranslationEngine.hymt15
+        translator.chooseEngine(SelectionTranslationEngine.hymt15)
         return translator
     }
 
@@ -174,39 +174,62 @@ private final class FakeModelBackend: SelectionModelTranslating {
         }
     }
 
-    @Test func defaultsToFollowingTheRecordingAndChineseEnglishPair() {
+    @Test func defaultsToChineseEnglishPair() {
         let translator = SelectionTranslator(defaults: Self.makeDefaults(), modelBackend: FakeModelBackend(), modelURLProvider: { nil })
-        #expect(translator.engineID == SelectionTranslationEngine.followRecording)
         #expect(translator.myLanguageCode == "zh-CN")
         #expect(translator.foreignLanguageCode == "en-US")
     }
 
-    @Test func followRecordingUsesTheRecordingEngineAndReplacesT3PO() {
-        var recording: String? = SelectionTranslationEngine.system
-        var modelURL: URL? = URL(fileURLWithPath: "/tmp/hymt.gguf")
+    @Test func defaultEngineIsHYMTOnceDownloadedElseSystem() {
+        var modelURL: URL?
         let translator = SelectionTranslator(
-            defaults: Self.makeDefaults(), modelBackend: FakeModelBackend(),
-            recordingEngineID: { recording }, modelURLProvider: { modelURL }
+            defaults: Self.makeDefaults(), modelBackend: FakeModelBackend(), modelURLProvider: { modelURL }
         )
-        #expect(translator.effectiveEngineID == SelectionTranslationEngine.system)
-        recording = SelectionTranslationEngine.hymt15
-        #expect(translator.effectiveEngineID == SelectionTranslationEngine.hymt15)
-        recording = "model.t3po"
-        #expect(translator.effectiveEngineID == SelectionTranslationEngine.hymt15)
-        modelURL = nil
-        #expect(translator.effectiveEngineID == SelectionTranslationEngine.system)
-
-        // An explicit choice ignores the recording.
-        translator.engineID = SelectionTranslationEngine.system
-        recording = SelectionTranslationEngine.hymt15
-        #expect(translator.effectiveEngineID == SelectionTranslationEngine.system)
+        #expect(translator.engineID == SelectionTranslationEngine.system)
+        modelURL = URL(fileURLWithPath: "/tmp/hymt.gguf")
+        #expect(translator.engineID == SelectionTranslationEngine.hymt15)
     }
 
-    @Test func followRecordingRoutesTranslationsToTheResolvedEngine() async {
+    @Test func choosingAnEngineWinsOverTheDefaultAndIsRemembered() {
+        let defaults = Self.makeDefaults()
+        let modelURL = URL(fileURLWithPath: "/tmp/hymt.gguf")
+        let translator = SelectionTranslator(defaults: defaults, modelBackend: FakeModelBackend(), modelURLProvider: { modelURL })
+        translator.chooseEngine(SelectionTranslationEngine.system)
+        #expect(translator.engineID == SelectionTranslationEngine.system)
+        let again = SelectionTranslator(defaults: defaults, modelBackend: FakeModelBackend(), modelURLProvider: { modelURL })
+        #expect(again.engineID == SelectionTranslationEngine.system)
+        translator.chooseEngine("model.t3po")  // not offered here
+        #expect(translator.engineID == SelectionTranslationEngine.system)
+    }
+
+    @Test func useEngineDoesNotChangeTheRememberedChoice() {
+        let defaults = Self.makeDefaults()
+        let translator = SelectionTranslator(defaults: defaults, modelBackend: FakeModelBackend(), modelURLProvider: { nil })
+        translator.useEngine(SelectionTranslationEngine.hymt15)
+        #expect(translator.engineID == SelectionTranslationEngine.hymt15)
+        #expect(defaults.string(forKey: PersistedSelectionKey.engineID) == nil)
+    }
+
+    @Test func aStoredFollowRecordingChoiceBecomesTheEngineItResolvedTo() {
+        func migrated(recording: String?, modelDownloaded: Bool) -> (String, String?) {
+            let defaults = Self.makeDefaults()
+            defaults.set("follow.recording", forKey: PersistedSelectionKey.engineID)
+            let translator = SelectionTranslator(
+                defaults: defaults, modelBackend: FakeModelBackend(), recordingEngineID: { recording },
+                modelURLProvider: { modelDownloaded ? URL(fileURLWithPath: "/tmp/hymt.gguf") : nil }
+            )
+            return (translator.engineID, defaults.string(forKey: PersistedSelectionKey.engineID))
+        }
+        #expect(migrated(recording: SelectionTranslationEngine.system, modelDownloaded: true) == (SelectionTranslationEngine.system, SelectionTranslationEngine.system))
+        #expect(migrated(recording: SelectionTranslationEngine.hymt15, modelDownloaded: false) == (SelectionTranslationEngine.hymt15, SelectionTranslationEngine.hymt15))
+        #expect(migrated(recording: "model.t3po", modelDownloaded: true) == (SelectionTranslationEngine.hymt15, SelectionTranslationEngine.hymt15))
+        #expect(migrated(recording: "model.t3po", modelDownloaded: false) == (SelectionTranslationEngine.system, SelectionTranslationEngine.system))
+    }
+
+    @Test func translationsGoToTheEngineInUse() async {
         let backend = FakeModelBackend()
         let translator = SelectionTranslator(
             defaults: Self.makeDefaults(), modelBackend: backend,
-            recordingEngineID: { SelectionTranslationEngine.hymt15 },
             modelURLProvider: { URL(fileURLWithPath: "/tmp/hymt.gguf") }
         )
         translator.load("The quick brown fox jumps over the lazy dog.")
@@ -316,7 +339,7 @@ private final class FakeModelBackend: SelectionModelTranslating {
 
     @Test func systemEnginePublishesConfigurationAndRunsThroughBridge() async {
         let translator = SelectionTranslator(defaults: Self.makeDefaults(), modelBackend: FakeModelBackend(), modelURLProvider: { nil })
-        translator.engineID = SelectionTranslationEngine.system
+        translator.chooseEngine(SelectionTranslationEngine.system)
         translator.load("The quick brown fox jumps over the lazy dog.")
         #expect(translator.systemTranslationConfiguration?.target == Locale.Language(identifier: "zh-CN"))
         #expect(translator.phase == .translating)

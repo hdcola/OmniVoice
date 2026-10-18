@@ -42,7 +42,7 @@
 "Background opacity" = "背景透明度";
 "Before typing, the text is handed to the LLM you configured to add punctuation, remove filler words and tidy lists; the recognized text is sent to that service. If it fails, times out or the result looks unreliable, the original is typed; pressing Esc while polishing also types the original. Polishing happens before translation." = "输入前先交给你配置的 LLM 补标点、去口癖、整理列表；识别出的文字会发送到该服务。失败、超时或结果不可靠时输入原文，润色中按 Esc 也输入原文。先润色，再翻译";
 "Bilingual" = "双语对照";
-"Both engines run on this Mac; HY-MT1.5 frees its memory after 5 idle minutes" = "两种引擎都在本机运行；HY-MT1.5 闲置 5 分钟后自动释放内存";
+"Both engines run on this Mac. Quick Translate releases HY-MT1.5 after 5 idle minutes, unless transcription is still using it" = "两种引擎都在本机运行。快捷翻译闲置 5 分钟后会释放它占用的 HY-MT1.5；转录正在使用时不会释放";
 "Built into macOS · Sentence-by-sentence translation" = "系统原生 · 整句翻译";
 "Built into macOS · Zero memory use" = "系统原生 · 零内存占用";
 "Built-in macOS translation. Translates by sentence punctuation; no live typewriter preview." = "macOS 内置翻译，按句子标点翻译，不支持实时打字机预览。";
@@ -137,9 +137,7 @@
 "Failed to start the stream" = "启动流失败";
 "Failed: %@" = "失败：%@";
 "Faster results (may be less accurate)" = "更快出结果（可能不够准确）";
-"Follow speech recognition (%@)" = "跟随语音识别设置（当前：%@）";
 "Follow system" = "跟随系统";
-"Follow transcription · %@" = "跟随转录 · %@";
 "Font size" = "字号";
 "For more natural voices or more languages: open it, then use the menu next to “System Voice” to download" = "更自然的声音或更多语言：打开后点「系统语音」旁的菜单下载";
 "Foreign language (%@)" = "外语（%@）";
@@ -392,7 +390,6 @@
 "System speech recognition" = "系统语音识别";
 "System translation" = "系统翻译";
 "T3PO offline model" = "T3PO 离线大模型";
-"T3PO, used for transcription, is designed for real-time speech and isn't suited to translating whole passages, so Quick Translate will use %@ instead." = "转录使用的 T3PO 专为实时语音设计，不适合整段翻译，快捷翻译会改用%@。";
 "Target language" = "目标语言";
 "Tencent Hunyuan lightweight translation model. Low memory use, whole-sentence translation (no streaming preview)." = "腾讯混元轻量翻译模型，内存开销小，整句翻译（无流式预览）。";
 "Test connection" = "测试连接";
