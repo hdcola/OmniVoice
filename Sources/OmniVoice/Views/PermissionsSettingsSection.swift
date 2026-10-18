@@ -33,9 +33,9 @@ struct PermissionsSettingsSection: View {
 
     var body: some View {
         Section(String(localized: "Permissions")) {
-            if allGranted && !showsDetails {
+            if allGranted {
                 LabeledContent {
-                    Button("Show Details") { showsDetails = true }
+                    Button(showsDetails ? LocalizedStringKey("Hide Details") : "Show Details") { showsDetails.toggle() }
                 } label: {
                     Label {
                         Text("All permissions granted")
@@ -43,7 +43,8 @@ struct PermissionsSettingsSection: View {
                         Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                     }
                 }
-            } else {
+            }
+            if !allGranted || showsDetails {
                 permissionRow(
                     icon: "mic", title: "Microphone", detail: PermissionCopy.microphone,
                     isGranted: microphoneStatus == .authorized,

@@ -79,19 +79,26 @@ enum Clipboard {
     }
 }
 
+/// One copy event: every value is distinct, so a repeated copy with the same
+/// message still counts as a change.
+struct CopyConfirmation: Equatable {
+    let id = UUID()
+    let message: String
+}
+
 /// A short "已复制" capsule that fades out on its own — before this, every
 /// copy button in the app gave no sign that anything had happened. Set
-/// `message` to show it; it clears itself after `duration`.
+/// a new `CopyConfirmation` to show it; it clears itself after `duration`.
 private struct CopyConfirmationModifier: ViewModifier {
-    @Binding var message: String?
+    @Binding var confirmation: CopyConfirmation?
     let alignment: Alignment
     private static let duration: Duration = .seconds(1.5)
 
     func body(content: Content) -> some View {
         content
             .overlay(alignment: alignment) {
-                if let message {
-                    Label(message, systemImage: "checkmark.circle.fill")
+                if let confirmation {
+                    Label(confirmation.message, systemImage: "checkmark.circle.fill")
                         .font(.caption)
                         .labelStyle(CopyConfirmationLabelStyle())
                         .padding(.horizontal, 10)
@@ -105,13 +112,14 @@ private struct CopyConfirmationModifier: ViewModifier {
                         .accessibilityAddTraits(.updatesFrequently)
                 }
             }
-            .animation(.easeOut(duration: 0.2), value: message)
-            // Keyed on the message so copying again restarts the timer.
-            .task(id: message) {
-                guard message != nil else { return }
+            .animation(.easeOut(duration: 0.2), value: confirmation)
+            // Keyed on the confirmation, which is distinct per copy, so copying
+            // again restarts the timer even when the message is the same.
+            .task(id: confirmation) {
+                guard confirmation != nil else { return }
                 try? await Task.sleep(for: Self.duration)
                 guard !Task.isCancelled else { return }
-                message = nil
+                confirmation = nil
             }
     }
 }
@@ -126,8 +134,8 @@ private struct CopyConfirmationLabelStyle: LabelStyle {
 }
 
 extension View {
-    /// Shows `message` briefly as a confirmation capsule; see `CopyConfirmationModifier`.
-    func copyConfirmation(_ message: Binding<String?>, alignment: Alignment = .bottom) -> some View {
-        modifier(CopyConfirmationModifier(message: message, alignment: alignment))
+    /// Shows `confirmation` briefly as a capsule; see `CopyConfirmationModifier`.
+    func copyConfirmation(_ confirmation: Binding<CopyConfirmation?>, alignment: Alignment = .bottom) -> some View {
+        modifier(CopyConfirmationModifier(confirmation: confirmation, alignment: alignment))
     }
 }

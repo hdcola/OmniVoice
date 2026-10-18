@@ -464,11 +464,15 @@ private struct CopyGlyphButton: View {
     var size: CGFloat = 13
     let text: () -> String
     @State private var didCopy = false
+    /// Bumped on every click, so a second copy restarts the 1.5 s check mark
+    /// (`didCopy` is already true then, which `.task(id:)` wouldn't notice).
+    @State private var copyCount = 0
 
     var body: some View {
         Button {
             Clipboard.copy(text())
             didCopy = true
+            copyCount += 1
         } label: {
             Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
                 .font(.system(size: size))
@@ -480,9 +484,10 @@ private struct CopyGlyphButton: View {
         .buttonStyle(.plain)
         .help(help)
         .accessibilityLabel(help)
-        .task(id: didCopy) {
+        .task(id: copyCount) {
             guard didCopy else { return }
             try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
             didCopy = false
         }
     }
