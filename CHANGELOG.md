@@ -11,7 +11,7 @@ The format is based on Keep a Changelog.
 ### Changed
 
 ### Fixed
-- fix(l10n): the Quick Translate engine label now reads “跟随转录翻译引擎 · …” instead of “跟随转录 · …” (English “Follow transcription translation engine · …”), matching the glossary
+- fix(l10n): the Quick Translate engine label now reads “跟随转录翻译引擎 · …” instead of “跟随转录 · …” (English “Follow transcription translation engine · …”), matching the glossary (#121)
 - fix(models): the sherpa-onnx model descriptions no longer repeat the download size (already shown on each model card, and some were out of date) or mention Dictation's “Polish recognized text” (#120)
 
 ### Dependencies
