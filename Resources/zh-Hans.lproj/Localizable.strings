@@ -137,7 +137,7 @@
 "Failed to start the stream" = "启动流失败";
 "Failed: %@" = "失败：%@";
 "Faster results (may be less accurate)" = "更快出结果（可能不够准确）";
-"Follow transcription translation engine (%@)" = "跟随转录翻译引擎（当前：%@）";
+"Follow transcription translation engine (current: %@)" = "跟随转录翻译引擎（当前：%@）";
 "Follow system" = "跟随系统";
 "Follow transcription · %@" = "跟随转录 · %@";
 "Font size" = "字号";

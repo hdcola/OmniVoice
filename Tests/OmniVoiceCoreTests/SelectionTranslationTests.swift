@@ -204,6 +204,19 @@ private final class FakeModelBackend: SelectionModelTranslating {
         #expect(translator.effectiveEngineID == SelectionTranslationEngine.system)
     }
 
+    @Test func followedEngineIsKnownEvenWhileSystemTranslationIsPicked() {
+        var recording: String? = SelectionTranslationEngine.hymt15
+        let translator = SelectionTranslator(
+            defaults: Self.makeDefaults(), modelBackend: FakeModelBackend(),
+            recordingEngineID: { recording }, modelURLProvider: { nil }
+        )
+        translator.engineID = SelectionTranslationEngine.system
+        #expect(translator.effectiveEngineID == SelectionTranslationEngine.system)
+        #expect(translator.followedEngineID == SelectionTranslationEngine.hymt15)
+        recording = "model.t3po"
+        #expect(translator.followedEngineID == SelectionTranslationEngine.system)
+    }
+
     @Test func followRecordingRoutesTranslationsToTheResolvedEngine() async {
         let backend = FakeModelBackend()
         let translator = SelectionTranslator(

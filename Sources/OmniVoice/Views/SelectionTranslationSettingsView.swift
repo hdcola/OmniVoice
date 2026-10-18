@@ -14,7 +14,7 @@ struct SelectionTranslationSettingsView: View {
     /// finish downloading in the "模型库" tab.
     @ObservedObject var downloadManager: ModelDownloadManager
     @EnvironmentObject private var navigation: SettingsNavigationState
-    /// Observed so "跟随转录设置" re-resolves the moment the recording's
+    /// Observed so "跟随转录翻译引擎" re-resolves the moment the recording's
     /// translation engine changes in the "语音识别" tab.
     @EnvironmentObject private var session: RecordingSession
 
@@ -111,7 +111,7 @@ struct SelectionTranslationSettingsView: View {
     }
 
     private var followRecordingLabel: String {
-        String(localized: "Follow transcription translation engine (\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID)))")
+        String(localized: "Follow transcription translation engine (current: \(SelectionTranslationEngine.displayName(for: translator.followedEngineID)))")
     }
 
     private var unsupportedLanguageNames: String? {

@@ -180,8 +180,13 @@ public final class SelectionTranslator: ObservableObject {
     /// `SelectionTranslationEngine`'s doc for why the panel never uses it)
     /// the system engine.
     public var effectiveEngineID: String {
-        guard engineID == SelectionTranslationEngine.followRecording else { return engineID }
-        return recordingEngineID() == SelectionTranslationEngine.hymt15
+        engineID == SelectionTranslationEngine.followRecording ? followedEngineID : engineID
+    }
+
+    /// What "follow the recording" resolves to right now, whichever option is
+    /// selected — the picker's Follow label shows it.
+    public var followedEngineID: String {
+        recordingEngineID() == SelectionTranslationEngine.hymt15
             ? SelectionTranslationEngine.hymt15 : SelectionTranslationEngine.system
     }
 
