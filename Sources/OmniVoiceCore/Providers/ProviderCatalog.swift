@@ -142,7 +142,7 @@ public enum ProviderCatalog {
         EngineDescriptor(
             id: "model.sherpa", displayName: String(localized: "sherpa-onnx local engine"), kind: .model,
             badge: String(localized: "Lightweight · Low latency"),
-            summary: String(localized: "Small streaming models with very low latency and little memory use; pick the one for your languages. Text appears as you speak, without punctuation; Dictation’s “Polish recognized text” can tidy it up.")
+            summary: String(localized: "Small streaming models with very low latency and little memory use; pick the one for your languages. Text appears as you speak, without punctuation.")
         ),
     ]
 
@@ -184,7 +184,7 @@ public enum ProviderCatalog {
             ],
             sourceLanguageCodes: ["zh-CN", "en-US"],
             memoryMB: 540,
-            summary: String(localized: "Chinese (Mandarin and dialects) and English, about 240MB. Strong on accented and regional Chinese.")
+            summary: String(localized: "Chinese (Mandarin and dialects) and English. Strong on accented and regional Chinese.")
         ),
         sherpaVariant(
             id: "sherpa-zipformer-bilingual-zh-en", name: "Zipformer Bilingual (zh-en)", quantization: "FP32", sizeMB: 341,
@@ -198,7 +198,7 @@ public enum ProviderCatalog {
             ],
             sourceLanguageCodes: ["zh-CN", "en-US"],
             memoryMB: 930,
-            summary: String(localized: "Chinese and English with code-switching, real-time streaming. About 360MB; English comes out in capitals without punctuation, which Dictation’s “Polish recognized text” can clean up.")
+            summary: String(localized: "Chinese and English with code-switching, real-time streaming. English comes out in capitals without punctuation.")
         ),
         sherpaVariant(
             id: "sherpa-zipformer-zh-2025", name: "Zipformer Chinese (2025)", quantization: "INT8", sizeMB: 160,
@@ -212,7 +212,7 @@ public enum ProviderCatalog {
             ],
             sourceLanguageCodes: ["zh-CN"],
             memoryMB: 590,
-            summary: String(localized: "Newer (2025) Chinese-only streaming model, about 170MB. Mandarin only: English words are not recognized.")
+            summary: String(localized: "Newer (2025) Chinese-only streaming model. Mandarin only: English words are not recognized.")
         ),
         sherpaVariant(
             id: "sherpa-zipformer-ctc-zh-2025", name: "Zipformer CTC Chinese (2025)", quantization: "INT8", sizeMB: 155,
@@ -224,7 +224,7 @@ public enum ProviderCatalog {
             ],
             sourceLanguageCodes: ["zh-CN"],
             memoryMB: 470,
-            summary: String(localized: "CTC version of the 2025 Chinese model, about 160MB, a single model file. Mandarin only: English words are not recognized.")
+            summary: String(localized: "CTC version of the 2025 Chinese model, a single model file. Mandarin only: English words are not recognized.")
         ),
         sherpaVariant(
             id: "sherpa-zipformer-small-ctc-zh", name: "Zipformer CTC Chinese (small)", quantization: "INT8", sizeMB: 26,
@@ -236,7 +236,7 @@ public enum ProviderCatalog {
             ],
             sourceLanguageCodes: ["zh-CN"],
             memoryMB: 170,
-            summary: String(localized: "The smallest Chinese streaming model here, about 26MB, for low-end Macs. Mandarin only.")
+            summary: String(localized: "The smallest Chinese streaming model here, for low-end Macs. Mandarin only.")
         ),
         sherpaVariant(
             id: "sherpa-zipformer-multi-zh-hans", name: "Zipformer Chinese (multi-dataset)", quantization: "INT8", sizeMB: 73,
@@ -250,7 +250,7 @@ public enum ProviderCatalog {
             ],
             sourceLanguageCodes: ["zh-CN"],
             memoryMB: 350,
-            summary: String(localized: "Chinese streaming model trained on several datasets, about 76MB. Mandarin only.")
+            summary: String(localized: "Chinese streaming model trained on several datasets. Mandarin only.")
         ),
         sherpaVariant(
             id: "sherpa-zipformer-zh-14m", name: "Zipformer Chinese (14M)", quantization: "INT8", sizeMB: 25,
@@ -264,7 +264,7 @@ public enum ProviderCatalog {
             ],
             sourceLanguageCodes: ["zh-CN"],
             memoryMB: 140,
-            summary: String(localized: "Ultra-light 14M-parameter Chinese model, about 25MB, lowest memory use. Mandarin only.")
+            summary: String(localized: "Ultra-light 14M-parameter Chinese model, lowest memory use. Mandarin only.")
         ),
         sherpaVariant(
             id: "sherpa-paraformer-trilingual-zh-yue-en", name: "Paraformer Trilingual (zh-yue-en)", quantization: "INT8", sizeMB: 228,
@@ -277,7 +277,7 @@ public enum ProviderCatalog {
             ],
             sourceLanguageCodes: ["zh-CN", "yue-CN", "en-US"],
             memoryMB: 550,
-            summary: String(localized: "Mandarin, Cantonese and English, about 240MB. The only streaming model here that recognizes Cantonese.")
+            summary: String(localized: "Mandarin, Cantonese and English. The only streaming model here that recognizes Cantonese.")
         ),
         sherpaVariant(
             id: "sherpa-zipformer-multilingual-8", name: "Zipformer Multilingual", quantization: "INT8", sizeMB: 324,
@@ -291,7 +291,7 @@ public enum ProviderCatalog {
             ],
             sourceLanguageCodes: ["zh-CN", "en-US", "ja-JP", "ru-RU", "ar-SA", "vi-VN", "th-TH"],
             memoryMB: 800,
-            summary: String(localized: "Arabic, English, Japanese, Russian, Thai, Vietnamese and Chinese in one model, about 340MB.")
+            summary: String(localized: "Arabic, English, Japanese, Russian, Thai, Vietnamese and Chinese in one model.")
         ),
     ]
 

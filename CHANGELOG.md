@@ -11,6 +11,7 @@ The format is based on Keep a Changelog.
 ### Changed
 
 ### Fixed
+- fix(models): the sherpa-onnx model descriptions no longer repeat the download size (already shown on each model card, and some were out of date) or mention Dictation's “Polish recognized text” (#120)
 
 ### Dependencies
 
