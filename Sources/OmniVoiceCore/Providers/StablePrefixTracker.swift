@@ -75,8 +75,10 @@ struct StablePrefixTracker {
             isWordCharacter(textChars[common])
                 || (common < emittedChars.count && isWordCharacter(emittedChars[common]))
         {
-            let lastSpace = textChars[..<common].lastIndex { $0.isWhitespace }
-            common = lastSpace.map { $0 + 1 } ?? 0
+            // The word starts after the last character that isn't part of one
+            // (whitespace, punctuation, or CJK text next to Latin words).
+            let wordStart = textChars[..<common].lastIndex { !isWordCharacter($0) }
+            common = wordStart.map { $0 + 1 } ?? 0
         }
         let tail = String(textChars[common...])
         if let first = tail.first, let last = emittedChars.last,

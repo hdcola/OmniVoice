@@ -79,4 +79,11 @@ struct StablePrefixTrackerTests {
         _ = tracker.ingest("C'est déjà")
         #expect(tracker.close(finalText: "C'est dépassé") == " dépassé")
     }
+
+    @Test func midWordDivergenceNextToCJKBacksUpToTheLatinWordStart() {
+        var tracker = StablePrefixTracker(holdback: 0)
+        _ = tracker.ingest("我们think")
+        _ = tracker.ingest("我们think")
+        #expect(tracker.close(finalText: "我们thought") == " thought")
+    }
 }

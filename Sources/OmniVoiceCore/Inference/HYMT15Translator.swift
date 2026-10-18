@@ -69,9 +69,10 @@ final class HYMT15Translator: @unchecked Sendable {
 
     private var model: OpaquePointer?
     private var ctx: OpaquePointer?
-    /// Source text collected since the last `flush()` — unlike
-    /// `InProcessTranslator.buffer`, this never gets probed mid-way; it's
-    /// only ever consumed whole by `flush()`.
+    /// Source text collected since the last translation — unlike
+    /// `InProcessTranslator.buffer`, it is never probed for a WAIT/TRANS
+    /// decision; it is consumed whole, by `flush()` or by an early
+    /// translation (`feed`'s thresholds, `notifyPause()`).
     private var buffer: [String] = []
     /// Sliding window of recent (source, translation) pairs for pronoun & terminology context.
     private var history: [(source: String, translation: String)] = []
