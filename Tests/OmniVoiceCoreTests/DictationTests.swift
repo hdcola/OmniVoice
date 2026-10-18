@@ -76,6 +76,16 @@ struct DictationTextAssemblerTests {
         #expect(assembler.text == "안녕하세요 반갑습니다")
     }
 
+    @Test("appended text and the revised tentative tail both show while the segment is open")
+    func appendedPlusRevised() {
+        var assembler = assemble([.appended("hello wor"), .revised("ld")])
+        #expect(assembler.pending == "hello world")
+        #expect(assembler.text == "hello world")
+        assembler.apply(.segmentClosed(finalAppend: "ld."))
+        #expect(assembler.text == "hello world.")
+        #expect(assembler.pending.isEmpty)
+    }
+
     @Test("nothing heard is empty")
     func empty() {
         #expect(DictationTextAssembler().text.isEmpty)

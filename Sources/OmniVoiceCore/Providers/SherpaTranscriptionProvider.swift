@@ -4,10 +4,11 @@ import Foundation
 /// to conform to `TranscriptionProvider`.
 ///
 /// Event mapping: sherpa re-reports the whole current utterance on every
-/// decode, so partial results are `.revised` (display-only, never fed to
-/// translation) and the whole text arrives via `.segmentClosed` when sherpa's
-/// own endpoint detector fires or the recording stops. It never emits
-/// `.appended`, so translation of this engine's output waits for segment end.
+/// decode. `StablePrefixTracker` turns the part of that hypothesis that has
+/// stopped changing into `.appended` deltas (so translation can run while the
+/// utterance is still going), the volatile remainder is `.revised`, and
+/// `.segmentClosed` carries whatever was never appended when sherpa's own
+/// endpoint detector fires or the recording stops.
 /// `notifyUtteranceBoundary()` is deliberately ignored — the VAD hint is only
 /// needed by engines without their own endpointing.
 public final class SherpaTranscriptionProvider: TranscriptionProvider {
@@ -15,6 +16,8 @@ public final class SherpaTranscriptionProvider: TranscriptionProvider {
 
     private let transcriber = SherpaOnnxTranscriber()
     private let modelDir: URL?
+    private let trackerLock = NSLock()
+    private var tracker = StablePrefixTracker()
 
     /// - Parameter modelDir: `nil` when no model is downloaded — `loadModel()`
     ///   then throws. Otherwise the directory of an unpacked
@@ -23,10 +26,19 @@ public final class SherpaTranscriptionProvider: TranscriptionProvider {
     public init(modelDir: URL? = nil) {
         self.modelDir = modelDir
         transcriber.onPartial = { [weak self] text in
-            self?.onEvent?(.revised(text))
+            guard let self else { return }
+            self.trackerLock.lock()
+            let result = self.tracker.ingest(text)
+            self.trackerLock.unlock()
+            if let appended = result.appended { self.onEvent?(.appended(appended)) }
+            self.onEvent?(.revised(result.tentative))
         }
         transcriber.onSegmentFinal = { [weak self] text in
-            self?.onEvent?(.segmentClosed(finalAppend: text))
+            guard let self else { return }
+            self.trackerLock.lock()
+            let tail = self.tracker.close(finalText: text)
+            self.trackerLock.unlock()
+            self.onEvent?(.segmentClosed(finalAppend: tail))
         }
     }
 
@@ -42,7 +54,14 @@ public final class SherpaTranscriptionProvider: TranscriptionProvider {
     public func start(config: TranscriptionConfig) async throws {
         // The bilingual model detects zh/en itself; `config.languageCode` has
         // nothing to select.
+        resetTracker()
         try transcriber.startStream()
+    }
+
+    private func resetTracker() {
+        trackerLock.lock()
+        tracker.reset()
+        trackerLock.unlock()
     }
 
     public nonisolated func push(samples: [Float]) {

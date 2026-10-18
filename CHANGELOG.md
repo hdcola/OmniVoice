@@ -7,7 +7,7 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(onboarding): the first-run wizard has three steps — permissions and switches, then a speech recognition model, then a translation model — each choice showing its memory use and download size, with your Mac's memory next to the selected total (orange from half, red from 70%); the preselection follows this Mac's memory, and notes warn about pairings such as sherpa-onnx with T3PO (translation waits for the sentence end) (#115)
+- feat(onboarding): the first-run wizard has three steps — permissions and switches, then a speech recognition model, then a translation model — each choice showing its memory use and download size, with your Mac's memory next to the selected total (orange from half, red from 70%); the preselection follows this Mac's memory, and notes warn about a speech model's limited languages (#115)
 - feat(asr): new sherpa-onnx local engine for speech recognition (small streaming models), selectable in Settings → Speech Recognition and downloadable from the Model Library; works for Live transcription and Dictation, whose Polish recognized text can tidy its unpunctuated output (#114)
 - feat(asr): the sherpa-onnx local engine offers nine models to choose from in Settings → Speech Recognition and the Model Library: Paraformer bilingual (zh-en) (default), Zipformer bilingual (zh-en), Chinese 2025 (transducer and CTC), Chinese small CTC, Chinese multi-dataset, Chinese 14M, Paraformer trilingual (Mandarin, Cantonese, English) and a multilingual Zipformer (seven languages); sizes from about 25MB to 360MB (#114)
 - feat(asr): each sherpa-onnx model only offers the source languages it can recognize (for example Chinese only, or Mandarin, Cantonese and English) (source picker in the Caption panel, My language / Foreign language, ⇄ swap, Dictation language), and switching to it repairs a language it cannot recognize, as System speech recognition already does (#114)
@@ -24,7 +24,9 @@ The format is based on Keep a Changelog.
 - feat(dictation): once allowed in Settings › Dictation › “Control Music and Spotify directly”, Music and Spotify are paused and resumed with their own commands instead of the play/pause key, so a dictation never starts or resumes another app by mistake (“Allow” starts a player that isn’t running in the background to ask, then quits it); without permission, and for other players, the key is still used (#112)
 
 ### Fixed
-- fix(panel): the translation in the Caption panel is drawn in the full text color instead of gray, so it is easier to read; the not-yet-final preview stays italic and slightly lighter
+- fix(translation): with a recognizer that emits no punctuation (sherpa-onnx), HY-MT1.5 now treats a short pause in the speech as a sentence break and translates the buffered text early, instead of waiting for the sentence end or the character threshold (#118)
+- fix(asr): with the sherpa-onnx local engine, T3PO now translates while a sentence is still being recognized — text that has stopped changing is passed on early instead of the whole sentence only at its end, so the first-run wizard no longer warns that sherpa-onnx with T3PO waits for the sentence end (#118)
+- fix(panel): the translation in the Caption panel is drawn in the full text color instead of gray, so it is easier to read; the not-yet-final preview stays italic and slightly lighter (#119)
 - fix(selection): the Quick Translate engine note no longer promises that HY-MT1.5 frees its memory after 5 idle minutes (#116)
 - fix(dictation): starting a dictation no longer launches Music (and steals the focus) when nothing was playing — music is only paused when a dedicated player app (Music, Spotify, …) is outputting audio; browser tabs no longer trigger the play/pause key (#112)
 

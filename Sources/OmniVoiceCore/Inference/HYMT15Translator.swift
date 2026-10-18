@@ -69,9 +69,10 @@ final class HYMT15Translator: @unchecked Sendable {
 
     private var model: OpaquePointer?
     private var ctx: OpaquePointer?
-    /// Source text collected since the last `flush()` — unlike
-    /// `InProcessTranslator.buffer`, this never gets probed mid-way; it's
-    /// only ever consumed whole by `flush()`.
+    /// Source text collected since the last translation — unlike
+    /// `InProcessTranslator.buffer`, it is never probed for a WAIT/TRANS
+    /// decision; it is consumed whole, by `flush()` or by an early
+    /// translation (`feed`'s thresholds, `notifyPause()`).
     private var buffer: [String] = []
     /// Sliding window of recent (source, translation) pairs for pronoun & terminology context.
     private var history: [(source: String, translation: String)] = []
@@ -353,6 +354,22 @@ final class HYMT15Translator: @unchecked Sendable {
             let crossedHardCap = bufferedLength >= threshold
             let crossedSoftBreak = bufferedLength >= threshold / 2 && SentenceBoundary.endsSentence(sourceDelta)
             if crossedHardCap || crossedSoftBreak {
+                self.translateBufferLocked()
+            }
+        }
+    }
+
+    /// A pause in the source text stands in for the sentence-ending
+    /// punctuation a recognizer like sherpa-onnx never emits: once a quarter
+    /// of `earlyTranslateThreshold` is buffered, translate it early (appending
+    /// into the open translation row, like the other early translations).
+    /// The bar is lower than the punctuation soft break's half, since a
+    /// pause is a stronger signal than a stray period.
+    func notifyPause() {
+        queue.async {
+            guard self.model != nil, self.ctx != nil else { return }
+            let bufferedLength = self.buffer.reduce(0) { $0 + $1.count }
+            if bufferedLength >= max(1, self.earlyTranslateThreshold / 4) {
                 self.translateBufferLocked()
             }
         }
