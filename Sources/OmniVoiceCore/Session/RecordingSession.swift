@@ -531,6 +531,12 @@ public final class RecordingSession: ObservableObject {
     /// `RecordingSession` doesn't assume that.
     private var translationRowIndex = 0
 
+    /// How long the source text must stay unchanged before
+    /// `TranslationProvider.notifyPause()` fires — a soft sentence break for
+    /// recognizers that emit no punctuation.
+    private static let sourcePauseDelay: Duration = .milliseconds(600)
+    private var sourcePauseTask: Task<Void, Never>?
+
     public init(
         sessionStore: SessionStore? = nil, modelDownloadManager: ModelDownloadManager? = nil,
         languages: LanguagePreferences? = nil
@@ -1425,6 +1431,8 @@ public final class RecordingSession: ObservableObject {
     public func stop() async {
         guard isRunning, !isStopping else { return }
         isStopping = true
+        sourcePauseTask?.cancel()
+        sourcePauseTask = nil
         micCapture?.stop()
         micCapture = nil
         systemAudioCapture?.stop()
@@ -1531,15 +1539,19 @@ public final class RecordingSession: ObservableObject {
     // MARK: - Transcription event handling (engine-agnostic)
 
     private func handle(_ event: TranscriptionEvent) {
+        sourcePauseTask?.cancel()
+        sourcePauseTask = nil
         switch event {
         case .appended(let text):
             ensureLine(sourceRowIndex)
             lines[sourceRowIndex].source += text
             translationProvider?.feed(text)
+            scheduleSourcePause()
 
         case .revised(let text):
             ensureLine(sourceRowIndex)
             lines[sourceRowIndex].sourceTentative = text
+            scheduleSourcePause()
 
         case .segmentClosed(let finalAppend):
             ensureLine(sourceRowIndex)
@@ -1551,6 +1563,17 @@ public final class RecordingSession: ObservableObject {
             translationProvider?.flush()
             sourceRowIndex += 1
             ensureLine(sourceRowIndex)
+        }
+    }
+
+    /// Restarts the quiet-source timer; if no further transcription event
+    /// arrives within `sourcePauseDelay`, tells the translation provider the
+    /// speaker paused. Cancelled by the next event and by `stop()`.
+    private func scheduleSourcePause() {
+        sourcePauseTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.sourcePauseDelay)
+            guard !Task.isCancelled else { return }
+            self?.translationProvider?.notifyPause()
         }
     }
 

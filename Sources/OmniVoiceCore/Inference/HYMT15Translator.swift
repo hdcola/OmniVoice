@@ -358,6 +358,22 @@ final class HYMT15Translator: @unchecked Sendable {
         }
     }
 
+    /// A pause in the source text stands in for the sentence-ending
+    /// punctuation a recognizer like sherpa-onnx never emits: once a quarter
+    /// of `earlyTranslateThreshold` is buffered, translate it early (appending
+    /// into the open translation row, like the other early translations).
+    /// The bar is lower than the punctuation soft break's half, since a
+    /// pause is a stronger signal than a stray period.
+    func notifyPause() {
+        queue.async {
+            guard self.model != nil, self.ctx != nil else { return }
+            let bufferedLength = self.buffer.reduce(0) { $0 + $1.count }
+            if bufferedLength >= max(1, self.earlyTranslateThreshold / 4) {
+                self.translateBufferLocked()
+            }
+        }
+    }
+
     /// Translates whatever's buffered (if anything) in one shot, then fires
     /// `onFlushBoundary` — call this once an ASR utterance/segment boundary
     /// is reported. Dispatches asynchronously, same reasoning as

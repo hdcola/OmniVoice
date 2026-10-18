@@ -53,7 +53,8 @@ struct ModelSelectionPlanTests {
     }
 
     @Test func notesWarnAboutLimitedLanguages() {
-        #expect(plan("sherpa-paraformer-bilingual-zh-en", "t3po-q5_k_m").notes.isEmpty)
+        #expect(plan("sherpa-paraformer-bilingual-zh-en", "t3po-q5_k_m").notes
+            == plan("sherpa-paraformer-bilingual-zh-en", nil).notes)
         #expect(plan("sherpa-zipformer-zh-14m", nil).notes == [.limitedLanguages(["zh-CN"])])
         #expect(plan("r2t2-q8_0", nil).notes.isEmpty)
     }

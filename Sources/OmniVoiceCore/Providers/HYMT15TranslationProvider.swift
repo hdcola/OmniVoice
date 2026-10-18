@@ -105,6 +105,10 @@ public final class HYMT15TranslationProvider: TranslationProvider {
         translator?.feed(sourceDelta: text)
     }
 
+    public func notifyPause() {
+        translator?.notifyPause()
+    }
+
     public func flush() {
         if let translator {
             translator.flush()
