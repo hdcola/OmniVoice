@@ -7,18 +7,18 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
-- feat(ui): copying text now confirms it with a short “Copied” notice, in the Translation panel and in History
+- feat(ui): copying text now confirms it with a short “Copied” notice, in the Translation panel and in History (#122)
 
 ### Changed
-- feat(caption): the Caption panel's control bar has five controls instead of nine: a Start/Stop capsule that also shows the elapsed time and a live input level, a language chip (“English → Simplified Chinese”) that opens the source and target pickers, the swap button and why a swap is blocked, a display options menu, Copy All and close; the bar no longer rearranges itself by panel width
-- feat(caption): a missing microphone or Screen Recording permission shows as an orange notice with “Open System Settings” that stays visible while the controls fade; the status line only shows text that adds to the Start/Stop capsule (not “Not started”, “Transcribing…” or “Stopped”)
-- feat(caption): an empty Caption panel says “Click Start to begin transcription” (or “Listening…” once started) instead of “Waiting to start…”, and the copy buttons turn into a check mark for a moment after copying
-- feat(dictation): the Dictation bubble shows only its state (Translation, Translating…, Polishing…) in the headline and lists the keys below the text as key caps (⏎ Type and send · Right ⌥ Option Type only · esc Discard), so the headline no longer wraps
-- feat(quick-translate): the Translation panel's key hints are drawn as key caps; the engine label is now a menu for switching between System translation and Follow transcription translation engine (translating again), and reads “Follow transcription translation engine” in full; Copy Translation has the shortcut ⇧⌘C
-- feat(history): History's title bar keeps the title and two icon buttons: Copy (Copy All, Copy Translation Only, the new Copy Source Only) and Share (Export as Markdown…, Share…); search sits in the sidebar, and the transcript count and the Manage menu sit at the bottom of the sidebar; timestamps lose their brackets and are drawn lighter
-- feat(settings): Settings uses the standard macOS look: toolbar tabs (the window title follows the tab, ⌘1–⌘6 still switch), grouped forms and system buttons; the Speech Recognition and Model Library tabs open wider (640 pt) so engines and models have room
-- feat(settings): General is shorter — Permissions fold into “All permissions granted” once everything is allowed (Show Details expands them), the interface language joins Launch and notifications, and a new Shortcuts section holds Translate selection, Translate screenshot, Translate on double ⌘C and the Dictation trigger key, which used to be on the Quick Translate and Dictation tabs
-- feat(settings): the Caption panel settings (show at launch, background and content opacity) moved from General to Speech Recognition, next to the transcription they affect
+- feat(caption): the Caption panel's control bar has five controls instead of nine: a Start/Stop capsule that also shows the elapsed time and a live input level, a language chip (“English → Simplified Chinese”) that opens the source and target pickers, the swap button and why a swap is blocked, a display options menu, Copy All and close; the bar no longer rearranges itself by panel width (#123)
+- feat(caption): a missing microphone or Screen Recording permission shows as an orange notice with “Open System Settings” that stays visible while the controls fade; the status line only shows text that adds to the Start/Stop capsule (not “Not started”, “Transcribing…” or “Stopped”) (#123)
+- feat(caption): an empty Caption panel says “Click Start to begin transcription” (or “Listening…” once started) instead of “Waiting to start…”, and the copy buttons turn into a check mark for 1.5 seconds after each copy (#123)
+- feat(dictation): the Dictation bubble shows only its state (Translation, Translating…, Polishing…) in the headline and lists the keys below the text as key caps (⏎ Type and send · Right ⌥ Option Type only · esc Discard), so the headline no longer wraps (#122)
+- feat(quick-translate): the Translation panel's key hints are drawn as key caps; the engine label is now a menu for switching between System translation and Follow transcription translation engine (translating again), and reads “Follow transcription translation engine” in full; Copy Translation has the shortcut ⇧⌘C (#122)
+- feat(history): History's title bar keeps the title and two icon buttons: Copy (Copy All, Copy Translation Only, the new Copy Source Only) and Share (Export as Markdown…, Share…); search sits in the sidebar, and the transcript count and the Manage menu sit at the bottom of the sidebar; timestamps lose their brackets and are drawn lighter (#122)
+- feat(settings): Settings uses the standard macOS look: toolbar tabs (the window title follows the tab, ⌘1–⌘6 still switch), grouped forms and system buttons; the Speech Recognition and Model Library tabs open wider (640 pt) so engines and models have room (#124)
+- feat(settings): General is shorter — Permissions fold into “All permissions granted” once everything is allowed (Show Details expands them), the interface language joins Launch and notifications, and a new Shortcuts section holds Translate selection, Translate screenshot, Translate on double ⌘C and the Dictation trigger key, which used to be on the Quick Translate and Dictation tabs (#124)
+- feat(settings): the Caption panel settings (show at launch, background and content opacity) moved from General to Speech Recognition, next to the transcription they affect (#124)
 
 ### Fixed
 - fix(models): the sherpa-onnx model descriptions no longer repeat the download size (already shown on each model card, and some were out of date) or mention Dictation's “Polish recognized text” (#120)
@@ -26,10 +26,10 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
-- docs(glossary): Shortcuts is a section of Settings → General and includes the Dictation trigger key; the Caption panel settings live on Speech Recognition
+- docs(glossary): Shortcuts is a section of Settings → General and includes the Dictation trigger key; the Caption panel settings live on Speech Recognition (#124)
 
 ### Tests
-- test(ui): the Settings UI tests pick tabs from the window toolbar
+- test(ui): the Settings UI tests pick tabs from the window toolbar (#124)
 
 ## [0.9.0] - 2026-10-18
 
