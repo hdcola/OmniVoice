@@ -8,7 +8,7 @@ struct SessionDetailView: View {
     let session: RecordingSessionRecord
     @State private var exportDocument: TextFileDocument?
     @State private var isExporting = false
-    @State private var copyConfirmation: String?
+    @State private var copyConfirmation: CopyConfirmation?
 
     var body: some View {
         ScrollView {
@@ -103,7 +103,7 @@ struct SessionDetailView: View {
 
     private func copy(_ text: String) {
         Clipboard.copy(text)
-        copyConfirmation = String(localized: "Copied")
+        copyConfirmation = CopyConfirmation(message: String(localized: "Copied"))
     }
 
     /// Full bilingual transcript as plain, readable text (source line,

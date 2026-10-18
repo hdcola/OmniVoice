@@ -17,7 +17,7 @@ struct SelectionTranslationView: View {
     @ObservedObject var controller: SelectionTranslationController
     @ObservedObject var translator: SelectionTranslator
     @ObservedObject var speaker: SelectionSpeaker
-    @State private var copyConfirmation: String?
+    @State private var copyConfirmation: CopyConfirmation?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -174,11 +174,13 @@ struct SelectionTranslationView: View {
         } label: {
             Text(engineName)
                 .font(.caption)
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
         .menuStyle(.borderlessButton)
-        .fixedSize()
+        .layoutPriority(-1)
         .foregroundStyle(.secondary)
-        .help("Quick Translate engine")
+        .help(Text(verbatim: String(localized: "Quick Translate engine") + ": " + engineName))
     }
 
     // MARK: - Notice
@@ -340,6 +342,6 @@ struct SelectionTranslationView: View {
 
     private func copyResult() {
         Clipboard.copy(translator.resultText)
-        copyConfirmation = String(localized: "Translation copied")
+        copyConfirmation = CopyConfirmation(message: String(localized: "Translation copied"))
     }
 }
