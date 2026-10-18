@@ -8,6 +8,11 @@
 "%@ · about %lld MB · about %lld GB memory" = "%@ · 约 %lld MB · 内存约 %lld GB";
 "%@ · about %lld MB · about %lld MB memory" = "%@ · 约 %lld MB · 内存约 %lld MB";
 "%@ · about %lld MB" = "%@ · 约 %lld MB";
+"%@: allowed" = "%@：已允许";
+"%@: denied, turn it on in System Settings › Privacy & Security › Automation" = "%@：已拒绝，请在“系统设置 › 隐私与安全性 › 自动化”中打开";
+"%@: not allowed yet" = "%@：尚未允许";
+"%@: not installed" = "%@：未安装";
+"%@: not running" = "%@：未运行";
 "%lld h %lld min" = "%1$lld 小时 %2$lld 分钟";
 "%lld min %lld s" = "%1$lld 分 %2$lld 秒";
 "%lld min" = "%lld 分钟";
@@ -70,6 +75,7 @@
 "Community quantization (unofficial release): about half the size of Q8_0, about 1.8GB peak memory at runtime, faster decoding, suited to memory-constrained devices; slightly lower accuracy than Q8_0." = "社区量化版（非官方发布）：体积约为 Q8_0 的一半，运行时峰值内存约 1.8GB，解码更快，适合内存紧张的设备；精度略低于 Q8_0。";
 "Connected in %.1f s" = "连接成功，用时 %.1f 秒";
 "Content opacity" = "内容透明度";
+"Control Music and Spotify directly" = "直接控制 Music 和 Spotify";
 "Copy All" = "复制全文";
 "Copy Download Link" = "复制下载链接";
 "Copy Translation Only" = "仅复制译文";
@@ -283,7 +289,8 @@
 "Pair it with the audio.cpp local engine for the best real-time typewriter experience" = "搭配 audio.cpp 本地引擎可获得最佳实时打字机体验";
 "Paste, then press Return" = "粘贴后回车";
 "Pause music during dictation" = "语音输入时暂停音乐";
-"Pauses playing music or video when you start speaking and resumes it afterwards; only content paused by this feature is resumed." = "开始说话时暂停正在播放的音乐或视频，结束后自动继续；只会恢复由它暂停的内容";
+"Pauses and resumes them with their own commands, so no other app is started or resumed by mistake. Not allowed, they are still paused with the play/pause key; allowing is more precise." = "用它们自己的命令暂停和恢复，不会误启动或误恢复其他应用。未允许时仍会通过播放/暂停键暂停，允许后更准确。";
+"Pauses playing music when you start speaking and resumes it afterwards; browser audio, such as a video, is muted instead and keeps playing, except while the browser is in a call. Only what this feature paused or muted is restored." = "开始说话时暂停正在播放的音乐，结束后自动继续；浏览器里的声音（比如视频）改为静音，视频继续播放，浏览器正在通话时不静音。只会恢复由它暂停或静音的内容";
 "Permissions" = "权限";
 "Plan A: Standard live bilingual captions (recommended)" = "方案 A：标准实时双语字幕（推荐）";
 "Plan B: Lightweight, low-memory" = "方案 B：轻量低内存方案";
@@ -320,7 +327,7 @@
 "Read the translation aloud when done" = "翻译完成后自动朗读译文";
 "Read translations aloud" = "翻译朗读";
 "Reading speed" = "朗读语速";
-"Reads selected text in other apps, pastes dictated text at the cursor, and pauses and resumes music and video during dictation (by sending the play/pause key); without it you can copy the selection and paste it into the Translation panel, and music is not paused" = "读取其他应用中选中的文字，把语音输入的文字粘贴到光标处，并在语音输入时暂停、恢复音乐和视频（发送播放/暂停键）；未授权时划词可复制后在翻译面板里粘贴，也不会暂停音乐";
+"Reads selected text in other apps, pastes dictated text at the cursor, and pauses and resumes music during dictation (by sending the play/pause key); without it you can copy the selection and paste it into the Translation panel, and music is only paused in Music and Spotify, if you allowed controlling them (browsers are still muted)" = "读取其他应用中选中的文字，把语音输入的文字粘贴到光标处，并在语音输入时暂停、恢复音乐（发送播放/暂停键）；未授权时划词可复制后在翻译面板里粘贴，音乐也只会在已允许控制的 Music 和 Spotify 中暂停（浏览器仍会被静音）";
 "Ready to use right away" = "即开即用";
 "Recognition engine failed to start: %@" = "识别引擎启动失败: %@";
 "Recognition engine preload failed: %@" = "识别引擎预加载失败: %@";

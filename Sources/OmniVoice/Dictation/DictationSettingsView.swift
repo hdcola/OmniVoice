@@ -57,7 +57,7 @@ struct DictationSettingsView: View {
             SettingsDivider()
             SettingsRow(
                 title: String(localized: "Pause music during dictation"),
-                subtitle: String(localized: "Pauses playing music or video when you start speaking and resumes it afterwards; only content paused by this feature is resumed.")
+                subtitle: String(localized: "Pauses playing music when you start speaking and resumes it afterwards; browser audio, such as a video, is muted instead and keeps playing, except while the browser is in a call. Only what this feature paused or muted is restored.")
             ) {
                 Toggle("Pause music during dictation", isOn: $controller.pauseMediaEnabled)
                     .labelsHidden()
@@ -65,6 +65,9 @@ struct DictationSettingsView: View {
                     .controlSize(.small)
             }
             .disabled(!controller.isEnabled)
+            SettingsDivider()
+            PlayerAccessRow()
+                .disabled(!controller.isEnabled || !controller.pauseMediaEnabled)
             SettingsDivider()
             DictationPolishSettingsRows(controller: controller)
             SettingsDivider()
@@ -146,5 +149,62 @@ struct DictationSettingsView: View {
 
     private func languageName(_ code: String) -> String {
         LanguageCatalog.displayName(for: code)
+    }
+}
+
+/// Asks for the Automation permission that lets the pauser control Music and
+/// Spotify directly. Only here: asking mid-dictation would put the prompt in
+/// front of the text field being typed into.
+private struct PlayerAccessRow: View {
+    @State private var statuses = AppleEventPlayerController.accessStatus()
+    @State private var isRequesting = false
+
+    var body: some View {
+        SettingsRow(
+            title: String(localized: "Control Music and Spotify directly"),
+            subtitle: String(localized: "Pauses and resumes them with their own commands, so no other app is started or resumed by mistake. Not allowed, they are still paused with the play/pause key; allowing is more precise.")
+                + "\n" + statuses.map { Self.describe($0.player.name, $0.access) }.joined(separator: " · ")
+        ) {
+            Button("Allow", action: allow)
+                .controlSize(.small)
+                .disabled(isRequesting || !statuses.contains { [.notDetermined, .notRunning, .denied].contains($0.access) })
+        }
+        // Players open and quit, and the switch can be flipped in System
+        // Settings, while this tab is open. Checking never prompts.
+        .task {
+            while !Task.isCancelled {
+                statuses = AppleEventPlayerController.accessStatus()
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+    }
+
+    /// Prompts for the undecided ones, starting a player that isn't running
+    /// to ask; once denied, macOS only lets the user turn it on in System
+    /// Settings.
+    private func allow() {
+        guard statuses.contains(where: { $0.access == .notDetermined || $0.access == .notRunning }) else {
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!)
+            // A closed one can't be re-checked; the next click starts it to.
+            AppleEventPlayerController.forgetDeniedAccessOfClosedPlayers()
+            statuses = AppleEventPlayerController.accessStatus()
+            return
+        }
+        isRequesting = true
+        Task {
+            await AppleEventPlayerController.requestAccess()
+            statuses = AppleEventPlayerController.accessStatus()
+            isRequesting = false
+        }
+    }
+
+    private static func describe(_ name: String, _ access: AppleEventPlayerController.Access) -> String {
+        switch access {
+        case .allowed: String(localized: "\(name): allowed")
+        case .notDetermined: String(localized: "\(name): not allowed yet")
+        case .denied: String(localized: "\(name): denied, turn it on in System Settings › Privacy & Security › Automation")
+        case .notRunning: String(localized: "\(name): not running")
+        case .notInstalled: String(localized: "\(name): not installed")
+        }
     }
 }
