@@ -379,8 +379,6 @@ struct OnboardingView: View {
 
     private func noteText(_ note: ModelSelectionPlan.Note) -> String {
         switch note {
-        case .translationWaitsForSentenceEnd:
-            return String(localized: "T3PO previews word by word from a recognizer that streams text; with the sherpa-onnx local engine, translation waits until each sentence ends.")
         case .limitedLanguages(let codes):
             let names = codes.map(LanguageCatalog.displayName(for:)).joined(separator: ", ")
             return String(localized: "This speech model recognizes only: \(names).")

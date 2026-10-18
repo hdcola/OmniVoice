@@ -43,19 +43,12 @@ public struct ModelSelectionPlan: Equatable, Sendable {
     }
 
     public enum Note: Equatable, Sendable {
-        /// T3PO previews word by word from the recognizer's append-only
-        /// stream; sherpa-onnx has none, so translation waits for the
-        /// segment to close.
-        case translationWaitsForSentenceEnd
         /// The recognition model only knows these languages.
         case limitedLanguages([String])
     }
 
     public var notes: [Note] {
         var notes: [Note] = []
-        if transcription?.engineID == "model.sherpa", translation?.engineID == "model.t3po" {
-            notes.append(.translationWaitsForSentenceEnd)
-        }
         if let codes = transcription?.sourceLanguageCodes {
             notes.append(.limitedLanguages(codes))
         }
