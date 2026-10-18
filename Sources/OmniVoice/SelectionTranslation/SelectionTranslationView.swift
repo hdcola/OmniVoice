@@ -143,7 +143,8 @@ struct SelectionTranslationView: View {
     }
 
     private var engineName: String {
-        SelectionTranslationEngine.displayName(for: translator.engineID)
+        let name = SelectionTranslationEngine.displayName(for: translator.effectiveEngineID)
+        return translator.engineID == SelectionTranslationEngine.followRecording ? String(localized: "Follow transcription · \(name)") : name
     }
 
     // MARK: - Notice

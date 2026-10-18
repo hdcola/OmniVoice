@@ -472,7 +472,7 @@ final class DictationController: ObservableObject {
             guard !Task.isCancelled else { return }
             self?.cancelReview()
         }
-        translator.useEngine(translationEngineID())
+        translator.engineID = translationEngineID()
         translator.sourceText = text
         translator.targetOverrideCode = target
         translator.translate()

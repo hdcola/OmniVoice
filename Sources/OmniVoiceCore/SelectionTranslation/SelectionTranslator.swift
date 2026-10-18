@@ -10,6 +10,11 @@ import Translation
 public enum SelectionTranslationEngine {
     public static let system = "system.translation"
     public static let hymt15 = "model.hymt15"
+    /// Not an engine itself — "use whatever the recording uses", resolved
+    /// per translation by `SelectionTranslator.effectiveEngineID`. The
+    /// default, so the panel and the transcript agree out of the box.
+    public static let followRecording = "follow.recording"
+
     public static var all: [EngineDescriptor] {
         ProviderCatalog.translationEngines.filter { $0.id == system || $0.id == hymt15 }
     }
@@ -65,30 +70,9 @@ public final class SelectionTranslator: ObservableObject {
     /// done" listens for.
     @Published public private(set) var finishedTranslationCount = 0
 
-    /// The engine the user picked (a `SelectionTranslationEngine` ID from
-    /// `all`); nil until they pick one, then `defaultEngineID` applies.
-    @Published public private(set) var chosenEngineID: String?
-
-    /// The engine a translation started now uses: the user's pick, else
-    /// HY-MT1.5 once it is downloaded, else the system engine.
-    public var engineID: String { chosenEngineID ?? defaultEngineID }
-
-    private var defaultEngineID: String {
-        isModelEngineAvailable ? SelectionTranslationEngine.hymt15 : SelectionTranslationEngine.system
-    }
-
-    /// The user picked `id` in Settings: remembered across launches.
-    public func chooseEngine(_ id: String) {
-        guard SelectionTranslationEngine.all.contains(where: { $0.id == id }) else { return }
-        chosenEngineID = id
-        defaults.set(id, forKey: PersistedSelectionKey.engineID)
-    }
-
-    /// Uses `id` for this instance only, without remembering it — Dictation's
-    /// own translator mirrors the engine chosen for the panel.
-    public func useEngine(_ id: String) {
-        guard SelectionTranslationEngine.all.contains(where: { $0.id == id }) else { return }
-        chosenEngineID = id
+    /// `SelectionTranslationEngine.followRecording` or `.system`; both resolve through `effectiveEngineID`.
+    @Published public var engineID: String {
+        didSet { defaults.set(engineID, forKey: PersistedSelectionKey.engineID) }
     }
     /// The user's languages, shared with the recording and voice input.
     public let languages: LanguagePreferences
@@ -138,11 +122,11 @@ public final class SelectionTranslator: ObservableObject {
     private var modelTask: Task<Void, Never>?
     private var pendingSystemJob: Job?
 
-    /// `preferredModelVariantID` is asked on every translation — the app
-    /// passes the recording's selected translation variant, so the panel uses
-    /// the same HY-MT1.5 quantization when both are HY-MT1.5.
-    /// `recordingEngineID` is only read once, to turn a stored "follow the
-    /// recording" choice (an earlier version's setting) into a concrete engine.
+    /// `preferredModelVariantID` and `recordingEngineID` are asked on every
+    /// translation — the app passes the recording's selected translation
+    /// variant and engine, so the panel uses the same HY-MT1.5 quantization
+    /// when both are HY-MT1.5, and so `followRecording` tracks the
+    /// recording's engine as it changes.
     public convenience init(
         modelDownloadManager: ModelDownloadManager,
         preferredModelVariantID: @escaping () -> String? = { nil },
@@ -173,31 +157,40 @@ public final class SelectionTranslator: ObservableObject {
         self.modelBackend = modelBackend
         self.recordingEngineID = recordingEngineID
         self.modelURLProvider = modelURLProvider
+        let storedEngine = defaults.string(forKey: PersistedSelectionKey.engineID)
+        // The picker offers just System translation and "follow"; a stored
+        // HY-MT1.5 choice (an earlier version) now reads as "follow".
+        let isKnown = storedEngine == SelectionTranslationEngine.followRecording
+            || storedEngine == SelectionTranslationEngine.system
+        engineID = isKnown ? storedEngine! : SelectionTranslationEngine.followRecording
         let languages = languages ?? LanguagePreferences(defaults: defaults)
         self.languages = languages
         let mine = languages.myLanguageCode
         targetCode = mine
         languagesObserver = languages.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
-
-        let stored = defaults.string(forKey: PersistedSelectionKey.engineID)
-        if let stored, SelectionTranslationEngine.all.contains(where: { $0.id == stored }) {
-            chosenEngineID = stored
-        } else if stored == Self.legacyFollowRecordingID {
-            // An earlier version offered "follow the recording": keep what it
-            // resolved to now as a plain choice.
-            switch recordingEngineID() {
-            case SelectionTranslationEngine.system: chooseEngine(SelectionTranslationEngine.system)
-            case SelectionTranslationEngine.hymt15: chooseEngine(SelectionTranslationEngine.hymt15)
-            default: chooseEngine(defaultEngineID)
-            }
-        }
     }
-
-    private static let legacyFollowRecordingID = "follow.recording"
 
     /// Whether HY-MT1.5 weights are downloaded — the settings tab greys the
     /// engine out otherwise.
     public var isModelEngineAvailable: Bool { modelURLProvider() != nil }
+
+    /// The engine a translation started now would actually use —
+    /// `engineID` itself, unless that's `followRecording`: then the
+    /// recording's engine when it's one the panel can run, and for T3PO
+    /// (see `SelectionTranslationEngine`'s doc for why the panel never uses
+    /// it) HY-MT1.5 when downloaded — the closer match, being a local model
+    /// too — else the system engine.
+    public var effectiveEngineID: String {
+        guard engineID == SelectionTranslationEngine.followRecording else { return engineID }
+        switch recordingEngineID() {
+        case SelectionTranslationEngine.system:
+            return SelectionTranslationEngine.system
+        case SelectionTranslationEngine.hymt15:
+            return SelectionTranslationEngine.hymt15
+        default:
+            return isModelEngineAvailable ? SelectionTranslationEngine.hymt15 : SelectionTranslationEngine.system
+        }
+    }
 
     /// Brings a new selection/OCR result into the source pane and
     /// translates it. The same text as last time keeps the existing result
@@ -233,7 +226,7 @@ public final class SelectionTranslator: ObservableObject {
             generation: generation, pieces: SelectionTextChunker.pieces(of: text),
             sourceCode: detected, targetCode: target
         )
-        if engineID == SelectionTranslationEngine.hymt15 {
+        if effectiveEngineID == SelectionTranslationEngine.hymt15 {
             startModelJob(job)
         } else {
             startSystemJob(job)

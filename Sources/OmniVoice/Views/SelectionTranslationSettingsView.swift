@@ -14,6 +14,9 @@ struct SelectionTranslationSettingsView: View {
     /// finish downloading in the "模型库" tab.
     @ObservedObject var downloadManager: ModelDownloadManager
     @EnvironmentObject private var navigation: SettingsNavigationState
+    /// Observed so "跟随转录设置" re-resolves the moment the recording's
+    /// translation engine changes in the "语音识别" tab.
+    @EnvironmentObject private var session: RecordingSession
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -74,17 +77,20 @@ struct SelectionTranslationSettingsView: View {
 
     private var engineCard: some View {
         SettingsCard(title: "Quick Translate engine", icon: "cpu") {
-            SettingsRow(title: "Engine", subtitle: "Both engines run on this Mac. Quick Translate releases HY-MT1.5 after 5 idle minutes, unless transcription is still using it") {
-                Picker("Quick Translate engine", selection: Binding(
-                    get: { translator.engineID }, set: { translator.chooseEngine($0) }
-                )) {
-                    ForEach(SelectionTranslationEngine.all) { engine in
-                        Text(engineLabel(for: engine)).tag(engine.id)
-                    }
+            SettingsRow(title: "Engine", subtitle: "Both options run on this Mac") {
+                Picker("Quick Translate engine", selection: $translator.engineID) {
+                    Text(followRecordingLabel).tag(SelectionTranslationEngine.followRecording)
+                    Text(SelectionTranslationEngine.displayName(for: SelectionTranslationEngine.system))
+                        .tag(SelectionTranslationEngine.system)
                 }
                 .labelsHidden()
                 .accessibilityLabel("Quick Translate engine")
                 .fixedSize()
+            }
+            if session.translationEngineID == "model.t3po",
+               translator.engineID == SelectionTranslationEngine.followRecording {
+                SettingsDivider()
+                SettingsNote(text: String(localized: "T3PO, used for transcription, is designed for real-time speech and isn't suited to translating whole passages, so Quick Translate will use \(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID)) instead."))
             }
             // 我的语言 / 外语 are set in the "语言" card (shared with the
             // recording and voice input); only this engine's caveat lives here.
@@ -95,7 +101,7 @@ struct SelectionTranslationSettingsView: View {
                     tint: .orange
                 )
             }
-            if translator.engineID == SelectionTranslationEngine.hymt15, !translator.isModelEngineAvailable {
+            if translator.effectiveEngineID == SelectionTranslationEngine.hymt15, !translator.isModelEngineAvailable {
                 SettingsDivider()
                 SettingsRow(title: "The HY-MT1.5 model hasn't been downloaded yet") {
                     PillButton(title: "Go to Model Library") { navigation.openModelLibrary() }
@@ -104,13 +110,12 @@ struct SelectionTranslationSettingsView: View {
         }
     }
 
-    private func engineLabel(for engine: EngineDescriptor) -> String {
-        engine.id == SelectionTranslationEngine.hymt15 && !translator.isModelEngineAvailable
-            ? String(localized: "\(engine.displayName) (not downloaded)") : engine.displayName
+    private var followRecordingLabel: String {
+        String(localized: "Follow transcription translation engine (\(SelectionTranslationEngine.displayName(for: translator.effectiveEngineID)))")
     }
 
     private var unsupportedLanguageNames: String? {
-        guard translator.engineID == SelectionTranslationEngine.hymt15 else { return nil }
+        guard translator.effectiveEngineID == SelectionTranslationEngine.hymt15 else { return nil }
         let names = [translator.myLanguageCode, translator.foreignLanguageCode]
             .filter { !ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: $0) }
             .map(LanguageCatalog.displayName(for:))
