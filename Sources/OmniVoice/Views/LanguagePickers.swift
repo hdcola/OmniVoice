@@ -130,15 +130,23 @@ struct TargetLanguagePicker: View {
     var isSessionActive: Bool = false
     @State private var isWarningPresented = false
 
-    private var isLocalModelEngine: Bool {
+    private var isLocalModelEngine: Bool { Self.isLocalModelEngine(translationEngineID) }
+
+    private static func isLocalModelEngine(_ translationEngineID: String?) -> Bool {
         translationEngineID == "model.t3po" || translationEngineID == "model.hymt15"
     }
 
-    private var isCurrentTargetNativelySupported: Bool {
-        ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: targetLanguageCode)
+    /// Whether this engine/target pair gets the language-support warning —
+    /// also read by the Caption panel's language chip, which shows the
+    /// warning glyph while this picker sits closed in its popover.
+    static func showsLanguageWarning(translationEngineID: String?, targetLanguageCode: String) -> Bool {
+        isLocalModelEngine(translationEngineID)
+            && !ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: targetLanguageCode)
     }
 
-    private var showsWarning: Bool { isLocalModelEngine && !isCurrentTargetNativelySupported }
+    private var showsWarning: Bool {
+        Self.showsLanguageWarning(translationEngineID: translationEngineID, targetLanguageCode: targetLanguageCode)
+    }
 
     private var nativeOptions: [LanguageOption] {
         LanguageCatalog.common.filter { ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: $0.code) }

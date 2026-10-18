@@ -27,10 +27,7 @@ struct FloatingTranscriptView: View {
     /// once that delay elapses, so a full-screen slide/video behind the
     /// panel isn't permanently competing with idle chrome for attention.
     @State private var isControlsVisible = true
-    @State private var isSwapHintPresented = false
-    /// The reason shown in the swap-blocked popover, captured at click time
-    /// so it keeps its text (and height) while the popover fades out.
-    @State private var swapHintText = ""
+    @State private var isLanguagePopoverPresented = false
     @State private var autoHideTask: Task<Void, Never>?
     /// A popover from the control bar is open (see `PanelPopoverOpenKey`),
     /// and whether the pointer is over the panel itself — together they
@@ -66,8 +63,12 @@ struct FloatingTranscriptView: View {
                 fontScale: session.panelFontScale
             )
             .equatable()
-            Divider()
-                .opacity(isControlsVisible ? 1 : 0)
+            // Not faded with the controls: a missing permission is the one
+            // thing on the panel the user has to act on. Inserted only when
+            // the permission flag flips, never on hover (see above).
+            ForEach(permissionIssues) { issue in
+                permissionBanner(issue)
+            }
             statusBar
                 .opacity(isControlsVisible ? 1 : 0)
                 .allowsHitTesting(isControlsVisible)
@@ -140,79 +141,39 @@ struct FloatingTranscriptView: View {
         }
     }
 
-    /// Start/stop plus the two language pickers — the controls adjusted most
-    /// often, so they live here instead of behind the Settings window.
-    /// Pickers, not free-text fields: this panel is a non-activating,
-    /// never-key `NSPanel` (see `FloatingTranscriptPanel.canBecomeKey`), and
-    /// a `TextField` can't take keyboard input without a key window, while a
-    /// menu-based `Picker` still works via a plain mouse click. (Settings
-    /// uses the same `SourceLanguagePicker`/`TargetLanguagePicker` — not
-    /// because it has this panel's key-window constraint, but so the two
-    /// don't offer different language options.)
+    // MARK: - Control bar
+
+    /// Five controls: start/stop (with the timer and mic level folded in),
+    /// the language pair, display options, copy and close. Everything that
+    /// changes less often than once per recording lives one click deeper,
+    /// so the bar fits the panel's minimum width without fallback layouts.
+    ///
+    /// Menus and popovers rather than text fields throughout: this panel is
+    /// a non-activating, never-key `NSPanel` (see
+    /// `FloatingTranscriptPanel.canBecomeKey`), and a `TextField` can't take
+    /// keyboard input without a key window, while a menu or popover still
+    /// works from a plain mouse click.
     private var controlBar: some View {
-        // Copy/close live outside the adaptive part and are always pinned to
-        // the trailing edge — an earlier version wrapped the *whole* row in a
-        // horizontal `ScrollView`, which sized it to its natural width: at a
-        // narrow panel the close button scrolled off-screen, and at a wide
-        // one the row stayed left-aligned, leaving a big empty gap to the
-        // right of the close button (a `Spacer` inside a scroll view has no
-        // width to expand into).
-        HStack(spacing: 10) {
-            // Picks the first layout that fits the space left after the
-            // trailing buttons: everything inline at natural width, then the
-            // display-mode/font-scale pickers folded into one menu, and as a
-            // last resort language pickers that shrink (truncating their
-            // labels) instead of anything being hidden or scrolled away.
-            // `.layoutPriority(1)` makes the `HStack` offer this all of the
-            // remaining width first, instead of splitting it with the
-            // `Spacer` below.
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) {
-                    primaryControls(compressible: false)
-                    displayOptionPickers
-                }
-                HStack(spacing: 10) {
-                    primaryControls(compressible: false)
-                    displayOptionsMenu
-                }
-                HStack(spacing: 10) {
-                    primaryControls(compressible: true)
-                    displayOptionsMenu
-                }
-            }
-            .layoutPriority(1)
-
+        HStack(spacing: 8) {
+            transcriptionButton
+            languageChip
+                .layoutPriority(-1)
             Spacer(minLength: 0)
-
-            // "一键复制全文" (proposal 3.1.D / roadmap P1_3) — copies the
-            // whole current transcript, not just a single selected line;
-            // `TranscriptListView`'s own per-row hover button below handles
-            // the single-line case.
-            Button {
-                copyFullTranscript()
-            } label: {
-                Image(systemName: "doc.on.doc")
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .help("Copy All")
-            .disabled(session.lines.allSatisfy(\.displaySource.isEmpty))
-
+            displayOptionsMenu
+            CopyGlyphButton(help: "Copy All", text: fullTranscriptText)
+                .disabled(session.lines.allSatisfy(\.displaySource.isEmpty))
             PanelCloseButton(action: onClose)
         }
-        .padding(10)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 
-    /// Tooltip for the ⇄ button — says why it is greyed out.
-    private var swapHelp: String { session.swapBlockedReason ?? String(localized: "Swap source and target languages") }
-
-    /// Start/stop, the source ⇄ target language pickers, and the timer.
-    /// The language pickers are flexible views that would otherwise stretch
-    /// across the whole bar in a wide panel, so they're pinned to their
-    /// natural width (the selected language's label) — except with
-    /// `compressible`, where they may shrink below it to fit a narrow one.
-    @ViewBuilder
-    private func primaryControls(compressible: Bool) -> some View {
+    /// Start/stop as one capsule: a red dot when idle, a stop square plus the
+    /// elapsed time and a live input level while transcribing, a spinner
+    /// while starting. The timer and level used to be separate controls in
+    /// the bar and the status bar; next to the button they answer "is it
+    /// listening, and does it hear me" in one place.
+    private var transcriptionButton: some View {
         Button {
             Task {
                 if session.isRunning {
@@ -222,129 +183,174 @@ struct FloatingTranscriptView: View {
                 }
             }
         } label: {
-            HStack(spacing: 5) {
-                // Only while `isStarting` — a cold `start()` (no
-                // preloaded model yet) does the exact same
-                // possibly-multi-second `loadModel()` work
-                // `preloadButton` guards, just without a warning first.
-                // Without this spinner that stretch had zero visual
-                // feedback beyond the static "启动中…" label — with the
-                // main-actor-blocking bug fixed (see
-                // `InProcessTranscriber.loadModel(modelPath:)`'s doc),
-                // the window itself stays responsive through it, so this
-                // is what actually shows something's happening.
-                if session.isStarting {
-                    ProgressView()
-                        .controlSize(.small)
+            HStack(spacing: 6) {
+                recordGlyph
+                    .frame(width: 16, height: 16)
+                Text(transcriptionButtonTitle)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
+                if session.isRunning {
+                    InputLevelBars(level: session.inputLevel)
                 }
-                Text(
-                    session.isRunning
-                        ? String(localized: "Stop")
-                        : (session.isStarting ? String(localized: "Starting…") : String(localized: "Start"))
-                )
             }
-        }
-        .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
-
-        // Disabled for the whole start→stop lifecycle (isSessionActive,
-        // not just isRunning): it's only read once, at the top of
-        // `start()`, to configure the ASR engine for that recording
-        // (`SpeechAnalyzer`'s locale can't change mid-session) — editing
-        // it during setup would either race that read or silently not
-        // apply until the next start.
-        SourceLanguagePicker(
-            sourceLanguageCode: $session.sourceLanguageCode,
-            transcriptionEngineKind: session.transcriptionEngineKind,
-            transcriptionEngineID: session.transcriptionEngineID,
-            transcriptionVariantID: session.currentTranscriptionModelVariant?.id,
-            allowsAuto: session.languages.transcriptionDirection == .listenForeign
-        )
-        .labelsHidden()
-        .disabled(session.isSessionActive)
-        .fixedSize(horizontal: !compressible, vertical: false)
-
-        // Swaps source and target (听外语 ⇄ 说我的语言). Not while a
-        // recording runs (the source is fixed at `start()`). "自动" survives a
-        // swap — it comes back when swapping back.
-        //
-        // When blocked it is only dimmed, not `.disabled`: a click then shows
-        // why in a popover. A tooltip can't carry that — this panel never
-        // becomes key and the app is inactive while it is used, so no
-        // `.help` in it ever appears.
-        Button {
-            if session.canSwapTranscriptionDirection {
-                session.swapTranscriptionDirection()
-            } else {
-                swapHintText = session.swapBlockedReason ?? ""
-                isSwapHintPresented = true
-            }
-        } label: {
-            Image(systemName: "arrow.left.arrow.right")
-                .foregroundStyle(.secondary)
-                .font(.caption)
-                .frame(width: 20, height: 20)
-                .contentShape(Rectangle())
-                .opacity(session.canSwapTranscriptionDirection ? 1 : 0.35)
+            .font(.system(size: 12, weight: .medium))
+            .padding(.leading, 5)
+            .padding(.trailing, 10)
+            .frame(height: 26)
+            .background(Color.primary.opacity(0.1), in: Capsule())
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(swapHelp)
-        .accessibilityLabel("Swap source and target languages")
-        .accessibilityHint(session.swapBlockedReason ?? "")
-        .preference(key: PanelPopoverOpenKey.self, value: isSwapHintPresented)
-        // The reason ending (e.g. the recording stops) must not leave an empty
-        // bubble behind.
-        .onChange(of: session.canSwapTranscriptionDirection) {
-            if session.canSwapTranscriptionDirection { isSwapHintPresented = false }
-        }
-        .popover(isPresented: $isSwapHintPresented) {
-            Text(swapHintText)
-                .font(.callout)
-                .frame(width: 220, alignment: .leading)
-                .padding()
-        }
-
-        // Target stays editable while running: unlike source, it isn't
-        // baked into a provider at `start()` — the `.translationTask`
-        // above rebuilds `translationConfiguration` on every change, so
-        // switching it mid-recording actually retargets the next
-        // translated segment.
-        TargetLanguagePicker(
-            targetLanguageCode: $session.targetLanguageCode,
-            translationEngineID: session.translationEngineID,
-            onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
-            isSessionActive: session.isSessionActive
-        )
-        .labelsHidden()
-        .fixedSize(horizontal: !compressible, vertical: false)
-
-        // 录制计时器（提案 3.1.E）— 只在录制中显示，停止后复位，避免一个
-        // 静止的 "00:00:00" 常驻在控制栏里，看起来像是坏掉了。
-        if session.isRunning {
-            Text(session.elapsedTimeString)
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-        }
+        // Same rule as before: no start while a preload is in flight, no
+        // double start/stop while one is already under way.
+        .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
+        .accessibilityLabel(session.isRunning ? String(localized: "Stop Transcription") : String(localized: "Start Transcription"))
+        .accessibilityValue(session.isRunning ? session.elapsedTimeString : "")
     }
 
-    /// 显示模式切换（提案 3.1.B：双语对照 / 仅译文 / 仅原文）与字号档位
-    /// （提案 3.1.C：标准 / 大 / 特大），在控制栏放得下时直接平铺。
-    /// `.fixedSize()` instead of a fixed `.frame(width:)` — sizing to the
-    /// currently-selected label's actual content is narrower than one sized
-    /// for the widest option, but still never clips whichever one is showing.
+    private var transcriptionButtonTitle: String {
+        if session.isRunning { return session.elapsedTimeString }
+        if session.isStarting { return String(localized: "Starting…") }
+        return String(localized: "Start")
+    }
+
     @ViewBuilder
-    private var displayOptionPickers: some View {
-        displayModePicker
-            .labelsHidden()
-            .fixedSize()
-        fontScalePicker
-            .labelsHidden()
-            .fixedSize()
+    private var recordGlyph: some View {
+        if session.isStarting {
+            ProgressView()
+                .controlSize(.mini)
+        } else {
+            ZStack {
+                Circle()
+                    .strokeBorder(Color.primary.opacity(0.45), lineWidth: 1.5)
+                if session.isRunning {
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(Color.red)
+                        .frame(width: 7, height: 7)
+                } else {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 8, height: 8)
+                }
+            }
+        }
     }
 
-    /// The same two pickers folded into a single icon menu, for when the
-    /// panel is too narrow to show them inline (see `controlBar`). A menu,
-    /// like the pickers themselves, still works from a plain mouse click on
-    /// this never-key panel.
+    /// "英语 → 简体中文" — the source and target pickers, the ⇄ swap and
+    /// why a swap is blocked, all behind one chip. They used to take three
+    /// controls (and a popover of their own for the blocked-swap reason) in
+    /// the bar.
+    private var languageChip: some View {
+        Button {
+            isLanguagePopoverPresented.toggle()
+        } label: {
+            HStack(spacing: 4) {
+                Text(sourceLanguageName)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text(LanguageCatalog.localizedName(for: session.targetLanguageCode))
+                if TargetLanguagePicker.showsLanguageWarning(
+                    translationEngineID: session.translationEngineID,
+                    targetLanguageCode: session.targetLanguageCode
+                ) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .font(.system(size: 12))
+            .lineLimit(1)
+            .padding(.horizontal, 9)
+            .frame(height: 26)
+            .background(
+                Color.primary.opacity(isLanguagePopoverPresented ? 0.16 : 0.1),
+                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Language")
+        .accessibilityValue("\(sourceLanguageName) → \(LanguageCatalog.localizedName(for: session.targetLanguageCode))")
+        .preference(key: PanelPopoverOpenKey.self, value: isLanguagePopoverPresented)
+        .popover(isPresented: $isLanguagePopoverPresented, arrowEdge: .bottom) {
+            languagePopover
+        }
+    }
+
+    private var sourceLanguageName: String {
+        session.sourceLanguageCode.map(LanguageCatalog.localizedName(for:)) ?? String(localized: "Auto-detect")
+    }
+
+    private var languagePopover: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+                GridRow {
+                    Text("Source language")
+                        .foregroundStyle(.secondary)
+                    // Disabled for the whole start→stop lifecycle
+                    // (isSessionActive, not just isRunning): it's only read
+                    // once, at the top of `start()`, to configure the ASR
+                    // engine for that recording (`SpeechAnalyzer`'s locale
+                    // can't change mid-session).
+                    SourceLanguagePicker(
+                        sourceLanguageCode: $session.sourceLanguageCode,
+                        transcriptionEngineKind: session.transcriptionEngineKind,
+                        transcriptionEngineID: session.transcriptionEngineID,
+                        transcriptionVariantID: session.currentTranscriptionModelVariant?.id,
+                        allowsAuto: session.languages.transcriptionDirection == .listenForeign
+                    )
+                    .labelsHidden()
+                    .disabled(session.isSessionActive)
+                    .fixedSize()
+                }
+                GridRow {
+                    Text("Target language")
+                        .foregroundStyle(.secondary)
+                    // Target stays editable while running: unlike source, it
+                    // isn't baked into a provider at `start()` — the
+                    // `.translationTask` above rebuilds
+                    // `translationConfiguration` on every change, so
+                    // switching it mid-recording retargets the next
+                    // translated segment.
+                    TargetLanguagePicker(
+                        targetLanguageCode: $session.targetLanguageCode,
+                        translationEngineID: session.translationEngineID,
+                        onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
+                        isSessionActive: session.isSessionActive
+                    )
+                    .labelsHidden()
+                    .fixedSize()
+                }
+            }
+            // Swaps source and target (听外语 ⇄ 说我的语言). Not while a
+            // recording runs (the source is fixed at `start()`). "自动" survives
+            // a swap — it comes back when swapping back. The reason it's
+            // blocked is written right under it: a tooltip never shows in
+            // this panel, which is never key.
+            Button {
+                session.swapTranscriptionDirection()
+            } label: {
+                Label("Swap source and target languages", systemImage: "arrow.left.arrow.right")
+            }
+            .disabled(!session.canSwapTranscriptionDirection)
+            if let reason = session.swapBlockedReason {
+                Text(reason)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .font(.callout)
+        .padding(14)
+        .frame(width: 320, alignment: .leading)
+    }
+
+    /// Display mode (双语对照 / 仅译文 / 仅原文) and font size, set rarely
+    /// enough to live in one icon menu at every panel width.
     private var displayOptionsMenu: some View {
         Menu {
             displayModePicker
@@ -352,6 +358,8 @@ struct FloatingTranscriptView: View {
         } label: {
             Image(systemName: "textformat.size")
                 .foregroundStyle(.secondary)
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
         }
         // `.button` + `.plain` rather than `.borderlessButton`: the latter
         // is drawn by AppKit and ignores the label's `.secondary` style, so
@@ -361,6 +369,7 @@ struct FloatingTranscriptView: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Display options")
+        .accessibilityLabel("Display options")
     }
 
     private var displayModePicker: some View {
@@ -379,12 +388,12 @@ struct FloatingTranscriptView: View {
         }
     }
 
-    /// Copies every closed/in-progress transcript line as plain bilingual
-    /// text (source line, translation line below it) — same shape as
+    /// Every closed/in-progress transcript line as plain bilingual text
+    /// (source line, translation line below it) — same shape as
     /// `SessionDetailView`'s "复制全文", just sourced from the live
     /// in-memory `session.lines` instead of a persisted `RecordingSessionRecord`.
-    private func copyFullTranscript() {
-        let text = session.lines
+    private func fullTranscriptText() -> String {
+        session.lines
             .filter { !$0.displaySource.isEmpty }
             .map { line in
                 line.displayTranslation.isEmpty
@@ -392,83 +401,99 @@ struct FloatingTranscriptView: View {
                     : "\(line.displaySource)\n\(line.displayTranslation)"
             }
             .joined(separator: "\n\n")
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
     }
 
-    /// Surfaces `RecordingSession.statusMessage` (e.g. "识别引擎启动失败:
-    /// ...") on the panel itself — without this, a failed `start()` gave no
-    /// visible indication of what went wrong: the button just went back to
-    /// "开始" and the transcript area stayed empty, and this message
-    /// otherwise only ever appeared in the menu bar dropdown.
+    // MARK: - Problems and status
+
+    private enum PermissionIssue: String, Identifiable {
+        case microphone
+        case screenRecording
+
+        var id: String { rawValue }
+
+        var message: String {
+            switch self {
+            case .microphone: return String(localized: "Grant microphone access in System Settings")
+            case .screenRecording: return String(localized: "Grant screen recording access in System Settings")
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .microphone: return "mic.slash"
+            case .screenRecording: return "display"
+            }
+        }
+
+        var settingsURL: URL {
+            switch self {
+            case .microphone: return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
+            case .screenRecording: return URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
+            }
+        }
+    }
+
+    private var permissionIssues: [PermissionIssue] {
+        var issues: [PermissionIssue] = []
+        if session.microphonePermissionNeeded { issues.append(.microphone) }
+        if session.screenRecordingPermissionNeeded { issues.append(.screenRecording) }
+        return issues
+    }
+
+    /// One missing permission, with a one-tap deeplink straight to the
+    /// relevant System Settings privacy pane (proposal 3.4.C).
+    private func permissionBanner(_ issue: PermissionIssue) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: issue.systemImage)
+                .foregroundStyle(.orange)
+            Text(issue.message)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            Button("Open System Settings") {
+                NSWorkspace.shared.open(issue.settingsURL)
+            }
+            .controlSize(.small)
+        }
+        .font(.caption)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(.horizontal, 8)
+        .padding(.bottom, 6)
+    }
+
+    /// Status text that adds something to what the start/stop capsule says
+    /// (an engine loading, a start that failed, a model not downloaded),
+    /// plus the model preload/release control. Routine text — not started,
+    /// transcribing, stopped — is left out (`isStatusMessageRoutine`).
     private var statusBar: some View {
         HStack(spacing: 6) {
-            // Only shown while actually running: `session.inputLevel` is
-            // reset to 0 on `stop()`, but a static muted mic icon sitting
-            // here at rest would read as "not picking up sound" rather than
-            // "not recording" — gating on `isRunning` avoids that confusion.
-            if session.isRunning {
-                micLevelIndicator
+            if !session.isStatusMessageRoutine {
+                Text(session.statusMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .help(session.statusMessage)
             }
-            Text(session.statusMessage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                // Longer messages (a localized error description tacked onto a
-                // permission hint, say) get cut off by `.lineLimit(1)` at the
-                // panel's default width — the tooltip is how the full text
-                // stays reachable without needing to widen the panel.
-                .help(session.statusMessage)
-
-            // One-tap deeplink straight to the relevant System Settings
-            // privacy pane (proposal 3.4.C) — without this, a denied
-            // mic/screen-recording permission only ever showed up as prose
-            // in `statusMessage`, leaving the user to hunt for the right
-            // settings pane themselves.
-            if session.microphonePermissionNeeded {
-                permissionSettingsButton(
-                    urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
-                    systemImage: "mic.slash",
-                    tooltip: "Grant microphone access in System Settings"
-                )
-            }
-            if session.screenRecordingPermissionNeeded {
-                permissionSettingsButton(
-                    urlString: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
-                    systemImage: "display",
-                    tooltip: "Grant screen recording access in System Settings"
-                )
-            }
-
-            Spacer()
-
-            // `.layoutPriority(1)`: without it, a long `statusMessage` (a
-            // localized error tacked onto a permission hint, say) could
-            // compress this down to nothing at a narrow panel width instead
-            // of truncating the `Text` above further — the button/label
-            // here is what's actionable, so it should be what keeps its
-            // full width, not what gets squeezed out first.
+            Spacer(minLength: 0)
+            // `.layoutPriority(1)`: a long status message truncates before
+            // the actionable control here gets squeezed out.
             modelStatusControl
                 .layoutPriority(1)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, minHeight: 16, alignment: .leading)
+        .padding(.horizontal, 12)
         .padding(.vertical, 6)
     }
 
-    /// Model preload/loaded/release affordance — in the status bar's
-    /// bottom-right corner rather than a button up in `controlBar` (an
-    /// earlier version of this put it there) or behind a right-click
-    /// context menu on a label (an earlier version tried that too, for
-    /// "释放模型" specifically): a plain, always-visible button beats a
-    /// context menu for discoverability, and this corner keeps it out of
-    /// the way of the controls used on every single recording (start/stop,
-    /// language pickers) while still being visible without digging for it.
-    /// Only worth surfacing for a `.model`-kind engine at all — a `.system`
-    /// engine's `loadModel()` is a no-op, so there's nothing to preload or
-    /// release (see `usesOnDeviceModelEngine`'s doc).
+    /// Model preload/loaded/release affordance in the status bar's
+    /// bottom-right corner — out of the way of the controls used on every
+    /// recording, still visible without digging for it. Only worth
+    /// surfacing for a `.model`-kind engine at all — a `.system` engine's
+    /// `loadModel()` is a no-op, so there's nothing to preload or release
+    /// (see `usesOnDeviceModelEngine`'s doc).
     @ViewBuilder
     private var modelStatusControl: some View {
         if session.usesOnDeviceModelEngine {
@@ -479,15 +504,10 @@ struct FloatingTranscriptView: View {
                     // A translation-only launch preload leaves the recognizer
                     // unloaded (`start()` loads it); still releasable here.
                     Text(session.isModelLoaded ? String(localized: "Model ready") : String(localized: "Translation model ready"))
-                    // A `.model`-kind engine otherwise only ever unloads on
-                    // an engine switch or app quit (see `isModelLoaded`'s
-                    // doc) — this is the escape hatch for reclaiming that
-                    // memory/VRAM sooner on a memory-constrained machine,
-                    // without either. Disabled while running/starting/
-                    // stopping (not just relying on `unloadModels()`'s own
-                    // no-op guard): a button that silently does nothing
-                    // when tapped reads as broken, not as "not applicable
-                    // right now".
+                    // The escape hatch for reclaiming memory sooner than an
+                    // engine switch or app quit. Disabled (not just a no-op)
+                    // while a recording is active: a button that silently
+                    // does nothing reads as broken.
                     Button {
                         session.unloadModels()
                     } label: {
@@ -504,17 +524,8 @@ struct FloatingTranscriptView: View {
                     Task { await session.preloadModel() }
                 } label: {
                     HStack(spacing: 5) {
-                        // A visible spinner while `loadModel()` is in flight
-                        // — without this, the button just sat on a static
-                        // "加载中…" label for however many seconds R2T2/T3PO's
-                        // weights took to read, which (before
-                        // `InProcessTranscriber`/`InProcessTranslator.loadModel(modelPath:)`
-                        // stopped blocking the main actor synchronously —
-                        // see their doc) used to coincide with the entire
-                        // window being genuinely frozen, not just looking
-                        // idle. Now that the load runs off the main actor,
-                        // this spinner animates the whole time, which is
-                        // itself confirmation the window hasn't hung.
+                        // Animates the whole time `loadModel()` runs off the
+                        // main actor — itself confirmation the window hasn't hung.
                         if session.isPreloadingModel {
                             ProgressView()
                                 .controlSize(.small)
@@ -529,39 +540,6 @@ struct FloatingTranscriptView: View {
         }
     }
 
-    /// One button, reused for both the microphone and screen-recording
-    /// privacy panes above — `x-apple.systempreferences:` URLs are always
-    /// well-formed literals here, so the force-unwrap is safe. Takes a
-    /// distinct `systemImage`/`tooltip` per call site: with both permissions
-    /// missing at once, two identical gear icons with the same tooltip gave
-    /// no way to tell which one addressed which permission.
-    private func permissionSettingsButton(urlString: String, systemImage: String, tooltip: LocalizedStringKey) -> some View {
-        Button {
-            NSWorkspace.shared.open(URL(string: urlString)!)
-        } label: {
-            Image(systemName: systemImage)
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(.orange)
-        .help(tooltip)
-    }
-
-    /// Live feedback that audio is actually being picked up — without this,
-    /// nothing on the panel changed between "转录中…" with the mic silent vs.
-    /// the mic capturing normally, so a misconfigured input device (wrong
-    /// mic selected, muted, unplugged) looked identical to a working one
-    /// until text failed to show up. Scales with `session.inputLevel`
-    /// (0...1, see `AudioMixer.onLevel`'s doc) rather than just toggling
-    /// on/off, so it reads as a level meter, not just a "recording" light.
-    private var micLevelIndicator: some View {
-        Image(systemName: "mic.fill")
-            .font(.system(size: 10))
-            .foregroundStyle(.red)
-            .scaleEffect(1 + CGFloat(session.inputLevel) * 0.5)
-            .animation(.easeOut(duration: 0.1), value: session.inputLevel)
-            .accessibilityLabel("Microphone is receiving audio")
-    }
-
     private func rebuildConfiguration() {
         translationConfiguration = TranslationSession.Configuration(
             source: session.currentSourceLanguage,
@@ -570,10 +548,65 @@ struct FloatingTranscriptView: View {
     }
 }
 
+/// Four small bars that rise with the microphone level — next to the timer
+/// in the start/stop capsule. Without it a misconfigured input device (wrong
+/// mic, muted, unplugged) looked identical to a working one until text
+/// failed to show up. Scales with `level` (0...1, see `AudioMixer.onLevel`)
+/// rather than toggling on/off, so it reads as a meter.
+private struct InputLevelBars: View {
+    let level: Float
+    private static let weights: [CGFloat] = [0.55, 1, 0.75, 0.9]
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 2) {
+            ForEach(Self.weights.indices, id: \.self) { index in
+                Capsule()
+                    .fill(Color.green)
+                    .frame(width: 2, height: 3 + CGFloat(level) * 9 * Self.weights[index])
+            }
+        }
+        .frame(height: 12)
+        .animation(.easeOut(duration: 0.1), value: level)
+        .accessibilityLabel("Microphone is receiving audio")
+    }
+}
+
+/// A copy icon that turns into a green check for a moment after a click —
+/// the panel's only copy feedback, since it never becomes key and a toast
+/// would sit over the transcript.
+private struct CopyGlyphButton: View {
+    let help: LocalizedStringKey
+    var size: CGFloat = 13
+    let text: () -> String
+    @State private var didCopy = false
+
+    var body: some View {
+        Button {
+            Clipboard.copy(text())
+            didCopy = true
+        } label: {
+            Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
+                .font(.system(size: size))
+                .foregroundStyle(didCopy ? Color.green : Color.secondary)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(help)
+        .task(id: didCopy) {
+            guard didCopy else { return }
+            try? await Task.sleep(for: .seconds(1.5))
+            didCopy = false
+        }
+    }
+}
+
 /// The scrollable transcript itself, pulled out of `FloatingTranscriptView`
 /// so that view's very-high-frequency, unrelated `@Published` changes (chiefly
 /// `session.inputLevel`, ticking ~10-15×/sec while recording — see
-/// `micLevelIndicator`'s doc) don't force a full re-diff of what can be
+/// `InputLevelBars`' doc) don't force a full re-diff of what can be
 /// hundreds of transcript rows on every single tick. Takes `lines`/`isRunning`
 /// as plain values instead of observing `session` directly, and the call site
 /// applies `.equatable()` — together, that lets SwiftUI skip this view's
@@ -647,7 +680,9 @@ private struct TranscriptListView: View, Equatable {
                     // would leave the panel looking blank instead of showing
                     // this.
                     if lines.allSatisfy(\.displaySource.isEmpty) {
-                        Text("Waiting to start…")
+                        // Says what to do next instead of a bare "waiting":
+                        // listening once started, how to start otherwise.
+                        Text(isRunning ? String(localized: "Listening…") : String(localized: "Click Start to begin transcription"))
                             .foregroundStyle(.secondary)
                     }
                     ForEach(lines) { line in
@@ -783,27 +818,16 @@ private struct TranscriptLineRow: View {
             .textSelection(.enabled)
 
             if isHovering {
-                Button {
-                    copyLine()
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 11))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help("Copy this sentence")
+                CopyGlyphButton(help: "Copy this sentence", size: 11, text: lineText)
             }
         }
         .onHover { isHovering = $0 }
     }
 
-    private func copyLine() {
-        let text = line.displayTranslation.isEmpty
+    private func lineText() -> String {
+        line.displayTranslation.isEmpty
             ? line.displaySource
             : "\(line.displaySource)\n\(line.displayTranslation)"
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
     }
 
     @ViewBuilder

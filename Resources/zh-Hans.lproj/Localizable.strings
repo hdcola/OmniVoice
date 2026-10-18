@@ -59,6 +59,7 @@
 "Clean up %lld empty transcripts?" = "清理 %lld 条空记录？";
 "Clean" = "清爽";
 "Clear" = "清除";
+"Click Start to begin transcription" = "点「开始」开始转录";
 "Click the “Translate to…” button on the bubble while dictating to turn it on or off at any time. Translation uses the engine chosen under “Translate selection and screenshot”, and the target language is your “Foreign language”. The bubble grows taller for long text." = "语音输入时点气泡上的「译成…」按钮就能随时开关；翻译用「划词与截图翻译」里选的引擎，目标语言是你的「外语」。长内容时气泡会随内容变高。";
 "Close (Esc)" = "关闭（Esc）";
 "Close" = "关闭";
@@ -96,6 +97,7 @@
 "Discard" = "放弃";
 "Export as Markdown…" = "导出为 Markdown…";
 "Follow transcription translation engine · %@" = "跟随转录翻译引擎 · %@";
+"Listening…" = "正在聆听…";
 "New line" = "换行";
 "New sherpa-onnx local engine: streaming recognition with less memory" = "新增 sherpa-onnx 本地引擎：流式识别，更省内存";
 "Live transcription and Dictation can now use the sherpa-onnx local engine, built for real-time streaming speech recognition with much less memory and computation than the large models: about 140 MB to 930 MB of memory, and the default Paraformer bilingual (zh-en) model uses about 540 MB." = "转录和语音输入现在可以使用 sherpa-onnx 本地引擎：它专为实时流式语音识别而设计，比大模型占用的内存和计算资源少得多——内存约 140 MB 到 930 MB，默认的 Paraformer 双语（中英）模型约 540 MB。";
@@ -233,6 +235,7 @@
 "Model ready" = "模型已就绪";
 "Model status" = "模型状态";
 "Model weights not found: %@" = "找不到模型权重: %@";
+"Open System Settings" = "打开系统设置";
 "Polishing…" = "润色中…";
 "Press ⌫ or use the Manage menu at the bottom of the sidebar to delete them in bulk" = "按 ⌫ 或使用侧栏底部的“管理”菜单批量删除";
 "Share" = "分享";
@@ -492,7 +495,6 @@
 "Up to %lld characters; affects style only, e.g. “address me formally”" = "最多 %lld 字，只影响风格，例如「称呼用您」";
 "Verified, ready" = "校验通过，就绪";
 "Vietnamese" = "越南语";
-"Waiting to start…" = "等待开始…";
 "Warning: this is an unencrypted http address and the recognized text will be sent in plain text; only use http for this Mac (localhost)." = "警告：这是非加密的 http 地址，识别的文字会明文发送；只有本机（localhost）建议用 http";
 "Welcome to OmniVoice" = "欢迎使用 OmniVoice";
 "What's New" = "新功能";
