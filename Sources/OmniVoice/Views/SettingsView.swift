@@ -17,14 +17,9 @@ enum SettingsWindowLayout {
         min(620, (NSScreen.main?.visibleFrame.height ?? 800) - 120)
     }
 
-    /// The window resizes to each tab: the engine and model lists get the
-    /// room they need without stretching the short tabs' rows apart.
-    static func width(for tab: SettingsTab) -> CGFloat {
-        switch tab {
-        case .recognition, .models: return 640
-        case .general, .dictation, .quickTranslation, .about: return 520
-        }
-    }
+    /// One size for every tab, so the window doesn't jump when switching;
+    /// wide enough for the engine and model lists.
+    static let width: CGFloat = 640
 }
 
 struct SettingsView: View {
@@ -44,13 +39,13 @@ struct SettingsView: View {
     var body: some View {
         TabView(selection: $navigation.selectedTab) {
             Tab(SettingsTab.general.title, systemImage: SettingsTab.general.systemImage, value: .general) {
-                GeneralSettingsView().settingsTabFrame(.general)
+                GeneralSettingsView().settingsTabFrame()
             }
             Tab(SettingsTab.recognition.title, systemImage: SettingsTab.recognition.systemImage, value: .recognition) {
-                RecognitionSettingsView(modelDownloadManager: downloadManager).settingsTabFrame(.recognition)
+                RecognitionSettingsView(modelDownloadManager: downloadManager).settingsTabFrame()
             }
             Tab(SettingsTab.dictation.title, systemImage: SettingsTab.dictation.systemImage, value: .dictation) {
-                DictationSettingsView(controller: dictationController).settingsTabFrame(.dictation)
+                DictationSettingsView(controller: dictationController).settingsTabFrame()
             }
             Tab(SettingsTab.quickTranslation.title, systemImage: SettingsTab.quickTranslation.systemImage, value: .quickTranslation) {
                 SelectionTranslationSettingsView(
@@ -59,13 +54,13 @@ struct SettingsView: View {
                     speaker: selectionController.speaker,
                     downloadManager: downloadManager
                 )
-                .settingsTabFrame(.quickTranslation)
+                .settingsTabFrame()
             }
             Tab(SettingsTab.models.title, systemImage: SettingsTab.models.systemImage, value: .models) {
-                ModelManagementView(modelDownloadManager: downloadManager).settingsTabFrame(.models)
+                ModelManagementView(modelDownloadManager: downloadManager).settingsTabFrame()
             }
             Tab(SettingsTab.about.title, systemImage: SettingsTab.about.systemImage, value: .about) {
-                aboutTab.settingsTabFrame(.about)
+                aboutTab.settingsTabFrame()
             }
         }
         .background(TabShortcuts(selection: $navigation.selectedTab))
@@ -199,10 +194,9 @@ struct SettingsView: View {
 
 
 private extension View {
-    /// Every tab fills the window's height; the width varies by tab (see
-    /// `SettingsWindowLayout.width(for:)`), and the window animates between them.
-    func settingsTabFrame(_ tab: SettingsTab) -> some View {
-        frame(width: SettingsWindowLayout.width(for: tab), height: SettingsWindowLayout.height)
+    /// Every tab fills the same window size (see `SettingsWindowLayout`).
+    func settingsTabFrame() -> some View {
+        frame(width: SettingsWindowLayout.width, height: SettingsWindowLayout.height)
     }
 }
 
