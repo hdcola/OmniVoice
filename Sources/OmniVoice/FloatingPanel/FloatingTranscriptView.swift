@@ -286,8 +286,7 @@ struct FloatingTranscriptView: View {
     }
 
     private var languagePopover: some View {
-        LanguagePairControls(session: session)
-            .font(.callout)
+        LanguagePairRow(session: session)
             .padding(14)
             .frame(width: 320, alignment: .leading)
     }
