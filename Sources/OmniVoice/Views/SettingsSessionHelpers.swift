@@ -49,16 +49,17 @@ struct GeneralTabHint: View {
         HStack(spacing: 4) {
             switch topic {
             case .languages:
-                Text("Set languages in General → Language.")
+                Text("Set languages in General → Language.").foregroundStyle(.secondary)
                 Button("Go to General to set languages") { navigation.open(.general) }
                     .buttonStyle(.link)
             case .shortcuts:
-                Text("Set shortcuts in General → Shortcuts.")
+                Text("Set shortcuts in General → Shortcuts.").foregroundStyle(.secondary)
                 Button("Go to General to set shortcuts") { navigation.open(.general) }
                     .buttonStyle(.link)
             }
         }
+        // Secondary on the sentence only: on the whole row it also greyed
+        // out the link, which then read as plain text.
         .font(.subheadline)
-        .foregroundStyle(.secondary)
     }
 }
