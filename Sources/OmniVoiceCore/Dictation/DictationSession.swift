@@ -37,6 +37,9 @@ public final class DictationSession: ObservableObject {
     /// What a slow start is doing right now ("正在下载语言识别资源…"), for
     /// the HUD; nil once listening.
     @Published public private(set) var statusDetail: String?
+    /// Microphone level (0...1) while the microphone runs, for the bubble's
+    /// meter — so a wrong or muted mic shows before any text fails to.
+    @Published public private(set) var inputLevel: Float = 0
 
     /// How long the microphone keeps running after the user lets go — people
     /// release the key a beat before the last word is out.
@@ -169,7 +172,14 @@ public final class DictationSession: ObservableObject {
         // `pending`, so the recognizer's (slow) start doesn't cost the first words.
         let pending = PendingAudioBuffer()
         let mic = MicrophoneCapture(deviceID: deviceID)
-        mic.onBuffer = { pending.submit($0) }
+        mic.onBuffer = { [weak self] samples in
+            pending.submit(samples)
+            let level = InputLevel.peak(samples)
+            Task { @MainActor in
+                guard let self, self.mic != nil || self.state == .starting else { return }
+                self.inputLevel = InputLevel.smoothed(current: self.inputLevel, new: level)
+            }
+        }
         let providerStart = Task { try await provider.start(config: config) }
         logStep("recognizer start requested")
         do {
@@ -229,6 +239,7 @@ public final class DictationSession: ObservableObject {
     private func tearDown() async {
         mic?.stop()
         mic = nil
+        inputLevel = 0
         await provider?.stop()
         if let provider { releaseRecognizer(provider) }
         provider = nil
@@ -250,12 +261,14 @@ public final class DictationSession: ObservableObject {
     /// Back to idle after a start the user cancelled — nothing to report.
     private func abandonStart() {
         statusDetail = nil
+        inputLevel = 0
         previewText = ""
         state = .idle
     }
 
     private func fail(_ message: String) {
         statusDetail = nil
+        inputLevel = 0
         errorMessage = message
         state = .idle
     }

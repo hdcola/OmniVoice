@@ -1,26 +1,34 @@
 import AppKit
 import OmniVoiceCore
+import SwiftData
 import SwiftUI
 
-/// Content of the menu-bar dropdown — OmniVoice has no Dock icon
-/// (`LSUIElement`, see `Resources/Info.plist`), so this menu is the app's
-/// primary entry point for start/stop, the floating panel, history, and
-/// settings.
+/// Content of the menu bar popover (`MenuBarExtra` in `.window` style) —
+/// OmniVoice has no Dock icon (`LSUIElement`, see `Resources/Info.plist`),
+/// so this is the app's primary entry point and, with the 字幕悬浮窗
+/// hidden, the only place that shows whether transcription is running, hears
+/// anything, or failed. Grouped by task: status and start/stop, the
+/// languages and audio source, Quick Translate, recent transcripts, then the
+/// windows.
+///
+/// A `.window` popover has no menu-style arrow-key navigation, so the main
+/// actions carry key equivalents (⏎ start/stop, ⌘, Settings, ⌘Q quit) and
+/// Esc closes it.
 struct MenuBarContentView: View {
     @EnvironmentObject private var session: RecordingSession
     @EnvironmentObject private var appDelegate: AppDelegate
     @EnvironmentObject private var settingsNavigation: SettingsNavigationState
-    /// Observed (not just reached through `appDelegate`) so the rows below
-    /// pick up a shortcut re-recorded in Settings.
+    /// Observed (not just reached through `appDelegate`) so the key caps
+    /// below pick up a shortcut re-recorded in Settings.
     @EnvironmentObject private var selectionController: SelectionTranslationController
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.dismiss) private var dismiss
     /// Same instance `SettingsView`/`ModelManagementView` observe — see
     /// `SettingsView`'s own `downloadManager` doc for why this is passed in
     /// explicitly rather than defaulted to `.shared`. Only used here to show
-    /// download progress on the "模型库…" row (see `modelManagementLabel`)
-    /// so a download started in that window stays visible after it's closed,
-    /// without needing that window open at all.
+    /// download progress on the "模型库…" row (see `modelLibraryRow`) so a
+    /// download started in Settings stays visible after it's closed.
     @ObservedObject private var downloadManager: ModelDownloadManager
 
     init(modelDownloadManager: ModelDownloadManager) {
@@ -28,48 +36,110 @@ struct MenuBarContentView: View {
     }
 
     var body: some View {
-        // Device list can change between menu opens (a USB mic plugged in,
-        // AirPods connected, ...) — cheap enough to just refresh every time
-        // the menu opens. Session/panel construction itself happens in
+        VStack(alignment: .leading, spacing: 0) {
+            transcriptionSection
+            PopoverDivider()
+            languageAndAudioSection
+            PopoverDivider()
+            quickTranslateSection
+            if appDelegate.modelContainer != nil {
+                RecentTranscriptsSection(open: openTranscript)
+            }
+            PopoverDivider()
+            windowsSection
+        }
+        .padding(.vertical, 6)
+        .frame(width: 320)
+        // Device list can change between opens (a USB mic plugged in,
+        // AirPods connected, ...) — cheap enough to refresh every time.
+        // Session/panel construction itself happens in
         // `AppDelegate.applicationDidFinishLaunching`, not here — see that
         // file's doc for why.
-        Group {
-            content
-        }
-        .onAppear {
-            session.refreshDevices()
-        }
+        .onAppear { session.refreshDevices() }
+        .onExitCommand { dismiss() }
     }
 
-    @ViewBuilder
-    private var content: some View {
-        // Kept here alongside the floating panel's own start/stop button
-        // (not removed in favor of it) — if the user has hidden the panel,
-        // this is the only way to start/stop without first digging it back
-        // out via "显示/隐藏字幕悬浮窗" below.
-        // The `isPreloadingModel` case matters specifically here (unlike the
-        // floating panel's own start/stop button, which sits right next to
-        // a "预加载模型"/"加载中…" button of its own): if the panel is
-        // hidden, this dropdown is the only place the user can see *why*
-        // the button below is grayed out — a plain "开始转录" that just
-        // doesn't respond reads as broken, not as "busy".
-        // Elapsed-time readout (proposal 3.1.E/3.2) — the floating panel
-        // already shows this in its control bar, but with the panel hidden
-        // this dropdown had no equivalent, even though `elapsedTimeString`'s
-        // own doc says it drives both.
-        if session.isRunning {
-            Text(session.elapsedTimeString)
-                .font(.caption.monospacedDigit())
-        }
+    // MARK: - Status and start/stop
 
-        Button(
-            session.isRunning ? String(localized: "Stop Transcription")
-                : (session.isStarting
-                    ? String(localized: "Starting…")
-                    : (session.isPreloadingModel
-                        ? String(localized: "Preloading…")
-                        : String(localized: "Start Transcription")))
-        ) {
+    private var transcriptionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            statusRow
+            ForEach(PermissionIssue.current(in: session)) { issue in
+                permissionNotice(issue)
+            }
+            // Text that adds to the status row: an engine loading, a start
+            // that failed, a model not downloaded.
+            if !session.isStatusMessageRoutine {
+                Text(session.statusMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            transcriptionButton
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+
+    /// "● 转录中 ▁▃▅ 00:12:48" while running; "就绪 · 模型已就绪" at rest.
+    private var statusRow: some View {
+        HStack(spacing: 8) {
+            if session.isStarting || session.isStopping {
+                ProgressView().controlSize(.mini)
+            } else {
+                Circle()
+                    .fill(session.isRunning ? Color.red : Color.secondary.opacity(0.5))
+                    .frame(width: 8, height: 8)
+            }
+            Text(statusTitle)
+                .font(.system(size: 13, weight: .semibold))
+            if session.isRunning && !session.isStopping {
+                InputLevelBars(level: session.inputLevel)
+            }
+            Spacer(minLength: 0)
+            if session.isRunning && !session.isStopping {
+                Text(session.elapsedTimeString)
+                    .font(.system(size: 12).monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var statusTitle: String {
+        // Stopping first: `isRunning` stays true until `stop()` has finished.
+        if session.isStopping { return String(localized: "Stopping…") }
+        if session.isRunning { return String(localized: "Transcribing") }
+        if session.isStarting { return String(localized: "Starting…") }
+        if session.isPreloadingModel { return String(localized: "Preloading…") }
+        if session.usesOnDeviceModelEngine && session.hasLoadedModels {
+            return String(localized: "Ready · \(session.isModelLoaded ? String(localized: "Model ready") : String(localized: "Translation model ready"))")
+        }
+        return String(localized: "Ready")
+    }
+
+    private func permissionNotice(_ issue: PermissionIssue) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: issue.systemImage)
+                .foregroundStyle(.orange)
+            Text(issue.message)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            Button("Open System Settings") {
+                NSWorkspace.shared.open(issue.settingsURL)
+                dismiss()
+            }
+            .controlSize(.small)
+        }
+        .font(.caption)
+        .padding(8)
+        .background(Color.orange.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    /// The one prominent control: blue "开始转录" at rest, red "停止转录"
+    /// while running, with the global shortcut that does the same.
+    private var transcriptionButton: some View {
+        Button {
             Task {
                 if session.isRunning {
                     await session.stop()
@@ -77,106 +147,299 @@ struct MenuBarContentView: View {
                     await session.start()
                 }
             }
+        } label: {
+            HStack {
+                Text(session.isRunning ? LocalizedStringKey("Stop Transcription") : "Start Transcription")
+                Spacer(minLength: 8)
+                if let shortcut = selectionController.shortcuts[.toggleTranscription] {
+                    Text(shortcut.displayTokens.joined())
+                        .font(.system(size: 11, weight: .medium))
+                        .opacity(0.75)
+                }
+            }
+            .frame(maxWidth: .infinity)
         }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .tint(session.isRunning ? .red : .accentColor)
+        .keyboardShortcut(.defaultAction)
         // `isPreloadingModel` too — `start()` itself already no-ops while a
-        // preload is in flight (see its own guard), but without disabling
-        // this button too, clicking it here felt like nothing happened
-        // rather than the button visibly reflecting why.
+        // preload is in flight; disabling says why nothing would happen.
         .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
+    }
 
-        Button("Show/Hide Caption Panel") {
-            appDelegate.toggleFloatingPanel()
+    // MARK: - Languages and audio source
+
+    /// Disabled for the whole start→stop lifecycle (isSessionActive, not just
+    /// isRunning): `RecordingSession.start()` reads the source language and
+    /// audio settings once, at the top, to configure that recording.
+    private var languageAndAudioSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            PopoverSectionLabel("Language")
+            LanguagePairRow(session: session)
+            PopoverSectionLabel("Audio source")
+                .padding(.top, 4)
+            Picker("Microphone", selection: $session.selectedDeviceID) {
+                ForEach(session.inputDevices) { device in
+                    Text(device.name).tag(Optional(device.id))
+                }
+            }
+            .disabled(session.isSessionActive)
+            // A missing Screen Recording permission (needed for this to
+            // capture anything) shows as a notice in the status section above.
+            Toggle(isOn: $session.includeSystemAudio) {
+                Text("Include system audio")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .disabled(session.isSessionActive)
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
 
-        Divider()
+    // MARK: - Quick Translate
 
-        // The global shortcuts are the main way in; these rows make the
-        // feature discoverable and show which keys to press. The panel
-        // opens as it was left rather than reading a selection — by the time
-        // a menu row is clicked, the menu itself holds the focus.
-        Button(menuTitle(String(localized: "Open Translation Panel"), for: .translateSelection)) {
-            selectionController.showPanel()
-        }
-        Button(menuTitle(String(localized: "Translate screenshot"), for: .captureText)) {
-            selectionController.perform(.captureText)
-        }
-
-        Divider()
-
-        // Audio source — changed far less often than start/stop or the
-        // language pair (which live on the floating panel instead), but
-        // still frequent enough to want here rather than buried in
-        // Settings. Disabled for the whole start→stop lifecycle
-        // (isSessionActive, not just isRunning): `RecordingSession.start()`
-        // reads these once, at the top, to configure that recording's audio
-        // pipeline — changing them during setup would either race that read
-        // or silently not apply to the run in progress.
-        Picker("Microphone", selection: $session.selectedDeviceID) {
-            ForEach(session.inputDevices) { device in
-                Text(device.name).tag(Optional(device.id))
+    /// The global shortcuts are the main way in; these tiles make the
+    /// feature discoverable and show which keys to press. The panel opens as
+    /// it was left rather than reading a selection — by the time a tile is
+    /// clicked, the popover itself holds the focus.
+    private var quickTranslateSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            PopoverSectionLabel("Quick Translate")
+            HStack(spacing: 8) {
+                tile(String(localized: "Open Translation Panel"), shortcut: .translateSelection) {
+                    selectionController.showPanel()
+                }
+                tile(String(localized: "Translate screenshot"), shortcut: .captureText) {
+                    selectionController.perform(.captureText)
+                }
             }
         }
-        .disabled(session.isSessionActive)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
 
-        // A missing Screen Recording permission (needed for this toggle to
-        // actually capture anything) surfaces via `session.statusMessage`
-        // on the floating panel instead of a caption here — kept out of
-        // this label so it doesn't wrap/get cut off, and out of this menu
-        // entirely so the panel stays the one place status text lives (see
-        // `FloatingTranscriptView.statusBar`).
-        Toggle("Include system audio", isOn: $session.includeSystemAudio)
-            .disabled(session.isSessionActive)
-
-        Divider()
-
-        Button("History…") {
-            // OmniVoice runs as an accessory app (`LSUIElement`, no Dock
-            // icon) — opening a window without activating first creates it
-            // behind whatever app currently has focus, since this app never
-            // becomes frontmost on its own.
-            NSApp.activate(ignoringOtherApps: true)
-            openWindow(id: "history")
+    private func tile(_ title: String, shortcut action: GlobalShortcutAction, perform: @escaping () -> Void) -> some View {
+        Button {
+            dismiss()
+            perform()
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                if let shortcut = selectionController.shortcuts[action] {
+                    KeyCap(shortcut.displayTokens.joined())
+                } else {
+                    KeyCap("–")
+                }
+                Text(title)
+                    .font(.system(size: 12))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
+        .buttonStyle(.plain)
+    }
 
-        Button(modelManagementLabel) {
-            // Task 3.4 — "模型库…" jumps directly to Settings' "模型库"
-            // tab instead of opening a separate window (see
+    // MARK: - Windows
+
+    private var windowsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Toggle(isOn: Binding(
+                get: { appDelegate.isFloatingPanelVisible },
+                set: { appDelegate.setFloatingPanelVisible($0) }
+            )) {
+                Text("Show Caption Panel")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 5)
+
+            PopoverRow("History…") {
+                // OmniVoice runs as an accessory app (`LSUIElement`, no Dock
+                // icon) — opening a window without activating first creates it
+                // behind whatever app currently has focus.
+                NSApp.activate(ignoringOtherApps: true)
+                openWindow(id: "history")
+            }
+            modelLibraryRow
+            PopoverRow("Settings…", shortcut: "⌘,") {
+                NSApp.activate(ignoringOtherApps: true)
+                openSettings()
+            }
+            .keyboardShortcut(",")
+            PopoverRow("Quit OmniVoice", shortcut: "⌘Q") {
+                NSApp.terminate(nil)
+            }
+            .keyboardShortcut("q")
+        }
+    }
+
+    /// "模型库…", plus an inline progress bar while a download runs —
+    /// without it, closing Settings (or never having opened it) left a
+    /// multi-GB download with no visible progress, easy to mistake for
+    /// "stuck" (see `MenuBarLabel` for the icon-level equivalent).
+    private var modelLibraryRow: some View {
+        PopoverRow("Model Library…") {
+            // Task 3.4 — jumps straight to Settings' "模型库" tab (see
             // `SettingsNavigationState`'s doc).
             NSApp.activate(ignoringOtherApps: true)
             settingsNavigation.openModelLibrary()
             openSettings()
+        } trailing: {
+            if let fraction = downloadManager.downloadProgress.values.max() {
+                HStack(spacing: 6) {
+                    ProgressView(value: fraction)
+                        .frame(width: 60)
+                    Text("\(Int((fraction * 100).rounded()))%")
+                        .monospacedDigit()
+                }
+            } else if downloadManager.hasActiveDownloads {
+                Text("Preparing download…")
+            }
         }
-
-        Button("Settings…") {
-            NSApp.activate(ignoringOtherApps: true)
-            openSettings()
-        }
-
-        Divider()
-
-        Button("Quit OmniVoice") {
-            NSApp.terminate(nil)
-        }
-        .keyboardShortcut("q")
     }
 
-    private func menuTitle(_ title: String, for action: GlobalShortcutAction) -> String {
-        guard let shortcut = selectionController.shortcuts[action] else { return title }
-        return String(localized: "\(title) (\(shortcut.displayText))")
+    private func openTranscript(_ id: UUID) {
+        HistoryNavigationState.shared.requestedSessionID = id
+        NSApp.activate(ignoringOtherApps: true)
+        openWindow(id: "history")
+        dismiss()
+    }
+}
+
+/// The three most recent transcripts; clicking one opens History on it.
+/// Its own view so `@Query` only runs when a SwiftData container exists
+/// (`SessionStore` can fail to open — see `AppDelegate.init()`).
+private struct RecentTranscriptsSection: View {
+    @Query(Self.descriptor) private var records: [RecordingSessionRecord]
+    let open: (UUID) -> Void
+
+    private static var descriptor: FetchDescriptor<RecordingSessionRecord> {
+        var descriptor = FetchDescriptor<RecordingSessionRecord>(sortBy: [SortDescriptor(\.startedAt, order: .reverse)])
+        descriptor.fetchLimit = 3
+        return descriptor
     }
 
-    /// "模型库…", plus a live progress readout once a download is running
-    /// — without this, closing that window (or never having opened it) left
-    /// a multi-GB download with no visible progress anywhere in the app,
-    /// easy to mistake for "stuck" (see `MenuBarLabel` for the icon-level
-    /// equivalent when the menu itself isn't even open).
-    private var modelManagementLabel: String {
-        guard let fraction = downloadManager.downloadProgress.values.max() else {
-            return downloadManager.hasActiveDownloads
-                ? String(localized: "Model Library… (preparing download…)")
-                : String(localized: "Model Library…")
+    var body: some View {
+        if !records.isEmpty {
+            PopoverDivider()
+            VStack(alignment: .leading, spacing: 0) {
+                PopoverSectionLabel("Recent transcripts")
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 4)
+                ForEach(records) { record in
+                    PopoverRow(verbatim: record.displayTitle()) {
+                        open(record.id)
+                    } trailing: {
+                        Text(detail(for: record))
+                    }
+                }
+            }
+            .padding(.vertical, 6)
         }
-        return String(localized: "Model Library… (downloading \(Int((fraction * 100).rounded()))%)")
+    }
+
+    /// "2 hours ago · 29s" — how long only once the transcript has ended.
+    private func detail(for record: RecordingSessionRecord) -> String {
+        let when = record.startedAt.formatted(.relative(presentation: .named))
+        guard let endedAt = record.endedAt else { return when }
+        let length = Duration.seconds(max(1, endedAt.timeIntervalSince(record.startedAt)))
+            .formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated, maximumUnitCount: 1))
+        return "\(when) · \(length)"
+    }
+}
+
+// MARK: - Popover building blocks
+
+private struct PopoverSectionLabel: View {
+    let title: LocalizedStringKey
+
+    init(_ title: LocalizedStringKey) {
+        self.title = title
+    }
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.secondary)
+    }
+}
+
+private struct PopoverDivider: View {
+    var body: some View {
+        Divider().padding(.horizontal, 14).padding(.vertical, 2)
+    }
+}
+
+/// A menu-like row: highlighted under the pointer, the action on click,
+/// optional trailing detail (a shortcut, progress, a date). Closes the
+/// popover first, like a menu item.
+private struct PopoverRow<Trailing: View>: View {
+    let title: Text
+    let action: () -> Void
+    @ViewBuilder var trailing: Trailing
+    @State private var isHovered = false
+    @Environment(\.dismiss) private var dismiss
+
+    init(_ title: LocalizedStringKey, action: @escaping () -> Void, @ViewBuilder trailing: () -> Trailing) {
+        self.title = Text(title)
+        self.action = action
+        self.trailing = trailing()
+    }
+
+    init(verbatim title: String, action: @escaping () -> Void, @ViewBuilder trailing: () -> Trailing) {
+        self.title = Text(verbatim: title)
+        self.action = action
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        Button {
+            dismiss()
+            action()
+        } label: {
+            HStack(spacing: 8) {
+                title
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 8)
+                trailing
+                    .font(.system(size: 11))
+                    .foregroundStyle(isHovered ? Color.white.opacity(0.85) : Color.secondary)
+            }
+            .font(.system(size: 13))
+            .foregroundStyle(isHovered ? Color.white : Color.primary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(isHovered ? Color.accentColor : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 6)
+        .onHover { isHovered = $0 }
+    }
+}
+
+extension PopoverRow where Trailing == Text {
+    init(_ title: LocalizedStringKey, shortcut: String, action: @escaping () -> Void) {
+        self.init(title, action: action) { Text(verbatim: shortcut) }
+    }
+}
+
+extension PopoverRow where Trailing == EmptyView {
+    init(_ title: LocalizedStringKey, action: @escaping () -> Void) {
+        self.init(title, action: action) { EmptyView() }
     }
 }
 

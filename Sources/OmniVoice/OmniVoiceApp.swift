@@ -19,10 +19,14 @@ struct OmniVoiceApp: App {
                 .environmentObject(appDelegate)
                 .environmentObject(settingsNavigation)
                 .environmentObject(appDelegate.selectionController)
+                // For its recent-transcripts rows.
+                .modelContainerIfAvailable(appDelegate.modelContainer)
         } label: {
             MenuBarLabel(modelDownloadManager: appDelegate.session.modelDownloadManager, session: appDelegate.session)
         }
-        .menuBarExtraStyle(.menu)
+        // A popover rather than a menu: it holds live status (level meter,
+        // timer), pickers and switches a menu can't show.
+        .menuBarExtraStyle(.window)
 
         WindowGroup("History", id: "history") {
             SessionListView()

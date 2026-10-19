@@ -23,6 +23,10 @@ struct SourceLanguagePicker: View {
     /// False while speaking in the user's own language — there is no
     /// "自动" for that side (see `LanguagePreferences.sourceLanguageCode`).
     var allowsAuto: Bool = true
+    /// Shows the selection by its plain name ("自动检测", "英语") instead of
+    /// the full menu entry ("✨ 自动检测语种 (Auto)"), for a narrow row; the
+    /// menu itself is unchanged.
+    var showsShortName = false
     @State private var isAutoExplanationPresented = false
 
     /// An engine can't recognize every `LanguageCatalog` entry: the system
@@ -46,9 +50,17 @@ struct SourceLanguagePicker: View {
             : String(localized: "✨ Auto-detect (only available when listening to a foreign language)")
     }
 
+    /// The menu entry for the current selection, as the picker shows it by
+    /// default.
+    private var selectedEntryTitle: String {
+        guard let code = sourceLanguageCode else { return autoLabel }
+        if let option = options.first(where: { $0.code == code }) { return option.displayName }
+        return String(localized: "\(code) (custom)")
+    }
+
     var body: some View {
         HStack(spacing: 4) {
-            Picker("Source language", selection: $sourceLanguageCode) {
+            Picker(selection: $sourceLanguageCode) {
                 Text(autoLabel)
                     .tag(String?.none)
                     // Kept in the list (not filtered out) so the feature
@@ -67,6 +79,14 @@ struct SourceLanguagePicker: View {
                 if let custom = sourceLanguageCode,
                    !options.contains(where: { $0.code == custom }) {
                     Text("\(custom) (custom)").tag(Optional(custom))
+                }
+            } label: {
+                Text("Source language")
+            } currentValueLabel: {
+                if showsShortName {
+                    Text(sourceLanguageCode.map(LanguageCatalog.localizedName(for:)) ?? String(localized: "Auto-detect"))
+                } else {
+                    Text(selectedEntryTitle)
                 }
             }
             // Takes the row's width (the "?" keeps its own), so it lines up

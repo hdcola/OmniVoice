@@ -79,22 +79,6 @@ final class AudioMixer {
     private func emit(_ samples: [Float]) {
         guard !samples.isEmpty else { return }
         onPCMChunk?(samples)
-        onLevel?(Self.peakLevel(samples))
-    }
-
-    /// Converts peak amplitude to a 0...1 level on a dBFS scale rather than a
-    /// linear one — normal speech barely moves a linear peak meter.
-    private static func peakLevel(_ samples: [Float]) -> Float {
-        var peak: Float = 0
-        for sample in samples {
-            let magnitude = abs(sample)
-            if magnitude > peak { peak = magnitude }
-        }
-        guard peak > 0 else { return 0 }
-
-        let dB = 20 * log10(peak)
-        let minDB: Float = -45 // quiet room / silence floor
-        let normalized = (dB - minDB) / -minDB
-        return max(0, min(1, normalized))
+        onLevel?(InputLevel.peak(samples))
     }
 }

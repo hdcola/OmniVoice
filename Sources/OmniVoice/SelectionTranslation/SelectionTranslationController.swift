@@ -116,12 +116,19 @@ final class SelectionTranslationController: ObservableObject {
 
     var isPanelVisible: Bool { panel.isVisible }
 
+    /// Runs `GlobalShortcutAction.toggleTranscription`. Set by `AppDelegate`,
+    /// which owns the `RecordingSession` this controller doesn't know about;
+    /// the hot key itself lives here with the others so Settings records and
+    /// checks it for conflicts the same way.
+    var onToggleTranscription: (() -> Void)?
+
     // MARK: - Shortcuts
 
     func perform(_ action: GlobalShortcutAction) {
         switch action {
         case .translateSelection: toggleWithSelection()
         case .captureText: captureAndTranslate()
+        case .toggleTranscription: onToggleTranscription?()
         }
     }
 

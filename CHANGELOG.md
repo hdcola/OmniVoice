@@ -7,9 +7,11 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(shortcuts): new global shortcut Start/Stop Transcription, ⌥R by default, changeable or clearable in Settings → General → Shortcuts (#125)
 - feat(ui): copying text now confirms it with a short “Copied” notice, in the Translation panel and in History (#122)
 
 ### Changed
+- feat(dictation): while you dictate, the Dictation bubble shows a green microphone level meter next to its title, like the live transcription's, so you can see the microphone hears you before any text appears (#125)
 - feat(caption): the Caption panel's control bar has five controls instead of nine: a Start/Stop capsule that also shows the elapsed time and a live input level, a language chip (“English → Simplified Chinese”) that opens the source and target pickers, the swap button and why a swap is blocked, a display options menu, Copy All and close; the bar no longer rearranges itself by panel width (#123)
 - feat(caption): a missing microphone or Screen Recording permission shows as an orange notice with “Open System Settings” that stays visible while the controls fade; the status line only shows text that adds to the Start/Stop capsule and the model status (not “Not started”, “Transcribing…”, “Stopped” or “Model preloaded”) (#123)
 - feat(caption): an empty Caption panel says “Click Start to begin transcription” (or “Listening…” once started) instead of “Waiting to start…”, and the copy buttons turn into a check mark for 1.5 seconds after each copy (#123)
@@ -19,15 +21,19 @@ The format is based on Keep a Changelog.
 - feat(settings): Settings uses the standard macOS look: toolbar tabs (the window title follows the tab, ⌘1–⌘6 still switch), grouped forms and system buttons; every tab has the same window size (640 pt wide), so the window no longer jumps when switching tabs (#124)
 - feat(settings): General is shorter — Permissions fold into “All permissions granted” once everything is allowed (Show Details expands them, Hide Details folds them again), the interface language joins Launch and notifications, and a new Shortcuts section holds Translate selection, Translate screenshot, Translate on double ⌘C and the Dictation trigger key, which used to be on the Quick Translate and Dictation tabs (#124)
 - feat(settings): the Caption panel settings (show at launch, background and content opacity) moved from General to Speech Recognition, next to the transcription they affect (#124)
+- feat(menubar): the menu bar opens a popover instead of a menu: a status row (Transcribing with a live mic level and the elapsed time, or Ready), missing-permission notices with Open System Settings, a large Start/Stop Transcription button (⏎), the language pair with the ⇄ swap, the audio source, Quick Translate tiles with their shortcuts, the three latest transcripts (click one to open it in History), a Show Caption Panel switch, a progress bar on Model Library… while a download runs, Settings… (⌘,) and Quit (⌘Q); Esc closes it (#125)
 
 ### Fixed
 - fix(caption): while a transcription is stopping, the Caption panel's start/stop button says Stopping… instead of showing 00:00:00 and a live microphone meter (#123)
+- fix(dictation): the Dictation bubble's Translate to… control is now a switch, so on and off are easy to tell apart and it reads as clickable; before, on and off looked almost the same, because the bubble is never the active window and macOS draws a pressed button grey there (#125)
 - fix(l10n): the Quick Translate engine label now reads “跟随转录翻译引擎 · …” instead of “跟随转录 · …” (English “Follow transcription translation engine · …”), matching the glossary (#121)
 - fix(models): the sherpa-onnx model descriptions no longer repeat the download size (already shown on each model card, and some were out of date) or mention Dictation's “Polish recognized text” (#120)
 
 ### Dependencies
 
 ### Documentation
+- docs(readme): describe the menu bar popover and ⌥R; the Settings tab list says Dictation instead of Voice Input, as the glossary requires (#125)
+- docs(glossary): the menu bar opens a popover; add Start/Stop Transcription (⌥R) (#125)
 - docs(glossary): Shortcuts is a section of Settings → General and includes the Dictation trigger key; the Caption panel settings live on Speech Recognition (#124)
 
 ### Tests

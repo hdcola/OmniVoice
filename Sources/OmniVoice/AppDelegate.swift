@@ -26,6 +26,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
     @Published private(set) var session: RecordingSession
     private let sessionStore: SessionStore?
     private(set) var floatingPanel: FloatingTranscriptPanel?
+    /// Whether the 字幕悬浮窗 is on screen — the menu bar's "显示字幕悬浮窗"
+    /// switch reads it. Every show/hide goes through
+    /// `setFloatingPanelVisible(_:)` so it can't drift from the panel.
+    @Published private(set) var isFloatingPanelVisible = false
     private var isRunningCancellable: AnyCancellable?
     /// Task 4.1 (首次启动向导) — kept alive only for as long as the window
     /// itself is open; released once the user finishes/skips it.
@@ -64,6 +68,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
                 languages: session.languages
             )
         )
+        // The global "开始/停止转录" shortcut. Wired here, not at launch: the
+        // controller registers its hot keys in its own init, so a press
+        // before `applicationDidFinishLaunching` would otherwise be dropped.
+        // Starting also brings the 字幕悬浮窗 back (the `isRunning` sink).
+        selectionController.onToggleTranscription = { [session] in
+            Task {
+                if session.isRunning {
+                    if !session.isStopping { await session.stop() }
+                } else if !(session.isStarting || session.isPreloadingModel) {
+                    await session.start()
+                }
+            }
+        }
         dictationController = DictationController(
             // Voice input borrows the loaded on-device recognizer when
             // there is one (see `RecordingSession.lendRecognizerToDictation()`).
@@ -101,8 +118,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
 
         let panel = FloatingTranscriptPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 280))
         panel.contentView = DraggableHostingView(
-            rootView: FloatingTranscriptView(session: session, onClose: { [weak panel] in
-                panel?.orderOut(nil)
+            rootView: FloatingTranscriptView(session: session, onClose: { [weak self] in
+                self?.setFloatingPanelVisible(false)
             })
         )
         // Only place a brand-new panel — one whose position/size was just
@@ -116,13 +133,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
 
         // Shown from launch (not just on demand) since the panel hosts the
         // controls used most often (start/stop, language pickers) alongside
-        // the live transcript — `toggleFloatingPanel()`/the panel's own
+        // the live transcript — the menu bar's switch/the panel's own
         // close button still let the user hide it manually.
         // — unless turned off in Settings ("启动时显示字幕悬浮窗"), for people
         // who mostly use selection translation and don't want a transcript
         // window on every launch; recording start still re-shows it below.
         if UserDefaults.standard.object(forKey: PersistedFloatingPanelKey.showOnLaunch) as? Bool ?? true {
-            panel.orderFrontRegardless()
+            setFloatingPanelVisible(true)
         }
 
         // ...but the user can also hide it (menu toggle or the panel's own
@@ -133,8 +150,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         isRunningCancellable = session.$isRunning
             .filter { $0 }
             .receive(on: DispatchQueue.main)
-            .sink { [weak panel] _ in
-                panel?.orderFrontRegardless()
+            .sink { [weak self] _ in
+                self?.setFloatingPanelVisible(true)
             }
 
         presentOnboardingIfNeeded()
@@ -323,13 +340,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
         }
     }
 
-    func toggleFloatingPanel() {
+    func setFloatingPanelVisible(_ visible: Bool) {
         guard let panel = floatingPanel else { return }
-        if panel.isVisible {
-            panel.orderOut(nil)
-        } else {
+        if visible {
             panel.orderFrontRegardless()
+        } else {
+            panel.orderOut(nil)
         }
+        isFloatingPanelVisible = visible
     }
 
     func applicationWillTerminate(_ notification: Notification) {

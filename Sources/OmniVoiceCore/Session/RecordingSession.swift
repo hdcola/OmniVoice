@@ -1657,14 +1657,8 @@ public final class RecordingSession: ObservableObject {
         }
     }
 
-    /// Fast attack / slow decay smoothing so the meter reacts instantly to
-    /// louder sound but doesn't flicker down to zero between syllables.
     private func updateLevel(_ level: Float) {
-        if level > inputLevel {
-            inputLevel = level
-        } else {
-            inputLevel = inputLevel * 0.7 + level * 0.3
-        }
+        inputLevel = InputLevel.smoothed(current: inputLevel, new: level)
     }
 
     private static func makeTranscriptionProvider(engineID: String, modelPath: URL?) -> TranscriptionProvider {
