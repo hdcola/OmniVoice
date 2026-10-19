@@ -21,6 +21,7 @@ The format is based on Keep a Changelog.
 - feat(settings): the Caption panel settings (show at launch, background and content opacity) moved from General to Speech Recognition, next to the transcription they affect (#124)
 
 ### Fixed
+- fix(caption): while a transcription is stopping, the Caption panel's start/stop button says Stopping… instead of showing 00:00:00 and a live microphone meter (#123)
 - fix(models): the sherpa-onnx model descriptions no longer repeat the download size (already shown on each model card, and some were out of date) or mention Dictation's “Polish recognized text” (#120)
 
 ### Dependencies
