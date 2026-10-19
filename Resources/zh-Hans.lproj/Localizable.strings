@@ -98,7 +98,6 @@
 "Dictation" = "语音输入";
 "Discard" = "放弃";
 "Export as Markdown…" = "导出为 Markdown…";
-"Follow transcription translation engine · %@" = "跟随转录翻译引擎 · %@";
 "Go to General to set shortcuts" = "去通用设快捷键";
 "Hide Details" = "隐藏详情";
 "Launch and notifications" = "启动与通知";
@@ -156,6 +155,7 @@
 "Faster results (may be less accurate)" = "更快出结果（可能不够准确）";
 "Follow transcription translation engine (current: %@)" = "跟随转录翻译引擎（当前：%@）";
 "Follow system" = "跟随系统";
+"Follow transcription translation engine · %@" = "跟随转录翻译引擎 · %@";
 "Font size" = "字号";
 "For more natural voices or more languages: open it, then use the menu next to “System Voice” to download" = "更自然的声音或更多语言：打开后点「系统语音」旁的菜单下载";
 "Foreign language (%@)" = "外语（%@）";

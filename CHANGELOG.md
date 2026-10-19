@@ -26,6 +26,7 @@ The format is based on Keep a Changelog.
 ### Fixed
 - fix(caption): while a transcription is stopping, the Caption panel's start/stop button says Stopping… instead of showing 00:00:00 and a live microphone meter (#123)
 - fix(dictation): the Dictation bubble's Translate to… control is now a switch, so on and off are easy to tell apart and it reads as clickable; before, on and off looked almost the same, because the bubble is never the active window and macOS draws a pressed button grey there (#125)
+- fix(l10n): the Quick Translate engine label now reads “跟随转录翻译引擎 · …” instead of “跟随转录 · …” (English “Follow transcription translation engine · …”), matching the glossary (#121)
 - fix(models): the sherpa-onnx model descriptions no longer repeat the download size (already shown on each model card, and some were out of date) or mention Dictation's “Polish recognized text” (#120)
 
 ### Dependencies
