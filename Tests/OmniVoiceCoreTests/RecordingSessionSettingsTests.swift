@@ -1128,7 +1128,10 @@ struct RecordingSessionSettingsTests {
         #expect(session.isStatusMessageRoutine)
         session.statusMessage = String(localized: "Recognition engine failed to start: \("boom")")
         #expect(!session.isStatusMessageRoutine)
+        // The model status next to it already says "模型已就绪".
         session.statusMessage = String(localized: "Model preloaded")
-        #expect(!session.isStatusMessageRoutine)
+        #expect(session.isStatusMessageRoutine)
+        session.statusMessage = String(localized: "Translation model preloaded")
+        #expect(session.isStatusMessageRoutine)
     }
 }
