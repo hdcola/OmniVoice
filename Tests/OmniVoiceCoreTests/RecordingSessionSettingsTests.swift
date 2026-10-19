@@ -1116,4 +1116,22 @@ struct RecordingSessionSettingsTests {
     @Test func liveSessionIDIsNilWhenIdle() {
         #expect(RecordingSession().liveSessionID == nil)
     }
+
+    /// The Caption panel hides routine status text (the start/stop control
+    /// already says it) but must keep anything else, errors above all.
+    @Test func routineStatusMessagesAreToldApartFromOthers() {
+        let session = RecordingSession()
+        #expect(session.isStatusMessageRoutine)
+        session.statusMessage = String(localized: "Transcribing…")
+        #expect(session.isStatusMessageRoutine)
+        session.statusMessage = String(localized: "Stopped")
+        #expect(session.isStatusMessageRoutine)
+        session.statusMessage = String(localized: "Recognition engine failed to start: \("boom")")
+        #expect(!session.isStatusMessageRoutine)
+        // The model status next to it already says "模型已就绪".
+        session.statusMessage = String(localized: "Model preloaded")
+        #expect(session.isStatusMessageRoutine)
+        session.statusMessage = String(localized: "Translation model preloaded")
+        #expect(session.isStatusMessageRoutine)
+    }
 }

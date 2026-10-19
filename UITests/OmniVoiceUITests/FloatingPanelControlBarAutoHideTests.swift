@@ -107,15 +107,14 @@ final class FloatingPanelControlBarAutoHideTests: XCTestCase {
         guard let panelWindow else { return }
         let frameBefore = panelWindow.frame
 
-        // Whichever `Picker` the control bar renders first (source language,
-        // target language, display mode, or font scale — all are real
-        // SwiftUI controls, not drag-through background) — clicking it pops
-        // its menu rather than doing anything destructive.
-        let aPicker = app.popUpButtons.firstMatch
-        XCTAssertTrue(aPicker.waitForExistence(timeout: 5))
-        aPicker.click()
-        // Dismiss whatever menu opened (Escape) without selecting anything,
-        // so this test doesn't depend on which option happens to be current.
+        // The language chip — a real control, not drag-through background —
+        // whose click opens the language popover rather than doing anything
+        // destructive.
+        let languageChip = app.buttons["语言"]
+        XCTAssertTrue(languageChip.waitForExistence(timeout: 5))
+        languageChip.click()
+        // Dismiss the popover (Escape) without changing anything, so this
+        // test doesn't depend on which languages happen to be current.
         app.typeKey(.escape, modifierFlags: [])
 
         let frameAfter = panelWindow.frame

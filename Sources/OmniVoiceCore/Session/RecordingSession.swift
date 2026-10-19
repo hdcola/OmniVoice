@@ -75,6 +75,19 @@ public final class RecordingSession: ObservableObject {
     /// side by side.
     @Published public var lines: [TranscriptLine] = []
     @Published public var statusMessage: String = String(localized: "Not started")
+    /// True when `statusMessage` only restates what the start/stop control
+    /// or the model status already shows (not started, transcribing,
+    /// stopped, a model preloaded and now "模型已就绪"), so a view may leave
+    /// it out instead of repeating it.
+    public var isStatusMessageRoutine: Bool {
+        [
+            String(localized: "Not started"),
+            String(localized: "Transcribing…"),
+            String(localized: "Stopped"),
+            String(localized: "Model preloaded"),
+            String(localized: "Translation model preloaded"),
+        ].contains(statusMessage)
+    }
     @Published public var inputLevel: Float = 0
     /// Mix in system/output audio (ScreenCaptureKit) alongside the mic. Only
     /// changeable while stopped — the mixer/capture are constructed once in
@@ -92,7 +105,7 @@ public final class RecordingSession: ObservableObject {
     /// to some other capture failure (wrong device, device unplugged mid-
     /// setup, ...), which still surfaces via the generic `statusMessage`
     /// instead. Drives a one-tap deeplink to System Settings' microphone
-    /// privacy pane (see `FloatingTranscriptView.statusBar`) rather than
+    /// privacy pane (see `FloatingTranscriptView.permissionBanner`) rather than
     /// leaving the user to find it themselves.
     @Published public var microphonePermissionNeeded = false
 
@@ -1122,7 +1135,7 @@ public final class RecordingSession: ObservableObject {
         // `lines` is reset the same way: `lines = [TranscriptLine(id: 0)]`
         // below runs before any of those same failure points, so without
         // this a failed `start()` left one empty row behind — `lines.isEmpty`
-        // then reads `false`, so `FloatingTranscriptView`'s "等待开始…"
+        // then reads `false`, so `FloatingTranscriptView`'s empty-state
         // placeholder never shows and the panel just looks blank, with no
         // indication anything went wrong (that's `statusMessage`'s job —
         // see `FloatingTranscriptView.statusBar`).

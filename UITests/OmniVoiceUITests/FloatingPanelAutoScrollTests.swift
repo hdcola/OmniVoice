@@ -48,11 +48,11 @@ final class FloatingPanelAutoScrollTests: XCTestCase {
     }
 
     /// With no recording ever started, `lines` is empty and
-    /// `isPinnedToBottom` defaults to `true` — the placeholder "等待开始…" is
+    /// `isPinnedToBottom` defaults to `true` — the hint "点「开始」开始转录" is
     /// showing, and the "最新内容" jump button (only shown once
     /// `!isPinnedToBottom`) must not exist.
     func testEmptyTranscriptShowsPlaceholderAndNoJumpButton() {
-        let placeholder = app.staticTexts["等待开始…"]
+        let placeholder = app.staticTexts["点「开始」开始转录"]
         XCTAssertTrue(placeholder.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["最新内容"].exists, "jump-to-latest button must not appear while already pinned to the bottom")
     }

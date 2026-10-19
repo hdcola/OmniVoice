@@ -69,6 +69,11 @@ struct SourceLanguagePicker: View {
                     Text("\(custom) (custom)").tag(Optional(custom))
                 }
             }
+            // Takes the row's width (the "?" keeps its own), so it lines up
+            // with the target picker below it in the language popover. A menu
+            // picker keeps its natural width under a flexible frame alone.
+            .buttonSizing(.flexible)
+            .frame(maxWidth: .infinity, alignment: .leading)
             // A disabled `Picker` can't be reasoned about via its own tap —
             // this small "?" sits next to it so the explanation is reachable
             // even while the picker itself is fully system-driven (auto
@@ -130,15 +135,23 @@ struct TargetLanguagePicker: View {
     var isSessionActive: Bool = false
     @State private var isWarningPresented = false
 
-    private var isLocalModelEngine: Bool {
+    private var isLocalModelEngine: Bool { Self.isLocalModelEngine(translationEngineID) }
+
+    private static func isLocalModelEngine(_ translationEngineID: String?) -> Bool {
         translationEngineID == "model.t3po" || translationEngineID == "model.hymt15"
     }
 
-    private var isCurrentTargetNativelySupported: Bool {
-        ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: targetLanguageCode)
+    /// Whether this engine/target pair gets the language-support warning —
+    /// also read by the Caption panel's language chip, which shows the
+    /// warning glyph while this picker sits closed in its popover.
+    static func showsLanguageWarning(translationEngineID: String?, targetLanguageCode: String) -> Bool {
+        isLocalModelEngine(translationEngineID)
+            && !ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: targetLanguageCode)
     }
 
-    private var showsWarning: Bool { isLocalModelEngine && !isCurrentTargetNativelySupported }
+    private var showsWarning: Bool {
+        Self.showsLanguageWarning(translationEngineID: translationEngineID, targetLanguageCode: targetLanguageCode)
+    }
 
     private var nativeOptions: [LanguageOption] {
         LanguageCatalog.common.filter { ModelLanguageMapping.isNativelyTranslatableByLocalModel(code: $0.code) }
@@ -180,6 +193,8 @@ struct TargetLanguagePicker: View {
                 Text("\(targetLanguageCode) (custom)").tag(targetLanguageCode)
             }
         }
+        // Fills the row like the source picker above it.
+        .buttonSizing(.flexible)
     }
 
     /// Task 1.1's warning — shown the moment a `.model`-kind translation
