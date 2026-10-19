@@ -70,7 +70,9 @@ struct SourceLanguagePicker: View {
                 }
             }
             // Takes the row's width (the "?" keeps its own), so it lines up
-            // with the target picker below it in the language popover.
+            // with the target picker below it in the language popover. A menu
+            // picker keeps its natural width under a flexible frame alone.
+            .buttonSizing(.flexible)
             .frame(maxWidth: .infinity, alignment: .leading)
             // A disabled `Picker` can't be reasoned about via its own tap —
             // this small "?" sits next to it so the explanation is reachable
@@ -191,6 +193,8 @@ struct TargetLanguagePicker: View {
                 Text("\(targetLanguageCode) (custom)").tag(targetLanguageCode)
             }
         }
+        // Fills the row like the source picker above it.
+        .buttonSizing(.flexible)
     }
 
     /// Task 1.1's warning — shown the moment a `.model`-kind translation
