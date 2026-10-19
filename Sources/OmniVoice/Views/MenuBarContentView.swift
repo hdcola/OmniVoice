@@ -188,7 +188,10 @@ struct MenuBarContentView: View {
             .disabled(session.isSessionActive)
             // A missing Screen Recording permission (needed for this to
             // capture anything) shows as a notice in the status section above.
-            Toggle("Include system audio", isOn: $session.includeSystemAudio)
+            Toggle(isOn: $session.includeSystemAudio) {
+                Text("Include system audio")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .disabled(session.isSessionActive)
