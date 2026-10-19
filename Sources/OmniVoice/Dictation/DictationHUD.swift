@@ -234,11 +234,8 @@ struct DictationHUDView: View {
                     .controlSize(.small)
             }
         } else if controller.notice == nil, dictation.state == .listening, controller.mode == .toggle {
-            Toggle(isOn: $controller.translateEnabled) {
-                Label("Translate to \(LanguageCatalog.displayName(for: translator.foreignLanguageCode))", systemImage: "character.bubble")
-            }
-            .toggleStyle(.button)
-            .controlSize(.small)
+            Toggle("Translate to \(LanguageCatalog.displayName(for: translator.foreignLanguageCode))", isOn: $controller.translateEnabled)
+                .toggleStyle(HUDSwitchToggleStyle())
         }
     }
 
@@ -306,5 +303,64 @@ struct DictationHUDView: View {
             return controller.translateEnabled ? String(localized: "Speak now · Press Return to finish and translate") : String(localized: "Speak now · Press Return to finish and send")
         }
         return dictation.previewText
+    }
+}
+
+/// The bubble's "译成…" switch: a capsule with a small switch in it, drawn
+/// in fixed colours. The bubble is never key, and system controls in a
+/// non-key window draw "on" in grey — `.toggleStyle(.button)` looked the same
+/// either way, and didn't read as something to click. The switch says both.
+struct HUDSwitchToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HUDSwitchToggle(configuration: configuration)
+    }
+}
+
+private struct HUDSwitchToggle: View {
+    let configuration: ToggleStyleConfiguration
+    @State private var isHovered = false
+
+    private var isOn: Bool { configuration.isOn }
+
+    var body: some View {
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                knob
+                configuration.label
+                    .font(.system(size: 12, weight: isOn ? .semibold : .regular))
+                    .foregroundStyle(isOn ? Color.primary : Color.secondary)
+            }
+            .padding(.leading, 5)
+            .padding(.trailing, 10)
+            .padding(.vertical, 4)
+            .background(
+                Capsule().fill(isOn ? Color.accentColor.opacity(0.18) : Color.primary.opacity(isHovered ? 0.1 : 0.05))
+            )
+            .overlay(
+                Capsule().strokeBorder(isOn ? Color.accentColor.opacity(0.6) : Color.primary.opacity(isHovered ? 0.3 : 0.18), lineWidth: 1)
+            )
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.15), value: isOn)
+        .animation(.easeOut(duration: 0.1), value: isHovered)
+        .accessibilityRepresentation {
+            Toggle(isOn: configuration.$isOn) { configuration.label }
+        }
+    }
+
+    private var knob: some View {
+        Capsule()
+            .fill(isOn ? Color.accentColor : Color.primary.opacity(0.22))
+            .frame(width: 24, height: 14)
+            .overlay(alignment: isOn ? .trailing : .leading) {
+                Circle()
+                    .fill(.white)
+                    .shadow(color: .black.opacity(0.25), radius: 0.5, y: 0.5)
+                    .padding(2)
+            }
     }
 }
