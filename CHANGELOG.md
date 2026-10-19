@@ -7,6 +7,20 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+### Tests
+
+## [0.10.0] - 2026-10-19
+
+### Added
 - feat(shortcuts): new global shortcut Start/Stop Transcription, ⌥R by default, changeable or clearable in Settings → General → Shortcuts (#125)
 - feat(ui): copying text now confirms it with a short “Copied” notice, in the Translation panel and in History (#122)
 
