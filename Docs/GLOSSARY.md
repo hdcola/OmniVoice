@@ -23,11 +23,12 @@ intentionally unchanged (renaming them would break persisted settings).
 | macOS Speech framework engine | 系统语音识别 | System speech recognition | `system.speech` |
 | Model download/delete UI | 模型库（设置标签页，菜单「模型库…」） | Model Library | `ModelManagementView` |
 | Memory used by loaded models | 内存 | Memory | — |
-| Global key bindings | 快捷键 | Shortcuts | `GlobalShortcut` |
+| Global key bindings, all set in one section (Settings → General → Shortcuts, with double ⌘C and the Dictation trigger key) | 快捷键（设置「通用」中的分组） | Shortcuts | `GlobalShortcut`, `ShortcutsSettingsSection` |
+| Key held or pressed to dictate | 语音输入触发键 | Dictation trigger key | `DictationTriggerKey` |
 | Status-bar icon + menu | 菜单栏 | Menu bar | `MenuBarExtra` |
 | Language the app UI is shown in (Settings → General) | 界面语言（跟随系统 / English / 简体中文；重启后生效） | Interface language (Follow system) | `AppLanguage` |
 | Settings row granting Automation access to Music/Spotify for pausing during dictation | 直接控制 Music 和 Spotify | Control Music and Spotify directly | `PlayerAccessRow`, `AppleEventPlayerController` |
-| Settings tabs | 通用 · 语音识别 · 语音输入 · 快捷翻译 · 模型库 · 关于 | General · Speech Recognition · Dictation · Quick Translate · Model Library · About | `SettingsTab` |
+| Settings tabs (toolbar tabs; the Caption panel's settings are on Speech Recognition) | 通用 · 语音识别 · 语音输入 · 快捷翻译 · 模型库 · 关于 | General · Speech Recognition · Dictation · Quick Translate · Model Library · About | `SettingsTab` |
 
 Rules: never say plain "floating panel" / "悬浮窗" / "面板" without the
 qualifier above; there is no "main window" (the app is menu-bar only);

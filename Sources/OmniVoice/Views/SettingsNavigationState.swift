@@ -1,8 +1,9 @@
 import Foundation
 import SwiftUI
 
-/// One of `SettingsView`'s tabs — "通用" (permissions, language, launch,
-/// notifications, 字幕悬浮窗), "语音识别" (engines and memory), "语音输入",
+/// One of `SettingsView`'s tabs — "通用" (permissions, language, launch and
+/// notifications, onboarding, shortcuts), "语音识别" (engines, 字幕悬浮窗 and
+/// memory), "语音输入",
 /// "快捷翻译", "模型库" and "关于". Raw values saved by older builds
 /// ("engines", "language", "selection") no longer parse and fall back to
 /// "通用".
@@ -43,7 +44,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 /// `OmniVoiceApp`) so a click on the menu bar's "模型库…" — which fires
 /// *before* `SettingsView` even exists, since `Settings { ... }` only
 /// constructs its content on first open — can still steer which tab that
-/// view lands on (Task 3.4). `SettingsView`'s `SettingsTabBar` binds
+/// view lands on (Task 3.4). `SettingsView`'s `TabView` binds
 /// straight to `selectedTab`, rather than keeping its own
 /// duplicate `@State`, so both this external trigger and the user's own tab
 /// clicks go through the one source of truth.

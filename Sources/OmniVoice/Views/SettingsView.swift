@@ -2,21 +2,24 @@ import AppKit
 import OmniVoiceCore
 import SwiftUI
 
-/// Settings window — a pill-style `SettingsTabBar` over six tabs: "通用"
-/// (permissions, language, launch, notifications, floating panel), "语音识别"
-/// (recognition / translation engines and memory), "语音输入", "快捷翻译",
-/// "模型库" (the full model catalog — the same content that used to be the
-/// standalone "模型管理" window) and "关于". Data-driven from `ProviderCatalog`
-/// rather than one hand-written `case` per engine, so adding a new community
-/// model audio.cpp supports later is a catalog change, not a UI change.
-/// One fixed window size for every tab (capped to the screen's height); the
-/// long tabs scroll inside it.
+/// Settings window — a `TabView` whose tabs macOS shows as toolbar buttons
+/// (the window title follows the selected tab) over six tabs: "通用"
+/// (permissions, language, launch and notifications, onboarding, shortcuts),
+/// "语音识别" (recognition / translation engines, the 字幕悬浮窗 and memory),
+/// "语音输入", "快捷翻译", "模型库" (the full model catalog — the same content
+/// that used to be the standalone "模型管理" window) and "关于". Each tab is
+/// a grouped `Form`. Data-driven from `ProviderCatalog` rather than one
+/// hand-written `case` per engine, so adding a new community model audio.cpp
+/// supports later is a catalog change, not a UI change.
 enum SettingsWindowLayout {
-    static let width: CGFloat = 520
-
+    /// Capped to the screen's height; the long tabs scroll inside it.
     static var height: CGFloat {
         min(620, (NSScreen.main?.visibleFrame.height ?? 800) - 120)
     }
+
+    /// One size for every tab, so the window doesn't jump when switching;
+    /// wide enough for the engine and model lists.
+    static let width: CGFloat = 640
 }
 
 struct SettingsView: View {
@@ -34,61 +37,40 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            SettingsTabBar(selection: $navigation.selectedTab)
-                .padding(.top, 10)
-                .padding(.bottom, 4)
-            switch navigation.selectedTab {
-            case .general: GeneralSettingsView()
-            case .recognition: RecognitionSettingsView(modelDownloadManager: downloadManager)
-            case .dictation: dictationTab
-            case .quickTranslation: quickTranslationTab
-            case .models: modelsTab
-            case .about: aboutTab
+        TabView(selection: $navigation.selectedTab) {
+            Tab(SettingsTab.general.title, systemImage: SettingsTab.general.systemImage, value: .general) {
+                GeneralSettingsView().settingsTabFrame()
             }
-        }
-        .frame(width: SettingsWindowLayout.width, height: SettingsWindowLayout.height)
-        // Settings is a SwiftUI `Settings` scene (no NSWindow of ours), so
-        // pick its window up here — on the root, not a per-tab child, so it
-        // works whichever tab opens first — to give the app a Dock icon.
-        .background(WindowReader { appDelegate.trackForDock($0, id: "settings") })
-    }
-
-    // MARK: - 语音输入 / 快捷翻译
-
-    private var dictationTab: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                LanguageSettingsHint()
-                DictationSettingsView(controller: dictationController)
+            Tab(SettingsTab.recognition.title, systemImage: SettingsTab.recognition.systemImage, value: .recognition) {
+                RecognitionSettingsView(modelDownloadManager: downloadManager).settingsTabFrame()
             }
-            .padding(16)
-        }
-    }
-
-    private var quickTranslationTab: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                LanguageSettingsHint()
+            Tab(SettingsTab.dictation.title, systemImage: SettingsTab.dictation.systemImage, value: .dictation) {
+                DictationSettingsView(controller: dictationController).settingsTabFrame()
+            }
+            Tab(SettingsTab.quickTranslation.title, systemImage: SettingsTab.quickTranslation.systemImage, value: .quickTranslation) {
                 SelectionTranslationSettingsView(
                     controller: selectionController,
                     translator: selectionController.translator,
                     speaker: selectionController.speaker,
                     downloadManager: downloadManager
                 )
+                .settingsTabFrame()
             }
-            .padding(16)
+            Tab(SettingsTab.models.title, systemImage: SettingsTab.models.systemImage, value: .models) {
+                ModelManagementView(modelDownloadManager: downloadManager).settingsTabFrame()
+            }
+            Tab(SettingsTab.about.title, systemImage: SettingsTab.about.systemImage, value: .about) {
+                aboutTab.settingsTabFrame()
+            }
         }
+        .background(TabShortcuts(selection: $navigation.selectedTab))
+        // Settings is a SwiftUI `Settings` scene (no NSWindow of ours), so
+        // pick its window up here — on the root, not a per-tab child, so it
+        // works whichever tab opens first — to give the app a Dock icon.
+        .background(WindowReader { appDelegate.trackForDock($0, id: "settings") })
     }
 
-    // MARK: - Tab 2: 模型库
-
-    private var modelsTab: some View {
-        ModelManagementView(modelDownloadManager: downloadManager)
-    }
-
-
-    // MARK: - Tab 3: 关于
+    // MARK: - 关于
 
     private static let repositoryURL = URL(string: "https://github.com/hdcola/OmniVoice")!
 
@@ -210,6 +192,32 @@ struct SettingsView: View {
     }
 }
 
+
+private extension View {
+    /// Every tab fills the same window size (see `SettingsWindowLayout`).
+    func settingsTabFrame() -> some View {
+        frame(width: SettingsWindowLayout.width, height: SettingsWindowLayout.height)
+    }
+}
+
+/// ⌘1–⌘6 select the tabs in order, as they did with the old pill tab bar —
+/// the toolbar tabs have no key equivalents of their own. Invisible
+/// zero-size buttons, so the shortcuts work from any tab.
+private struct TabShortcuts: View {
+    @Binding var selection: SettingsTab
+
+    var body: some View {
+        ZStack {
+            ForEach(Array(SettingsTab.allCases.enumerated()), id: \.element.id) { index, tab in
+                Button(tab.title) { selection = tab }
+                    .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+            }
+        }
+        .frame(width: 0, height: 0)
+        .opacity(0)
+        .accessibilityHidden(true)
+    }
+}
 
 /// Hands the hosting `NSWindow` to `onWindow` whenever the view (re)attaches
 /// to one — SwiftUI offers no direct handle on a `Settings` scene's window.

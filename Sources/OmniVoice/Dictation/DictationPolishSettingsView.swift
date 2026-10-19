@@ -1,7 +1,7 @@
 import OmniVoiceCore
 import SwiftUI
 
-/// The 润色识别结果 rows of the 语音输入 card.
+/// The 润色识别结果 rows of the 语音输入 tab, one `Form` section of their own.
 struct DictationPolishSettingsRows: View {
     @ObservedObject var controller: DictationController
 
@@ -27,7 +27,7 @@ struct DictationPolishSettingsRows: View {
     }
 
     var body: some View {
-        SettingsRow(
+        SettingsFormRow(
             title: String(localized: "Polish recognized text"),
             subtitle: controller.polish.isEnabled && !configured
                 ? String(localized: "Setup is incomplete: fill in the service, model and API Key below, otherwise the original text is typed.")
@@ -50,8 +50,7 @@ struct DictationPolishSettingsRows: View {
         }
 
         if controller.polish.isEnabled {
-            SettingsDivider()
-            SettingsRow(title: String(localized: "Service")) {
+            SettingsFormRow(title: String(localized: "Service")) {
                 Picker("Service", selection: presetBinding) {
                     ForEach(PolishPreset.allCases) { Text($0.title).tag($0) }
                 }
@@ -59,8 +58,7 @@ struct DictationPolishSettingsRows: View {
                 .accessibilityLabel("Polish service")
                 .fixedSize()
             }
-            SettingsDivider()
-            SettingsRow(
+            SettingsFormRow(
                 title: "Base URL",
                 subtitle: controller.polish.usesInsecureRemoteEndpoint
                     ? String(localized: "Warning: this is an unencrypted http address and the recognized text will be sent in plain text; only use http for this Mac (localhost).")
@@ -71,15 +69,13 @@ struct DictationPolishSettingsRows: View {
                     .frame(width: 240)
                     .accessibilityLabel("Base URL")
             }
-            SettingsDivider()
-            SettingsRow(title: String(localized: "Model")) {
+            SettingsFormRow(title: String(localized: "Model")) {
                 TextField("Model name", text: $controller.polish.model)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 240)
                     .accessibilityLabel("Polish model")
             }
-            SettingsDivider()
-            SettingsRow(
+            SettingsFormRow(
                 title: "API Key",
                 subtitle: keySubtitle,
                 subtitleTint: controller.polishKeyRejected ? .red : .secondary
@@ -97,8 +93,7 @@ struct DictationPolishSettingsRows: View {
                     }
                 }
             }
-            SettingsDivider()
-            SettingsRow(title: String(localized: "Polish style")) {
+            SettingsFormRow(title: String(localized: "Polish style")) {
                 Picker("Polish style", selection: $controller.polish.style) {
                     ForEach(PolishStyle.allCases) { Text($0.title).tag($0) }
                 }
@@ -106,8 +101,7 @@ struct DictationPolishSettingsRows: View {
                 .accessibilityLabel("Polish style")
                 .fixedSize()
             }
-            SettingsDivider()
-            SettingsRow(
+            SettingsFormRow(
                 title: String(localized: "Extra instructions"),
                 subtitle: String(localized: "Up to \(PolishSettings.maxExtraLength) characters; affects style only, e.g. “address me formally”")
             ) {
@@ -116,16 +110,14 @@ struct DictationPolishSettingsRows: View {
                     .frame(width: 240)
                     .accessibilityLabel("Extra instructions")
             }
-            SettingsDivider()
-            SettingsRow(title: String(localized: "Timeout"), subtitle: String(localized: "The original text is typed after this time.")) {
+            SettingsFormRow(title: String(localized: "Timeout"), subtitle: String(localized: "The original text is typed after this time.")) {
                 Stepper(
                     "\(controller.polish.timeoutSeconds) s",
                     value: $controller.polish.timeoutSeconds, in: PolishSettings.timeoutRange, step: 1
                 )
                 .fixedSize()
             }
-            SettingsDivider()
-            SettingsRow(title: String(localized: "Test connection"), subtitle: testResult) {
+            SettingsFormRow(title: String(localized: "Test connection"), subtitle: testResult) {
                 Button(testing ? String(localized: "Testing…") : String(localized: "Test")) { runTest() }
                     .disabled(testing || !configured)
             }

@@ -40,18 +40,14 @@ final class SettingsDisabledStateTests: XCTestCase {
         app.terminate()
     }
 
-    /// Clicks a Settings tab pill and waits for its `.isSelected` trait —
-    /// the engine pickers and memory console live on "语音识别", the 快捷翻译
+    /// Clicks a Settings toolbar tab and waits for the window title to follow
+    /// it — the engine pickers and memory console live on "语音识别", the 快捷翻译
     /// engine on "快捷翻译".
     private func selectSettingsTab(_ title: String) {
-        let tab = app.buttons[title].firstMatch
+        let tab = app.toolbars.buttons[title].firstMatch
         XCTAssertTrue(tab.waitForExistence(timeout: 10), "Settings tab \(title) should exist")
         tab.click()
-        let selected = XCTWaiter.wait(
-            for: [expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: tab)],
-            timeout: 5
-        )
-        XCTAssertEqual(selected, .completed, "Settings tab \(title) should become selected")
+        XCTAssertTrue(app.windows[title].waitForExistence(timeout: 5), "Settings tab \(title) should become selected")
     }
 
     /// At rest (`isBusy == false`), the ASR/translation engine pickers must

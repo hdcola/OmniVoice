@@ -2,7 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import SwiftUI
 
-/// One global shortcut's row in Settings: its current combination as a
+/// One global shortcut's row in Settings' "快捷键" section: its current combination as a
 /// chip; clicking the chip records a new one. While recording, Escape (or
 /// clicking elsewhere) cancels, ⌫/⌦ clears the shortcut, and a press
 /// without ⌘/⌥/⌃ is refused with a hint.
@@ -13,7 +13,7 @@ struct ShortcutRecorderRow: View {
     @State private var message: String?
 
     var body: some View {
-        SettingsRow(
+        SettingsFormRow(
             title: action.title,
             subtitle: message ?? action.subtitle,
             subtitleTint: message == nil ? .secondary : .red

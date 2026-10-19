@@ -16,6 +16,9 @@ The format is based on Keep a Changelog.
 - feat(dictation): the Dictation bubble shows only its state (Translation, Translating…, Polishing…) in the headline and lists the keys below the text as key caps (⏎ Type and send · Right ⌥ Option Type only · esc Discard), so the headline no longer wraps (#122)
 - feat(quick-translate): the Translation panel's key hints are drawn as key caps; the engine label is now a menu for switching between System translation and Follow transcription translation engine (translating again), and reads “Follow transcription translation engine” in full; Copy Translation has the shortcut ⇧⌘C (#122)
 - feat(history): History's title bar keeps the title and two icon buttons: Copy (Copy All, Copy Translation Only, the new Copy Source Only) and Share (Export as Markdown…, Share…); search sits in the sidebar, and the transcript count and the Manage menu sit at the bottom of the sidebar; timestamps lose their brackets and are drawn lighter (#122)
+- feat(settings): Settings uses the standard macOS look: toolbar tabs (the window title follows the tab, ⌘1–⌘6 still switch), grouped forms and system buttons; every tab has the same window size (640 pt wide), so the window no longer jumps when switching tabs (#124)
+- feat(settings): General is shorter — Permissions fold into “All permissions granted” once everything is allowed (Show Details expands them, Hide Details folds them again), the interface language joins Launch and notifications, and a new Shortcuts section holds Translate selection, Translate screenshot, Translate on double ⌘C and the Dictation trigger key, which used to be on the Quick Translate and Dictation tabs (#124)
+- feat(settings): the Caption panel settings (show at launch, background and content opacity) moved from General to Speech Recognition, next to the transcription they affect (#124)
 
 ### Fixed
 - fix(caption): while a transcription is stopping, the Caption panel's start/stop button says Stopping… instead of showing 00:00:00 and a live microphone meter (#123)
@@ -25,8 +28,10 @@ The format is based on Keep a Changelog.
 ### Dependencies
 
 ### Documentation
+- docs(glossary): Shortcuts is a section of Settings → General and includes the Dictation trigger key; the Caption panel settings live on Speech Recognition (#124)
 
 ### Tests
+- test(ui): the Settings UI tests pick tabs from the window toolbar (#124)
 
 ## [0.9.0] - 2026-10-18
 
