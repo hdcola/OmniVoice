@@ -69,6 +69,9 @@ struct SourceLanguagePicker: View {
                     Text("\(custom) (custom)").tag(Optional(custom))
                 }
             }
+            // Takes the row's width (the "?" keeps its own), so it lines up
+            // with the target picker below it in the language popover.
+            .frame(maxWidth: .infinity, alignment: .leading)
             // A disabled `Picker` can't be reasoned about via its own tap —
             // this small "?" sits next to it so the explanation is reachable
             // even while the picker itself is fully system-driven (auto
