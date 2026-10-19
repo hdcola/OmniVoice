@@ -68,6 +68,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
                 languages: session.languages
             )
         )
+        // The global "开始/停止转录" shortcut. Wired here, not at launch: the
+        // controller registers its hot keys in its own init, so a press
+        // before `applicationDidFinishLaunching` would otherwise be dropped.
+        // Starting also brings the 字幕悬浮窗 back (the `isRunning` sink).
+        selectionController.onToggleTranscription = { [session] in
+            Task {
+                if session.isRunning {
+                    if !session.isStopping { await session.stop() }
+                } else if !(session.isStarting || session.isPreloadingModel) {
+                    await session.start()
+                }
+            }
+        }
         dictationController = DictationController(
             // Voice input borrows the loaded on-device recognizer when
             // there is one (see `RecordingSession.lendRecognizerToDictation()`).
@@ -117,17 +130,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, Obse
             panel.positionAtBottomCenterOfScreen()
         }
         floatingPanel = panel
-        // The global "开始/停止转录" shortcut; starting also brings the
-        // panel back (see the `isRunning` sink below).
-        selectionController.onToggleTranscription = { [session] in
-            Task {
-                if session.isRunning {
-                    await session.stop()
-                } else if !(session.isStarting || session.isStopping || session.isPreloadingModel) {
-                    await session.start()
-                }
-            }
-        }
 
         // Shown from launch (not just on demand) since the panel hosts the
         // controls used most often (start/stop, language pickers) alongside

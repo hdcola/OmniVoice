@@ -93,11 +93,11 @@ struct MenuBarContentView: View {
             }
             Text(statusTitle)
                 .font(.system(size: 13, weight: .semibold))
-            if session.isRunning {
+            if session.isRunning && !session.isStopping {
                 InputLevelBars(level: session.inputLevel)
             }
             Spacer(minLength: 0)
-            if session.isRunning {
+            if session.isRunning && !session.isStopping {
                 Text(session.elapsedTimeString)
                     .font(.system(size: 12).monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -107,9 +107,10 @@ struct MenuBarContentView: View {
     }
 
     private var statusTitle: String {
+        // Stopping first: `isRunning` stays true until `stop()` has finished.
+        if session.isStopping { return String(localized: "Stopping…") }
         if session.isRunning { return String(localized: "Transcribing") }
         if session.isStarting { return String(localized: "Starting…") }
-        if session.isStopping { return String(localized: "Stopping…") }
         if session.isPreloadingModel { return String(localized: "Preloading…") }
         if session.usesOnDeviceModelEngine && session.hasLoadedModels {
             return String(localized: "Ready · \(session.isModelLoaded ? String(localized: "Model ready") : String(localized: "Translation model ready"))")
