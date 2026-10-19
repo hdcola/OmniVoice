@@ -7,8 +7,12 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(ui): copying text now confirms it with a short “Copied” notice, in the Translation panel and in History (#122)
 
 ### Changed
+- feat(dictation): the Dictation bubble shows only its state (Translation, Translating…, Polishing…) in the headline and lists the keys below the text as key caps (⏎ Type and send · Right ⌥ Option Type only · esc Discard), so the headline no longer wraps (#122)
+- feat(quick-translate): the Translation panel's key hints are drawn as key caps; the engine label is now a menu for switching between System translation and Follow transcription translation engine (translating again), and reads “Follow transcription translation engine” in full; Copy Translation has the shortcut ⇧⌘C (#122)
+- feat(history): History's title bar keeps the title and two icon buttons: Copy (Copy All, Copy Translation Only, the new Copy Source Only) and Share (Export as Markdown…, Share…); search sits in the sidebar, and the transcript count and the Manage menu sit at the bottom of the sidebar; timestamps lose their brackets and are drawn lighter (#122)
 
 ### Fixed
 - fix(l10n): the Quick Translate engine label now reads “跟随转录翻译引擎 · …” instead of “跟随转录 · …” (English “Follow transcription translation engine · …”), matching the glossary (#121)

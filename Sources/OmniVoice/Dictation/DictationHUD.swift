@@ -83,6 +83,12 @@ private struct DetailHeightKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
+/// Reports the height of the key hints under the text.
+private struct HintsHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 struct DictationHUDView: View {
     @ObservedObject var controller: DictationController
     @ObservedObject var dictation: DictationSession
@@ -94,16 +100,24 @@ struct DictationHUDView: View {
 
     @State private var headlineHeight: CGFloat = 0
     @State private var detailHeight: CGFloat = 0
+    @State private var hintsHeight: CGFloat = 0
 
     private static let verticalPadding: CGFloat = 14
     private static let spacing: CGFloat = 2
+    private static let hintsTopPadding: CGFloat = 8
 
     private var review: DictationReview? { controller.review }
 
+    /// What the key hints row takes below the text, if there is one.
+    private var hintsBlockHeight: CGFloat {
+        keyHints.isEmpty ? 0 : Self.spacing + hintsHeight
+    }
+
     /// The room the text gets under the headline, once the bubble is as tall
-    /// as it goes.
+    /// as it goes. The key hints always stay in view below it.
     private var detailViewportHeight: CGFloat {
         let available = DictationHUDPanel.maxHeight - 2 * Self.verticalPadding - headlineHeight - Self.spacing
+            - hintsBlockHeight
         return min(detailHeight, max(available, 0))
     }
 
@@ -111,7 +125,10 @@ struct DictationHUDView: View {
 
     private var height: CGFloat {
         let text = hasDetail ? Self.spacing + detailViewportHeight : 0
-        return max(2 * Self.verticalPadding + headlineHeight + text, DictationHUDPanel.size.height)
+        return max(
+            2 * Self.verticalPadding + headlineHeight + text + hintsBlockHeight,
+            DictationHUDPanel.size.height
+        )
     }
 
     @ViewBuilder
@@ -179,6 +196,14 @@ struct DictationHUDView: View {
                         }
                         .clipped()
                 }
+                if !keyHints.isEmpty {
+                    KeyHintRow(hints: keyHints)
+                        .padding(.top, Self.hintsTopPadding)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            GeometryReader { Color.clear.preference(key: HintsHeightKey.self, value: $0.size.height) }
+                        )
+                }
             }
             Spacer(minLength: 0)
         }
@@ -189,6 +214,7 @@ struct DictationHUDView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onPreferenceChange(HeadlineHeightKey.self) { headlineHeight = $0 }
         .onPreferenceChange(DetailHeightKey.self) { detailHeight = $0 }
+        .onPreferenceChange(HintsHeightKey.self) { hintsHeight = $0 }
         .onChange(of: height, initial: true) { _, _ in onLayout(height) }
         .translationTask(translator.systemTranslationConfiguration) { session in
             await translator.runPendingSystemJob { text in
@@ -235,21 +261,41 @@ struct DictationHUDView: View {
         }
     }
 
+    /// What the bubble is doing — only the state; the keys that act on it are
+    /// in `keyHints`, so the headline stays one line.
     private var headline: String {
         if controller.notice != nil { return String(localized: "Dictation") }
-        if controller.isPolishing { return String(localized: "Polishing… · Esc types original") }
+        if controller.isPolishing { return String(localized: "Polishing…") }
         if let review {
-            let trigger = controller.triggerKey.title
             switch review.stage {
-            case .translating: return String(localized: "Translating… · Esc to discard")
-            case .ready: return String(localized: "Translation · Return types and sends · \(trigger) types only · Esc to discard")
-            case .failed: return String(localized: "Translation failed · Return types original and sends · \(trigger) types only · Esc to discard")
+            case .translating: return String(localized: "Translating…")
+            case .ready: return String(localized: "Translation")
+            case .failed: return String(localized: "Translation failed")
             }
         }
         switch dictation.state {
         case .idle, .starting: return dictation.statusDetail ?? String(localized: "Preparing…")
         case .listening: return dictation.isUsingLocalModel ? String(localized: "Dictating · Local model") : String(localized: "Dictating · System recognition")
         case .finishing: return String(localized: "Recognizing…")
+        }
+    }
+
+    /// The keys that act on the bubble right now, shown under the text.
+    private var keyHints: [KeyHint] {
+        guard controller.notice == nil else { return [] }
+        let discard = KeyHint(key: "esc", action: String(localized: "Discard"))
+        if controller.isPolishing {
+            return [KeyHint(key: "esc", action: String(localized: "Type Original"))]
+        }
+        guard let review else { return [] }
+        let typeOnly = KeyHint(key: controller.triggerKey.title, action: String(localized: "Type only"))
+        switch review.stage {
+        case .translating:
+            return [discard]
+        case .ready:
+            return [KeyHint(key: "⏎", action: String(localized: "Type and send")), typeOnly, discard]
+        case .failed:
+            return [KeyHint(key: "⏎", action: String(localized: "Type original and send")), typeOnly, discard]
         }
     }
 

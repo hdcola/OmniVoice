@@ -8,6 +8,7 @@ struct SessionDetailView: View {
     let session: RecordingSessionRecord
     @State private var exportDocument: TextFileDocument?
     @State private var isExporting = false
+    @State private var copyConfirmation: CopyConfirmation?
 
     var body: some View {
         ScrollView {
@@ -19,9 +20,13 @@ struct SessionDetailView: View {
                         // `session.startedAt`, so each line can be placed in
                         // the recording's timeline without cross-referencing
                         // the session's overall start time.
+                        // Quieter than the text, and fixed-width so the
+                        // text column lines up from row to row.
                         Text(Self.relativeTimestampLabel(for: utterance, in: session))
                             .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.tertiary)
+                            .frame(minWidth: 38, alignment: .leading)
+                            .padding(.top, 2)
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(utterance.sourceText)
@@ -42,19 +47,37 @@ struct SessionDetailView: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .copyConfirmation($copyConfirmation)
         .navigationTitle(session.displayTitle(maxLength: nil))
+        // Two icon buttons instead of three text ones, which left the title
+        // only half its room.
         .toolbar {
             ToolbarItem {
-                Button("Copy All") { copyToClipboard(Self.plainText(for: session)) }
-            }
-            ToolbarItem {
-                Button("Copy Translation Only") { copyToClipboard(Self.translationOnlyText(for: session)) }
-            }
-            ToolbarItem {
-                Button("Export…") {
-                    exportDocument = TextFileDocument(text: SessionExporter.markdown(for: session))
-                    isExporting = true
+                Menu {
+                    Button("Copy All") { copy(Self.plainText(for: session)) }
+                    Button("Copy Translation Only") { copy(Self.translationOnlyText(for: session)) }
+                        .disabled(!session.utterances.contains { !$0.translationText.isEmpty })
+                    Button("Copy Source Only") { copy(Self.sourceOnlyText(for: session)) }
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
+                } primaryAction: {
+                    copy(Self.plainText(for: session))
                 }
+                .help("Copy All")
+            }
+            ToolbarItem {
+                Menu {
+                    Button("Export as Markdown…") {
+                        exportDocument = TextFileDocument(text: SessionExporter.markdown(for: session))
+                        isExporting = true
+                    }
+                    ShareLink(item: Self.plainText(for: session)) {
+                        Text("Share…")
+                    }
+                } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                .help("Share")
             }
         }
         .fileExporter(
@@ -73,15 +96,14 @@ struct SessionDetailView: View {
         let minutes = (elapsed % 3600) / 60
         let seconds = elapsed % 60
         if hours > 0 {
-            return String(format: "[%02d:%02d:%02d]", hours, minutes, seconds)
+            return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
         }
-        return String(format: "[%02d:%02d]", minutes, seconds)
+        return String(format: "%02d:%02d", minutes, seconds)
     }
 
-    private func copyToClipboard(_ text: String) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+    private func copy(_ text: String) {
+        Clipboard.copy(text)
+        copyConfirmation = CopyConfirmation(message: String(localized: "Copied"))
     }
 
     /// Full bilingual transcript as plain, readable text (source line,
@@ -106,6 +128,15 @@ struct SessionDetailView: View {
     private static func translationOnlyText(for session: RecordingSessionRecord) -> String {
         session.utterances.sorted(by: { $0.index < $1.index })
             .map(\.translationText)
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+    }
+
+    /// Only the source lines, one per utterance — the counterpart of
+    /// `translationOnlyText(for:)`.
+    private static func sourceOnlyText(for session: RecordingSessionRecord) -> String {
+        session.utterances.sorted(by: { $0.index < $1.index })
+            .map(\.sourceText)
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
     }

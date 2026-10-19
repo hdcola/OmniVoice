@@ -18,6 +18,7 @@
 "%lld sec" = "%lld 秒";
 "%lld transcripts selected" = "已选择 %lld 条记录";
 "%lld transcripts started more than %lld days ago will be deleted. This can't be undone." = "将删除 %1$lld 条开始于 %2$lld 天前的转录记录，无法恢复。";
+"%lld transcripts" = "%lld 条转录记录";
 ", " = "、";
 "1 minute" = "1 分钟";
 "10 minutes" = "10 分钟";
@@ -65,11 +66,14 @@
 "Connected in %.1f s" = "连接成功，用时 %.1f 秒";
 "Content opacity" = "内容透明度";
 "Control Music and Spotify directly" = "直接控制 Music 和 Spotify";
+"Copied" = "已复制";
 "Copy All" = "复制全文";
 "Copy Download Link" = "复制下载链接";
+"Copy Source Only" = "仅复制原文";
 "Copy Translation Only" = "仅复制译文";
 "Copy Translation" = "复制译文";
 "Copy this sentence" = "复制本句";
+"Copy" = "复制";
 "Could not add the audio output to the capture session" = "无法添加音频输出到音频采集";
 "Could not add the microphone input to the capture session" = "无法添加麦克风输入到音频采集";
 "Custom" = "自定义";
@@ -89,6 +93,9 @@
 "Dictation is in progress. Try again in a moment." = "正在语音输入，请稍后再开始";
 "Dictation language" = "语音输入语言";
 "Dictation" = "语音输入";
+"Discard" = "放弃";
+"Export as Markdown…" = "导出为 Markdown…";
+"New line" = "换行";
 "New sherpa-onnx local engine: streaming recognition with less memory" = "新增 sherpa-onnx 本地引擎：流式识别，更省内存";
 "Live transcription and Dictation can now use the sherpa-onnx local engine, built for real-time streaming speech recognition with much less memory and computation than the large models: about 140 MB to 930 MB of memory, and the default Paraformer bilingual (zh-en) model uses about 540 MB." = "转录和语音输入现在可以使用 sherpa-onnx 本地引擎：它专为实时流式语音识别而设计，比大模型占用的内存和计算资源少得多——内存约 140 MB 到 930 MB，默认的 Paraformer 双语（中英）模型约 540 MB。";
 "Choose it in “Settings › Speech Recognition” and download its models (nine to choose from, about 25 MB to 360 MB) in the Model Library. Its output has no punctuation, so turn on “Polish recognized text” in Dictation to tidy it." = "在「设置 › 语音识别」中选择它，并在模型库中下载模型（共九个可选，约 25 MB 到 360 MB）。它的输出不带标点，可在语音输入中开启「润色识别结果」来整理。";
@@ -123,7 +130,6 @@
 "English" = "英语";
 "Enter the service, model, and API key (stored in the Keychain) in “Settings › Dictation”, choose one of four styles (Keep original, Clean, Structured, Professional), and adjust the timeout. If it fails, times out, or the result looks unreliable, your original text is entered; pressing Esc while polishing also enters the original text. When translation is on too, text is polished first and then translated." = "在「设置 › 语音输入」里填写服务、模型和 API Key（存在钥匙串），可选保持原话、清爽、结构化、正式四种风格，并调整超时。失败、超时或结果不可靠时一律输入原文，润色中按 Esc 也输入原文；同时开着翻译时先润色再翻译。";
 "Estimated memory use: about %lld GB" = "预计占用内存：约 %lld GB";
-"Export…" = "导出…";
 "Extra instructions" = "额外要求";
 "Extra large" = "特大";
 "Failed to build the HY-MT1.5 prompt template" = "HY-MT1.5 提示词模板构建失败";
@@ -227,6 +233,10 @@
 "Model ready" = "模型已就绪";
 "Model status" = "模型状态";
 "Model weights not found: %@" = "找不到模型权重: %@";
+"Polishing…" = "润色中…";
+"Press ⌫ or use the Manage menu at the bottom of the sidebar to delete them in bulk" = "按 ⌫ 或使用侧栏底部的“管理”菜单批量删除";
+"Share" = "分享";
+"Share…" = "分享…";
 "The recognition engine could not load the model" = "识别引擎无法加载模型";
 "Model" = "模型";
 "More accurate (waits for more context)" = "更准确（等待更多上下文）";
@@ -279,7 +289,6 @@
 "Polish service" = "润色服务";
 "Polish style" = "润色风格";
 "Polishing failed; the original text was typed" = "润色失败，已输入原文";
-"Polishing… · Esc types original" = "润色中… · Esc 输入原文";
 "Portuguese" = "葡萄牙语";
 "Preload Model" = "预加载模型";
 "Preloading recognition engine…" = "预加载识别引擎中…";
@@ -290,12 +299,16 @@
 "Preparing…" = "准备中…";
 "Press new shortcut…" = "按下新快捷键…";
 "Press once to start, press again to stop" = "按一下开始，再按一下结束";
-"Press ⌫ or use the toolbar Manage menu to delete them in bulk" = "按 ⌫ 或使用工具栏“管理”菜单批量删除";
 "Pressing it alone types nothing; it does not trigger when pressed together with another key." = "单独按下不会输入字符；和别的键一起按时不会触发";
 "Professional" = "正式";
 "Quick Translate engine" = "快捷翻译引擎";
 "Quick Translate" = "快捷翻译";
 "Quit OmniVoice" = "退出 OmniVoice";
+"Translation copied" = "已复制译文";
+"Translation failed" = "翻译失败";
+"Type and send" = "输入并发送";
+"Type only" = "仅输入";
+"Type original and send" = "输入原文并发送";
 "audio.cpp local engine" = "audio.cpp 本地引擎";
 "sherpa-onnx local engine" = "sherpa-onnx 本地引擎";
 "Re-run onboarding" = "重新运行引导";
@@ -451,13 +464,11 @@
 "Translate to foreign language before typing (%@)" = "输入前翻译成外语（%@）";
 "Translate to foreign language before typing" = "输入前翻译成外语";
 "Translate" = "翻译";
-"Translating… · Esc to discard" = "翻译中… · Esc 放弃";
 "Translating…" = "翻译中…";
 "Translation and recognition models" = "翻译和识别模型";
 "Translation commit strategy" = "翻译提交策略";
 "Translation engine failed to start: %@" = "翻译引擎启动失败: %@";
 "Translation engine preload failed: %@" = "翻译引擎预加载失败: %@";
-"Translation failed · Return types original and sends · %@ types only · Esc to discard" = "翻译失败 · Return 输入原文并发送 · %@ 仅输入 · Esc 放弃";
 "Translation failed: %@" = "翻译失败：%@";
 "Translation model only" = "仅翻译模型";
 "Translation model preloaded" = "翻译模型已预加载";
@@ -467,7 +478,6 @@
 "Translation only" = "仅译文";
 "Translation only: about %lld GB; translation and recognition: about %lld GB" = "仅翻译约 %lld GB；翻译和识别约 %lld GB";
 "Translation uses the system engine, so “Translation model only” loads nothing; the recognition model is about %lld GB" = "翻译为系统引擎，「仅翻译模型」不会加载任何内容；识别模型约 %lld GB";
-"Translation · Return types and sends · %@ types only · Esc to discard" = "译文 · Return 输入并发送 · %@ 仅输入 · Esc 放弃";
 "Translation" = "译文";
 "Trigger key" = "触发键";
 "Trigger mode" = "触发方式";
@@ -511,7 +521,6 @@
 "“%@” was downloaded and is ready to use" = "「%@」已下载，可以使用了";
 "“%@”: %@" = "「%@」：%@";
 "“%@”: %@. You can retry in Settings → Model Library." = "「%@」：%@。可在「设置 → 模型库」重试";
-"⏎ Translate · ⇧⏎ New line · Esc Close" = "⏎ 翻译 · ⇧⏎ 换行 · Esc 关闭";
 "★ Recommended for native streaming (fully supported by T3PO)" = "★ 原生流式推荐 (T3PO 完美支持)";
 "⚠️ Other languages (require the system translation engine)" = "⚠️ 其他语言（需系统翻译引擎支持）";
 "⚡ Preload into Memory" = "⚡ 预加载到内存";
