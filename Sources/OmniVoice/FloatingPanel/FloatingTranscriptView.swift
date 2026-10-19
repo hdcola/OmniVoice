@@ -190,7 +190,7 @@ struct FloatingTranscriptView: View {
                     .monospacedDigit()
                     .lineLimit(1)
                     .fixedSize()
-                if session.isRunning {
+                if session.isRunning && !session.isStopping {
                     InputLevelBars(level: session.inputLevel)
                 }
             }
@@ -206,10 +206,11 @@ struct FloatingTranscriptView: View {
         // double start/stop while one is already under way.
         .disabled(session.isStopping || session.isStarting || session.isPreloadingModel)
         .accessibilityLabel(session.isRunning ? String(localized: "Stop Transcription") : String(localized: "Start Transcription"))
-        .accessibilityValue(session.isRunning ? session.elapsedTimeString : "")
+        .accessibilityValue(session.isRunning && !session.isStopping ? session.elapsedTimeString : "")
     }
 
     private var transcriptionButtonTitle: String {
+        if session.isStopping { return String(localized: "Stopping…") }
         if session.isRunning { return session.elapsedTimeString }
         if session.isStarting { return String(localized: "Starting…") }
         return String(localized: "Start")
@@ -217,7 +218,7 @@ struct FloatingTranscriptView: View {
 
     @ViewBuilder
     private var recordGlyph: some View {
-        if session.isStarting {
+        if session.isStarting || session.isStopping {
             ProgressView()
                 .controlSize(.mini)
         } else {

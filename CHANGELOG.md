@@ -24,6 +24,7 @@ The format is based on Keep a Changelog.
 - feat(menubar): the menu bar opens a popover instead of a menu: a status row (Transcribing with a live mic level and the elapsed time, or Ready), missing-permission notices with Open System Settings, a large Start/Stop Transcription button (⏎), the language pair with the ⇄ swap, the audio source, Quick Translate tiles with their shortcuts, the three latest transcripts (click one to open it in History), a Show Caption Panel switch, a progress bar on Model Library… while a download runs, Settings… (⌘,) and Quit (⌘Q); Esc closes it (#125)
 
 ### Fixed
+- fix(caption): while a transcription is stopping, the Caption panel's start/stop button says Stopping… instead of showing 00:00:00 and a live microphone meter (#123)
 - fix(dictation): the Dictation bubble's Translate to… control is now a switch, so on and off are easy to tell apart and it reads as clickable; before, on and off looked almost the same, because the bubble is never the active window and macOS draws a pressed button grey there (#125)
 - fix(models): the sherpa-onnx model descriptions no longer repeat the download size (already shown on each model card, and some were out of date) or mention Dictation's “Polish recognized text” (#120)
 
