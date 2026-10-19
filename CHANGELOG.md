@@ -15,6 +15,7 @@ The format is based on Keep a Changelog.
 - feat(history): History's title bar keeps the title and two icon buttons: Copy (Copy All, Copy Translation Only, the new Copy Source Only) and Share (Export as Markdown…, Share…); search sits in the sidebar, and the transcript count and the Manage menu sit at the bottom of the sidebar; timestamps lose their brackets and are drawn lighter (#122)
 
 ### Fixed
+- fix(l10n): the Quick Translate engine label now reads “跟随转录翻译引擎 · …” instead of “跟随转录 · …” (English “Follow transcription translation engine · …”), matching the glossary (#121)
 - fix(models): the sherpa-onnx model descriptions no longer repeat the download size (already shown on each model card, and some were out of date) or mention Dictation's “Polish recognized text” (#120)
 
 ### Dependencies
