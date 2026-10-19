@@ -96,7 +96,9 @@ struct LanguagePairControls: View {
                     )
                     .labelsHidden()
                     .disabled(session.isSessionActive)
-                    .fixedSize()
+                    // Fills the column rather than its widest option's width,
+                    // which overflowed the popover.
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 GridRow {
                     Text("Target language")
@@ -115,7 +117,7 @@ struct LanguagePairControls: View {
                         isSessionActive: session.isSessionActive
                     )
                     .labelsHidden()
-                    .fixedSize()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             // Swaps source and target (听外语 ⇄ 说我的语言). Not while a
