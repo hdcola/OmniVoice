@@ -166,6 +166,11 @@ struct DictationHUDView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    // The same meter as the live transcription's: it moves
+                    // when the microphone hears you, before any text shows.
+                    if review == nil, controller.notice == nil, !controller.isPolishing, dictation.state == .listening {
+                        InputLevelBars(level: dictation.inputLevel, scale: 1.5)
+                    }
                     Spacer(minLength: 0)
                     headerButton
                 }

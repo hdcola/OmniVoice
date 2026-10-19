@@ -51,17 +51,20 @@ enum PermissionIssue: String, Identifiable {
 /// rather than toggling on/off, so it reads as a meter.
 struct InputLevelBars: View {
     let level: Float
+    /// 1 is the menu bar's and 字幕悬浮窗's size; the Dictation bubble's
+    /// meter is larger, as it's the only sign the mic hears you there.
+    var scale: CGFloat = 1
     private static let weights: [CGFloat] = [0.55, 1, 0.75, 0.9]
 
     var body: some View {
-        HStack(alignment: .center, spacing: 2) {
+        HStack(alignment: .center, spacing: 2 * scale) {
             ForEach(Self.weights.indices, id: \.self) { index in
                 Capsule()
                     .fill(Color.green)
-                    .frame(width: 2, height: 3 + CGFloat(level) * 9 * Self.weights[index])
+                    .frame(width: 2 * scale, height: (3 + CGFloat(level) * 9 * Self.weights[index]) * scale)
             }
         }
-        .frame(height: 12)
+        .frame(height: 12 * scale)
         .animation(.easeOut(duration: 0.1), value: level)
         .accessibilityLabel("Microphone is receiving audio")
     }

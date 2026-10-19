@@ -11,6 +11,7 @@ The format is based on Keep a Changelog.
 - feat(ui): copying text now confirms it with a short “Copied” notice, in the Translation panel and in History (#122)
 
 ### Changed
+- feat(dictation): while you dictate, the Dictation bubble shows a green microphone level meter next to its title, like the live transcription's, so you can see the microphone hears you before any text appears (#125)
 - feat(caption): the Caption panel's control bar has five controls instead of nine: a Start/Stop capsule that also shows the elapsed time and a live input level, a language chip (“English → Simplified Chinese”) that opens the source and target pickers, the swap button and why a swap is blocked, a display options menu, Copy All and close; the bar no longer rearranges itself by panel width (#123)
 - feat(caption): a missing microphone or Screen Recording permission shows as an orange notice with “Open System Settings” that stays visible while the controls fade; the status line only shows text that adds to the Start/Stop capsule and the model status (not “Not started”, “Transcribing…”, “Stopped” or “Model preloaded”) (#123)
 - feat(caption): an empty Caption panel says “Click Start to begin transcription” (or “Listening…” once started) instead of “Waiting to start…”, and the copy buttons turn into a check mark for 1.5 seconds after each copy (#123)
