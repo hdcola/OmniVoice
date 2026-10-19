@@ -76,13 +76,16 @@ public final class RecordingSession: ObservableObject {
     @Published public var lines: [TranscriptLine] = []
     @Published public var statusMessage: String = String(localized: "Not started")
     /// True when `statusMessage` only restates what the start/stop control
-    /// already shows (not started, transcribing, stopped), so a view may
-    /// leave it out instead of repeating it.
+    /// or the model status already shows (not started, transcribing,
+    /// stopped, a model preloaded and now "模型已就绪"), so a view may leave
+    /// it out instead of repeating it.
     public var isStatusMessageRoutine: Bool {
         [
             String(localized: "Not started"),
             String(localized: "Transcribing…"),
             String(localized: "Stopped"),
+            String(localized: "Model preloaded"),
+            String(localized: "Translation model preloaded"),
         ].contains(statusMessage)
     }
     @Published public var inputLevel: Float = 0

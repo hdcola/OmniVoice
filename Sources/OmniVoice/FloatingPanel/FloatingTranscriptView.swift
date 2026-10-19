@@ -291,6 +291,9 @@ struct FloatingTranscriptView: View {
                 GridRow {
                     Text("Source language")
                         .foregroundStyle(.secondary)
+                        // The pickers give way instead: a squeezed label
+                        // wrapped to "源\n语言".
+                        .fixedSize()
                     // Disabled for the whole start→stop lifecycle
                     // (isSessionActive, not just isRunning): it's only read
                     // once, at the top of `start()`, to configure the ASR
@@ -310,6 +313,7 @@ struct FloatingTranscriptView: View {
                 GridRow {
                     Text("Target language")
                         .foregroundStyle(.secondary)
+                        .fixedSize()
                     // Target stays editable while running: unlike source, it
                     // isn't baked into a provider at `start()` — the
                     // `.translationTask` above rebuilds
