@@ -140,3 +140,58 @@ struct LanguagePairControls: View {
         }
     }
 }
+
+/// The menu bar's language row: "[英语 ⌄] ⇄ [简体中文 ⌄]" — the pair reads
+/// left to right like the 字幕悬浮窗's chip, with the swap between the two
+/// sides it swaps. Same rules as `LanguagePairControls`; why a swap is
+/// blocked is written under the row.
+struct LanguagePairRow: View {
+    @ObservedObject var session: RecordingSession
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                // Fixed at `start()`, so not while a session is active.
+                SourceLanguagePicker(
+                    sourceLanguageCode: $session.sourceLanguageCode,
+                    transcriptionEngineKind: session.transcriptionEngineKind,
+                    transcriptionEngineID: session.transcriptionEngineID,
+                    transcriptionVariantID: session.currentTranscriptionModelVariant?.id,
+                    allowsAuto: session.languages.transcriptionDirection == .listenForeign,
+                    showsShortName: true
+                )
+                .labelsHidden()
+                .disabled(session.isSessionActive)
+                .frame(maxWidth: .infinity)
+
+                Button {
+                    session.swapTranscriptionDirection()
+                } label: {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .disabled(!session.canSwapTranscriptionDirection)
+                .help("Swap source and target languages")
+                .accessibilityLabel("Swap source and target languages")
+
+                // Editable while running: the next translated segment uses it.
+                TargetLanguagePicker(
+                    targetLanguageCode: $session.targetLanguageCode,
+                    translationEngineID: session.translationEngineID,
+                    onSwitchToSystemTranslation: { session.translationEngineID = "system.translation" },
+                    isSessionActive: session.isSessionActive
+                )
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
+            }
+            if let reason = session.swapBlockedReason {
+                Text(reason)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}

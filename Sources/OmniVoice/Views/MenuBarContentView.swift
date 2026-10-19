@@ -176,8 +176,7 @@ struct MenuBarContentView: View {
     private var languageAndAudioSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             PopoverSectionLabel("Language")
-            LanguagePairControls(session: session)
-                .font(.callout)
+            LanguagePairRow(session: session)
             PopoverSectionLabel("Audio source")
                 .padding(.top, 4)
             Picker("Microphone", selection: $session.selectedDeviceID) {
