@@ -341,6 +341,15 @@ See `Sources/OmniVoiceCore/Providers/TranscriptionProvider.swift` and
       weights, and one-shot `HYMT15Translator.translateText` — plus floating
       panel toolbar/resize-cursor fixes (PR #41), the 启动时显示悬浮窗 toggle
       (PR #42), and the terminology unification pass (PR #43).
+- [x] **0.10.0 release cut** (2026-10-19, `chore/release-0.10.0`): version
+      bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.10.0,
+      `CFBundleVersion` 25), CHANGELOG's `[Unreleased]` cut into a dated
+      `[0.10.0]` section, `README.md` / `README.zh-CN.md` version and
+      download-link references bumped to match. Adds the standard-macOS UI
+      refresh (Settings toolbar tabs and grouped forms, Caption panel control
+      bar, Dictation bubble, History title bar, menu bar popover; PRs
+      #122–#125) and the Start/Stop Transcription shortcut (⌥R). No new
+      what's-new entry.
 - [x] **0.9.0 release cut** (2026-10-18, `chore/release-0.9.0`): version
       bumped in `Scripts/Info.plist` (`CFBundleShortVersionString` 0.9.0,
       `CFBundleVersion` 24), CHANGELOG's `[Unreleased]` cut into a dated
