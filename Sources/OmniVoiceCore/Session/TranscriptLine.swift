@@ -19,6 +19,9 @@ public struct TranscriptLine: Identifiable, Sendable, Equatable {
     /// un-committed, if it reports one (see `TranslationProvider.onPreview`) —
     /// render as `translation + translationPreview`, visually distinguished.
     public var translationPreview: String = ""
+    /// Speaker key (“A”, “B”, or “P-…” for a remembered voice), filled in
+    /// asynchronously by `SpeakerTagger`; show it via `SpeakerTagger.displayName(for:)`.
+    public var speaker: String? = nil
 
     public init(id: Int) {
         self.id = id

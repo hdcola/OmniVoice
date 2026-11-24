@@ -12,7 +12,7 @@ public enum SessionExporter {
         lines.append("*\(Self.dateFormatter.string(from: session.startedAt))*")
         lines.append("")
         for utterance in session.utterances.sorted(by: { $0.index < $1.index }) {
-            lines.append("**\(utterance.sourceText)**")
+            lines.append(utterance.speaker.map { "**[\($0)]** **\(utterance.sourceText)**" } ?? "**\(utterance.sourceText)**")
             if !utterance.translationText.isEmpty {
                 lines.append("> \(utterance.translationText)")
             }

@@ -13,6 +13,9 @@ public final class UtteranceRecord {
     public var sourceText: String
     public var translationText: String
     public var createdAt: Date
+    /// Speaker display name (“Speaker A” or the name the user gave), or nil
+    /// when speaker identification was off or older transcripts.
+    public var speaker: String?
 
     public var session: RecordingSessionRecord?
 
