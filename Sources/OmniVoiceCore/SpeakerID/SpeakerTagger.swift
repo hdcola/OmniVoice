@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import os
 
 /// Speaker identification: labels each finished row of a live transcription
 /// with who said it (“Speaker A”, “Speaker B”, or a remembered name).
@@ -47,7 +48,10 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
         didSet {
             UserDefaults.standard.set(threshold, forKey: Self.thresholdKey)
             let t = Float(threshold)
-            queue.async { self.clusterer.threshold = t }
+            queue.async {
+                self.clusterer.threshold = t
+                self.clusterer.seedThreshold = SpeakerClusterer.seedThreshold(for: t)
+            }
         }
     }
 
@@ -164,12 +168,19 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
             let samples = self.buffer
             self.buffer.removeAll(keepingCapacity: true)
             let gen = self.generation
+            let seconds = Double(samples.count) / 16_000
             guard let extractor = self.extractor,
-                  Double(samples.count) / 16_000 >= Self.minVoicedSeconds,
+                  seconds >= Self.minVoicedSeconds,
                   let embedding = extractor.embed(samples),
                   gen == self.generation
-            else { return }
+            else {
+                Self.log.debug("speaker: skipped row (\(seconds, format: .fixed(precision: 2)) s voiced)")
+                return
+            }
             let index = self.clusterer.assign(embedding)
+            if let sim = self.clusterer.lastBestSeedSimilarity {
+                Self.log.debug("speaker: best remembered-voice similarity \(sim, format: .fixed(precision: 3))")
+            }
             if index >= self.keys.count {
                 self.keys.append(SpeakerClusterer.letter(for: self.letterCount))
                 self.letterCount += 1
@@ -207,6 +218,12 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
         }
         let new = displayName(for: key)
         if new != old { onRenamed?(old, new) }
+        // Renamed to a remembered name (e.g. a remembered voice that wasn't
+        // recognized this time): merge into that voice, which both labels this
+        // speaker and makes the remembered voice more accurate.
+        if rememberedKeys[key] == nil, !trimmed.isEmpty, profiles.contains(where: { $0.name == trimmed }) {
+            remember(key)
+        }
     }
 
     /// Remembers this speaker's voice and name for future transcriptions.
@@ -246,6 +263,8 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
         profileStore.save(profiles)
         for (k, v) in rememberedKeys where v == profileID { rememberedKeys.removeValue(forKey: k) }
     }
+
+    private static let log = Logger(subsystem: "org.hdcola.omnivoice", category: "speakerid")
 
     static func profileKey(_ id: UUID) -> String { "P-" + id.uuidString.prefix(8) }
 

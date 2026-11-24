@@ -86,9 +86,19 @@ enum SpeakerNameDialog {
         let tagger = SpeakerTagger.shared
         let alert = NSAlert()
         alert.messageText = String(localized: "Name this speaker")
-        alert.informativeText = String(localized: "Everything this person said in this transcription will show this name. Leave it empty to go back to “Speaker \(key)”.")
-        let field = NSTextField(frame: NSRect(x: 0, y: 28, width: 260, height: 24))
-        field.placeholderString = String(localized: "For example: Alex")
+        let saved = tagger.profiles.map(\.name).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        alert.informativeText = saved.isEmpty
+            ? String(localized: "Everything this person said in this transcription will show this name. Leave it empty to go back to “Speaker \(key)”.")
+            : String(localized: "Pick a remembered person from the list (they are merged into the same voice) or type a new name. Leave it empty to go back to “Speaker \(key)”.")
+        // Combo box: remembered names to pick from, or type a new one. Picking
+        // avoids near-duplicates like “Irene” vs “Me (Irene)”.
+        let field = NSComboBox(frame: NSRect(x: 0, y: 28, width: 260, height: 26))
+        field.addItems(withObjectValues: saved)
+        field.completes = true
+        field.numberOfVisibleItems = min(max(saved.count, 1), 10)
+        field.placeholderString = saved.isEmpty
+            ? String(localized: "For example: Alex")
+            : String(localized: "Pick a remembered person or type a new name")
         field.stringValue = tagger.names[key] ?? ""
         let check = NSButton(checkboxWithTitle: String(localized: "Remember this voice (recognize it next time)"), target: nil, action: nil)
         check.frame = NSRect(x: 0, y: 0, width: 260, height: 20)
@@ -102,8 +112,10 @@ enum SpeakerNameDialog {
         alert.window.initialFirstResponder = field
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        tagger.rename(key, to: field.stringValue)
-        if check.state == .on { tagger.remember(key) }
+        let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        tagger.rename(key, to: name)
+        // Picking a remembered person already merged the voice in `rename`.
+        if check.state == .on, !saved.contains(name) { tagger.remember(key) }
     }
 }
 

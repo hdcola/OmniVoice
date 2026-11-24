@@ -258,6 +258,8 @@
 "None yet. Click the bookmark next to a speaker in the Caption panel to remember their voice." = "还没有。在字幕悬浮窗里点说话人旁边的书签按钮就能记住。";
 "On. Each transcription numbers new voices from “Speaker A”; remembered voices show their names." = "已开启。每次开始转录，新面孔从“说话人 A”重新编号；已记住的声音直接显示名字。";
 "Open System Settings" = "打开系统设置";
+"Pick a remembered person from the list (they are merged into the same voice) or type a new name. Leave it empty to go back to “Speaker %@”." = "可以从列表里直接选已记住的人（会并成同一个人），也可以输入新名字。留空则恢复成“说话人 %@”。";
+"Pick a remembered person or type a new name" = "选一个已记住的人，或输入新名字";
 "Polishing…" = "润色中…";
 "Press ⌫ or use the Manage menu at the bottom of the sidebar to delete them in bulk" = "按 ⌫ 或使用侧栏底部的“管理”菜单批量删除";
 "Read aloud" = "朗读";
