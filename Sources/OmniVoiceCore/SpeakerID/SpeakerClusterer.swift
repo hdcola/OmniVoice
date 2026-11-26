@@ -17,6 +17,9 @@ public struct SpeakerClusterer: Sendable {
     public var seedThreshold: Float
 
     private var sums: [[Float]] = []
+    /// Every row assigned to each speaker in this transcription (not the seeded
+    /// voice itself), so remembering can keep only the dominant voice.
+    private var members: [[SpeakerSample]] = []
     /// The first `seededCount` speakers are remembered voices.
     private var seededCount = 0
     /// Best similarity to a remembered voice in the last `assign` (nil without
@@ -34,7 +37,7 @@ public struct SpeakerClusterer: Sendable {
 
     public var speakerCount: Int { sums.count }
 
-    public mutating func reset() { sums.removeAll(); seededCount = 0; lastBestSeedSimilarity = nil }
+    public mutating func reset() { sums.removeAll(); members.removeAll(); seededCount = 0; lastBestSeedSimilarity = nil }
 
     /// Adds a known speaker (a remembered voice) and returns its index. A larger
     /// `weight` keeps it from drifting toward this transcription's audio.
@@ -42,6 +45,7 @@ public struct SpeakerClusterer: Sendable {
     public mutating func seed(_ embedding: [Float], weight: Float = 3) -> Int {
         let e = Self.normalized(embedding)
         sums.append(e.map { $0 * weight })
+        members.append([])
         seededCount = sums.count
         return sums.count - 1
     }
@@ -52,10 +56,16 @@ public struct SpeakerClusterer: Sendable {
         return Self.normalized(sums[index])
     }
 
+    /// The rows assigned to speaker `index` in this transcription.
+    public func samples(at index: Int) -> [SpeakerSample] {
+        members.indices.contains(index) ? members[index] : []
+    }
+
     /// The zero-based speaker index for this embedding (need not be normalized).
-    public mutating func assign(_ embedding: [Float]) -> Int {
+    public mutating func assign(_ embedding: [Float], seconds: Double = 0) -> Int {
         let e = Self.normalized(embedding)
         guard !e.isEmpty else { return 0 }
+        let sample = SpeakerSample(embedding: e, seconds: seconds)
         // Remembered voices first, with the lower threshold.
         var bestSeed = -1
         var bestSeedSim: Float = -2
@@ -66,6 +76,7 @@ public struct SpeakerClusterer: Sendable {
         lastBestSeedSimilarity = bestSeed >= 0 ? bestSeedSim : nil
         if bestSeed >= 0, bestSeedSim >= seedThreshold {
             for k in e.indices { sums[bestSeed][k] += e[k] }
+            members[bestSeed].append(sample)
             return bestSeed
         }
         var best = -1
@@ -76,9 +87,11 @@ public struct SpeakerClusterer: Sendable {
         }
         if best >= 0, bestSim >= threshold || sums.count >= maxSpeakers {
             for k in e.indices { sums[best][k] += e[k] }
+            members[best].append(sample)
             return best
         }
         sums.append(e)
+        members.append([sample])
         return sums.count - 1
     }
 

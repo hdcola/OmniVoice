@@ -8,7 +8,9 @@ import os
 /// `RecordingSession` calls it from a few places only:
 /// - transcription starts: `beginSession()`
 /// - every mixed audio chunk: `push(_:)` (audio thread, near-zero cost)
+/// - a VAD pause: `markUtteranceBoundary()`
 /// - every finished row: `closeSegment { key in ... }`
+/// - a speaker change it hears mid-row: `onSpeakerChange` (RecordingSession ends the row)
 /// - a rename that must reach History: `onRenamed`
 ///
 /// Embedding and clustering run on a private serial queue and **never block
@@ -51,6 +53,7 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
             queue.async {
                 self.clusterer.threshold = t
                 self.clusterer.seedThreshold = SpeakerClusterer.seedThreshold(for: t)
+                self.changeThreshold = SpeakerClusterer.seedThreshold(for: t)
             }
         }
     }
@@ -63,7 +66,16 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
     private let queue = DispatchQueue(label: "org.hdcola.omnivoice.speakerid", qos: .utility)
     private var extractor: SpeakerEmbeddingExtractor?
     private var clusterer: SpeakerClusterer
+    /// Voiced audio of the row in progress.
     private var buffer: [Float] = []
+    /// Rows already ended (by a pause or a speaker change) but not yet labeled, oldest first.
+    private var completed: [[Float]] = []
+    /// Speaker-change detection: every `changeWindowSeconds` of voiced audio is
+    /// embedded and compared with the row so far.
+    private var window: [Float] = []
+    private var rowEmbeddingSum: [Float]?
+    /// Below this similarity to the row so far, the window counts as a new speaker.
+    private var changeThreshold: Float = SpeakerClusterer.seedThreshold(for: Float(SpeakerTagger.defaultThreshold))
     private var generation = 0
 
     // `push` runs on the audio thread and only reads this locked flag.
@@ -92,6 +104,12 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
     @Published public private(set) var profiles: [SpeakerProfile] = []
     /// Called on rename with (old display name, new display name) so History can follow.
     public var onRenamed: ((String, String) -> Void)?
+    /// Called (on this feature's own queue) when a different voice is heard
+    /// mid-row, so the row can end there instead of mixing two people.
+    public var onSpeakerChange: (() -> Void)?
+    /// In testing, 1.5 s windows scored ≥ 0.55 for the same person and a
+    /// median of 0.23 across a speaker change.
+    static let changeWindowSeconds: Double = 1.5
     private let profileStore: SpeakerProfileStore
 
     // Cluster numbering (`queue` only).
@@ -137,7 +155,8 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
         speakerCount = 0
         queue.async {
             self.generation += 1
-            self.buffer.removeAll(keepingCapacity: true)
+            self.resetRow()
+            self.completed.removeAll()
             self.clusterer.reset()
             self.keys = []
             self.letterCount = 0
@@ -156,6 +175,49 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
             self.buffer.append(contentsOf: samples)
             let cap = Int(Self.maxVoicedSeconds * 16_000)
             if self.buffer.count > cap { self.buffer.removeFirst(self.buffer.count - cap) }
+            self.window.append(contentsOf: samples)
+            if Double(self.window.count) / 16_000 >= Self.changeWindowSeconds { self.checkSpeakerChange() }
+        }
+    }
+
+    /// A VAD pause: keep this row's audio until its `closeSegment` arrives, so
+    /// a late `closeSegment` doesn't pick up the next speaker's first words.
+    public func markUtteranceBoundary() {
+        guard active else { return }
+        queue.async { self.finishRow() }
+    }
+
+    /// `queue` only.
+    private func finishRow() {
+        if !buffer.isEmpty { completed.append(buffer) }
+        resetRow()
+    }
+
+    private func resetRow() {
+        buffer.removeAll(keepingCapacity: true)
+        window.removeAll(keepingCapacity: true)
+        rowEmbeddingSum = nil
+    }
+
+    /// `queue` only: if this window sounds unlike the row so far, end the row
+    /// before it and ask RecordingSession to start a new one.
+    private func checkSpeakerChange() {
+        let win = window
+        window.removeAll(keepingCapacity: true)
+        guard let extractor, let e = extractor.embed(win) else { return }
+        let en = SpeakerClusterer.normalized(e)
+        guard !en.isEmpty else { return }
+        guard let sum = rowEmbeddingSum else { rowEmbeddingSum = en; return }
+        let sim = SpeakerClusterer.dot(en, SpeakerClusterer.normalized(sum))
+        if sim < changeThreshold {
+            Self.log.debug("speaker: change detected (similarity \(sim, format: .fixed(precision: 2)))")
+            let before = Array(buffer.dropLast(min(win.count, buffer.count)))
+            if !before.isEmpty { completed.append(before) }
+            buffer = win
+            rowEmbeddingSum = en
+            onSpeakerChange?()
+        } else {
+            rowEmbeddingSum = zip(sum, en).map { $0 + $1 }
         }
     }
 
@@ -165,8 +227,19 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
     public func closeSegment(_ completion: @escaping @MainActor (String?) -> Void) {
         guard active else { return }
         queue.async {
-            let samples = self.buffer
-            self.buffer.removeAll(keepingCapacity: true)
+            // Prefer the rows already ended by a pause or a speaker change; an
+            // engine that ignores pauses has none, so fall back to the current
+            // row. Of several, use the longest, so two voices aren't mixed.
+            let samples: [Float]
+            if self.completed.isEmpty {
+                samples = self.buffer
+                self.resetRow()
+            } else {
+                let longest = self.completed.max(by: { $0.count < $1.count }) ?? []
+                samples = Double(longest.count) / 16_000 >= Self.minVoicedSeconds
+                    ? longest : self.completed.flatMap { $0 }
+                self.completed.removeAll()
+            }
             let gen = self.generation
             let seconds = Double(samples.count) / 16_000
             guard let extractor = self.extractor,
@@ -177,7 +250,7 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
                 Self.log.debug("speaker: skipped row (\(seconds, format: .fixed(precision: 2)) s voiced)")
                 return
             }
-            let index = self.clusterer.assign(embedding)
+            let index = self.clusterer.assign(embedding, seconds: seconds)
             if let sim = self.clusterer.lastBestSeedSimilarity {
                 Self.log.debug("speaker: best remembered-voice similarity \(sim, format: .fixed(precision: 3))")
             }
@@ -228,29 +301,39 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
 
     /// Remembers this speaker's voice and name for future transcriptions.
     /// Needs a name first (returns false otherwise). A remembered voice with
-    /// the same name is merged instead of duplicated.
+    /// the same name gets this one added instead of a duplicate.
+    ///
+    /// Instead of averaging every row of this speaker, only the dominant voice
+    /// is kept (a few rows from somebody else are dropped), and each remember
+    /// is stored as its own sample so Settings can flag one that doesn't match.
     @discardableResult
     public func remember(_ key: String) -> Bool {
         guard let name = names[key] else { return false }
         let linked = rememberedKeys[key]
+        let sameVoice = self.sameVoice
         queue.async {
-            guard let index = self.keys.firstIndex(of: key),
-                  let centroid = self.clusterer.centroid(at: index) else { return }
+            guard let index = self.keys.firstIndex(of: key) else { return }
+            var heard = self.clusterer.samples(at: index)
+            if heard.isEmpty, let c = self.clusterer.centroid(at: index) { heard = [SpeakerSample(embedding: c, seconds: 0)] }
+            let main = SpeakerVoice.dominant(heard, sameVoice: sameVoice)
+            guard !main.embedding.isEmpty else { return }
+            let seconds = main.included.reduce(0.0) { $0 + heard[$1].seconds }
+            Self.log.debug("speaker: remembering \(main.included.count) of \(heard.count) rows")
+            let sample = SpeakerSample(embedding: main.embedding, seconds: seconds)
             DispatchQueue.main.async {
                 var list = self.profiles
                 let id: UUID
                 if let i = list.firstIndex(where: { $0.id == linked }) ?? list.firstIndex(where: { $0.name == name }) {
-                    let merged = SpeakerClusterer.normalized(zip(list[i].embedding, centroid).map { $0 + $1 })
-                    list[i].embedding = merged.isEmpty ? centroid : merged
+                    list[i].samples = list[i].allSamples + [sample]
+                    list[i].refreshEmbedding(sameVoice: sameVoice)
                     list[i].name = name
                     list[i].updatedAt = .now
                     id = list[i].id
                 } else {
                     id = UUID()
-                    list.append(SpeakerProfile(id: id, name: name, embedding: centroid, updatedAt: .now))
+                    list.append(SpeakerProfile(id: id, name: name, embedding: sample.embedding, updatedAt: .now, samples: [sample]))
                 }
-                self.profiles = list
-                self.profileStore.save(list)
+                self.saveProfiles(list)
                 self.rememberedKeys[key] = id
             }
         }
@@ -262,6 +345,97 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
         profiles.removeAll { $0.id == profileID }
         profileStore.save(profiles)
         for (k, v) in rememberedKeys where v == profileID { rememberedKeys.removeValue(forKey: k) }
+    }
+
+    // MARK: - Tidying up remembered voices (Settings, main thread only)
+
+    /// Samples of one name that disagree, and names that sound alike.
+    public var profileIssues: [SpeakerProfileIssue] {
+        SpeakerProfileIssue.find(in: profiles, threshold: Float(threshold))
+    }
+
+    private var sameVoice: Float { SpeakerClusterer.seedThreshold(for: Float(threshold)) }
+
+    private func saveProfiles(_ list: [SpeakerProfile]) {
+        profiles = list
+        profileStore.save(list)
+    }
+
+    /// Merges `from` into `into` (keeping `into`'s name and both sets of samples).
+    public func mergeProfile(_ from: UUID, into: UUID) {
+        guard from != into, let f = profiles.first(where: { $0.id == from }),
+              let i = profiles.firstIndex(where: { $0.id == into }) else { return }
+        var list = profiles
+        list[i].samples = list[i].allSamples + f.allSamples
+        list[i].distinctFrom = Array(Set((list[i].distinctFrom ?? []) + (f.distinctFrom ?? [])).subtracting([from, into]))
+        list[i].refreshEmbedding(sameVoice: sameVoice)
+        list[i].updatedAt = .now
+        let name = list[i].name
+        list.removeAll { $0.id == from }
+        saveProfiles(list)
+        for (k, v) in rememberedKeys where v == from {
+            rememberedKeys[k] = into
+            names[k] = name
+        }
+    }
+
+    /// Removes one sample (e.g. one that picked up somebody else). The last
+    /// sample can't be removed this way; use Forget.
+    public func removeSample(of profileID: UUID, at index: Int) {
+        guard let i = profiles.firstIndex(where: { $0.id == profileID }) else { return }
+        var all = profiles[i].allSamples
+        guard all.count > 1, all.indices.contains(index) else { return }
+        all.remove(at: index)
+        var list = profiles
+        list[i].samples = all
+        list[i].refreshEmbedding(sameVoice: sameVoice)
+        list[i].updatedAt = .now
+        saveProfiles(list)
+    }
+
+    /// Moves one sample out into another name (it was somebody else).
+    public func splitSample(of profileID: UUID, at index: Int, as newName: String) {
+        let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, let i = profiles.firstIndex(where: { $0.id == profileID }) else { return }
+        var all = profiles[i].allSamples
+        guard all.count > 1, all.indices.contains(index) else { return }
+        let moved = all.remove(at: index)
+        var list = profiles
+        list[i].samples = all
+        list[i].refreshEmbedding(sameVoice: sameVoice)
+        list[i].updatedAt = .now
+        if let j = list.firstIndex(where: { $0.name == name }) {
+            list[j].samples = list[j].allSamples + [moved]
+            list[j].refreshEmbedding(sameVoice: sameVoice)
+            list[j].updatedAt = .now
+        } else {
+            list.append(SpeakerProfile(id: UUID(), name: name, embedding: moved.embedding, updatedAt: .now, samples: [moved]))
+        }
+        saveProfiles(list)
+    }
+
+    /// The user confirmed these two are different people: stop suggesting a merge.
+    public func markDistinct(_ a: UUID, _ b: UUID) {
+        var list = profiles
+        if let i = list.firstIndex(where: { $0.id == a }) {
+            list[i].distinctFrom = Array(Set((list[i].distinctFrom ?? []) + [b]))
+        }
+        saveProfiles(list)
+    }
+
+    /// Renames a remembered voice; renaming to another remembered name merges them.
+    public func renameProfile(_ id: UUID, to newName: String) {
+        let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, let i = profiles.firstIndex(where: { $0.id == id }) else { return }
+        if let other = profiles.first(where: { $0.name == name && $0.id != id }) {
+            mergeProfile(id, into: other.id)
+            return
+        }
+        var list = profiles
+        list[i].name = name
+        list[i].updatedAt = .now
+        saveProfiles(list)
+        for (k, v) in rememberedKeys where v == id { names[k] = name }
     }
 
     private static let log = Logger(subsystem: "org.hdcola.omnivoice", category: "speakerid")
@@ -287,7 +461,8 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
                 return
             }
             self.extractor = ex
-            self.buffer.removeAll()
+            self.resetRow()
+            self.completed.removeAll()
             self.active = true
             self.setStatus(.ready)
         }
@@ -299,7 +474,8 @@ public final class SpeakerTagger: ObservableObject, @unchecked Sendable {
         status = .off
         queue.async {
             self.extractor = nil
-            self.buffer.removeAll()
+            self.resetRow()
+            self.completed.removeAll()
         }
     }
 

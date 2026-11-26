@@ -1342,9 +1342,11 @@ public final class RecordingSession: ObservableObject {
         )
         segmenter.onUtteranceBoundary = { [weak transcription] in
             transcription?.notifyUtteranceBoundary()
+            SpeakerTagger.shared.markUtteranceBoundary()
         }
         vadSegmenter = segmenter
         SpeakerTagger.shared.beginSession()
+        SpeakerTagger.shared.onSpeakerChange = { [weak transcription] in transcription?.forceSegmentBoundary() }
         SpeakerTagger.shared.onRenamed = { [weak self] old, new in self?.speakerIDRenamed(from: old, to: new) }
 
         // "无" mic selection: no `MicrophoneCapture` at all — system audio

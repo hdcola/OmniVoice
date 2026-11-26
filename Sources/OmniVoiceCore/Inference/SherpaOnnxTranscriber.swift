@@ -152,6 +152,17 @@ final class SherpaOnnxTranscriber: @unchecked Sendable {
         }
     }
 
+    /// Closes the current segment as if sherpa's own endpoint detector had
+    /// fired (used when the speaker changes mid-row).
+    func forceEndpoint() {
+        queue.sync {
+            guard let recognizer, let stream else { return }
+            decodeLocked(recognizer: recognizer, stream: stream)
+            closeSegmentLocked(recognizer: recognizer, stream: stream)
+            SherpaOnnxOnlineStreamReset(recognizer, stream)
+        }
+    }
+
     /// Flushes the trailing audio (the model needs a little right-padding to
     /// emit its last tokens), reports whatever is left as a final segment and
     /// frees the stream. The recognizer stays loaded.

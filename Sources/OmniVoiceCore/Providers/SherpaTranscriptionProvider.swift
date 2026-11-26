@@ -68,6 +68,9 @@ public final class SherpaTranscriptionProvider: TranscriptionProvider {
         transcriber.push(samples: samples)
     }
 
+    /// The VAD hint stays ignored, but a speaker change does end the segment.
+    public nonisolated func forceSegmentBoundary() { transcriber.forceEndpoint() }
+
     public func stop() async {
         transcriber.finishStream()
     }

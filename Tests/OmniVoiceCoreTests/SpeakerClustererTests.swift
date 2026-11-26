@@ -55,6 +55,48 @@ struct SpeakerClustererTests {
         #expect(c.lastBestSeedSimilarity == nil)
     }
 
+    @Test func dominantVoiceDropsMinorityVoice() {
+        // 30 s from one person with 4 s from somebody else mixed in: keep the former.
+        let a1 = SpeakerSample(embedding: [1, 0, 0], seconds: 20)
+        let a2 = SpeakerSample(embedding: [0.9, 0.1, 0], seconds: 10)
+        let b = SpeakerSample(embedding: [0, 1, 0], seconds: 4)
+        let main = SpeakerVoice.dominant([b, a1, a2], sameVoice: 0.45)
+        #expect(main.included.sorted() == [1, 2])
+        #expect(main.embedding[0] > 0.99)
+    }
+
+    @Test func clustererKeepsPerRowSamples() {
+        var c = SpeakerClusterer(threshold: 0.6)
+        c.seed([0, 0, 1])
+        _ = c.assign([1, 0, 0], seconds: 3)
+        _ = c.assign([0.95, 0.05, 0], seconds: 2)
+        #expect(c.samples(at: 0).isEmpty)
+        #expect(c.samples(at: 1).map(\.seconds) == [3, 2])
+    }
+
+    @Test func issuesFindMixedAndSimilarProfiles() {
+        let nick = SpeakerProfile(id: UUID(), name: "Nick", embedding: [1, 0, 0], updatedAt: .now, samples: [
+            SpeakerSample(embedding: [1, 0, 0], seconds: 20),
+            SpeakerSample(embedding: [0.98, 0.2, 0], seconds: 15),
+            SpeakerSample(embedding: [0, 0, 1], seconds: 6),
+        ])
+        let seb = SpeakerProfile(id: UUID(), name: "Seb", embedding: [0.9, 0.436, 0], updatedAt: .now)
+        let madi = SpeakerProfile(id: UUID(), name: "Madi", embedding: [0, 1, 0], updatedAt: .now)
+        let issues = SpeakerProfileIssue.find(in: [nick, seb, madi], threshold: 0.6)
+        #expect(issues.contains { if case let .mixed(id, s, _) = $0.kind { return id == nick.id && s == [2] }; return false })
+        #expect(issues.contains { if case let .similar(a, b, _, same) = $0.kind { return a == nick.id && b == seb.id && same }; return false })
+        var nick2 = nick
+        nick2.distinctFrom = [seb.id]
+        #expect(!SpeakerProfileIssue.find(in: [nick2, seb], threshold: 0.6).contains { if case .similar = $0.kind { return true }; return false })
+    }
+
+    @Test func voicesSavedBeforeSamplesStillLoad() throws {
+        let json = #"[{"id":"7C9E6679-7425-40DE-944B-E07FC1F90AE7","name":"Alex","embedding":[0.6,0.8],"updatedAt":0}]"#
+        let p = try JSONDecoder().decode([SpeakerProfile].self, from: Data(json.utf8))
+        #expect(p.first?.allSamples.count == 1)
+        #expect(p.first?.samples == nil)
+    }
+
     @Test func profileStoreRoundTrip() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("speaker-\(UUID()).json")
         defer { try? FileManager.default.removeItem(at: url) }

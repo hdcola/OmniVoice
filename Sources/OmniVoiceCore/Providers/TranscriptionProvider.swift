@@ -104,6 +104,14 @@ public protocol TranscriptionProvider: AnyObject {
     /// audio queue, not the main actor — see this protocol's doc.
     nonisolated func notifyUtteranceBoundary()
 
+    /// Ends the current segment right away, whatever the engine's own
+    /// endpointing says — used when speaker identification hears a different
+    /// voice mid-row. The default forwards to `notifyUtteranceBoundary()`
+    /// (enough for R2T2). `SpeechTranscriber` is left alone on purpose: it
+    /// already closes a result per sentence, and forcing `finalize` mid-sentence
+    /// cut words in testing. Called from a background queue.
+    nonisolated func forceSegmentBoundary()
+
     /// Ends the current session, flushing any trailing uncommitted segment
     /// through `onEvent` (`.segmentClosed`) first.
     func stop() async
@@ -111,4 +119,5 @@ public protocol TranscriptionProvider: AnyObject {
 
 extension TranscriptionProvider {
     public nonisolated func notifyUtteranceBoundary() {}
+    public nonisolated func forceSegmentBoundary() { notifyUtteranceBoundary() }
 }

@@ -119,6 +119,158 @@ enum SpeakerNameDialog {
     }
 }
 
+extension SpeakerNameDialog {
+    /// Asks for a single name (used when tidying up). Returns nil on Cancel.
+    static func ask(title: String, message: String, initial: String = "") -> String? {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        let saved = SpeakerTagger.shared.profiles.map(\.name).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        let field = NSComboBox(frame: NSRect(x: 0, y: 0, width: 260, height: 26))
+        field.addItems(withObjectValues: saved)
+        field.completes = true
+        field.numberOfVisibleItems = min(max(saved.count, 1), 10)
+        field.stringValue = initial
+        alert.accessoryView = field
+        alert.addButton(withTitle: String(localized: "OK"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
+    }
+}
+
+/// Settings → Tidy Up remembered voices: points out a name whose samples
+/// disagree and names that sound alike, with merge / split / remove actions.
+struct SpeakerOrganizerView: View {
+    @ObservedObject var tagger = SpeakerTagger.shared
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Tidy Up Remembered Voices").font(.headline)
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+            }
+            .padding()
+            Divider()
+            List {
+                let issues = tagger.profileIssues
+                Section(issues.isEmpty ? String(localized: "Nothing to check") : String(localized: "To check (\(issues.count))")) {
+                    if issues.isEmpty {
+                        Text("Each person's samples agree, and different people are well apart.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(issues) { issue in issueRow(issue).padding(.vertical, 4) }
+                }
+                Section(String(localized: "All (\(tagger.profiles.count))")) {
+                    ForEach(tagger.profiles) { p in profileRow(p, issues: issues) }
+                }
+                Section {
+                    Text("Similarity says how alike two voices are: 1 is identical; the same person in two transcriptions is usually above 0.45, different people usually below 0.3. Merges and splits take effect from the next transcription.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(width: 560, height: 520)
+    }
+
+    private func name(_ id: UUID) -> String { tagger.profiles.first { $0.id == id }?.name ?? "?" }
+    private func fmt(_ v: Float) -> String { String(format: "%.2f", v) }
+
+    @ViewBuilder
+    private func issueRow(_ issue: SpeakerProfileIssue) -> some View {
+        switch issue.kind {
+        case let .similar(a, b, sim, likelySame):
+            VStack(alignment: .leading, spacing: 6) {
+                Label {
+                    Text(likelySame
+                         ? String(localized: "“\(name(a))” and “\(name(b))” sound very alike (similarity \(fmt(sim))) and are probably the same person.")
+                         : String(localized: "“\(name(a))” and “\(name(b))” sound fairly alike (similarity \(fmt(sim))) and may be mixed up during a transcription."))
+                } icon: {
+                    Image(systemName: likelySame ? "person.2.fill" : "exclamationmark.triangle")
+                        .foregroundStyle(likelySame ? Color.orange : .yellow)
+                }
+                HStack {
+                    Button(String(localized: "Merge into “\(name(a))”")) { tagger.mergeProfile(b, into: a) }
+                    Button(String(localized: "Merge into “\(name(b))”")) { tagger.mergeProfile(a, into: b) }
+                    Button("Different People") { tagger.markDistinct(a, b) }
+                }
+                .controlSize(.small)
+            }
+        case let .mixed(pid, samples, sims):
+            let all = tagger.profiles.first { $0.id == pid }?.allSamples ?? []
+            VStack(alignment: .leading, spacing: 6) {
+                Label {
+                    Text(String(localized: "The samples remembered for “\(name(pid))” don't agree; one may have picked up somebody else."))
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                }
+                ForEach(Array(zip(samples, sims)), id: \.0) { index, sim in
+                    if all.indices.contains(index) {
+                        HStack {
+                            Text(String(localized: "\(sampleText(all[index])): similarity to the others only \(fmt(sim))"))
+                                .font(.callout)
+                            Spacer()
+                            Button("Remove This One") { tagger.removeSample(of: pid, at: index) }
+                            Button("Somebody Else…") {
+                                if let n = SpeakerNameDialog.ask(
+                                    title: String(localized: "Who was this?"),
+                                    message: String(localized: "This sample moves to that name (merged in if the name is already remembered).")
+                                ) {
+                                    tagger.splitSample(of: pid, at: index, as: n)
+                                }
+                            }
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            }
+        }
+    }
+
+    private func sampleText(_ s: SpeakerSample) -> String {
+        let date = s.date.formatted(date: .abbreviated, time: .shortened)
+        return s.seconds > 0
+            ? String(localized: "Remembered \(date) (\(Int(s.seconds.rounded())) s)")
+            : String(localized: "Remembered \(date)")
+    }
+
+    private func profileRow(_ p: SpeakerProfile, issues: [SpeakerProfileIssue]) -> some View {
+        let involved = issues.contains { i in
+            switch i.kind {
+            case let .mixed(id, _, _): return id == p.id
+            case let .similar(a, b, _, _): return a == p.id || b == p.id
+            }
+        }
+        let count = p.allSamples.count
+        return HStack(spacing: 8) {
+            SpeakerChip(text: p.name, color: SpeakerChip.color(for: p.name))
+            Image(systemName: involved ? "exclamationmark.circle" : "checkmark.circle")
+                .foregroundStyle(involved ? Color.orange : .green)
+            Text(involved ? String(localized: "See above")
+                 : count > 1 ? String(localized: "Remembered \(count) times, consistent") : String(localized: "Remembered once"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Rename…") {
+                if let n = SpeakerNameDialog.ask(
+                    title: String(localized: "Rename “\(p.name)”"),
+                    message: String(localized: "Renaming to another remembered name merges the two."),
+                    initial: p.name
+                ) {
+                    tagger.renameProfile(p.id, to: n)
+                }
+            }
+            Button("Forget", role: .destructive) { tagger.forget(p.id) }
+        }
+        .controlSize(.small)
+    }
+}
+
 /// The switch in the Caption panel's control bar.
 struct SpeakerToggleButton: View {
     @ObservedObject var tagger = SpeakerTagger.shared
@@ -170,6 +322,7 @@ struct SpeakerMenuToggle: View {
 /// Settings → Speech Recognition: switch, sensitivity and remembered voices.
 struct SpeakerIDSettingsSection: View {
     @ObservedObject var tagger = SpeakerTagger.shared
+    @State private var showOrganizer = false
 
     var body: some View {
         Section("Identify speakers") {
@@ -190,10 +343,16 @@ struct SpeakerIDSettingsSection: View {
                 title: "Remembered voices",
                 subtitle: tagger.profiles.isEmpty
                     ? String(localized: "None yet. Click the bookmark next to a speaker in the Caption panel to remember their voice.")
-                    : String(localized: "Future transcriptions show these names as soon as the person speaks.")
+                    : rememberedHint
             ) {
-                EmptyView()
+                if !tagger.profiles.isEmpty {
+                    Button(issueCount > 0 ? String(localized: "Tidy Up (\(issueCount) to Check)…") : String(localized: "Tidy Up…")) {
+                        showOrganizer = true
+                    }
+                    .controlSize(.small)
+                }
             }
+            .sheet(isPresented: $showOrganizer) { SpeakerOrganizerView() }
             ForEach(tagger.profiles) { profile in
                 LabeledContent {
                     Button("Forget", role: .destructive) { tagger.forget(profile.id) }
@@ -208,6 +367,14 @@ struct SpeakerIDSettingsSection: View {
                 }
             }
         }
+    }
+
+    private var issueCount: Int { tagger.profileIssues.count }
+
+    private var rememberedHint: String {
+        issueCount > 0
+            ? String(localized: "Future transcriptions show these names as soon as the person speaks. \(issueCount) may be mixed up or duplicated; click Tidy Up to check.")
+            : String(localized: "Future transcriptions show these names as soon as the person speaks.")
     }
 
     private var subtitle: String {
