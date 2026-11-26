@@ -1342,8 +1342,12 @@ public final class RecordingSession: ObservableObject {
         )
         segmenter.onUtteranceBoundary = { [weak transcription] in
             transcription?.notifyUtteranceBoundary()
+            SpeakerTagger.shared.markUtteranceBoundary()
         }
         vadSegmenter = segmenter
+        SpeakerTagger.shared.beginSession()
+        SpeakerTagger.shared.onSpeakerChange = { [weak transcription] in transcription?.forceSegmentBoundary() }
+        SpeakerTagger.shared.onRenamed = { [weak self] old, new in self?.speakerIDRenamed(from: old, to: new) }
 
         // "无" mic selection: no `MicrophoneCapture` at all — system audio
         // becomes the whole pipeline (both the sample stream `AudioMixer`
@@ -1356,6 +1360,7 @@ public final class RecordingSession: ObservableObject {
         let mixer = AudioMixer(includeSystemAudio: includeSystemAudio, micEnabled: micEnabled)
         mixer.onPCMChunk = { [weak transcription] samples in
             transcription?.push(samples: samples)
+            SpeakerTagger.shared.push(samples)
         }
         mixer.onLevel = { [weak self] level in
             Task { @MainActor in self?.updateLevel(level) }
@@ -1575,6 +1580,7 @@ public final class RecordingSession: ObservableObject {
                 translationProvider?.feed(finalAppend)
             }
             lines[sourceRowIndex].sourceTentative = ""
+            speakerIDCloseSegment(row: sourceRowIndex)
             translationProvider?.flush()
             sourceRowIndex += 1
             ensureLine(sourceRowIndex)
@@ -1642,7 +1648,7 @@ public final class RecordingSession: ObservableObject {
     private func advanceTranslationRow() {
         if let sessionStore, let activeSessionRecord, translationRowIndex < lines.count {
             let row = lines[translationRowIndex]
-            sessionStore.appendUtterance(to: activeSessionRecord, sourceText: row.source, translationText: row.translation)
+            sessionStore.appendUtterance(to: activeSessionRecord, sourceText: row.source, translationText: row.translation, speaker: row.speaker.map { SpeakerTagger.shared.displayName(for: $0) })
             try? sessionStore.save()
         }
         translationRowIndex += 1
@@ -1650,6 +1656,28 @@ public final class RecordingSession: ObservableObject {
     }
 
     // MARK: - Shared
+
+    /// Speaker identification for a finished row runs on `SpeakerTagger`'s own
+    /// queue and never blocks translation; when the result arrives it fills in
+    /// the row, and the persisted utterance too if the row was already saved.
+    private func speakerIDCloseSegment(row: Int) {
+        SpeakerTagger.shared.closeSegment { [weak self] key in
+            guard let self, let key, row < lines.count else { return }
+            lines[row].speaker = key
+            if row < translationRowIndex, let record = activeSessionRecord?.utterances
+                .last(where: { $0.sourceText == self.lines[row].source && $0.speaker == nil }) {
+                record.speaker = SpeakerTagger.shared.displayName(for: key)
+                try? sessionStore?.save()
+            }
+        }
+    }
+
+    /// A speaker was renamed mid-transcription: update the utterances already saved.
+    private func speakerIDRenamed(from old: String, to new: String) {
+        guard let utterances = activeSessionRecord?.utterances else { return }
+        for u in utterances where u.speaker == old { u.speaker = new }
+        try? sessionStore?.save()
+    }
 
     private func ensureLine(_ index: Int) {
         while lines.count <= index {

@@ -29,6 +29,7 @@ struct SessionDetailView: View {
                             .padding(.top, 2)
 
                         VStack(alignment: .leading, spacing: 4) {
+                            SpeakerBadge(name: utterance.speaker)
                             Text(utterance.sourceText)
                                 .font(.body)
                             if !utterance.translationText.isEmpty {

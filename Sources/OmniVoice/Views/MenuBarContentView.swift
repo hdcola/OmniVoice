@@ -194,6 +194,7 @@ struct MenuBarContentView: View {
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .disabled(session.isSessionActive)
+            SpeakerMenuToggle()
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)

@@ -29,6 +29,10 @@ intentionally unchanged (renaming them would break persisted settings).
 | ⌥R action (global shortcut) | 开始/停止转录 | Start/Stop Transcription | `toggleTranscription` |
 | Language the app UI is shown in (Settings → General) | 界面语言（跟随系统 / English / 简体中文；重启后生效） | Interface language (Follow system) | `AppLanguage` |
 | Settings row granting Automation access to Music/Spotify for pausing during dictation | 直接控制 Music 和 Spotify | Control Music and Spotify directly | `PlayerAccessRow`, `AppleEventPlayerController` |
+| Labeling who said each row of a live transcription (switch in the Caption panel, the menu bar popover and Settings → Speech Recognition) | 区分说话人 | Identify speakers | `SpeakerTagger` |
+| A person told apart by voice, shown as a label on a row | 说话人（未命名时显示“说话人 A”“说话人 B”） | Speaker (“Speaker A”, “Speaker B” until named) | `TranscriptLine.speaker`, `UtteranceRecord.speaker` |
+| A speaker's voice and name kept for future transcriptions | 已记住的声音 | Remembered voices | `SpeakerProfile`, `SpeakerProfileStore` |
+| Reviewing remembered voices for mixed-up samples and look-alike names, with merge / split (Settings → Speech Recognition → Remembered voices) | 整理已记住的声音 | Tidy Up Remembered Voices | `SpeakerOrganizerView`, `SpeakerProfileIssue` |
 | Settings tabs (toolbar tabs; the Caption panel's settings are on Speech Recognition) | 通用 · 语音识别 · 语音输入 · 快捷翻译 · 模型库 · 关于 | General · Speech Recognition · Dictation · Quick Translate · Model Library · About | `SettingsTab` |
 
 Rules: never say plain "floating panel" / "悬浮窗" / "面板" without the

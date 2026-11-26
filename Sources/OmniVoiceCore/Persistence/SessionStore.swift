@@ -38,12 +38,13 @@ public final class SessionStore {
         return session
     }
 
-    public func appendUtterance(to session: RecordingSessionRecord, sourceText: String, translationText: String) {
+    public func appendUtterance(to session: RecordingSessionRecord, sourceText: String, translationText: String, speaker: String? = nil) {
         let utterance = UtteranceRecord(
             index: session.utterances.count,
             sourceText: sourceText,
             translationText: translationText
         )
+        utterance.speaker = speaker
         utterance.session = session
         session.utterances.append(utterance)
     }

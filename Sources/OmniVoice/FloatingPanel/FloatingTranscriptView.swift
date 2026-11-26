@@ -159,6 +159,7 @@ struct FloatingTranscriptView: View {
             languageChip
                 .layoutPriority(-1)
             Spacer(minLength: 0)
+            SpeakerToggleButton()
             displayOptionsMenu
             CopyGlyphButton(help: "Copy All", text: fullTranscriptText)
                 .disabled(session.lines.allSatisfy(\.displaySource.isEmpty))
@@ -686,6 +687,7 @@ private struct TranscriptLineRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 6) {
             VStack(alignment: .leading, spacing: 2) {
+                SpeakerLiveBadge(key: line.speaker)
                 if displayMode != .translationOnly {
                     sourceView
                 }

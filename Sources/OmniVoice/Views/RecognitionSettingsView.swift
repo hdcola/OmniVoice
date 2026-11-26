@@ -34,6 +34,7 @@ struct RecognitionSettingsView: View {
             transcriptionEngineSection
             translationEngineSection
             captionPanelSection
+            SpeakerIDSettingsSection()
             memoryConsole
         }
         .formStyle(.grouped)

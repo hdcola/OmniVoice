@@ -7,6 +7,9 @@ The format is based on Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- feat(speaker-id): Identify speakers labels each row of a live transcription with who said it (“Speaker A”, “Speaker B”…), from the voice alone, so it also works when a whole meeting comes in through one microphone. Turn it on with the new button in the Caption panel's control bar, in the menu bar popover or in Settings → Speech Recognition; click a label to rename the speaker, and click the bookmark next to it to remember the voice so future transcriptions show the name right away. Renaming opens a list of remembered people to pick from, so the same person isn't saved twice under slightly different names; picking one merges this voice into theirs. Labels are saved in History and in Markdown exports. Runs on its own queue with the 3D-Speaker CAM++ voice model through the bundled sherpa-onnx (about 28 MB, downloaded the first time it is turned on) and uses no resources while off
+- feat(speaker-id): when meeting audio is played through speakers and the pause detector rarely fires, several people used to end up in one row (and one label). Identify speakers now notices a different voice mid-row and ends the row there, through a new `TranscriptionProvider.forceSegmentBoundary()` (R2T2 via the existing boundary hint, sherpa-onnx via a forced endpoint; the system engine already closes a result per sentence and is left alone)
+- feat(speaker-id): remembering a voice keeps only the dominant voice among the speaker's rows, each remember is kept as its own sample, and Settings → Remembered voices → Tidy Up points out samples that don't match and names that sound alike, with merge, split, remove and “different people”
 
 ### Changed
 
